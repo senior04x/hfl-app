@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "compilerOptions": {
     "target": "es5",
     "lib": ["dom", "dom.iterable", "es6"],
@@ -30,4 +31,10 @@
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules", "functions"]
+=======
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  }
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
 }

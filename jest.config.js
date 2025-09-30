@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const nextJest = require('next/jest')
 
 const createJestConfig = nextJest({
@@ -23,3 +24,16 @@ const customJestConfig = {
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
 module.exports = createJestConfig(customJestConfig)
 
+=======
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/src'],
+  testMatch: ['**/__tests__/**/*.test.ts'],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/__tests__/**',
+  ],
+};
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043

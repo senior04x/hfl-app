@@ -1,15 +1,24 @@
+<<<<<<< HEAD
 name: CI/CD Pipeline
+=======
+name: CI
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
+<<<<<<< HEAD
     branches: [ main ]
+=======
+    branches: [ main, develop ]
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
 
 jobs:
   test:
     runs-on: ubuntu-latest
     
+<<<<<<< HEAD
     steps:
     - uses: actions/checkout@v4
     
@@ -17,11 +26,25 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
+=======
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
         cache: 'npm'
     
     - name: Install dependencies
       run: npm ci
     
+<<<<<<< HEAD
     - name: Run linting
       run: npm run lint
     
@@ -37,6 +60,19 @@ jobs:
         file: ./coverage/lcov.info
         flags: unittests
         name: codecov-umbrella
+=======
+    - name: Run type checking
+      run: npm run type-check
+    
+    - name: Run linting
+      run: npm run lint
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Check formatting
+      run: npm run format -- --check
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
 
   build:
     runs-on: ubuntu-latest
@@ -45,15 +81,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+<<<<<<< HEAD
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
+=======
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18.x
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
         cache: 'npm'
     
     - name: Install dependencies
       run: npm ci
     
+<<<<<<< HEAD
     - name: Build application
       run: npm run build
       env:
@@ -98,3 +142,14 @@ jobs:
       env:
         FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
+=======
+    - name: Install Expo CLI
+      run: npm install -g @expo/cli
+    
+    - name: Check Expo configuration
+      run: npx expo doctor
+    
+    - name: Build functions
+      run: npm run build:functions
+      working-directory: functions
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043

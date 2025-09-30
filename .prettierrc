@@ -4,7 +4,12 @@
   "singleQuote": true,
   "printWidth": 80,
   "tabWidth": 2,
+<<<<<<< HEAD
   "useTabs": false,
   "plugins": ["prettier-plugin-tailwindcss"]
 }
 
+=======
+  "useTabs": false
+}
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
