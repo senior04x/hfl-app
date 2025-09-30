@@ -1,8 +1,14 @@
 {
+<<<<<<< HEAD
+  "name": "hfl-admin-functions",
+  "version": "1.0.0",
+  "description": "Cloud Functions for HFL Admin",
+=======
   "name": "hfl-functions",
   "version": "1.0.0",
   "description": "Cloud Functions for HFL Mobile App",
   "main": "index.js",
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
   "scripts": {
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
@@ -14,6 +20,20 @@
   "engines": {
     "node": "18"
   },
+<<<<<<< HEAD
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^4.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.0",
+    "@types/node": "^20.8.0"
+  },
+  "private": true
+}
+
+=======
   "dependencies": {
     "firebase-admin": "^12.0.0",
     "firebase-functions": "^4.8.0"
@@ -24,3 +44,4 @@
   },
   "private": true
 }
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043

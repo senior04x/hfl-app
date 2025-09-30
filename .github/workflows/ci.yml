@@ -1,15 +1,32 @@
+<<<<<<< HEAD
+name: CI/CD Pipeline
+=======
 name: CI
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
+<<<<<<< HEAD
+    branches: [ main ]
+=======
     branches: [ main, develop ]
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
 
 jobs:
   test:
     runs-on: ubuntu-latest
     
+<<<<<<< HEAD
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+=======
     strategy:
       matrix:
         node-version: [18.x, 20.x]
@@ -21,11 +38,29 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
         cache: 'npm'
     
     - name: Install dependencies
       run: npm ci
     
+<<<<<<< HEAD
+    - name: Run linting
+      run: npm run lint
+    
+    - name: Run type checking
+      run: npm run type-check
+    
+    - name: Run tests
+      run: npm run test:coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+=======
     - name: Run type checking
       run: npm run type-check
     
@@ -37,6 +72,7 @@ jobs:
     
     - name: Check formatting
       run: npm run format -- --check
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
 
   build:
     runs-on: ubuntu-latest
@@ -45,15 +81,68 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+<<<<<<< HEAD
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+=======
     - name: Use Node.js 18.x
       uses: actions/setup-node@v4
       with:
         node-version: 18.x
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
         cache: 'npm'
     
     - name: Install dependencies
       run: npm ci
     
+<<<<<<< HEAD
+    - name: Build application
+      run: npm run build
+      env:
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Deploy to Vercel
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--prod'
+    
+    - name: Deploy Firebase Functions
+      run: |
+        cd functions
+        npm ci
+        npm run build
+        firebase deploy --only functions --token ${{ secrets.FIREBASE_TOKEN }}
+      env:
+        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+=======
     - name: Install Expo CLI
       run: npm install -g @expo/cli
     
@@ -63,3 +152,4 @@ jobs:
     - name: Build functions
       run: npm run build:functions
       working-directory: functions
+>>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043
