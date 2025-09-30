@@ -1,5 +1,5 @@
 [build]
-  command = "npm install --legacy-peer-deps --force && npx expo export:web"
+  command = "npm install --legacy-peer-deps --force --no-audit && npx expo export:web"
   publish = "dist"
 
 [build.environment]
