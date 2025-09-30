@@ -3,14 +3,12 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import AppNavigator from './src/navigation/AppNavigator';
-import { useAuthStore } from './src/store/useAuthStore';
+import { initializePlayerStore } from './src/store/usePlayerStore';
 
 export default function App() {
-  const { checkAuthState } = useAuthStore();
-
   useEffect(() => {
-    // Check authentication state on app start
-    checkAuthState();
+    // Initialize player store on app start
+    initializePlayerStore();
   }, []);
 
   return (

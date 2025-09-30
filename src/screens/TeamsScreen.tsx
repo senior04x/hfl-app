@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  Image,
+  SafeAreaView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -18,11 +20,25 @@ type TeamsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>
 
 const TeamsScreen = () => {
   const navigation = useNavigation<TeamsScreenNavigationProp>();
-  const { teams, loadTeams, isLoading } = useAppStore();
+  const { teams, loadTeams, isLoading, setupRealTimeListeners } = useAppStore();
 
   useEffect(() => {
+    console.log('TeamsScreen: Loading teams...');
     loadTeams();
+    
+    // Setup real-time listeners
+    const cleanup = setupRealTimeListeners();
+    
+    return () => {
+      console.log('TeamsScreen: Cleaning up listeners...');
+      cleanup();
+    };
   }, []);
+
+  useEffect(() => {
+    console.log('TeamsScreen: Teams updated:', teams.length, 'teams');
+    console.log('TeamsScreen: Teams data:', teams);
+  }, [teams]);
 
   const onRefresh = () => {
     loadTeams();
@@ -34,14 +50,22 @@ const TeamsScreen = () => {
       onPress={() => navigation.navigate('TeamDetail', { teamId: item.id })}
     >
       <View style={styles.teamHeader}>
-        <View style={[styles.teamColor, { backgroundColor: item.color }]} />
-        <Text style={styles.teamName}>{item.name}</Text>
+        {item.logo ? (
+          <Image
+            source={{ uri: item.logo }}
+            style={styles.teamLogo}
+            resizeMode="contain"
+          />
+        ) : (
+          <View style={[styles.teamColor, { backgroundColor: item.color || '#3B82F6' }]} />
+        )}
+        <Text style={styles.teamName}>{item.name || 'Unknown Team'}</Text>
         <Ionicons name="chevron-forward" size={20} color="#ccc" />
       </View>
       
       <View style={styles.teamStats}>
         <View style={styles.stat}>
-          <Text style={styles.statValue}>{item.players.length}</Text>
+          <Text style={styles.statValue}>{item.players?.length || 0}</Text>
           <Text style={styles.statLabel}>Players</Text>
         </View>
       </View>
@@ -49,15 +73,15 @@ const TeamsScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Teams</Text>
       </View>
 
       <FlatList
-        data={teams}
+        data={teams || []}
         renderItem={renderTeam}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id || Math.random().toString()}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
         }
@@ -69,7 +93,7 @@ const TeamsScreen = () => {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -113,6 +137,12 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     marginRight: 12,
+  },
+  teamLogo: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+    borderRadius: 12,
   },
   teamName: {
     flex: 1,

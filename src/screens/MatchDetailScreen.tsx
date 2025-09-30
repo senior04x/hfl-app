@@ -3,62 +3,77 @@ import {
   View,
   Text,
   StyleSheet,
+  SafeAreaView,
   ScrollView,
+  TouchableOpacity,
   ActivityIndicator,
+  Linking,
   Alert,
 } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, getDoc } from 'firebase/firestore';
 
-import { DataService } from '../services/data';
-import { Match } from '../types';
+import { useTheme } from '../store/useThemeStore';
+import { RootStackParamList, Match } from '../types';
+import { db } from '../services/firebase';
 
-type MatchDetailRouteProp = RouteProp<RootStackParamList, 'MatchDetail'>;
+type MatchDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MatchDetail'>;
+type MatchDetailScreenRouteProp = RouteProp<RootStackParamList, 'MatchDetail'>;
 
 const MatchDetailScreen = () => {
-  const route = useRoute<MatchDetailRouteProp>();
+  const navigation = useNavigation<MatchDetailScreenNavigationProp>();
+  const route = useRoute<MatchDetailScreenRouteProp>();
+  const { colors } = useTheme();
   const { matchId } = route.params;
   
   const [match, setMatch] = useState<Match | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Subscribe to real-time updates for this match
-    const unsubscribe = DataService.subscribeToMatch(matchId, (updatedMatch) => {
-      setMatch(updatedMatch);
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchMatch();
   }, [matchId]);
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading match details...</Text>
-      </View>
-    );
-  }
-
-  if (!match) {
-    return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={48} color="#FF3B30" />
-        <Text style={styles.errorText}>Match not found</Text>
-      </View>
-    );
-  }
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
+  const fetchMatch = async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching match details:', matchId);
+      
+      const matchRef = doc(db, 'matches', matchId);
+      const matchSnap = await getDoc(matchRef);
+      
+      if (matchSnap.exists()) {
+        const data = matchSnap.data();
+        const matchData: Match = {
+          id: matchSnap.id,
+          homeTeamId: data.homeTeamId || '',
+          homeTeamName: data.homeTeamName || '',
+          awayTeamId: data.awayTeamId || '',
+          awayTeamName: data.awayTeamName || '',
+          homeScore: data.homeScore || 0,
+          awayScore: data.awayScore || 0,
+            matchDate: data.matchDate?.toDate ? data.matchDate.toDate() : new Date(data.matchDate),
+            status: data.status || 'scheduled',
+            venue: data.venue || '',
+            referee: data.referee || '',
+            youtubeLink: data.youtubeLink || '',
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
+        };
+        
+        console.log('Match details fetched:', matchData);
+        setMatch(matchData);
+      } else {
+        console.log('Match not found');
+        setMatch(null);
+      }
+    } catch (error) {
+      console.error('Error fetching match details:', error);
+      setMatch(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -74,230 +89,342 @@ const MatchDetailScreen = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case 'scheduled':
+        return 'Rejalashtirilgan';
       case 'live':
-        return 'LIVE';
+        return 'Jarayonda';
       case 'finished':
-        return 'FINISHED';
+        return 'Tugagan';
       default:
-        return 'SCHEDULED';
+        return 'Noma\'lum';
     }
   };
 
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat('uz-UZ', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  };
+
+  const openYouTubeLink = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Xatolik', 'YouTube linkini ochish mumkin emas');
+      }
+    } catch (error) {
+      console.error('Error opening YouTube link:', error);
+      Alert.alert('Xatolik', 'YouTube linkini ochishda xatolik yuz berdi');
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Ma'lumotlar yuklanmoqda...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!match) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>O'yin Tafsilotlari</Text>
+        </View>
+        
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.textTertiary} />
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+            O'yin topilmadi
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.statusContainer}>
-          <View style={[styles.statusDot, { backgroundColor: getStatusColor(match.status) }]} />
-          <Text style={[styles.statusText, { color: getStatusColor(match.status) }]}>
-            {getStatusText(match.status)}
-          </Text>
-        </View>
-        
-        <Text style={styles.dateText}>{formatDate(match.scheduledAt)}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.title, { color: colors.text }]}>O'yin Tafsilotlari</Text>
       </View>
 
-      <View style={styles.scoreboard}>
-        <View style={styles.teamSection}>
-          <View style={styles.teamInfo}>
-            <View style={[styles.teamColor, { backgroundColor: match.homeTeam.color }]} />
-            <Text style={styles.teamName}>{match.homeTeam.name}</Text>
+      <ScrollView style={styles.content}>
+        {/* Match Header */}
+        <View style={[styles.matchHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.teamsContainer}>
+            <View style={styles.teamContainer}>
+              <Text style={[styles.teamName, { color: colors.text }]}>{match.homeTeamName}</Text>
+            </View>
+            
+            <View style={styles.scoreContainer}>
+              <Text style={[styles.score, { color: colors.text }]}>
+                {match.status === 'scheduled' ? 'VS' : `${match.homeScore} - ${match.awayScore}`}
+              </Text>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(match.status) }]}>
+                <Text style={styles.statusText}>
+                  {getStatusText(match.status)}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.teamContainer}>
+              <Text style={[styles.teamName, { color: colors.text }]}>{match.awayTeamName}</Text>
+            </View>
           </View>
-          <Text style={styles.teamScore}>{match.score.home}</Text>
         </View>
 
-        <View style={styles.vsContainer}>
-          <Text style={styles.vsText}>VS</Text>
-        </View>
-
-        <View style={styles.teamSection}>
-          <Text style={styles.teamScore}>{match.score.away}</Text>
-          <View style={styles.teamInfo}>
-            <Text style={styles.teamName}>{match.awayTeam.name}</Text>
-            <View style={[styles.teamColor, { backgroundColor: match.awayTeam.color }]} />
-          </View>
-        </View>
-      </View>
-
-      {match.status === 'live' && (
-        <View style={styles.liveIndicator}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>LIVE UPDATES ENABLED</Text>
-        </View>
-      )}
-
-      <View style={styles.matchInfo}>
-        <View style={styles.infoRow}>
-          <Ionicons name="calendar" size={20} color="#666" />
-          <Text style={styles.infoText}>
-            {new Intl.DateTimeFormat('en-US', {
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-            }).format(match.scheduledAt)}
-          </Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="time" size={20} color="#666" />
-          <Text style={styles.infoText}>
-            {new Intl.DateTimeFormat('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-            }).format(match.scheduledAt)}
-          </Text>
-        </View>
-
-        {match.startedAt && (
+        {/* Match Info */}
+        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>O'yin Ma'lumotlari</Text>
+          
           <View style={styles.infoRow}>
-            <Ionicons name="play" size={20} color="#34C759" />
-            <Text style={styles.infoText}>
-              Started: {formatDate(match.startedAt)}
-            </Text>
+            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+            <View style={styles.infoContent}>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Sana va Vaqt</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>
+                {formatDate(match.matchDate)}
+              </Text>
+            </View>
+          </View>
+
+          {match.venue && (
+            <View style={styles.infoRow}>
+              <Ionicons name="location-outline" size={20} color={colors.primary} />
+              <View style={styles.infoContent}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Maydon</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{match.venue}</Text>
+              </View>
+            </View>
+          )}
+
+          {match.referee && (
+            <View style={styles.infoRow}>
+              <Ionicons name="person-outline" size={20} color={colors.primary} />
+              <View style={styles.infoContent}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Hakam</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{match.referee}</Text>
+              </View>
+            </View>
+          )}
+
+          {match.youtubeLink && (
+            <View style={styles.infoRow}>
+              <Ionicons name="play-circle-outline" size={20} color={colors.primary} />
+              <View style={styles.infoContent}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Jonli Ko'rish</Text>
+                <TouchableOpacity
+                  style={[styles.youtubeButton, { backgroundColor: colors.primary }]}
+                  onPress={() => openYouTubeLink(match.youtubeLink!)}
+                >
+                  <Ionicons name="play" size={16} color="white" />
+                  <Text style={styles.youtubeButtonText}>YouTube da Ko'rish</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Match Statistics */}
+        {match.status === 'finished' && (
+          <View style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Statistikalar</Text>
+            
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.primary }]}>{match.homeScore}</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Uy Jamoasi</Text>
+              </View>
+              
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.primary }]}>{match.awayScore}</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Mehmon Jamoasi</Text>
+              </View>
+            </View>
           </View>
         )}
 
-        {match.finishedAt && (
-          <View style={styles.infoRow}>
-            <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-            <Text style={styles.infoText}>
-              Finished: {formatDate(match.finishedAt)}
+        {/* Live Match Indicator */}
+        {match.status === 'live' && (
+          <View style={[styles.liveCard, { backgroundColor: '#FF3B30' }]}>
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+            <Text style={styles.liveDescription}>
+              O'yin hozir jarayonda. Hisoblar real vaqtda yangilanadi.
             </Text>
           </View>
         )}
-      </View>
-
-      <View style={styles.teamsInfo}>
-        <Text style={styles.sectionTitle}>Teams</Text>
-        
-        <View style={styles.teamCard}>
-          <View style={styles.teamHeader}>
-            <View style={[styles.teamColor, { backgroundColor: match.homeTeam.color }]} />
-            <Text style={styles.teamName}>{match.homeTeam.name}</Text>
-          </View>
-          <Text style={styles.playerCount}>{match.homeTeam.players.length} players</Text>
-        </View>
-
-        <View style={styles.teamCard}>
-          <View style={styles.teamHeader}>
-            <View style={[styles.teamColor, { backgroundColor: match.awayTeam.color }]} />
-            <Text style={styles.teamName}>{match.awayTeam.name}</Text>
-          </View>
-          <Text style={styles.playerCount}>{match.awayTeam.players.length} players</Text>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  backButton: {
+    marginRight: 16,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  content: {
+    flex: 1,
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   loadingText: {
-    marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    marginTop: 12,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 40,
   },
   errorText: {
-    marginTop: 16,
-    fontSize: 18,
-    color: '#FF3B30',
-  },
-  header: {
-    backgroundColor: 'white',
-    padding: 20,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    marginTop: 12,
+    textAlign: 'center',
   },
-  dateText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  scoreboard: {
-    backgroundColor: 'white',
-    margin: 20,
+  matchHeader: {
     borderRadius: 12,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 16,
+    borderWidth: 1,
   },
-  teamSection: {
+  teamsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  teamInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  teamContainer: {
     flex: 1,
+    alignItems: 'center',
   },
   teamName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
-    marginHorizontal: 12,
-  },
-  teamColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  teamScore: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    minWidth: 60,
     textAlign: 'center',
   },
-  vsContainer: {
+  scoreContainer: {
     alignItems: 'center',
-    marginVertical: 16,
+    marginHorizontal: 20,
   },
-  vsText: {
+  score: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  infoCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  infoContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  infoLabel: {
     fontSize: 14,
-    color: '#666',
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 16,
     fontWeight: '500',
+  },
+  statsCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  liveCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FF3B30',
-    marginHorizontal: 20,
-    padding: 12,
-    borderRadius: 8,
+    marginBottom: 8,
   },
   liveDot: {
     width: 8,
@@ -308,49 +435,29 @@ const styles = StyleSheet.create({
   },
   liveText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  matchInfo: {
-    backgroundColor: 'white',
-    margin: 20,
-    borderRadius: 12,
-    padding: 16,
+  liveDescription: {
+    color: 'white',
+    fontSize: 14,
+    opacity: 0.9,
   },
-  infoRow: {
+  youtubeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#333',
-    marginLeft: 12,
-  },
-  teamsInfo: {
-    margin: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  teamCard: {
-    backgroundColor: 'white',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 8,
+    marginTop: 4,
   },
-  teamHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  playerCount: {
+  youtubeButtonText: {
+    color: 'white',
     fontSize: 14,
-    color: '#666',
+    fontWeight: '600',
+    marginLeft: 6,
   },
 });
 
 export default MatchDetailScreen;
+

@@ -5,14 +5,25 @@ import {
   FlatList,
   StyleSheet,
   RefreshControl,
+  TouchableOpacity,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { useAppStore } from '../store/useAppStore';
+import { useThemeStore } from '../store/useThemeStore';
+import { lightColors, darkColors } from '../theme/colors';
+import { typography, borderRadius, shadows } from '../theme/typography';
 import { TeamStanding } from '../types';
+import Card from '../components/Card';
+import Button from '../components/Button';
 
 const StandingsScreen = () => {
   const { standings, loadStandings, isLoading } = useAppStore();
+  const { theme } = useThemeStore();
+  const colors = theme === 'dark' ? darkColors : lightColors;
 
   useEffect(() => {
     loadStandings();
@@ -35,18 +46,18 @@ const StandingsScreen = () => {
       
       <View style={styles.teamContainer}>
         <View style={[styles.teamColor, { backgroundColor: item.team.color }]} />
-        <Text style={styles.teamName}>{item.team.name}</Text>
+        <Text style={styles.teamName} numberOfLines={1} ellipsizeMode="tail">{item.team.name}</Text>
       </View>
       
       <View style={styles.statsContainer}>
-        <Text style={styles.stat}>{item.matchesPlayed}</Text>
-        <Text style={styles.stat}>{item.wins}</Text>
-        <Text style={styles.stat}>{item.draws}</Text>
-        <Text style={styles.stat}>{item.losses}</Text>
-        <Text style={styles.stat}>{item.goalsFor}</Text>
-        <Text style={styles.stat}>{item.goalsAgainst}</Text>
-        <Text style={styles.stat}>{item.goalDifference}</Text>
-        <Text style={[styles.stat, styles.points]}>{item.points}</Text>
+        <Text style={styles.stat}>{item.matchesPlayed || 0}</Text>
+        <Text style={styles.stat}>{item.wins || 0}</Text>
+        <Text style={styles.stat}>{item.draws || 0}</Text>
+        <Text style={styles.stat}>{item.losses || 0}</Text>
+        <Text style={styles.stat}>{item.goalsFor || 0}</Text>
+        <Text style={styles.stat}>{item.goalsAgainst || 0}</Text>
+        <Text style={styles.stat}>{item.goalDifference || 0}</Text>
+        <Text style={[styles.stat, styles.points]}>{item.points || 0}</Text>
       </View>
     </View>
   );
@@ -75,7 +86,7 @@ const StandingsScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.titleHeader}>
         <Text style={styles.title}>Standings</Text>
       </View>
@@ -102,7 +113,7 @@ const StandingsScreen = () => {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -175,6 +186,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 8,
+    marginRight: 8,
+    maxWidth: 120,
   },
   teamColor: {
     width: 12,
@@ -187,13 +200,17 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#333',
     flex: 1,
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
   },
   statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: 240,
+    justifyContent: 'space-between',
   },
   stat: {
-    width: 30,
+    width: 25,
     textAlign: 'center',
     fontSize: 12,
     color: '#333',
@@ -206,6 +223,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     color: 'white',
+    width: 25,
+    textAlign: 'center',
   },
   emptyContainer: {
     alignItems: 'center',

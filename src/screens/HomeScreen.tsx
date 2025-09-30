@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  SafeAreaView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -44,7 +45,7 @@ const HomeScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Welcome to HFL</Text>
         <Text style={styles.subtitle}>Havas Football League</Text>
@@ -96,7 +97,7 @@ const HomeScreen = () => {
         <Text style={styles.quickActionText}>View All Matches</Text>
         <Ionicons name="chevron-forward" size={20} color="#007AFF" />
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 

@@ -15,7 +15,7 @@ interface MatchCardProps {
 
 const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
   const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat('uz-UZ', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -45,6 +45,19 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
     }
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'REJALASHTIRILGAN';
+      case 'live':
+        return 'JARAYONDA';
+      case 'finished':
+        return 'TUGAGAN';
+      default:
+        return 'NOMA\'LUM';
+    }
+  };
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.header}>
@@ -55,29 +68,34 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
             color={getStatusColor(match.status)} 
           />
           <Text style={[styles.status, { color: getStatusColor(match.status) }]}>
-            {match.status.toUpperCase()}
+            {getStatusText(match.status)}
           </Text>
         </View>
-        <Text style={styles.date}>{formatDate(match.scheduledAt)}</Text>
+        <Text style={styles.date}>{formatDate(match.matchDate)}</Text>
       </View>
 
       <View style={styles.teams}>
         <View style={styles.team}>
-          <Text style={styles.teamName}>{match.homeTeam.name}</Text>
-          <View style={styles.teamColor} backgroundColor={match.homeTeam.color} />
+          <Text style={styles.teamName}>{match.homeTeamName}</Text>
         </View>
 
         <View style={styles.scoreContainer}>
           <Text style={styles.score}>
-            {match.status === 'scheduled' ? 'VS' : `${match.score.home} - ${match.score.away}`}
+            {match.status === 'scheduled' ? 'VS' : `${match.homeScore} - ${match.awayScore}`}
           </Text>
         </View>
 
         <View style={styles.team}>
-          <View style={styles.teamColor} backgroundColor={match.awayTeam.color} />
-          <Text style={styles.teamName}>{match.awayTeam.name}</Text>
+          <Text style={styles.teamName}>{match.awayTeamName}</Text>
         </View>
       </View>
+
+      {match.venue && (
+        <View style={styles.venueContainer}>
+          <Ionicons name="location-outline" size={14} color="#666" />
+          <Text style={styles.venue}>{match.venue}</Text>
+        </View>
+      )}
 
       {match.status === 'live' && (
         <View style={styles.liveIndicator}>
@@ -173,6 +191,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FF3B30',
   },
+  venueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  venue: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+  },
 });
 
 export default MatchCard;
+

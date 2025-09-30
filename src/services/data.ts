@@ -19,15 +19,62 @@ export class DataService {
   // Teams
   static async getTeams(): Promise<Team[]> {
     try {
+      console.log('Fetching teams from Firebase directly...');
+      
+      // Fetch directly from Firebase
       const teamsSnapshot = await getDocs(collection(db, 'teams'));
-      return teamsSnapshot.docs.map(doc => ({
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+      console.log('Firebase teams snapshot:', teamsSnapshot.size, 'documents found');
+      
+      if (teamsSnapshot.empty) {
+        console.log('No teams found in Firebase');
+        return [];
+      }
+      
+      const teams = await Promise.all(teamsSnapshot.docs.map(async (doc) => {
+        const data = doc.data();
+        console.log('Team data:', doc.id, data);
+        
+        // Safely handle timestamp conversion
+        const safeToDate = (timestamp: any): Date => {
+          if (!timestamp) return new Date();
+          if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+            return timestamp.toDate();
+          }
+          if (timestamp instanceof Date) {
+            return timestamp;
+          }
+          if (typeof timestamp === 'string') {
+            return new Date(timestamp);
+          }
+          return new Date();
+        };
+        
+        // Get players for this team
+        const playersQuery = query(collection(db, 'players'), where('teamId', '==', doc.id));
+        const playersSnapshot = await getDocs(playersQuery);
+        const players = playersSnapshot.docs.map(playerDoc => ({
+          id: playerDoc.id,
+          ...playerDoc.data(),
+          createdAt: safeToDate(playerDoc.data().createdAt),
+          updatedAt: safeToDate(playerDoc.data().updatedAt),
+        }));
+        
+        return {
+          id: doc.id,
+          ...data,
+          players,
+          createdAt: safeToDate(data.createdAt),
+          updatedAt: safeToDate(data.updatedAt),
+        };
       })) as Team[];
+      
+      console.log('Teams from Firebase:', teams.length, 'teams found');
+      console.log('Teams data:', teams);
+      return teams;
     } catch (error) {
       console.error('Error getting teams:', error);
-      throw error;
+      console.error('Error details:', error.message);
+      return [];
     }
   }
 
@@ -36,10 +83,39 @@ export class DataService {
       const teamDoc = await getDoc(doc(db, 'teams', teamId));
       if (!teamDoc.exists()) return null;
 
+      const data = teamDoc.data();
+      
+      // Safely handle timestamp conversion
+      const safeToDate = (timestamp: any): Date => {
+        if (!timestamp) return new Date();
+        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+          return timestamp.toDate();
+        }
+        if (timestamp instanceof Date) {
+          return timestamp;
+        }
+        if (typeof timestamp === 'string') {
+          return new Date(timestamp);
+        }
+        return new Date();
+      };
+
+      // Get players for this team
+      const playersQuery = query(collection(db, 'players'), where('teamId', '==', teamId));
+      const playersSnapshot = await getDocs(playersQuery);
+      const players = playersSnapshot.docs.map(playerDoc => ({
+        id: playerDoc.id,
+        ...playerDoc.data(),
+        createdAt: safeToDate(playerDoc.data().createdAt),
+        updatedAt: safeToDate(playerDoc.data().updatedAt),
+      }));
+
       return {
-        ...teamDoc.data(),
-        createdAt: teamDoc.data()?.createdAt?.toDate() || new Date(),
-        updatedAt: teamDoc.data()?.updatedAt?.toDate() || new Date(),
+        id: teamDoc.id,
+        ...data,
+        players,
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
       } as Team;
     } catch (error) {
       console.error('Error getting team:', error);
@@ -50,9 +126,44 @@ export class DataService {
   // Matches
   static async getMatches(): Promise<Match[]> {
     try {
+      console.log('Fetching matches from admin panel API...');
+      
+      // Try to fetch from admin panel API first
+      try {
+        const response = await fetch('http://192.168.1.38:3000/api/matches');
+        if (response.ok) {
+          const matchesData = await response.json();
+          console.log('Matches from admin panel API:', matchesData.length, 'matches found');
+          
+          // Fetch team details for each match
+          const matches = await Promise.all(
+            matchesData.map(async (match: any) => {
+              const homeTeam = await this.getTeam(match.homeTeamId);
+              const awayTeam = await this.getTeam(match.awayTeamId);
+              
+              return {
+                ...match,
+                homeTeam: homeTeam!,
+                awayTeam: awayTeam!,
+              } as Match;
+            })
+          );
+          
+          return matches;
+        }
+      } catch (apiError) {
+        console.log('Admin panel API not available, falling back to Firebase...');
+      }
+      
+      // Fallback to Firebase
       const matchesSnapshot = await getDocs(
         query(collection(db, 'matches'), orderBy('scheduledAt', 'desc'))
       );
+      
+      if (matchesSnapshot.empty) {
+        console.log('No matches found in Firebase');
+        return [];
+      }
       
       const matches = await Promise.all(
         matchesSnapshot.docs.map(async (doc) => {
@@ -60,16 +171,31 @@ export class DataService {
           const homeTeam = await this.getTeam(data.homeTeamId);
           const awayTeam = await this.getTeam(data.awayTeamId);
           
+          // Safely handle timestamp conversion
+          const safeToDate = (timestamp: any): Date => {
+            if (!timestamp) return new Date();
+            if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+              return timestamp.toDate();
+            }
+            if (timestamp instanceof Date) {
+              return timestamp;
+            }
+            if (typeof timestamp === 'string') {
+              return new Date(timestamp);
+            }
+            return new Date();
+          };
+
           return {
             id: doc.id,
             ...data,
             homeTeam: homeTeam!,
             awayTeam: awayTeam!,
-            scheduledAt: data.scheduledAt?.toDate() || new Date(),
-            startedAt: data.startedAt?.toDate(),
-            finishedAt: data.finishedAt?.toDate(),
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
+            scheduledAt: safeToDate(data.scheduledAt),
+            startedAt: data.startedAt ? safeToDate(data.startedAt) : undefined,
+            finishedAt: data.finishedAt ? safeToDate(data.finishedAt) : undefined,
+            createdAt: safeToDate(data.createdAt),
+            updatedAt: safeToDate(data.updatedAt),
           } as Match;
         })
       );
@@ -77,7 +203,7 @@ export class DataService {
       return matches;
     } catch (error) {
       console.error('Error getting matches:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -90,16 +216,31 @@ export class DataService {
       const homeTeam = await this.getTeam(data.homeTeamId);
       const awayTeam = await this.getTeam(data.awayTeamId);
 
+      // Safely handle timestamp conversion
+      const safeToDate = (timestamp: any): Date => {
+        if (!timestamp) return new Date();
+        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+          return timestamp.toDate();
+        }
+        if (timestamp instanceof Date) {
+          return timestamp;
+        }
+        if (typeof timestamp === 'string') {
+          return new Date(timestamp);
+        }
+        return new Date();
+      };
+
       return {
         id: matchDoc.id,
         ...data,
         homeTeam: homeTeam!,
         awayTeam: awayTeam!,
-        scheduledAt: data.scheduledAt?.toDate() || new Date(),
-        startedAt: data.startedAt?.toDate(),
-        finishedAt: data.finishedAt?.toDate(),
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
+        scheduledAt: safeToDate(data.scheduledAt),
+        startedAt: data.startedAt ? safeToDate(data.startedAt) : undefined,
+        finishedAt: data.finishedAt ? safeToDate(data.finishedAt) : undefined,
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
       } as Match;
     } catch (error) {
       console.error('Error getting match:', error);
@@ -122,16 +263,31 @@ export class DataService {
         const homeTeam = await this.getTeam(data.homeTeamId);
         const awayTeam = await this.getTeam(data.awayTeamId);
 
+        // Safely handle timestamp conversion
+        const safeToDate = (timestamp: any): Date => {
+          if (!timestamp) return new Date();
+          if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+            return timestamp.toDate();
+          }
+          if (timestamp instanceof Date) {
+            return timestamp;
+          }
+          if (typeof timestamp === 'string') {
+            return new Date(timestamp);
+          }
+          return new Date();
+        };
+
         const match: Match = {
           id: doc.id,
           ...data,
           homeTeam: homeTeam!,
           awayTeam: awayTeam!,
-          scheduledAt: data.scheduledAt?.toDate() || new Date(),
-          startedAt: data.startedAt?.toDate(),
-          finishedAt: data.finishedAt?.toDate(),
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
+          scheduledAt: safeToDate(data.scheduledAt),
+          startedAt: data.startedAt ? safeToDate(data.startedAt) : undefined,
+          finishedAt: data.finishedAt ? safeToDate(data.finishedAt) : undefined,
+          createdAt: safeToDate(data.createdAt),
+          updatedAt: safeToDate(data.updatedAt),
         };
 
         callback(match);
@@ -193,14 +349,76 @@ export class DataService {
     }
   }
 
+  // Get single player by ID
+  static async getPlayer(playerId: string): Promise<Player | null> {
+    try {
+      console.log('Fetching player with ID:', playerId);
+      
+      const playerDoc = await getDoc(doc(db, 'players', playerId));
+      if (!playerDoc.exists()) {
+        console.log('Player not found in Firebase');
+        return null;
+      }
+
+      const data = playerDoc.data();
+      console.log('Player data from Firebase:', data);
+      
+      // Safely handle timestamp conversion
+      const safeToDate = (timestamp: any): Date => {
+        if (!timestamp) return new Date();
+        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+          return timestamp.toDate();
+        }
+        if (timestamp instanceof Date) {
+          return timestamp;
+        }
+        if (typeof timestamp === 'string') {
+          return new Date(timestamp);
+        }
+        return new Date();
+      };
+
+      const player: Player = {
+        id: playerDoc.id,
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        photo: data.photo || '',
+        teamId: data.teamId || '',
+        teamName: data.teamName || '',
+        position: data.position || '',
+        number: data.number || 0,
+        goals: data.goals || 0,
+        assists: data.assists || 0,
+        yellowCards: data.yellowCards || 0,
+        redCards: data.redCards || 0,
+        matchesPlayed: data.matchesPlayed || 0,
+        status: data.status || 'active',
+        createdAt: safeToDate(data.createdAt),
+        updatedAt: safeToDate(data.updatedAt),
+      };
+
+      console.log('Processed player data:', player);
+      return player;
+    } catch (error) {
+      console.error('Error getting player:', error);
+      throw error;
+    }
+  }
+
   // Standings
   static async getStandings(): Promise<TeamStanding[]> {
     try {
       const standingsSnapshot = await getDocs(collection(db, 'standings'));
+      if (standingsSnapshot.empty) {
+        console.log('No standings found in Firebase');
+        return [];
+      }
       return standingsSnapshot.docs.map(doc => doc.data()) as TeamStanding[];
     } catch (error) {
       console.error('Error getting standings:', error);
-      throw error;
+      return [];
     }
   }
 }

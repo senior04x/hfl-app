@@ -1,297 +1,228 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  TextInput,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '../store/useThemeStore';
 
-import { useAppStore } from '../store/useAppStore';
-import { DataService } from '../services/data';
-import { RootStackParamList, Team, Match } from '../types';
+const AdminMatchEditScreen = ({ route, navigation }: any) => {
+  const { colors } = useThemeStore();
+  const { matchId } = route.params || {};
 
-type AdminMatchEditNavigationProp = StackNavigationProp<RootStackParamList, 'AdminMatchEdit'>;
+  const [homeScore, setHomeScore] = useState('');
+  const [awayScore, setAwayScore] = useState('');
+  const [status, setStatus] = useState('scheduled');
 
-const AdminMatchEditScreen = () => {
-  const navigation = useNavigation<AdminMatchEditNavigationProp>();
-  const { teams, loadTeams } = useAppStore();
-  
-  const [selectedHomeTeam, setSelectedHomeTeam] = useState<Team | null>(null);
-  const [selectedAwayTeam, setSelectedAwayTeam] = useState<Team | null>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    loadTeams();
-  }, []);
-
-  const handleCreateMatch = async () => {
-    if (!selectedHomeTeam || !selectedAwayTeam) {
-      Alert.alert('Error', 'Please select both teams');
+  const handleSave = () => {
+    if (!homeScore || !awayScore) {
+      Alert.alert('Xatolik', 'Hisobni kiriting');
       return;
     }
 
-    if (selectedHomeTeam.id === selectedAwayTeam.id) {
-      Alert.alert('Error', 'Home and away teams cannot be the same');
-      return;
-    }
+    // Here you would typically update the match in Firebase
+    console.log('Updating match:', {
+      matchId,
+      homeScore: parseInt(homeScore),
+      awayScore: parseInt(awayScore),
+      status
+    });
 
-    setIsLoading(true);
-    try {
-      const matchData: Omit<Match, 'id' | 'createdAt' | 'updatedAt'> = {
-        homeTeamId: selectedHomeTeam.id,
-        awayTeamId: selectedAwayTeam.id,
-        homeTeam: selectedHomeTeam,
-        awayTeam: selectedAwayTeam,
-        status: 'scheduled',
-        score: { home: 0, away: 0 },
-        scheduledAt: selectedDate,
-      };
-
-      await DataService.createMatch(matchData);
-      Alert.alert('Success', 'Match created successfully!', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to create match');
-    } finally {
-      setIsLoading(false);
-    }
+    Alert.alert('Muvaffaqiyat', 'O\'yin yangilandi', [
+      { text: 'OK', onPress: () => navigation.goBack() }
+    ]);
   };
 
-  const TeamSelector = ({ 
-    title, 
-    selectedTeam, 
-    onSelect 
-  }: { 
-    title: string; 
-    selectedTeam: Team | null; 
-    onSelect: (team: Team) => void; 
-  }) => (
-    <View style={styles.selectorContainer}>
-      <Text style={styles.selectorTitle}>{title}</Text>
-      <TouchableOpacity
-        style={styles.selectorButton}
-        onPress={() => {
-          // In a real app, you'd show a team selection modal
-          Alert.alert('Team Selection', 'Team selection modal would be implemented here');
-        }}
-      >
-        {selectedTeam ? (
-          <View style={styles.selectedTeam}>
-            <View style={[styles.teamColor, { backgroundColor: selectedTeam.color }]} />
-            <Text style={styles.teamName}>{selectedTeam.name}</Text>
-          </View>
-        ) : (
-          <Text style={styles.placeholderText}>Select {title.toLowerCase()}</Text>
-        )}
-        <Ionicons name="chevron-down" size={20} color="#666" />
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Create New Match</Text>
-        <Text style={styles.subtitle}>Set up a new match between two teams</Text>
-      </View>
-
-      <View style={styles.form}>
-        <TeamSelector
-          title="Home Team"
-          selectedTeam={selectedHomeTeam}
-          onSelect={setSelectedHomeTeam}
-        />
-
-        <TeamSelector
-          title="Away Team"
-          selectedTeam={selectedAwayTeam}
-          onSelect={setSelectedAwayTeam}
-        />
-
-        <View style={styles.dateContainer}>
-          <Text style={styles.selectorTitle}>Match Date & Time</Text>
-          <TouchableOpacity
-            style={styles.selectorButton}
-            onPress={() => {
-              // In a real app, you'd show a date/time picker
-              Alert.alert('Date Picker', 'Date picker would be implemented here');
-            }}
+    <KeyboardAvoidingView 
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
           >
-            <Ionicons name="calendar" size={20} color="#666" />
-            <Text style={styles.dateText}>
-              {selectedDate.toLocaleDateString()} at {selectedDate.toLocaleTimeString()}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="#666" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>O'yin Tahrirlash</Text>
         </View>
 
-        <View style={styles.preview}>
-          <Text style={styles.previewTitle}>Match Preview</Text>
-          {selectedHomeTeam && selectedAwayTeam ? (
-            <View style={styles.matchPreview}>
-              <View style={styles.teamPreview}>
-                <View style={[styles.teamColor, { backgroundColor: selectedHomeTeam.color }]} />
-                <Text style={styles.teamName}>{selectedHomeTeam.name}</Text>
+        <View style={styles.content}>
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Hisob</Text>
+            
+            <View style={styles.scoreContainer}>
+              <View style={styles.scoreInput}>
+                <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>Uy jamoasi</Text>
+                <TextInput
+                  style={[styles.scoreField, { 
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: colors.border 
+                  }]}
+                  value={homeScore}
+                  onChangeText={setHomeScore}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                />
               </View>
-              <Text style={styles.vsText}>VS</Text>
-              <View style={styles.teamPreview}>
-                <Text style={styles.teamName}>{selectedAwayTeam.name}</Text>
-                <View style={[styles.teamColor, { backgroundColor: selectedAwayTeam.color }]} />
+
+              <Text style={[styles.vsText, { color: colors.text }]}>VS</Text>
+
+              <View style={styles.scoreInput}>
+                <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>Mehmon jamoasi</Text>
+                <TextInput
+                  style={[styles.scoreField, { 
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: colors.border 
+                  }]}
+                  value={awayScore}
+                  onChangeText={setAwayScore}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                />
               </View>
             </View>
-          ) : (
-            <Text style={styles.previewPlaceholder}>Select both teams to see preview</Text>
-          )}
-        </View>
+          </View>
 
-        <TouchableOpacity
-          style={[styles.createButton, isLoading && styles.createButtonDisabled]}
-          onPress={handleCreateMatch}
-          disabled={isLoading || !selectedHomeTeam || !selectedAwayTeam}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <>
-              <Ionicons name="add-circle" size={20} color="white" />
-              <Text style={styles.createButtonText}>Create Match</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Holat</Text>
+            
+            <View style={styles.statusContainer}>
+              {['scheduled', 'live', 'finished'].map((statusOption) => (
+                <TouchableOpacity
+                  key={statusOption}
+                  style={[
+                    styles.statusButton,
+                    { 
+                      backgroundColor: status === statusOption ? colors.primary : colors.card,
+                      borderColor: colors.border 
+                    }
+                  ]}
+                  onPress={() => setStatus(statusOption)}
+                >
+                  <Text style={[
+                    styles.statusText,
+                    { 
+                      color: status === statusOption ? '#fff' : colors.text 
+                    }
+                  ]}>
+                    {statusOption === 'scheduled' ? 'Rejalashtirilgan' :
+                     statusOption === 'live' ? 'Jonli' : 'Tugallangan'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.saveButton, { backgroundColor: colors.primary }]}
+            onPress={handleSave}
+          >
+            <Text style={styles.saveButtonText}>Saqlash</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
   },
   header: {
-    backgroundColor: 'white',
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingTop: 60,
+  },
+  backButton: {
+    marginRight: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-  form: {
+  content: {
     padding: 20,
   },
-  selectorContainer: {
-    marginBottom: 20,
+  section: {
+    marginBottom: 32,
   },
-  selectorTitle: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  selectorButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  selectedTeam: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  teamColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  teamName: {
-    fontSize: 16,
-    color: '#333',
-  },
-  placeholderText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#666',
-  },
-  dateContainer: {
-    marginBottom: 20,
-  },
-  dateText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 8,
-  },
-  preview: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 20,
-  },
-  previewTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  matchPreview: {
+  scoreContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  teamPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  scoreInput: {
     flex: 1,
+    alignItems: 'center',
+  },
+  scoreLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  scoreField: {
+    width: 80,
+    height: 60,
+    borderWidth: 2,
+    borderRadius: 8,
+    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   vsText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#666',
-    marginHorizontal: 16,
+    marginHorizontal: 20,
   },
-  previewPlaceholder: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  createButton: {
+  statusContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    padding: 16,
+    justifyContent: 'space-between',
+  },
+  statusButton: {
+    flex: 1,
+    padding: 12,
+    marginHorizontal: 4,
     borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
   },
-  createButtonDisabled: {
-    backgroundColor: '#ccc',
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
-  createButtonText: {
-    color: 'white',
+  saveButton: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  saveButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
 });
 

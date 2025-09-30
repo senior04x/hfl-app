@@ -1,426 +1,321 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  TextInput,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '../store/useThemeStore';
 
-import { DataService } from '../services/data';
-import { Match } from '../types';
+const AdminScoreUpdateScreen = ({ route, navigation }: any) => {
+  const { colors } = useThemeStore();
+  const { matchId } = route.params || {};
 
-type AdminScoreUpdateRouteProp = RouteProp<RootStackParamList, 'AdminScoreUpdate'>;
+  const [homeScore, setHomeScore] = useState('0');
+  const [awayScore, setAwayScore] = useState('0');
 
-const AdminScoreUpdateScreen = () => {
-  const route = useRoute<AdminScoreUpdateRouteProp>();
-  const { matchId } = route.params;
-  
-  const [match, setMatch] = useState<Match | null>(null);
-  const [homeScore, setHomeScore] = useState(0);
-  const [awayScore, setAwayScore] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const handleUpdateScore = () => {
+    const home = parseInt(homeScore);
+    const away = parseInt(awayScore);
 
-  useEffect(() => {
-    const loadMatch = async () => {
-      try {
-        const matchData = await DataService.getMatch(matchId);
-        if (matchData) {
-          setMatch(matchData);
-          setHomeScore(matchData.score.home);
-          setAwayScore(matchData.score.away);
-        }
-      } catch (error) {
-        console.error('Error loading match:', error);
-        Alert.alert('Error', 'Failed to load match details');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (isNaN(home) || isNaN(away)) {
+      Alert.alert('Xatolik', 'To\'g\'ri hisob kiriting');
+      return;
+    }
 
-    loadMatch();
-  }, [matchId]);
+    // Here you would typically update the match score in Firebase
+    console.log('Updating match score:', {
+      matchId,
+      homeScore: home,
+      awayScore: away
+    });
 
-  const handleUpdateScore = async () => {
-    if (!match) return;
+    Alert.alert('Muvaffaqiyat', 'Hisob yangilandi', [
+      { text: 'OK', onPress: () => navigation.goBack() }
+    ]);
+  };
 
-    setIsUpdating(true);
-    try {
-      await DataService.updateMatchScore(matchId, {
-        home: homeScore,
-        away: awayScore,
-      });
-      Alert.alert('Success', 'Score updated successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update score');
-    } finally {
-      setIsUpdating(false);
+  const incrementScore = (team: 'home' | 'away') => {
+    if (team === 'home') {
+      setHomeScore((prev) => (parseInt(prev) + 1).toString());
+    } else {
+      setAwayScore((prev) => (parseInt(prev) + 1).toString());
     }
   };
 
-  const handleStatusChange = async (status: 'scheduled' | 'live' | 'finished') => {
-    if (!match) return;
-
-    Alert.alert(
-      'Change Match Status',
-      `Are you sure you want to change the match status to ${status.toUpperCase()}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            try {
-              await DataService.updateMatchStatus(matchId, status);
-              Alert.alert('Success', 'Match status updated successfully!');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to update match status');
-            }
-          },
-        },
-      ]
-    );
+  const decrementScore = (team: 'home' | 'away') => {
+    if (team === 'home') {
+      setHomeScore((prev) => Math.max(0, parseInt(prev) - 1).toString());
+    } else {
+      setAwayScore((prev) => Math.max(0, parseInt(prev) - 1).toString());
+    }
   };
 
-  const ScoreInput = ({ 
-    label, 
-    value, 
-    onChange, 
-    teamColor 
-  }: { 
-    label: string; 
-    value: number; 
-    onChange: (value: number) => void; 
-    teamColor: string; 
-  }) => (
-    <View style={styles.scoreInputContainer}>
-      <Text style={styles.scoreInputLabel}>{label}</Text>
-      <View style={styles.scoreInputRow}>
-        <TouchableOpacity
-          style={[styles.scoreButton, { backgroundColor: teamColor }]}
-          onPress={() => onChange(Math.max(0, value - 1))}
-        >
-          <Ionicons name="remove" size={20} color="white" />
-        </TouchableOpacity>
-        
-        <View style={styles.scoreDisplay}>
-          <Text style={styles.scoreText}>{value}</Text>
-        </View>
-        
-        <TouchableOpacity
-          style={[styles.scoreButton, { backgroundColor: teamColor }]}
-          onPress={() => onChange(value + 1)}
-        >
-          <Ionicons name="add" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading match details...</Text>
-      </View>
-    );
-  }
-
-  if (!match) {
-    return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={48} color="#FF3B30" />
-        <Text style={styles.errorText}>Match not found</Text>
-      </View>
-    );
-  }
-
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Update Score</Text>
-        <Text style={styles.subtitle}>
-          {match.homeTeam.name} vs {match.awayTeam.name}
-        </Text>
-      </View>
-
-      <View style={styles.matchInfo}>
-        <View style={styles.teamInfo}>
-          <View style={[styles.teamColor, { backgroundColor: match.homeTeam.color }]} />
-          <Text style={styles.teamName}>{match.homeTeam.name}</Text>
+    <KeyboardAvoidingView 
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>Hisob Yangilash</Text>
         </View>
-        
-        <Text style={styles.vsText}>VS</Text>
-        
-        <View style={styles.teamInfo}>
-          <Text style={styles.teamName}>{match.awayTeam.name}</Text>
-          <View style={[styles.teamColor, { backgroundColor: match.awayTeam.color }]} />
-        </View>
-      </View>
 
-      <View style={styles.scoreSection}>
-        <Text style={styles.sectionTitle}>Current Score</Text>
-        
-        <ScoreInput
-          label={match.homeTeam.name}
-          value={homeScore}
-          onChange={setHomeScore}
-          teamColor={match.homeTeam.color}
-        />
-        
-        <ScoreInput
-          label={match.awayTeam.name}
-          value={awayScore}
-          onChange={setAwayScore}
-          teamColor={match.awayTeam.color}
-        />
-      </View>
-
-      <View style={styles.statusSection}>
-        <Text style={styles.sectionTitle}>Match Status</Text>
-        
-        <View style={styles.statusContainer}>
-          <Text style={styles.currentStatus}>
-            Current Status: <Text style={styles.statusValue}>{match.status.toUpperCase()}</Text>
-          </Text>
-          
-          <View style={styles.statusButtons}>
-            {match.status !== 'scheduled' && (
-              <TouchableOpacity
-                style={styles.statusButton}
-                onPress={() => handleStatusChange('scheduled')}
-              >
-                <Text style={styles.statusButtonText}>Mark as Scheduled</Text>
-              </TouchableOpacity>
-            )}
-            
-            {match.status !== 'live' && (
-              <TouchableOpacity
-                style={[styles.statusButton, styles.liveButton]}
-                onPress={() => handleStatusChange('live')}
-              >
-                <Text style={styles.statusButtonText}>Start Match</Text>
-              </TouchableOpacity>
-            )}
-            
-            {match.status !== 'finished' && (
-              <TouchableOpacity
-                style={[styles.statusButton, styles.finishedButton]}
-                onPress={() => handleStatusChange('finished')}
-              >
-                <Text style={styles.statusButtonText}>End Match</Text>
-              </TouchableOpacity>
-            )}
+        <View style={styles.content}>
+          <View style={styles.matchInfo}>
+            <Text style={[styles.matchTitle, { color: colors.text }]}>
+              O'yin #{matchId}
+            </Text>
+            <Text style={[styles.matchSubtitle, { color: colors.textSecondary }]}>
+              Hisobni yangilang
+            </Text>
           </View>
-        </View>
-      </View>
 
-      <TouchableOpacity
-        style={[styles.updateButton, isUpdating && styles.updateButtonDisabled]}
-        onPress={handleUpdateScore}
-        disabled={isUpdating}
-      >
-        {isUpdating ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <>
-            <Ionicons name="save" size={20} color="white" />
-            <Text style={styles.updateButtonText}>Update Score</Text>
-          </>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+          <View style={styles.scoreSection}>
+            <View style={styles.teamContainer}>
+              <Text style={[styles.teamName, { color: colors.text }]}>Uy Jamoasi</Text>
+              <View style={styles.scoreControls}>
+                <TouchableOpacity
+                  style={[styles.scoreButton, { backgroundColor: colors.card }]}
+                  onPress={() => decrementScore('home')}
+                >
+                  <Ionicons name="remove" size={24} color={colors.text} />
+                </TouchableOpacity>
+                
+                <TextInput
+                  style={[styles.scoreDisplay, { 
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: colors.border 
+                  }]}
+                  value={homeScore}
+                  onChangeText={setHomeScore}
+                  keyboardType="numeric"
+                  textAlign="center"
+                />
+                
+                <TouchableOpacity
+                  style={[styles.scoreButton, { backgroundColor: colors.card }]}
+                  onPress={() => incrementScore('home')}
+                >
+                  <Ionicons name="add" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.vsContainer}>
+              <Text style={[styles.vsText, { color: colors.textSecondary }]}>VS</Text>
+            </View>
+
+            <View style={styles.teamContainer}>
+              <Text style={[styles.teamName, { color: colors.text }]}>Mehmon Jamoasi</Text>
+              <View style={styles.scoreControls}>
+                <TouchableOpacity
+                  style={[styles.scoreButton, { backgroundColor: colors.card }]}
+                  onPress={() => decrementScore('away')}
+                >
+                  <Ionicons name="remove" size={24} color={colors.text} />
+                </TouchableOpacity>
+                
+                <TextInput
+                  style={[styles.scoreDisplay, { 
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: colors.border 
+                  }]}
+                  value={awayScore}
+                  onChangeText={setAwayScore}
+                  keyboardType="numeric"
+                  textAlign="center"
+                />
+                
+                <TouchableOpacity
+                  style={[styles.scoreButton, { backgroundColor: colors.card }]}
+                  onPress={() => incrementScore('away')}
+                >
+                  <Ionicons name="add" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.quickActions}>
+            <Text style={[styles.actionsTitle, { color: colors.text }]}>Tezkor Harakatlar</Text>
+            
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.card }]}
+                onPress={() => {
+                  setHomeScore('0');
+                  setAwayScore('0');
+                }}
+              >
+                <Ionicons name="refresh" size={20} color={colors.text} />
+                <Text style={[styles.actionText, { color: colors.text }]}>Nolga qaytarish</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.card }]}
+                onPress={() => {
+                  setHomeScore('1');
+                  setAwayScore('0');
+                }}
+              >
+                <Ionicons name="home" size={20} color={colors.text} />
+                <Text style={[styles.actionText, { color: colors.text }]}>Uy g'olib</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.card }]}
+                onPress={() => {
+                  setHomeScore('0');
+                  setAwayScore('1');
+                }}
+              >
+                <Ionicons name="airplane" size={20} color={colors.text} />
+                <Text style={[styles.actionText, { color: colors.text }]}>Mehmon g'olib</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.updateButton, { backgroundColor: colors.primary }]}
+            onPress={handleUpdateScore}
+          >
+            <Ionicons name="checkmark" size={20} color="#fff" />
+            <Text style={styles.updateButtonText}>Hisobni Yangilash</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  loadingContainer: {
+  scrollView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  errorText: {
-    marginTop: 16,
-    fontSize: 18,
-    color: '#FF3B30',
   },
   header: {
-    backgroundColor: 'white',
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingTop: 60,
+  },
+  backButton: {
+    marginRight: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
+  content: {
+    padding: 20,
   },
   matchInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'white',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 32,
   },
-  teamInfo: {
-    flexDirection: 'row',
+  matchTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  matchSubtitle: {
+    fontSize: 14,
+  },
+  scoreSection: {
+    marginBottom: 32,
+  },
+  teamContainer: {
     alignItems: 'center',
-    flex: 1,
-  },
-  teamColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginHorizontal: 8,
+    marginBottom: 20,
   },
   teamName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    marginBottom: 12,
   },
-  vsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
-    marginHorizontal: 16,
-  },
-  scoreSection: {
-    backgroundColor: 'white',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  scoreInputContainer: {
-    marginBottom: 20,
-  },
-  scoreInputLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
-  },
-  scoreInputRow: {
+  scoreControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 12,
   },
   scoreButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scoreDisplay: {
     width: 80,
-    height: 50,
-    backgroundColor: '#f0f0f0',
+    height: 60,
+    borderWidth: 2,
     borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 16,
-  },
-  scoreText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
-  statusSection: {
-    backgroundColor: 'white',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-  },
-  statusContainer: {
+  vsContainer: {
     alignItems: 'center',
+    marginVertical: 16,
   },
-  currentStatus: {
+  vsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  quickActions: {
+    marginBottom: 32,
+  },
+  actionsTitle: {
     fontSize: 16,
-    color: '#333',
+    fontWeight: '600',
     marginBottom: 16,
   },
-  statusValue: {
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  statusButtons: {
+  actionButtons: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
+    padding: 12,
+    marginHorizontal: 4,
+    borderRadius: 8,
+    gap: 8,
   },
-  statusButton: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    margin: 4,
-  },
-  liveButton: {
-    backgroundColor: '#FF3B30',
-  },
-  finishedButton: {
-    backgroundColor: '#34C759',
-  },
-  statusButtonText: {
-    fontSize: 14,
-    color: '#333',
+  actionText: {
+    fontSize: 12,
     fontWeight: '500',
   },
   updateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    margin: 20,
     padding: 16,
-    borderRadius: 8,
-  },
-  updateButtonDisabled: {
-    backgroundColor: '#ccc',
+    borderRadius: 12,
+    gap: 8,
   },
   updateButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
 });
 

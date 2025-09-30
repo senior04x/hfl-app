@@ -14,6 +14,7 @@ export interface Team {
   name: string;
   logo?: string;
   color: string;
+  description?: string;
   players: Player[];
   createdAt: Date;
   updatedAt: Date;
@@ -22,10 +23,21 @@ export interface Team {
 // Player types
 export interface Player {
   id: string;
-  name: string;
-  position: 'GK' | 'DEF' | 'MID' | 'FWD';
-  number: number;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email?: string;
+  photo?: string;
   teamId: string;
+  teamName: string;
+  position?: string;
+  number?: number;
+  goals: number;
+  assists: number;
+  yellowCards: number;
+  redCards: number;
+  matchesPlayed: number;
+  status: 'active' | 'inactive' | 'suspended';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,14 +53,16 @@ export interface Score {
 export interface Match {
   id: string;
   homeTeamId: string;
+  homeTeamName: string;
   awayTeamId: string;
-  homeTeam: Team;
-  awayTeam: Team;
+  awayTeamName: string;
+  homeScore: number;
+  awayScore: number;
+  matchDate: Date;
   status: MatchStatus;
-  score: Score;
-  scheduledAt: Date;
-  startedAt?: Date;
-  finishedAt?: Date;
+  venue?: string;
+  referee?: string;
+  youtubeLink?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,8 +87,14 @@ export type RootStackParamList = {
   Main: undefined;
   MatchDetail: { matchId: string };
   TeamDetail: { teamId: string };
-  AdminMatchEdit: { matchId?: string };
-  AdminScoreUpdate: { matchId: string };
+  PlayerStats: { playerId: string; playerName?: string };
+  TeamSelection: undefined;
+  PlayerRegistration: { team: Team };
+  PlayerLogin: undefined;
+  PlayerVerification: { phoneNumber: string; verificationCode: string; playerId: string };
+  PlayerDashboard: { playerId: string };
+  TeamApplication: undefined;
+  TransferRequest: { playerId: string; currentTeamId: string; currentTeamName: string };
 };
 
 export type MainTabParamList = {
@@ -82,7 +102,7 @@ export type MainTabParamList = {
   Matches: undefined;
   Teams: undefined;
   Standings: undefined;
-  Admin: undefined;
+  Account: undefined;
 };
 
 // Auth types

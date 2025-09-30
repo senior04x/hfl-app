@@ -6,17 +6,21 @@ import {
   ScrollView,
   ActivityIndicator,
   FlatList,
+  Image,
+  SafeAreaView,
+  TouchableOpacity,
 } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { DataService } from '../services/data';
-import { Team, Player } from '../types';
+import { Team, Player, RootStackParamList } from '../types';
 
 type TeamDetailRouteProp = RouteProp<RootStackParamList, 'TeamDetail'>;
 
 const TeamDetailScreen = () => {
   const route = useRoute<TeamDetailRouteProp>();
+  const navigation = useNavigation();
   const { teamId } = route.params;
   
   const [team, setTeam] = useState<Team | null>(null);
@@ -26,6 +30,9 @@ const TeamDetailScreen = () => {
     const loadTeam = async () => {
       try {
         const teamData = await DataService.getTeam(teamId);
+        console.log('Team data loaded:', teamData);
+        console.log('Team players:', teamData?.players);
+        console.log('Players count:', teamData?.players?.length);
         setTeam(teamData);
       } catch (error) {
         console.error('Error loading team:', error);
@@ -55,17 +62,39 @@ const TeamDetailScreen = () => {
     );
   }
 
-  const renderPlayer = ({ item }: { item: Player }) => (
-    <View style={styles.playerCard}>
-      <View style={styles.playerNumber}>
-        <Text style={styles.playerNumberText}>{item.number}</Text>
-      </View>
-      <View style={styles.playerInfo}>
-        <Text style={styles.playerName}>{item.name}</Text>
-        <Text style={styles.playerPosition}>{item.position}</Text>
-      </View>
-    </View>
-  );
+  const renderPlayer = ({ item }: { item: Player }) => {
+    console.log('Rendering player:', item);
+    return (
+      <TouchableOpacity 
+        style={styles.playerCard}
+        onPress={() => {
+          navigation.navigate('PlayerStats', {
+            playerId: item.id,
+            playerName: `${item.firstName} ${item.lastName}`
+          });
+        }}
+      >
+        <View style={styles.playerNumber}>
+          <Text style={styles.playerNumberText}>{item.number || '?'}</Text>
+        </View>
+        <View style={styles.playerInfo}>
+          <Text style={styles.playerName}>{item.firstName} {item.lastName}</Text>
+          <Text style={styles.playerPosition}>{item.position || 'Unknown'}</Text>
+          <Text style={styles.playerPhone}>{item.phone}</Text>
+        </View>
+        <View style={[styles.statusBadge, { 
+          backgroundColor: item.status === 'active' ? '#34C759' : 
+                          item.status === 'inactive' ? '#8E8E93' : '#FF3B30' 
+        }]}>
+          <Text style={styles.statusText}>
+            {item.status === 'active' ? 'Faol' : 
+             item.status === 'inactive' ? 'Nofaol' : 'Suspensiya'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+      </TouchableOpacity>
+    );
+  };
 
   const getPositionColor = (position: string) => {
     switch (position) {
@@ -83,30 +112,40 @@ const TeamDetailScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView}>
       <View style={styles.header}>
         <View style={styles.teamHeader}>
-          <View style={[styles.teamColor, { backgroundColor: team.color }]} />
-          <Text style={styles.teamName}>{team.name}</Text>
+          {team.logo ? (
+            <Image
+              source={{ uri: team.logo }}
+              style={styles.teamLogo}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={[styles.teamColor, { backgroundColor: team.color || '#3B82F6' }]} />
+          )}
+          <Text style={styles.teamName}>{team.name || 'Unknown Team'}</Text>
         </View>
-        <Text style={styles.teamStats}>{team.players.length} players</Text>
+        <Text style={styles.teamStats}>{team.players?.length || 0} players</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Players</Text>
+        <Text style={styles.sectionTitle}>Players ({team.players?.length || 0})</Text>
         
-        <FlatList
-          data={team.players.sort((a, b) => a.number - b.number)}
-          renderItem={renderPlayer}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>No players found</Text>
-            </View>
-          }
-        />
+        {team.players && team.players.length > 0 ? (
+          <FlatList
+            data={team.players.sort((a, b) => (a.number || 0) - (b.number || 0))}
+            renderItem={renderPlayer}
+            keyExtractor={(item) => item.id || Math.random().toString()}
+            scrollEnabled={false}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="people-outline" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>No players found</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -116,22 +155,22 @@ const TeamDetailScreen = () => {
           <View style={styles.infoRow}>
             <Ionicons name="football" size={20} color="#666" />
             <Text style={styles.infoLabel}>Team Name:</Text>
-            <Text style={styles.infoValue}>{team.name}</Text>
+            <Text style={styles.infoValue}>{team.name || 'Unknown Team'}</Text>
           </View>
           
           <View style={styles.infoRow}>
             <Ionicons name="color-palette" size={20} color="#666" />
             <Text style={styles.infoLabel}>Team Color:</Text>
             <View style={styles.colorContainer}>
-              <View style={[styles.colorPreview, { backgroundColor: team.color }]} />
-              <Text style={styles.infoValue}>{team.color}</Text>
+              <View style={[styles.colorPreview, { backgroundColor: team.color || '#3B82F6' }]} />
+              <Text style={styles.infoValue}>{team.color || '#3B82F6'}</Text>
             </View>
           </View>
           
           <View style={styles.infoRow}>
             <Ionicons name="people" size={20} color="#666" />
             <Text style={styles.infoLabel}>Total Players:</Text>
-            <Text style={styles.infoValue}>{team.players.length}</Text>
+            <Text style={styles.infoValue}>{team.players?.length || 0}</Text>
           </View>
         </View>
       </View>
@@ -141,7 +180,7 @@ const TeamDetailScreen = () => {
         
         <View style={styles.positionStats}>
           {['GK', 'DEF', 'MID', 'FWD'].map((position) => {
-            const count = team.players.filter(p => p.position === position).length;
+            const count = team.players?.filter(p => p.position === position).length || 0;
             return (
               <View key={position} style={styles.positionStat}>
                 <View style={[styles.positionBadge, { backgroundColor: getPositionColor(position) }]}>
@@ -153,7 +192,8 @@ const TeamDetailScreen = () => {
           })}
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -161,6 +201,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -201,6 +244,12 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     marginRight: 12,
+  },
+  teamLogo: {
+    width: 40,
+    height: 40,
+    marginRight: 12,
+    borderRadius: 20,
   },
   teamName: {
     fontSize: 24,
@@ -299,6 +348,17 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   positionStats: {
     flexDirection: 'row',
