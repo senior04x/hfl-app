@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,18 +21,28 @@ interface PlayerLoginScreenProps {
 const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
   const { login } = usePlayerStore();
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('+998 93 378 68 86');
+  const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [countdown, setCountdown] = useState(0);
+  const [attempts, setAttempts] = useState(0);
+  const [isBlocked, setIsBlocked] = useState(false);
 
-  const handleLogin = async () => {
+  // Countdown timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (countdown > 0) {
+      interval = setInterval(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [countdown]);
+
+  const requestOtp = async () => {
     if (!phoneNumber.trim()) {
       Alert.alert('Xatolik', 'Telefon raqamini kiriting');
-      return;
-    }
-
-    if (!password.trim()) {
-      Alert.alert('Xatolik', 'Parolni kiriting');
       return;
     }
 
@@ -45,42 +55,98 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       setLoading(true);
       
       const cleanPhone = parsePhoneNumberForAPI(phoneNumber);
-      console.log('O\'yinchi login:', phoneNumber, '->', cleanPhone, password);
+      console.log('Requesting OTP for:', cleanPhone);
       
-      // API call to check player credentials
-      const response = await fetch('http://192.168.1.38:3000/api/player-login', {
+      // Call backend to request OTP
+      const response = await fetch('/api/request-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          phone: cleanPhone,
-          password: password,
-        }),
+        body: JSON.stringify({ phone: cleanPhone }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
-      }
 
       const data = await response.json();
-      console.log('Login successful:', data);
-      
-      // Save player data to store
-      await login(data.player);
-      
-      // Navigate to player dashboard
-      navigation.navigate('PlayerDashboard', { 
-        playerId: data.playerId,
-        player: data.player 
-      });
-    } catch (error) {
-      console.error('Login error:', error);
-      Alert.alert('Xatolik', 'Kirishda xatolik yuz berdi');
+
+      if (data.success) {
+        setStep('otp');
+        setCountdown(60); // 60 seconds countdown
+        Alert.alert('Muvaffaqiyat', 'Tasdiqlash kodi yuborildi');
+      } else {
+        Alert.alert('Xatolik', data.error || 'Kod yuborishda xatolik');
+      }
+    } catch (error: any) {
+      console.error('OTP request error:', error);
+      Alert.alert('Xatolik', 'Kod yuborishda xatolik yuz berdi');
     } finally {
       setLoading(false);
     }
+  };
+
+  const verifyOtp = async () => {
+    if (!otpCode.trim()) {
+      Alert.alert('Xatolik', 'Tasdiqlash kodini kiriting');
+      return;
+    }
+
+    if (otpCode.length !== 6) {
+      Alert.alert('Xatolik', 'Tasdiqlash kodi 6 xonali bo\'lishi kerak');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const cleanPhone = parsePhoneNumberForAPI(phoneNumber);
+      console.log('Verifying OTP:', cleanPhone, otpCode);
+      
+      // Call backend to verify OTP
+      const response = await fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone: cleanPhone, code: otpCode }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Get player data and login
+        const playerData = data.player;
+        await login(playerData);
+        
+        // Navigate to player dashboard
+        navigation.navigate('PlayerDashboard', { 
+          playerId: playerData.id,
+          player: playerData 
+        });
+      } else {
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
+        
+        if (newAttempts >= 3) {
+          setIsBlocked(true);
+          Alert.alert('Bloklangan', 'Juda ko\'p noto\'g\'ri urinish. 15 daqiqa kutib turing');
+        } else {
+          Alert.alert('Xatolik', data.reason || 'Noto\'g\'ri kod');
+        }
+      }
+    } catch (error: any) {
+      console.error('OTP verification error:', error);
+      Alert.alert('Xatolik', 'Kod tekshirishda xatolik yuz berdi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendOtp = async () => {
+    if (countdown > 0) {
+      Alert.alert('Kuting', `${countdown} soniya kutib turing`);
+      return;
+    }
+    
+    await requestOtp();
   };
 
   return (
@@ -92,7 +158,10 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>O'yinchi Kirish</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Telefon raqamingiz va parolingizni kiriting
+          {step === 'phone' 
+            ? 'Telefon raqamingizni kiriting va tasdiqlash kodi oling'
+            : 'Telefoningizga yuborilgan tasdiqlash kodini kiriting'
+          }
         </Text>
       </View>
 
@@ -102,52 +171,92 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Telefon raqam</Text>
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: colors.surface, 
-                color: colors.text,
-                borderColor: colors.border 
-              }]}
-            value={phoneNumber}
-            onChangeText={(value) => {
-              const formatted = formatPhoneNumber(value);
-              setPhoneNumber(formatted);
-            }}
-            maxLength={17}
-              placeholder="+998 90 123 45 67"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="phone-pad"
-              autoFocus
-            />
-          </View>
+          {step === 'phone' ? (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Telefon raqam</Text>
+                <TextInput
+                  style={[styles.input, { 
+                    backgroundColor: colors.surface, 
+                    color: colors.text,
+                    borderColor: colors.border 
+                  }]}
+                  value={phoneNumber}
+                  onChangeText={(value) => {
+                    const formatted = formatPhoneNumber(value);
+                    setPhoneNumber(formatted);
+                  }}
+                  maxLength={17}
+                  placeholder="+998 90 123 45 67"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="phone-pad"
+                  autoFocus
+                />
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Parol</Text>
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: colors.surface, 
-                color: colors.text,
-                borderColor: colors.border 
-              }]}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Parolni kiriting"
-              placeholderTextColor={colors.textSecondary}
-              secureTextEntry
-            />
-          </View>
+              <TouchableOpacity
+                style={[styles.loginButton, { backgroundColor: colors.primary }]}
+                onPress={requestOtp}
+                disabled={loading || isBlocked}
+              >
+                <Text style={styles.loginButtonText}>
+                  {loading ? 'Kod yuborilmoqda...' : 'Tasdiqlash kodi yuborish'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Tasdiqlash kodi</Text>
+                <TextInput
+                  style={[styles.input, { 
+                    backgroundColor: colors.surface, 
+                    color: colors.text,
+                    borderColor: colors.border 
+                  }]}
+                  value={otpCode}
+                  onChangeText={setOtpCode}
+                  placeholder="123456"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
+                />
+                <Text style={[styles.phoneDisplay, { color: colors.textSecondary }]}>
+                  {phoneNumber} raqamiga yuborildi
+                </Text>
+              </View>
 
-          <TouchableOpacity
-            style={[styles.loginButton, { backgroundColor: colors.primary }]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            <Text style={styles.loginButtonText}>
-              {loading ? 'Kirilmoqda...' : 'Kirish'}
-            </Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.loginButton, { backgroundColor: colors.primary }]}
+                onPress={verifyOtp}
+                disabled={loading || isBlocked}
+              >
+                <Text style={styles.loginButtonText}>
+                  {loading ? 'Tekshirilmoqda...' : 'Tasdiqlash'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.resendButton}
+                onPress={resendOtp}
+                disabled={countdown > 0 || loading}
+              >
+                <Text style={[styles.resendButtonText, { color: colors.primary }]}>
+                  {countdown > 0 ? `Qayta yuborish (${countdown}s)` : 'Qayta yuborish'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backToPhoneButton}
+                onPress={() => setStep('phone')}
+              >
+                <Text style={[styles.backToPhoneButtonText, { color: colors.textSecondary }]}>
+                  Telefon raqamni o'zgartirish
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity
             style={styles.backButton}
@@ -223,6 +332,27 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
+  },
+  phoneDisplay: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  resendButton: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  resendButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  backToPhoneButton: {
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  backToPhoneButtonText: {
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
 });
 
