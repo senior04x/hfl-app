@@ -1,0 +1,6 @@
+[build]
+  command = "npm install --legacy-peer-deps && npx expo export:web"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "18"
