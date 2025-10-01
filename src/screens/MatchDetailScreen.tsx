@@ -141,21 +141,17 @@ const MatchDetailScreen = () => {
   if (!match) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>O'yin Tafsilotlari</Text>
-        </View>
-        
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.textTertiary} />
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>
             O'yin topilmadi
           </Text>
+          <TouchableOpacity
+            style={[styles.backToHomeButton, { backgroundColor: colors.primary }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backToHomeText}>Orqaga qaytish</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -164,12 +160,6 @@ const MatchDetailScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>O'yin Tafsilotlari</Text>
       </View>
 
@@ -249,24 +239,6 @@ const MatchDetailScreen = () => {
           )}
         </View>
 
-        {/* Match Statistics */}
-        {match.status === 'finished' && (
-          <View style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Statistikalar</Text>
-            
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.primary }]}>{match.homeScore}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Uy Jamoasi</Text>
-              </View>
-              
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.primary }]}>{match.awayScore}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Mehmon Jamoasi</Text>
-              </View>
-            </View>
-          </View>
-        )}
 
         {/* Live Match Indicator */}
         {match.status === 'live' && (
@@ -292,11 +264,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 16,
     borderBottomWidth: 1,
-  },
-  backButton: {
-    marginRight: 16,
   },
   title: {
     fontSize: 18,
@@ -325,6 +295,18 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
     marginTop: 12,
+    textAlign: 'center',
+  },
+  backToHomeButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  backToHomeText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
     textAlign: 'center',
   },
   matchHeader: {
@@ -393,28 +375,6 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 16,
     fontWeight: '500',
-  },
-  statsCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    textAlign: 'center',
   },
   liveCard: {
     borderRadius: 12,

@@ -29,8 +29,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const matches = await DataService.getMatches();
       set({ matches, isLoading: false });
     } catch (error) {
-      set({ isLoading: false });
       console.error('Error loading matches:', error);
+      set({ matches: [], isLoading: false });
     }
   },
 

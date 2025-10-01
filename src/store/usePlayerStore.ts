@@ -1,25 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-interface Player {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  email?: string;
-  teamName: string;
-  teamId: string;
-  position?: string;
-  number?: number;
-  goals: number;
-  assists: number;
-  yellowCards: number;
-  redCards: number;
-  matchesPlayed: number;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { Player } from '../types';
 
 interface PlayerState {
   player: Player | null;
@@ -108,10 +89,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 // Initialize player data from storage on app start
 export const initializePlayerStore = async () => {
   try {
+    // Check AsyncStorage for offline support
     const storedPlayer = await AsyncStorage.getItem(PLAYER_STORAGE_KEY);
     if (storedPlayer) {
       const player = JSON.parse(storedPlayer);
-      usePlayerStore.getState().login(player);
+      // Use the login method but don't await it to prevent blocking
+      usePlayerStore.getState().login(player).catch(error => {
+        console.error('Error logging in stored player:', error);
+      });
     }
   } catch (error) {
     console.error('Error initializing player store:', error);

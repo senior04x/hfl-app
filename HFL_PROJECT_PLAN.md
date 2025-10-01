@@ -78,3 +78,7 @@ Frontend'ni to'liq ishlaydigan qilish
 
 
 
+
+
+
+

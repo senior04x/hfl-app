@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
+import CustomModal from '../components/CustomModal';
 
 interface MenuItemProps {
   icon: string;
@@ -19,22 +20,25 @@ interface MenuItemProps {
   onPress: () => void;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ icon, title, subtitle, onPress }) => (
-  <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+const MenuItem: React.FC<MenuItemProps & { colors: any }> = ({ icon, title, subtitle, onPress, colors }) => (
+  <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.surface }]} onPress={onPress}>
     <View style={styles.menuItemLeft}>
-      <Ionicons name={icon as any} size={24} color="#007AFF" />
+      <Ionicons name={icon as any} size={24} color={colors.primary} />
       <View style={styles.menuItemText}>
-        <Text style={styles.menuItemTitle}>{title}</Text>
-        <Text style={styles.menuItemSubtitle}>{subtitle}</Text>
+        <Text style={[styles.menuItemTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.menuItemSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
       </View>
     </View>
-    <Ionicons name="chevron-forward" size={20} color="#ccc" />
+    <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
   </TouchableOpacity>
 );
 
 const UserAccountScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const { player, isLoggedIn, logout } = usePlayerStore();
+  const [showLogoutModal, setShowLogoutModal] = React.useState(false);
+  const [showLeagueModal, setShowLeagueModal] = React.useState(false);
+  const [showPlayerModal, setShowPlayerModal] = React.useState(false);
 
   const handleTransferRequest = () => {
     if (isLoggedIn && player) {
@@ -63,24 +67,25 @@ const UserAccountScreen = ({ navigation }: any) => {
   };
 
   const handleLeagueApplication = () => {
-    Alert.alert(
-      'Ariza Turi',
-      'Qanday ariza berishni xohlaysiz?',
-      [
-        {
-          text: 'O\'yinchi sifatida',
-          onPress: () => navigation.navigate('TeamSelection'),
-        },
-        {
-          text: 'Jamoa sifatida',
-          onPress: () => navigation.navigate('TeamApplication'),
-        },
-        {
-          text: 'Bekor qilish',
-          style: 'cancel',
-        },
-      ]
-    );
+    console.log('League application button pressed');
+    setShowLeagueModal(true);
+  };
+
+  const handlePlayerApplication = () => {
+    setShowLeagueModal(false);
+    setShowPlayerModal(true);
+  };
+
+  const handleTeamApplication = () => {
+    setShowLeagueModal(false);
+    console.log('Navigating to TeamApplication');
+    navigation.navigate('TeamApplication');
+  };
+
+  const handleConfirmPlayerApplication = () => {
+    setShowPlayerModal(false);
+    console.log('Navigating to TeamSelection');
+    navigation.navigate('TeamSelection');
   };
 
   const handlePlayerLogin = () => {
@@ -96,25 +101,18 @@ const UserAccountScreen = ({ navigation }: any) => {
     }
   };
 
-  const handlePlayerLogout = async () => {
-    Alert.alert(
-      'Chiqish',
-      'Hisobingizdan chiqishni xohlaysizmi?',
-      [
-        { text: 'Bekor qilish', style: 'cancel' },
-        { 
-          text: 'Chiqish', 
-          onPress: async () => {
-            try {
-              await logout();
-              Alert.alert('Muvaffaqiyat', 'Hisobingizdan chiqdingiz');
-            } catch (error) {
-              Alert.alert('Xatolik', 'Chiqishda xatolik yuz berdi');
-            }
-          }
-        },
-      ]
-    );
+  const handlePlayerLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setShowLogoutModal(false);
+    try {
+      await logout();
+      Alert.alert('Muvaffaqiyat', 'Hisobingizdan chiqdingiz');
+    } catch (error) {
+      Alert.alert('Xatolik', 'Chiqishda xatolik yuz berdi');
+    }
   };
 
   const handleSettings = () => {
@@ -128,24 +126,24 @@ const UserAccountScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Hisob</Text>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
+        <Text style={[styles.title, { color: 'white' }]}>Hisob</Text>
         {isLoggedIn && player ? (
           <View style={styles.playerInfo}>
-            <Text style={[styles.playerName, { color: colors.text }]}>
+            <Text style={[styles.playerName, { color: 'white' }]}>
               {player.firstName} {player.lastName}
             </Text>
-            <Text style={[styles.playerTeam, { color: colors.primary }]}>
+            <Text style={[styles.playerTeam, { color: 'rgba(255, 255, 255, 0.9)' }]}>
               {player.teamName}
             </Text>
             {player.position && (
-              <Text style={[styles.playerPosition, { color: colors.textSecondary }]}>
+              <Text style={[styles.playerPosition, { color: 'rgba(255, 255, 255, 0.7)' }]}>
                 {player.position}
               </Text>
             )}
           </View>
         ) : (
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.subtitle, { color: 'rgba(255, 255, 255, 0.8)' }]}>
             Hisobingizni boshqaring
           </Text>
         )}
@@ -161,6 +159,7 @@ const UserAccountScreen = ({ navigation }: any) => {
             title="Transfer ariza berish"
             subtitle="Boshqa jamoaga o'tish uchun ariza"
             onPress={handleTransferRequest}
+            colors={colors}
           />
         ) : (
           <MenuItem
@@ -168,6 +167,7 @@ const UserAccountScreen = ({ navigation }: any) => {
             title="Ligaga ariza berish"
             subtitle="Yangi o'yinchi sifatida ro'yxatdan o'ting"
             onPress={handleLeagueApplication}
+            colors={colors}
           />
         )}
         <MenuItem
@@ -175,6 +175,7 @@ const UserAccountScreen = ({ navigation }: any) => {
           title={isLoggedIn ? "O'yinchi paneli" : "O'yinchi kirish"}
           subtitle={isLoggedIn ? "Statistikalar va ma'lumotlar" : "Mavjud o'yinchi hisobiga kiring"}
           onPress={handlePlayerLogin}
+          colors={colors}
         />
         {isLoggedIn && (
           <MenuItem
@@ -182,6 +183,7 @@ const UserAccountScreen = ({ navigation }: any) => {
             title="Chiqish"
             subtitle="Hisobingizdan chiqing"
             onPress={handlePlayerLogout}
+            colors={colors}
           />
         )}
       </View>
@@ -195,15 +197,53 @@ const UserAccountScreen = ({ navigation }: any) => {
           title="Sozlamalar"
           subtitle="Ilova sozlamalari"
           onPress={handleSettings}
+          colors={colors}
         />
         <MenuItem
           icon="information-circle-outline"
           title="Dastur haqida"
           subtitle="Ilova versiyasi va ma'lumotlar"
           onPress={handleAbout}
+          colors={colors}
         />
       </View>
       </ScrollView>
+
+      {/* Logout Modal */}
+      <CustomModal
+        visible={showLogoutModal}
+        title="Chiqish"
+        message="Hisobingizdan chiqishni xohlaysizmi?"
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        confirmText="Chiqish"
+        cancelText="Bekor qilish"
+        type="warning"
+      />
+
+      {/* League Application Modal */}
+      <CustomModal
+        visible={showLeagueModal}
+        title="Ariza Turi"
+        message="Qanday ariza berishni xohlaysiz?"
+        onClose={() => setShowLeagueModal(false)}
+        onConfirm={handlePlayerApplication}
+        confirmText="O'yinchi sifatida"
+        cancelText="Jamoa sifatida"
+        type="info"
+      />
+
+      {/* Player Application Confirmation Modal */}
+      <CustomModal
+        visible={showPlayerModal}
+        title="O'yinchi Ariza"
+        message="O'yinchi sifatida ariza berishni xohlaysizmi?"
+        onClose={() => setShowPlayerModal(false)}
+        onConfirm={handleConfirmPlayerApplication}
+        confirmText="Ha, davom etish"
+        cancelText="Bekor qilish"
+        type="info"
+      />
     </SafeAreaView>
   );
 };
@@ -218,16 +258,13 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingTop: 40,
-    backgroundColor: '#007AFF',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: 'white',
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
   },
   playerInfo: {
@@ -236,7 +273,6 @@ const styles = StyleSheet.create({
   playerName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
   },
   playerTeam: {
     fontSize: 16,
@@ -255,13 +291,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
-    color: '#333',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
     padding: 16,
     marginBottom: 8,
     borderRadius: 12,
@@ -283,11 +317,9 @@ const styles = StyleSheet.create({
   menuItemTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   menuItemSubtitle: {
     fontSize: 14,
-    color: '#666',
     marginTop: 2,
   },
 });

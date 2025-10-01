@@ -9,12 +9,15 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 interface PlayerDashboardScreenProps {
   navigation: any;
   route: {
     params: {
       playerId: string;
+      player?: PlayerData; // Player data might be passed directly
     };
   };
 }
@@ -27,6 +30,7 @@ interface PlayerData {
   teamId: string;
   phone: string;
   email?: string;
+  photo?: string;
   position?: string;
   number?: number;
   goals: number;
@@ -41,14 +45,61 @@ interface PlayerData {
 
 const PlayerDashboardScreen: React.FC<PlayerDashboardScreenProps> = ({ navigation, route }) => {
   const { colors } = useTheme();
-  const { playerId } = route.params;
+  const { playerId, player } = route.params;
   
-  const [playerData, setPlayerData] = useState<PlayerData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [playerData, setPlayerData] = useState<PlayerData | null>(player || null);
+  const [loading, setLoading] = useState(!player);
 
   useEffect(() => {
-    loadPlayerData();
-  }, []);
+    // If player data is already passed, use it
+    if (player) {
+      setPlayerData(player);
+      setLoading(false);
+    } else {
+      // Otherwise, load from Firestore
+      loadPlayerData();
+    }
+
+    // Set up real-time listener for player data changes
+    const playerRef = doc(db, 'players', playerId);
+    const unsubscribe = onSnapshot(playerRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+        console.log('Player data updated in real-time:', data);
+        
+        setPlayerData({
+          id: docSnapshot.id,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          photo: data.photo || '',
+          teamId: data.teamId || '',
+          teamName: data.teamName || '',
+          position: data.position || '',
+          number: data.number || 0,
+          goals: data.goals || 0,
+          assists: data.assists || 0,
+          yellowCards: data.yellowCards || 0,
+          redCards: data.redCards || 0,
+          matchesPlayed: data.matchesPlayed || 0,
+          status: data.status || 'active',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        });
+        
+        setLoading(false);
+      }
+    }, (error) => {
+      console.error('Error listening to player data:', error);
+      setLoading(false);
+    });
+
+    // Cleanup listener on unmount
+    return () => {
+      unsubscribe();
+    };
+  }, [player, playerId]);
 
   const loadPlayerData = async () => {
     try {
@@ -56,20 +107,31 @@ const PlayerDashboardScreen: React.FC<PlayerDashboardScreenProps> = ({ navigatio
       
       console.log('Loading player data for ID:', playerId);
       
-      // Fetch player data from Firebase
-      const response = await fetch(`http://192.168.1.38:3000/api/players/${playerId}`);
+      // Fetch player data directly from Firestore
+      const playerDoc = await getDoc(doc(db, 'players', playerId));
       
-      if (!response.ok) {
-        throw new Error('Player not found');
+      if (!playerDoc.exists()) {
+        throw new Error('O\'yinchi topilmadi');
       }
       
-      const data = await response.json();
-      console.log('Player data loaded:', data);
+      const data = playerDoc.data();
+      console.log('Player data loaded from Firestore:', data);
       
-      setPlayerData(data);
-    } catch (error) {
+      setPlayerData({
+        id: playerDoc.id,
+        ...data
+      } as PlayerData);
+    } catch (error: any) {
       console.error('Error loading player data:', error);
-      Alert.alert('Xatolik', 'O\'yinchi ma\'lumotlarini yuklashda xatolik yuz berdi');
+      
+      if (error.message.includes('Failed to fetch')) {
+        Alert.alert(
+          'Ulanish xatoligi', 
+          'Internet aloqangizni tekshiring yoki keyinroq urinib ko\'ring.'
+        );
+      } else {
+        Alert.alert('Xatolik', error.message || 'O\'yinchi ma\'lumotlarini yuklashda xatolik yuz berdi');
+      }
     } finally {
       setLoading(false);
     }
@@ -91,19 +153,6 @@ const PlayerDashboardScreen: React.FC<PlayerDashboardScreenProps> = ({ navigatio
     });
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Chiqish',
-      'Hisobingizdan chiqishni xohlaysizmi?',
-      [
-        { text: 'Bekor qilish', style: 'cancel' },
-        { 
-          text: 'Chiqish', 
-          onPress: () => navigation.navigate('Main')
-        },
-      ]
-    );
-  };
 
   if (loading) {
     return (
@@ -231,13 +280,6 @@ const PlayerDashboardScreen: React.FC<PlayerDashboardScreenProps> = ({ navigatio
           onPress={() => navigation.navigate('Main')}
         >
           <Text style={styles.homeButtonText}>Bosh Sahifa</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.logoutButton, { borderColor: colors.border }]}
-          onPress={handleLogout}
-        >
-          <Text style={[styles.logoutButtonText, { color: colors.text }]}>Chiqish</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

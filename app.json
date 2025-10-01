@@ -1,29 +1,39 @@
 {
   "expo": {
-    "name": "hfl-mobile",
-    "slug": "hfl-mobile",
+    "name": "HFL sports",
+    "slug": "hfl",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/havas-logo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/havas-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/havas-logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.seniorxo.hfl"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/havas-logo.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "55652ecc-9c9d-4966-9287-ab72bc39e448"
+      }
+    },
+    "owner": "seniorxo"
   }
 }

@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { Player } from '../types';
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
+import { apiService } from '../services/apiService';
 
 interface PlayerLoginScreenProps {
   navigation: any;
@@ -57,32 +59,15 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       const cleanPhone = parsePhoneNumberForAPI(phoneNumber);
       console.log('Requesting OTP for:', cleanPhone);
       
-      // Call proxy server
-      const apiBaseUrl = process.env.API_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
-      
-      // Create AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`${apiBaseUrl}/api/request-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phone: cleanPhone }),
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
+      // Use API service
+      const result = await apiService.requestOtp(cleanPhone);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (result.success) {
         setStep('otp');
         setCountdown(60); // 60 seconds countdown
         Alert.alert('Muvaffaqiyat', 'Tasdiqlash kodi yuborildi');
       } else {
-        Alert.alert('Xatolik', data.error || 'Kod yuborishda xatolik');
+        Alert.alert('Xatolik', result.error || 'Kod yuborishda xatolik');
       }
     } catch (error: any) {
       console.error('OTP request error:', error);
@@ -92,7 +77,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       } else if (error.message.includes('ERR_CONNECTION_REFUSED')) {
         Alert.alert('Xatolik', 'Server ishlamayapti. Iltimos, keyinroq urinib ko\'ring.');
       } else {
-        Alert.alert('Xatolik', 'Kod yuborishda xatolik yuz berdi. Qayta urinib ko\'ring.');
+        Alert.alert('Xatolik', error.message || 'Kod yuborishda xatolik yuz berdi. Qayta urinib ko\'ring.');
       }
     } finally {
       setLoading(false);
@@ -105,8 +90,8 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       return;
     }
 
-    if (otpCode.length !== 6) {
-      Alert.alert('Xatolik', 'Tasdiqlash kodi 6 xonali bo\'lishi kerak');
+    if (otpCode.length !== 4) {
+      Alert.alert('Xatolik', 'Tasdiqlash kodi 4 xonali bo\'lishi kerak');
       return;
     }
 
@@ -116,29 +101,30 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       const cleanPhone = parsePhoneNumberForAPI(phoneNumber);
       console.log('Verifying OTP:', cleanPhone, otpCode);
       
-      // Call proxy server
-      const apiBaseUrl = process.env.API_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
-      
-      // Create AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`${apiBaseUrl}/api/verify-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phone: cleanPhone, code: otpCode }),
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
+      // Use API service
+      const result = await apiService.verifyOtp(cleanPhone, otpCode);
 
-      const data = await response.json();
-
-      if (data.success) {
-        // Get player data and login
-        const playerData = data.player;
+      if (result.success) {
+        // Get player data and map to Player type
+        const apiPlayer = result.player;
+        const playerData: Player = {
+          id: apiPlayer.id,
+          firstName: apiPlayer.firstName,
+          lastName: apiPlayer.lastName,
+          phone: apiPlayer.phone,
+          teamId: '', // Will be set from team data
+          teamName: '', // Will be set from team data
+          position: apiPlayer.position,
+          number: parseInt(apiPlayer.number) || 0,
+          goals: 0,
+          assists: 0,
+          yellowCards: 0,
+          redCards: 0,
+          matchesPlayed: 0,
+          status: apiPlayer.status as 'active' | 'inactive' | 'suspended',
+          createdAt: new Date(apiPlayer.createdAt),
+          updatedAt: new Date(apiPlayer.updatedAt),
+        };
         await login(playerData);
         
         // Navigate to player dashboard
@@ -154,7 +140,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
           setIsBlocked(true);
           Alert.alert('Bloklangan', 'Juda ko\'p noto\'g\'ri urinish. 15 daqiqa kutib turing');
         } else {
-          Alert.alert('Xatolik', data.reason || 'Noto\'g\'ri kod');
+          Alert.alert('Xatolik', result.reason || 'Noto\'g\'ri kod');
         }
       }
     } catch (error: any) {
@@ -165,7 +151,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       } else if (error.message.includes('ERR_CONNECTION_REFUSED')) {
         Alert.alert('Xatolik', 'Server ishlamayapti. Iltimos, keyinroq urinib ko\'ring.');
       } else {
-        Alert.alert('Xatolik', 'Kod tekshirishda xatolik yuz berdi. Qayta urinib ko\'ring.');
+        Alert.alert('Xatolik', error.message || 'Kod tekshirishda xatolik yuz berdi. Qayta urinib ko\'ring.');
       }
     } finally {
       setLoading(false);
@@ -248,10 +234,10 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
                   }]}
                   value={otpCode}
                   onChangeText={setOtpCode}
-                  placeholder="123456"
+                  placeholder="1234"
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="number-pad"
-                  maxLength={6}
+                  maxLength={4}
                   autoFocus
                 />
                 <Text style={[styles.phoneDisplay, { color: colors.textSecondary }]}>

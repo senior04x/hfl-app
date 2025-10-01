@@ -111,15 +111,16 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
-    marginRight: 12,
+    padding: 20,
+    marginHorizontal: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    minWidth: 280,
+    minHeight: 140,
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -132,13 +133,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   status: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     marginLeft: 4,
   },
   date: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
+    fontWeight: '500',
   },
   teams: {
     flexDirection: 'row',
@@ -147,13 +149,14 @@ const styles = StyleSheet.create({
   },
   team: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   teamName: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
+    textAlign: 'center',
   },
   teamColor: {
     width: 12,
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   score: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -187,7 +190,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   liveText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#FF3B30',
   },
@@ -197,9 +200,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   venue: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     marginLeft: 4,
+    fontWeight: '500',
   },
 });
 

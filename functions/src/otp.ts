@@ -18,11 +18,11 @@ const OTP_CONFIG = {
 
 // Eskiz API configuration
 const ESKIZ_CONFIG = {
-  EMAIL: process.env.ESKIZ_EMAIL || '',
-  PASSWORD: process.env.ESKIZ_PASSWORD || '',
+  EMAIL: process.env.ESKIZ_EMAIL || 'gcccc406@gmail.com',
+  PASSWORD: process.env.ESKIZ_PASSWORD || 'DcPU5pJr9TkkDQYzUV4PmY3ljyqWYJZjRLwKut1f',
   FROM: process.env.ESKIZ_FROM || '4546',
-  LOGIN_URL: 'https://notify.eskiz.uz/api/auth/login',
-  SEND_URL: 'https://notify.eskiz.uz/api/message/sms/send',
+  LOGIN_URL: process.env.ESKIZ_LOGIN_URL || 'https://notify.eskiz.uz/api/auth/login',
+  SEND_URL: process.env.ESKIZ_API_URL || 'https://notify.eskiz.uz/api/message/sms/send',
 };
 
 // Generate 6-digit OTP code
@@ -104,27 +104,32 @@ async function sendSMS(phone: string, message: string): Promise<void> {
   try {
     const token = await getEskizToken();
     
+    // Use form-data format as shown in the API documentation
+    const formData = new URLSearchParams();
+    formData.append('mobile_phone', phone);
+    formData.append('message', message);
+    formData.append('from', ESKIZ_CONFIG.FROM);
+    
     const response = await fetch(ESKIZ_CONFIG.SEND_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        mobile_phone: phone,
-        message: message,
-        from: ESKIZ_CONFIG.FROM,
-      }),
+      body: formData,
     });
 
     const data = await response.json();
     
-    if (!data.success) {
-      throw new Error('Failed to send SMS');
+    console.log('SMS API Response:', data);
+    
+    if (data.status === 'waiting' || data.id) {
+      console.log('SMS sent successfully:', data.id);
+    } else {
+      throw new Error('Failed to send SMS: ' + (data.message || 'Unknown error'));
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending SMS:', error);
-    throw new Error('Failed to send SMS');
+    throw new Error('Failed to send SMS: ' + (error?.message || 'Unknown error'));
   }
 }
 
@@ -169,7 +174,7 @@ export const requestOTP = functions.https.onRequest(async (req, res) => {
 
     // Check if phone is blocked
     const blockedDoc = await db.collection('blockedPhones').doc(phone).get();
-    if (blockedDoc.exists()) {
+    if (blockedDoc.exists) {
       const blockedData = blockedDoc.data();
       const blockExpiry = blockedData?.blockedUntil?.toDate();
       
@@ -253,7 +258,7 @@ export const verifyOTP = functions.https.onRequest(async (req, res) => {
     // Get OTP document
     const otpDoc = await db.collection('otps').doc(phone).get();
     
-    if (!otpDoc.exists()) {
+    if (!otpDoc.exists) {
       res.status(404).json({ success: false, error: 'OTP not found or expired' });
       return;
     }

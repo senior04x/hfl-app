@@ -6,14 +6,16 @@
     "outDir": "lib",
     "sourceMap": true,
     "strict": true,
-    "target": "es2017"
+    "target": "es2017",
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true
   },
   "compileOnSave": true,
   "include": [
     "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "../node_modules"
   ]
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> dbdd47d97b5a64ad90e5c0be04a565b03b184043

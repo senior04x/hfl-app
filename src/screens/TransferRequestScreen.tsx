@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../store/useThemeStore';
 import { DataService } from '../services/data';
+import CustomModal from '../components/CustomModal';
 
 interface Team {
   id: string;
@@ -42,6 +43,8 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     loadTeams();
@@ -50,17 +53,29 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
   const loadTeams = async () => {
     try {
       setLoading(true);
-      console.log('Loading teams for transfer...');
       
       const teamsData = await DataService.getTeams();
-      console.log('Teams loaded:', teamsData);
       
       // Filter out current team
       const availableTeams = teamsData.filter(team => team.id !== currentTeamId);
+      
+      if (availableTeams.length === 0) {
+        Alert.alert('Xatolik', 'Transfer uchun mavjud jamoa yo\'q');
+        return;
+      }
+      
       setTeams(availableTeams);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading teams:', error);
-      Alert.alert('Xatolik', 'Jamoalar yuklanmadi');
+      
+      if (error.message.includes('Failed to fetch')) {
+        Alert.alert(
+          'Ulanish xatoligi', 
+          'Internet aloqangizni tekshiring yoki keyinroq urinib ko\'ring.'
+        );
+      } else {
+        Alert.alert('Xatolik', 'Jamoalar yuklanmadi');
+      }
     } finally {
       setLoading(false);
     }
@@ -70,23 +85,68 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
     setSelectedTeam(team);
   };
 
+  const handleConfirmTransfer = () => {
+    setShowConfirmModal(false);
+    submitTransferRequest();
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    navigation.navigate('PlayerDashboard', { playerId });
+  };
+
+  const checkTransferStatus = async () => {
+    try {
+      const { collection, query, where, orderBy, getDocs } = await import('firebase/firestore');
+      const { db } = await import('../services/firebase');
+      
+      const transferQuery = query(
+        collection(db, 'transferRequests'),
+        where('playerId', '==', playerId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const snapshot = await getDocs(transferQuery);
+      if (!snapshot.empty) {
+        const latestTransfer = snapshot.docs[0].data();
+        console.log('Latest transfer status:', latestTransfer.status);
+        
+        if (latestTransfer.status === 'approved') {
+          Alert.alert(
+            'Transfer Tasdiqlandi! 🎉',
+            `Transfer so'rovingiz ${latestTransfer.newTeamName} jamoasi tomonidan tasdiqlandi!`,
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('PlayerDashboard', { playerId })
+              }
+            ]
+          );
+        } else if (latestTransfer.status === 'rejected') {
+          Alert.alert(
+            'Transfer Rad Etildi',
+            `Transfer so'rovingiz ${latestTransfer.newTeamName} jamoasi tomonidan rad etildi.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('PlayerDashboard', { playerId })
+              }
+            ]
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error checking transfer status:', error);
+    }
+  };
+
   const handleSubmitTransfer = async () => {
     if (!selectedTeam) {
       Alert.alert('Xatolik', 'Jamoani tanlang');
       return;
     }
 
-    Alert.alert(
-      'Transfer so\'rovi',
-      `${selectedTeam.name} jamoasiga transfer so\'rovi yuborishni xohlaysizmi?`,
-      [
-        { text: 'Bekor qilish', style: 'cancel' },
-        { 
-          text: 'Yuborish', 
-          onPress: submitTransferRequest
-        },
-      ]
-    );
+    setShowConfirmModal(true);
   };
 
   const submitTransferRequest = async () => {
@@ -104,29 +164,40 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
         updatedAt: new Date(),
       };
 
-      console.log('Submitting transfer request:', transferData);
+      console.log('Transfer data being submitted:', transferData);
+      console.log('Player ID:', playerId);
+      console.log('Current team ID:', currentTeamId);
+      console.log('New team ID:', selectedTeam!.id);
 
       // Submit directly to Firebase
       const { collection, addDoc } = await import('firebase/firestore');
       const { db } = await import('../services/firebase');
       
-      const docRef = await addDoc(collection(db, 'transferRequests'), transferData);
-      console.log('Transfer request submitted with ID:', docRef.id);
+      const transferRequestsCollection = collection(db, 'transferRequests');
+      const docRef = await addDoc(transferRequestsCollection, transferData);
 
-      Alert.alert(
-        'Muvaffaqiyat',
-        'Transfer so\'rovi yuborildi. Admin tasdiqlashini kuting.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('PlayerDashboard', { playerId })
-          }
-        ]
-      );
+      setShowSuccessModal(true);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting transfer request:', error);
-      Alert.alert('Xatolik', 'Transfer so\'rovi yuborilmadi');
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      
+      if (error.message.includes('Failed to fetch')) {
+        Alert.alert(
+          'Ulanish xatoligi', 
+          'Internet aloqangizni tekshiring yoki keyinroq urinib ko\'ring.'
+        );
+      } else if (error.message.includes('permission-denied')) {
+        Alert.alert('Xatolik', 'Transfer so\'rovi yuborish uchun ruxsat yo\'q');
+      } else if (error.code === 'permission-denied') {
+        Alert.alert('Xatolik', 'Firestore rules: Transfer so\'rovi yuborish uchun ruxsat yo\'q');
+      } else {
+        Alert.alert('Xatolik', `Transfer so\'rovi yuborilmadi: ${error.message}`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -246,6 +317,28 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Confirmation Modal */}
+      <CustomModal
+        visible={showConfirmModal}
+        title="Transfer So'rovi"
+        message={`${selectedTeam?.name} jamoasiga transfer so'rovi yuborishni xohlaysizmi?`}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmTransfer}
+        confirmText="Yuborish"
+        cancelText="Bekor qilish"
+        type="info"
+      />
+
+      {/* Success Modal */}
+      <CustomModal
+        visible={showSuccessModal}
+        title="Muvaffaqiyat! 🎉"
+        message={`Transfer so'rovi ${selectedTeam?.name} jamoasiga yuborildi. Admin tasdiqlashini kuting.`}
+        onClose={handleSuccessClose}
+        confirmText="OK"
+        type="success"
+      />
     </SafeAreaView>
   );
 };

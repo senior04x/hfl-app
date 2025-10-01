@@ -41,6 +41,8 @@ const TeamSelectionScreen: React.FC<TeamSelectionScreenProps> = ({ navigation })
   };
 
   const handleTeamSelection = (team: Team) => {
+    console.log('Team selected:', team);
+    console.log('Navigating to PlayerRegistration with team:', team);
     navigation.navigate('PlayerRegistration', { team });
   };
 

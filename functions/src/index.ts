@@ -220,9 +220,9 @@ export const recalculateStandingsHttp = functions.https.onRequest(async (req, re
   try {
     await recalculateStandings();
     res.json({ success: true, message: 'Standings recalculated' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in recalculateStandingsHttp:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error?.message || 'Internal server error' });
   }
 });
 
@@ -266,8 +266,8 @@ export const sendTestNotification = functions.https.onRequest(async (req, res) =
       successCount: response.successCount,
       failureCount: response.failureCount,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in sendTestNotification:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error?.message || 'Internal server error' });
   }
 });

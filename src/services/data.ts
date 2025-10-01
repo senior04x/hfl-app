@@ -134,7 +134,7 @@ export class DataService {
         
         // Create AbortController for timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
         
         const response = await fetch(`${apiBaseUrl}/api/matches`, {
           signal: controller.signal,
@@ -172,10 +172,16 @@ export class DataService {
         }
       }
       
-      // Fallback to Firebase
-      const matchesSnapshot = await getDocs(
+      // Fallback to Firebase with timeout
+      const firebasePromise = getDocs(
         query(collection(db, 'matches'), orderBy('matchDate', 'desc'))
       );
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Firebase timeout')), 5000)
+      );
+      
+      const matchesSnapshot = await Promise.race([firebasePromise, timeoutPromise]) as any;
       
       if (matchesSnapshot.empty) {
         console.log('No matches found in Firebase');
@@ -219,6 +225,7 @@ export class DataService {
       return matches;
     } catch (error) {
       console.error('Error getting matches:', error);
+      // Return empty array to prevent app from hanging
       return [];
     }
   }

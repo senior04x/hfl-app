@@ -8,6 +8,7 @@ import {
   RefreshControl,
   SafeAreaView,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -28,6 +29,8 @@ const MatchesScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'live' | 'upcoming' | 'finished'>('all');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMatches();
@@ -57,6 +60,7 @@ const MatchesScreen = () => {
             venue: data.venue || '',
             referee: data.referee || '',
             youtubeLink: data.youtubeLink || '',
+            leagueType: data.leagueType || '',
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
             updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
           });
@@ -94,12 +98,94 @@ const MatchesScreen = () => {
     }
   });
 
+  // Group matches by date
+  const groupedMatches = filteredMatches.reduce((groups, match) => {
+    const dateKey = new Date(match.matchDate).toDateString();
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(match);
+    return groups;
+  }, {} as Record<string, Match[]>);
+
+  const sortedDates = Object.keys(groupedMatches).sort((a, b) => 
+    new Date(a).getTime() - new Date(b).getTime()
+  );
+
+  const formatDateHeader = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('uz-UZ', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      weekday: 'long',
+    }).format(date);
+  };
+
   const renderMatch = ({ item }: { item: Match }) => (
     <MatchCard 
       match={item} 
       onPress={() => navigation.navigate('MatchDetail', { matchId: item.id })}
     />
   );
+
+  const renderDateGroup = (dateString: string) => {
+    const matches = groupedMatches[dateString];
+    
+    // Group matches by league type
+    const leagueGroups = matches.reduce((groups, match) => {
+      // Determine league type based on match data or create mock data
+      const leagueType = getLeagueType(match);
+      if (!groups[leagueType]) {
+        groups[leagueType] = [];
+      }
+      groups[leagueType].push(match);
+      return groups;
+    }, {} as Record<string, Match[]>);
+
+    return (
+      <View key={dateString} style={styles.dateGroup}>
+        <View style={[styles.dateHeader, { backgroundColor: colors.primary }]}>
+          <Text style={styles.dateHeaderText}>
+            {formatDateHeader(dateString)}
+          </Text>
+        </View>
+        {Object.entries(leagueGroups).map(([leagueType, leagueMatches]) => (
+          <TouchableOpacity
+            key={leagueType}
+            style={[styles.leagueItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => {
+              setSelectedDate(dateString);
+              setSelectedLeague(leagueType);
+            }}
+          >
+            <Text style={[styles.leagueName, { color: colors.text }]}>{leagueType}</Text>
+            <View style={styles.leagueInfo}>
+              <Text style={[styles.matchCount, { color: colors.primary }]}>
+                {leagueMatches.length} o'yin
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  const getLeagueType = (match: Match): string => {
+    // Use leagueType from match data if available, otherwise fallback to mock
+    if (match.leagueType) {
+      return match.leagueType;
+    }
+    
+    // Fallback to mock league assignment
+    const leagues = ['HFL 3-liga', 'HFL Pro Liga', 'HFL Super Liga', 'HFL Chempions Liga'];
+    const hash = match.id.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return leagues[Math.abs(hash) % leagues.length];
+  };
 
   const FilterButton = ({ 
     title, 
@@ -149,26 +235,57 @@ const MatchesScreen = () => {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={filteredMatches}
-          renderItem={renderMatch}
-          keyExtractor={(item) => item.id}
+        <ScrollView
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           contentContainerStyle={styles.list}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="football-outline" size={48} color={colors.textTertiary} />
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {filter === 'all' 
-                  ? 'O\'yinlar topilmadi' 
-                  : `${filter} o\'yinlar topilmadi`
-                }
-              </Text>
+        >
+          {selectedDate && selectedLeague ? (
+            <View style={styles.matchesView}>
+              <View style={[styles.backHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={() => {
+                    setSelectedDate(null);
+                    setSelectedLeague(null);
+                  }}
+                >
+                  <Ionicons name="arrow-back" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.backTitle, { color: colors.text }]}>
+                  {selectedLeague} - {formatDateHeader(selectedDate)}
+                </Text>
+              </View>
+              
+              {groupedMatches[selectedDate]
+                ?.filter(match => getLeagueType(match) === selectedLeague)
+                .map((match) => (
+                  <MatchCard 
+                    key={match.id}
+                    match={match} 
+                    onPress={() => navigation.navigate('MatchDetail', { matchId: match.id })}
+                  />
+                ))}
             </View>
-          }
-        />
+          ) : (
+            <>
+              {sortedDates.length > 0 ? (
+                sortedDates.map(renderDateGroup)
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="football-outline" size={48} color={colors.textTertiary} />
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    {filter === 'all' 
+                      ? 'O\'yinlar topilmadi' 
+                      : `${filter} o\'yinlar topilmadi`
+                    }
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -229,6 +346,64 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     marginTop: 12,
+  },
+  dateGroup: {
+    marginBottom: 20,
+  },
+  dateHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  dateHeaderText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  leagueItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  leagueName: {
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+  },
+  leagueInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  matchCount: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  matchesView: {
+    flex: 1,
+  },
+  backHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  backButton: {
+    marginRight: 12,
+  },
+  backTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
   },
 });
 

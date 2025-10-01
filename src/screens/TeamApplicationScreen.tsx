@@ -26,6 +26,8 @@ interface TeamApplicationScreenProps {
 const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
   
+  console.log('TeamApplicationScreen mounted');
+  
   const [formData, setFormData] = useState({
     teamName: '',
     foundedDate: '',
@@ -129,8 +131,9 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
       console.log('Submitting team application:', teamApplicationData);
       
       // Submit directly to Firebase
-      const docRef = await addDoc(collection(db, 'teamApplications'), {
+      const docRef = await addDoc(collection(db, 'leagueApplications'), {
         ...teamApplicationData,
+        type: 'team',
         createdAt: new Date(),
         updatedAt: new Date(),
       });

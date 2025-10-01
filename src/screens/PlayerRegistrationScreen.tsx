@@ -33,6 +33,8 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
   const { colors } = useTheme();
   const { team } = route.params;
   
+  console.log('PlayerRegistrationScreen mounted with team:', team);
+  
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -141,6 +143,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
       // Submit directly to Firebase
       const docRef = await addDoc(collection(db, 'leagueApplications'), {
         ...registrationData,
+        type: 'player',
         createdAt: new Date(),
         updatedAt: new Date(),
       });

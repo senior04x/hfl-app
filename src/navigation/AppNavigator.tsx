@@ -5,7 +5,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
 import { RootStackParamList, MainTabParamList } from '../types';
-import HomeScreen from '../screens/HomeScreen';
+import SplashScreen from '../screens/SplashScreen';
+import SimpleHomeScreen from '../screens/SimpleHomeScreen';
 import MatchesScreen from '../screens/MatchesScreen';
 import TeamsScreen from '../screens/TeamsScreen';
 import StandingsScreen from '../screens/StandingsScreen';
@@ -54,7 +55,7 @@ const MainTabNavigator = () => {
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Home" component={SimpleHomeScreen} />
       <Tab.Screen name="Matches" component={MatchesScreen} />
       <Tab.Screen name="Teams" component={TeamsScreen} />
       <Tab.Screen name="Standings" component={StandingsScreen} />
@@ -66,7 +67,8 @@ const MainTabNavigator = () => {
 const AppNavigator = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
+        <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Main" component={MainTabNavigator} />
         <Stack.Screen 
           name="MatchDetail" 

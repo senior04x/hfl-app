@@ -49,10 +49,21 @@ export class AuthService {
       const firebaseUser = userCredential.user;
 
       // Get user data from Firestore
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userRef);
+
       if (!userDoc.exists()) {
-        throw new Error('User document not found');
+        // Create a minimal user document if missing (first login via other channel)
+        const userData: User = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || email,
+          displayName: firebaseUser.displayName || email.split('@')[0],
+          isAdmin: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        await setDoc(userRef, userData);
+        return userData;
       }
 
       return userDoc.data() as User;
