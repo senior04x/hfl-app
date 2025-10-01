@@ -130,7 +130,18 @@ export class DataService {
       
       // Try to fetch from admin panel API first
       try {
-        const response = await fetch('http://192.168.1.38:3000/api/matches');
+        const apiBaseUrl = process.env.API_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.38:3000';
+        
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        const response = await fetch(`${apiBaseUrl}/api/matches`, {
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
         if (response.ok) {
           const matchesData = await response.json();
           console.log('Matches from admin panel API:', matchesData.length, 'matches found');
@@ -152,12 +163,18 @@ export class DataService {
           return matches;
         }
       } catch (apiError) {
-        console.log('Admin panel API not available, falling back to Firebase...');
+        if (apiError.name === 'AbortError') {
+          console.log('Admin panel API timeout, falling back to Firebase...');
+        } else if (apiError.message.includes('ERR_CONNECTION_REFUSED')) {
+          console.log('Admin panel API server not running, falling back to Firebase...');
+        } else {
+          console.log('Admin panel API not available, falling back to Firebase...', apiError.message);
+        }
       }
       
       // Fallback to Firebase
       const matchesSnapshot = await getDocs(
-        query(collection(db, 'matches'), orderBy('scheduledAt', 'desc'))
+        query(collection(db, 'matches'), orderBy('matchDate', 'desc'))
       );
       
       if (matchesSnapshot.empty) {
@@ -191,9 +208,8 @@ export class DataService {
             ...data,
             homeTeam: homeTeam!,
             awayTeam: awayTeam!,
-            scheduledAt: safeToDate(data.scheduledAt),
-            startedAt: data.startedAt ? safeToDate(data.startedAt) : undefined,
-            finishedAt: data.finishedAt ? safeToDate(data.finishedAt) : undefined,
+            matchDate: safeToDate(data.matchDate),
+            leagueType: data.leagueType || '',
             createdAt: safeToDate(data.createdAt),
             updatedAt: safeToDate(data.updatedAt),
           } as Match;
@@ -236,9 +252,8 @@ export class DataService {
         ...data,
         homeTeam: homeTeam!,
         awayTeam: awayTeam!,
-        scheduledAt: safeToDate(data.scheduledAt),
-        startedAt: data.startedAt ? safeToDate(data.startedAt) : undefined,
-        finishedAt: data.finishedAt ? safeToDate(data.finishedAt) : undefined,
+        matchDate: safeToDate(data.matchDate),
+        leagueType: data.leagueType || '',
         createdAt: safeToDate(data.createdAt),
         updatedAt: safeToDate(data.updatedAt),
       } as Match;
@@ -283,9 +298,8 @@ export class DataService {
           ...data,
           homeTeam: homeTeam!,
           awayTeam: awayTeam!,
-          scheduledAt: safeToDate(data.scheduledAt),
-          startedAt: data.startedAt ? safeToDate(data.startedAt) : undefined,
-          finishedAt: data.finishedAt ? safeToDate(data.finishedAt) : undefined,
+          matchDate: safeToDate(data.matchDate),
+          leagueType: data.leagueType || '',
           createdAt: safeToDate(data.createdAt),
           updatedAt: safeToDate(data.updatedAt),
         };
@@ -303,9 +317,7 @@ export class DataService {
     try {
       const docRef = await addDoc(collection(db, 'matches'), {
         ...matchData,
-        scheduledAt: Timestamp.fromDate(matchData.scheduledAt),
-        startedAt: matchData.startedAt ? Timestamp.fromDate(matchData.startedAt) : null,
-        finishedAt: matchData.finishedAt ? Timestamp.fromDate(matchData.finishedAt) : null,
+        matchDate: Timestamp.fromDate(matchData.matchDate),
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
@@ -335,12 +347,6 @@ export class DataService {
         status,
         updatedAt: Timestamp.now(),
       };
-
-      if (status === 'live') {
-        updateData.startedAt = Timestamp.now();
-      } else if (status === 'finished') {
-        updateData.finishedAt = Timestamp.now();
-      }
 
       await updateDoc(doc(db, 'matches', matchId), updateData);
     } catch (error) {

@@ -8,6 +8,37 @@ const db = admin.firestore();
 // Export OTP functions
 export { requestOTP, verifyOTP, cleanupExpiredOTPs } from './otp';
 
+// Health check endpoint
+export const health = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'GET') {
+    res.status(405).json({ success: false, error: 'Method not allowed' });
+    return;
+  }
+
+  try {
+    res.json({
+      success: true,
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0'
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+});
+
 // Trigger when a match is updated
 export const onMatchUpdate = functions.firestore
   .document('matches/{matchId}')

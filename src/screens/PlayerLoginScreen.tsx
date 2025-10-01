@@ -57,14 +57,23 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       const cleanPhone = parsePhoneNumberForAPI(phoneNumber);
       console.log('Requesting OTP for:', cleanPhone);
       
-      // Call backend to request OTP
-      const response = await fetch('/api/request-otp', {
+      // Call proxy server
+      const apiBaseUrl = process.env.API_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(`${apiBaseUrl}/api/request-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ phone: cleanPhone }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -77,7 +86,14 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       }
     } catch (error: any) {
       console.error('OTP request error:', error);
-      Alert.alert('Xatolik', 'Kod yuborishda xatolik yuz berdi');
+      
+      if (error.name === 'AbortError') {
+        Alert.alert('Xatolik', 'Server bilan bog\'lanishda timeout. Qayta urinib ko\'ring.');
+      } else if (error.message.includes('ERR_CONNECTION_REFUSED')) {
+        Alert.alert('Xatolik', 'Server ishlamayapti. Iltimos, keyinroq urinib ko\'ring.');
+      } else {
+        Alert.alert('Xatolik', 'Kod yuborishda xatolik yuz berdi. Qayta urinib ko\'ring.');
+      }
     } finally {
       setLoading(false);
     }
@@ -100,14 +116,23 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       const cleanPhone = parsePhoneNumberForAPI(phoneNumber);
       console.log('Verifying OTP:', cleanPhone, otpCode);
       
-      // Call backend to verify OTP
-      const response = await fetch('/api/verify-otp', {
+      // Call proxy server
+      const apiBaseUrl = process.env.API_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(`${apiBaseUrl}/api/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ phone: cleanPhone, code: otpCode }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -134,7 +159,14 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       }
     } catch (error: any) {
       console.error('OTP verification error:', error);
-      Alert.alert('Xatolik', 'Kod tekshirishda xatolik yuz berdi');
+      
+      if (error.name === 'AbortError') {
+        Alert.alert('Xatolik', 'Server bilan bog\'lanishda timeout. Qayta urinib ko\'ring.');
+      } else if (error.message.includes('ERR_CONNECTION_REFUSED')) {
+        Alert.alert('Xatolik', 'Server ishlamayapti. Iltimos, keyinroq urinib ko\'ring.');
+      } else {
+        Alert.alert('Xatolik', 'Kod tekshirishda xatolik yuz berdi. Qayta urinib ko\'ring.');
+      }
     } finally {
       setLoading(false);
     }
