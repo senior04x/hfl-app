@@ -1,334 +1,216 @@
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  where,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from './firebase';
+// Firebase Firestore removed - using MongoDB API only
 import { Match, Team, Player, TeamStanding } from '../types';
+import { offlineService } from './offlineService';
 
 export class DataService {
   // Teams
   static async getTeams(): Promise<Team[]> {
-    try {
-      console.log('Fetching teams from Firebase directly...');
-      
-      // Fetch directly from Firebase
-      const teamsSnapshot = await getDocs(collection(db, 'teams'));
-      console.log('Firebase teams snapshot:', teamsSnapshot.size, 'documents found');
-      
-      if (teamsSnapshot.empty) {
-        console.log('No teams found in Firebase');
-        return [];
-      }
-      
-      const teams = await Promise.all(teamsSnapshot.docs.map(async (doc) => {
-        const data = doc.data();
-        console.log('Team data:', doc.id, data);
+    return await offlineService.fetchWithOfflineSupport(
+      'teams',
+      async () => {
+        console.log('Fetching teams from MongoDB API...');
         
-        // Safely handle timestamp conversion
-        const safeToDate = (timestamp: any): Date => {
-          if (!timestamp) return new Date();
-          if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-            return timestamp.toDate();
-          }
-          if (timestamp instanceof Date) {
-            return timestamp;
-          }
-          if (typeof timestamp === 'string') {
-            return new Date(timestamp);
-          }
-          return new Date();
-        };
+        // Use timeout for faster response
+        const timeoutPromise = new Promise<Team[]>((_, reject) => 
+          setTimeout(() => reject(new Error('Teams fetch timeout')), 5000)
+        );
         
-        // Get players for this team
-        const playersQuery = query(collection(db, 'players'), where('teamId', '==', doc.id));
-        const playersSnapshot = await getDocs(playersQuery);
-        const players = playersSnapshot.docs.map(playerDoc => ({
-          id: playerDoc.id,
-          ...playerDoc.data(),
-          createdAt: safeToDate(playerDoc.data().createdAt),
-          updatedAt: safeToDate(playerDoc.data().updatedAt),
-        }));
+        const fetchPromise = (async () => {
+          // Fetch from MongoDB API
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+          
+          const response = await fetch(`${apiBaseUrl}/api/teams`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          console.log('MongoDB API response:', result);
+          
+          if (!result.success) {
+            throw new Error('API returned error');
+          }
+          
+          const teams = result.data || [];
+          console.log('Teams from MongoDB API:', teams.length, 'teams found');
+          console.log('Teams data:', teams);
+          return teams;
+        })();
         
-        return {
-          id: doc.id,
-          ...data,
-          players,
-          createdAt: safeToDate(data.createdAt),
-          updatedAt: safeToDate(data.updatedAt),
-        };
-      })) as Team[];
-      
-      console.log('Teams from Firebase:', teams.length, 'teams found');
-      console.log('Teams data:', teams);
-      return teams;
-    } catch (error) {
-      console.error('Error getting teams:', error);
-      console.error('Error details:', error.message);
-      return [];
-    }
+        // Race between fetch and timeout
+        return await Promise.race([fetchPromise, timeoutPromise]);
+      },
+      true // Use cache
+    ) || [];
   }
 
   static async getTeam(teamId: string): Promise<Team | null> {
     try {
-      const teamDoc = await getDoc(doc(db, 'teams', teamId));
-      if (!teamDoc.exists()) return null;
-
-      const data = teamDoc.data();
+      console.log('🔍 Getting team with ID:', teamId);
       
-      // Safely handle timestamp conversion
-      const safeToDate = (timestamp: any): Date => {
-        if (!timestamp) return new Date();
-        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-          return timestamp.toDate();
-        }
-        if (timestamp instanceof Date) {
-          return timestamp;
-        }
-        if (typeof timestamp === 'string') {
-          return new Date(timestamp);
-        }
-        return new Date();
-      };
+      // Validate teamId
+      if (!teamId || typeof teamId !== 'string') {
+        console.error('❌ Invalid teamId:', teamId);
+        return null;
+      }
 
-      // Get players for this team
-      const playersQuery = query(collection(db, 'players'), where('teamId', '==', teamId));
-      const playersSnapshot = await getDocs(playersQuery);
-      const players = playersSnapshot.docs.map(playerDoc => ({
-        id: playerDoc.id,
-        ...playerDoc.data(),
-        createdAt: safeToDate(playerDoc.data().createdAt),
-        updatedAt: safeToDate(playerDoc.data().updatedAt),
-      }));
-
-      return {
-        id: teamDoc.id,
-        ...data,
-        players,
-        createdAt: safeToDate(data.createdAt),
-        updatedAt: safeToDate(data.updatedAt),
-      } as Team;
+      // Fetch from MongoDB API
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      
+      const response = await fetch(`${apiBaseUrl}/api/teams/${teamId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log('❌ Team not found in MongoDB API:', teamId);
+        return null;
+      }
+      
+      const result = await response.json();
+      console.log('📋 Team data from MongoDB API:', result);
+      
+      if (!result.success) {
+        console.log('❌ API returned error');
+        return null;
+      }
+      
+      const team = result.data;
+      console.log('✅ Team loaded successfully:', team);
+      return team;
     } catch (error) {
-      console.error('Error getting team:', error);
-      throw error;
+      console.error('❌ Error getting team:', error);
+      console.error('❌ Error details:', error.message);
+      console.error('❌ Team ID:', teamId);
+      return null;
     }
   }
 
   // Matches
   static async getMatches(): Promise<Match[]> {
     try {
-      console.log('Fetching matches from admin panel API...');
+      console.log('Fetching matches from MongoDB API...');
       
-      // Try to fetch from admin panel API first
-      try {
-        const apiBaseUrl = process.env.API_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.38:3000';
-        
-        // Create AbortController for timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      // Use timeout for faster response
+      const timeoutPromise = new Promise<Match[]>((_, reject) => 
+        setTimeout(() => reject(new Error('Matches fetch timeout')), 5000)
+      );
+      
+      const fetchPromise = (async () => {
+        // Fetch from MongoDB API
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
         
         const response = await fetch(`${apiBaseUrl}/api/matches`, {
-          signal: controller.signal,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
         });
         
-        clearTimeout(timeoutId);
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
         
-        if (response.ok) {
-          const matchesData = await response.json();
-          console.log('Matches from admin panel API:', matchesData.length, 'matches found');
-          
-          // Fetch team details for each match
-          const matches = await Promise.all(
-            matchesData.map(async (match: any) => {
-              const homeTeam = await this.getTeam(match.homeTeamId);
-              const awayTeam = await this.getTeam(match.awayTeamId);
-              
-              return {
-                ...match,
-                homeTeam: homeTeam!,
-                awayTeam: awayTeam!,
-              } as Match;
-            })
-          );
-          
-          return matches;
+        const result = await response.json();
+        console.log('MongoDB API matches response:', result);
+        
+        if (!result.success) {
+          throw new Error('API returned error');
         }
-      } catch (apiError) {
-        if (apiError.name === 'AbortError') {
-          console.log('Admin panel API timeout, falling back to Firebase...');
-        } else if (apiError.message.includes('ERR_CONNECTION_REFUSED')) {
-          console.log('Admin panel API server not running, falling back to Firebase...');
-        } else {
-          console.log('Admin panel API not available, falling back to Firebase...', apiError.message);
-        }
-      }
+        
+        const matches = result.data || [];
+        console.log('Matches from MongoDB API:', matches.length, 'matches found');
+        console.log('Matches data:', matches);
+        return matches;
+      })();
       
-      // Fallback to Firebase with timeout
-      const firebasePromise = getDocs(
-        query(collection(db, 'matches'), orderBy('matchDate', 'desc'))
-      );
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Firebase timeout')), 5000)
-      );
-      
-      const matchesSnapshot = await Promise.race([firebasePromise, timeoutPromise]) as any;
-      
-      if (matchesSnapshot.empty) {
-        console.log('No matches found in Firebase');
-        return [];
-      }
-      
-      const matches = await Promise.all(
-        matchesSnapshot.docs.map(async (doc) => {
-          const data = doc.data();
-          const homeTeam = await this.getTeam(data.homeTeamId);
-          const awayTeam = await this.getTeam(data.awayTeamId);
-          
-          // Safely handle timestamp conversion
-          const safeToDate = (timestamp: any): Date => {
-            if (!timestamp) return new Date();
-            if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-              return timestamp.toDate();
-            }
-            if (timestamp instanceof Date) {
-              return timestamp;
-            }
-            if (typeof timestamp === 'string') {
-              return new Date(timestamp);
-            }
-            return new Date();
-          };
-
-          return {
-            id: doc.id,
-            ...data,
-            homeTeam: homeTeam!,
-            awayTeam: awayTeam!,
-            matchDate: safeToDate(data.matchDate),
-            leagueType: data.leagueType || '',
-            createdAt: safeToDate(data.createdAt),
-            updatedAt: safeToDate(data.updatedAt),
-          } as Match;
-        })
-      );
-
-      return matches;
+      // Race between fetch and timeout
+      return await Promise.race([fetchPromise, timeoutPromise]);
     } catch (error) {
-      console.error('Error getting matches:', error);
-      // Return empty array to prevent app from hanging
+      console.error('Error getting matches from MongoDB API:', error);
+      console.error('Error details:', error.message);
+      
+      // No fallback - MongoDB API only
+      console.log('MongoDB API failed, returning empty array');
       return [];
     }
   }
 
   static async getMatch(matchId: string): Promise<Match | null> {
     try {
-      const matchDoc = await getDoc(doc(db, 'matches', matchId));
-      if (!matchDoc.exists()) return null;
-
-      const data = matchDoc.data();
-      const homeTeam = await this.getTeam(data.homeTeamId);
-      const awayTeam = await this.getTeam(data.awayTeamId);
-
-      // Safely handle timestamp conversion
-      const safeToDate = (timestamp: any): Date => {
-        if (!timestamp) return new Date();
-        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-          return timestamp.toDate();
-        }
-        if (timestamp instanceof Date) {
-          return timestamp;
-        }
-        if (typeof timestamp === 'string') {
-          return new Date(timestamp);
-        }
-        return new Date();
-      };
-
-      return {
-        id: matchDoc.id,
-        ...data,
-        homeTeam: homeTeam!,
-        awayTeam: awayTeam!,
-        matchDate: safeToDate(data.matchDate),
-        leagueType: data.leagueType || '',
-        createdAt: safeToDate(data.createdAt),
-        updatedAt: safeToDate(data.updatedAt),
-      } as Match;
+      // Fetch from MongoDB API
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      
+      const response = await fetch(`${apiBaseUrl}/api/matches/${matchId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log('❌ Match not found in MongoDB API:', matchId);
+        return null;
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        console.log('❌ API returned error');
+        return null;
+      }
+      
+      return result.data;
     } catch (error) {
       console.error('Error getting match:', error);
-      throw error;
+      return null;
     }
   }
 
-  // Real-time match updates
+  // Real-time match updates - using polling instead of Firebase
   static subscribeToMatch(matchId: string, callback: (match: Match | null) => void) {
-    const matchRef = doc(db, 'matches', matchId);
-    
-    return onSnapshot(matchRef, async (doc) => {
-      if (!doc.exists()) {
-        callback(null);
-        return;
-      }
-
+    // Polling every 5 seconds for real-time updates
+    const interval = setInterval(async () => {
       try {
-        const data = doc.data();
-        const homeTeam = await this.getTeam(data.homeTeamId);
-        const awayTeam = await this.getTeam(data.awayTeamId);
-
-        // Safely handle timestamp conversion
-        const safeToDate = (timestamp: any): Date => {
-          if (!timestamp) return new Date();
-          if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-            return timestamp.toDate();
-          }
-          if (timestamp instanceof Date) {
-            return timestamp;
-          }
-          if (typeof timestamp === 'string') {
-            return new Date(timestamp);
-          }
-          return new Date();
-        };
-
-        const match: Match = {
-          id: doc.id,
-          ...data,
-          homeTeam: homeTeam!,
-          awayTeam: awayTeam!,
-          matchDate: safeToDate(data.matchDate),
-          leagueType: data.leagueType || '',
-          createdAt: safeToDate(data.createdAt),
-          updatedAt: safeToDate(data.updatedAt),
-        };
-
+        const match = await this.getMatch(matchId);
         callback(match);
       } catch (error) {
-        console.error('Error in match subscription:', error);
+        console.error('Error in match polling:', error);
         callback(null);
       }
-    });
+    }, 5000);
+
+    // Return cleanup function
+    return () => clearInterval(interval);
   }
 
-  // Admin functions
+  // Admin functions - using MongoDB API
   static async createMatch(matchData: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'matches'), {
-        ...matchData,
-        matchDate: Timestamp.fromDate(matchData.matchDate),
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      
+      const response = await fetch(`${apiBaseUrl}/api/matches`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(matchData),
       });
-      return docRef.id;
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result.data.id;
     } catch (error) {
       console.error('Error creating match:', error);
       throw error;
@@ -337,11 +219,19 @@ export class DataService {
 
   static async updateMatchScore(matchId: string, score: { home: number; away: number }): Promise<void> {
     try {
-      await updateDoc(doc(db, 'matches', matchId), {
-        'score.home': score.home,
-        'score.away': score.away,
-        updatedAt: Timestamp.now(),
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      
+      const response = await fetch(`${apiBaseUrl}/api/matches/${matchId}/score`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(score),
       });
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
     } catch (error) {
       console.error('Error updating match score:', error);
       throw error;
@@ -350,12 +240,19 @@ export class DataService {
 
   static async updateMatchStatus(matchId: string, status: 'scheduled' | 'live' | 'finished'): Promise<void> {
     try {
-      const updateData: any = {
-        status,
-        updatedAt: Timestamp.now(),
-      };
-
-      await updateDoc(doc(db, 'matches', matchId), updateData);
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      
+      const response = await fetch(`${apiBaseUrl}/api/matches/${matchId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
     } catch (error) {
       console.error('Error updating match status:', error);
       throw error;
@@ -367,68 +264,62 @@ export class DataService {
     try {
       console.log('Fetching player with ID:', playerId);
       
-      const playerDoc = await getDoc(doc(db, 'players', playerId));
-      if (!playerDoc.exists()) {
-        console.log('Player not found in Firebase');
+      // Fetch from MongoDB API
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      
+      const response = await fetch(`${apiBaseUrl}/api/players/${playerId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log('❌ Player not found in MongoDB API:', playerId);
         return null;
       }
-
-      const data = playerDoc.data();
-      console.log('Player data from Firebase:', data);
       
-      // Safely handle timestamp conversion
-      const safeToDate = (timestamp: any): Date => {
-        if (!timestamp) return new Date();
-        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-          return timestamp.toDate();
-        }
-        if (timestamp instanceof Date) {
-          return timestamp;
-        }
-        if (typeof timestamp === 'string') {
-          return new Date(timestamp);
-        }
-        return new Date();
-      };
-
-      const player: Player = {
-        id: playerDoc.id,
-        firstName: data.firstName || '',
-        lastName: data.lastName || '',
-        phone: data.phone || '',
-        email: data.email || '',
-        photo: data.photo || '',
-        teamId: data.teamId || '',
-        teamName: data.teamName || '',
-        position: data.position || '',
-        number: data.number || 0,
-        goals: data.goals || 0,
-        assists: data.assists || 0,
-        yellowCards: data.yellowCards || 0,
-        redCards: data.redCards || 0,
-        matchesPlayed: data.matchesPlayed || 0,
-        status: data.status || 'active',
-        createdAt: safeToDate(data.createdAt),
-        updatedAt: safeToDate(data.updatedAt),
-      };
-
-      console.log('Processed player data:', player);
-      return player;
+      const result = await response.json();
+      
+      if (!result.success) {
+        console.log('❌ API returned error');
+        return null;
+      }
+      
+      console.log('Processed player data:', result.data);
+      return result.data;
     } catch (error) {
       console.error('Error getting player:', error);
-      throw error;
+      return null;
     }
   }
 
   // Standings
   static async getStandings(): Promise<TeamStanding[]> {
     try {
-      const standingsSnapshot = await getDocs(collection(db, 'standings'));
-      if (standingsSnapshot.empty) {
-        console.log('No standings found in Firebase');
+      // Fetch from MongoDB API
+          const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      
+      const response = await fetch(`${apiBaseUrl}/api/standings`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log('❌ Standings not found in MongoDB API');
         return [];
       }
-      return standingsSnapshot.docs.map(doc => doc.data()) as TeamStanding[];
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        console.log('❌ API returned error');
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
       console.error('Error getting standings:', error);
       return [];

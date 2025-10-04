@@ -1,5 +1,5 @@
 const { sendSmsViaEskiz, generateOtpCode, storeOtpData, verifyOtpData, cleanupOtpData } = require('../services/otpService');
-const { getPlayerByPhone, createPlayerSession } = require('../services/playerService');
+const { getPlayerByPhone, createPlayerSession, checkPendingApplication } = require('../services/playerService');
 
 /**
  * Request OTP code for phone number
@@ -85,22 +85,34 @@ const verifyOtp = async (req, res) => {
     let playerData = await getPlayerByPhone(phone);
     
     if (!playerData) {
-      // Create new player if not exists
-      playerData = {
-        id: `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        phone: phone,
-        firstName: 'O\'yinchi',
-        lastName: '',
-        position: 'Unknown',
-        number: '',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+      // Check if player has pending application
+      const hasPendingApplication = await checkPendingApplication(phone);
       
-      console.log(`👤 New player created: ${playerData.id}`);
+      if (hasPendingApplication) {
+        return res.status(400).json({
+          success: false,
+          reason: 'Arizangiz hali ko\'rib chiqilmoqda. Iltimos, kuting yoki admin bilan bog\'laning.',
+          hasApplication: true
+        });
+      }
+      
+      // No player and no application - redirect to application
+      return res.status(404).json({
+        success: false,
+        reason: 'Bu telefon raqami bilan ro\'yxatdan o\'tilgan o\'yinchi topilmadi. Iltimos, avval ariza bering.',
+        needsApplication: true
+      });
     } else {
       console.log(`👤 Existing player found: ${playerData.id}`);
+      
+      // Check if player is active
+      if (playerData.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          reason: 'O\'yinchi faol emas. Admin bilan bog\'laning.',
+          playerStatus: playerData.status
+        });
+      }
     }
     
     // Create player session

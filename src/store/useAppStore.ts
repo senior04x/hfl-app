@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { DataService } from '../services/data';
 import { Match, Team, TeamStanding } from '../types';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { realTimeService } from '../services/realTimeService';
 
 interface AppState {
   matches: Match[];
@@ -77,15 +76,59 @@ export const useAppStore = create<AppState>((set, get) => ({
   setupRealTimeListeners: () => {
     console.log('Setting up real-time listeners...');
     
-    // For now, we'll use manual refresh instead of real-time listeners
-    // because we need to fetch players for each team, which is complex
-    // Real-time listeners will be implemented later if needed
+    // Connect to WebSocket
+    realTimeService.connect().then(() => {
+      console.log('✅ Real-time service connected');
+      
+      // Subscribe to match updates
+      realTimeService.subscribe('match_update', (data) => {
+        console.log('📨 Match update received:', data);
+        const { match } = data;
+        
+        // Update matches in store
+        set((state) => ({
+          matches: state.matches.map(m => 
+            m.id === match.id ? { ...m, ...match } : m
+          )
+        }));
+      });
+      
+      // Subscribe to team updates
+      realTimeService.subscribe('team_update', (data) => {
+        console.log('📨 Team update received:', data);
+        const { team } = data;
+        
+        // Update teams in store
+        set((state) => ({
+          teams: state.teams.map(t => 
+            t.id === team.id ? { ...t, ...team } : t
+          )
+        }));
+      });
+      
+      // Subscribe to application updates
+      realTimeService.subscribe('application_update', (data) => {
+        console.log('📨 Application update received:', data);
+        // Handle application updates if needed
+      });
+      
+      // Subscribe to transfer updates
+      realTimeService.subscribe('transfer_update', (data) => {
+        console.log('📨 Transfer update received:', data);
+        // Handle transfer updates if needed
+      });
+      
+    }).catch((error) => {
+      console.error('❌ Real-time service connection failed:', error);
+      console.log('Falling back to manual refresh mode');
+    });
     
-    console.log('Real-time listeners setup complete (manual refresh mode)');
+    console.log('Real-time listeners setup complete');
     
     // Return cleanup function
     return () => {
       console.log('Cleaning up real-time listeners...');
+      realTimeService.disconnect();
     };
   },
 }));

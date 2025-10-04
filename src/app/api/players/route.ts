@@ -1,47 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import mongoService from '@/lib/mongodb';
 
 // GET /api/players - Get all players
 export async function GET() {
   try {
-    console.log('Fetching players from Firebase...');
+    console.log('Fetching players from MongoDB...');
     
-    const playersSnapshot = await getDocs(collection(db, 'players'));
-    console.log('Players snapshot size:', playersSnapshot.size);
+    await mongoService.connect();
+    const players = await mongoService.getPlayers();
     
-    if (playersSnapshot.empty) {
-      console.log('No players found in Firebase');
-      return NextResponse.json([]);
-    }
-    
-    const players = playersSnapshot.docs.map(doc => {
-      const data = doc.data();
-      console.log('Player data:', doc.id, data);
-      
-      // Safely handle timestamp conversion
-      const safeToDate = (timestamp: any): Date => {
-        if (!timestamp) return new Date();
-        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-          return timestamp.toDate();
-        }
-        if (timestamp instanceof Date) {
-          return timestamp;
-        }
-        if (typeof timestamp === 'string') {
-          return new Date(timestamp);
-        }
-        return new Date();
-      };
-      
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: safeToDate(data.createdAt),
-        updatedAt: safeToDate(data.updatedAt),
-      };
-    });
-
     console.log('Players fetched successfully:', players.length);
     return NextResponse.json(players);
   } catch (error) {
@@ -51,6 +18,8 @@ export async function GET() {
       error: 'Failed to fetch players',
       details: error.message 
     }, { status: 500 });
+  } finally {
+    await mongoService.disconnect();
   }
 }
 
@@ -90,17 +59,20 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    const docRef = await addDoc(collection(db, 'players'), playerData);
+    await mongoService.connect();
+    const newPlayer = await mongoService.createPlayer(playerData);
     
-    console.log('Player created:', docRef.id);
+    console.log('Player created:', newPlayer._id);
     
     return NextResponse.json({ 
-      id: docRef.id, 
+      id: newPlayer._id, 
       ...playerData 
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating player:', error);
     return NextResponse.json({ error: 'Failed to create player' }, { status: 500 });
+  } finally {
+    await mongoService.disconnect();
   }
 }
 

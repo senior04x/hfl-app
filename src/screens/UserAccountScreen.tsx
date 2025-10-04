@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
 import CustomModal from '../components/CustomModal';
+import ApplicationTypeModal from '../components/ApplicationTypeModal';
 
 interface MenuItemProps {
   icon: string;
@@ -39,6 +40,8 @@ const UserAccountScreen = ({ navigation }: any) => {
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [showLeagueModal, setShowLeagueModal] = React.useState(false);
   const [showPlayerModal, setShowPlayerModal] = React.useState(false);
+  const [showTeamModal, setShowTeamModal] = React.useState(false);
+  const [showLeagueTypeModal, setShowLeagueTypeModal] = React.useState(false);
 
   const handleTransferRequest = () => {
     if (isLoggedIn && player) {
@@ -68,18 +71,31 @@ const UserAccountScreen = ({ navigation }: any) => {
 
   const handleLeagueApplication = () => {
     console.log('League application button pressed');
-    setShowLeagueModal(true);
+    setShowLeagueTypeModal(true);
   };
 
   const handlePlayerApplication = () => {
-    setShowLeagueModal(false);
+    setShowLeagueTypeModal(false);
     setShowPlayerModal(true);
   };
 
   const handleTeamApplication = () => {
-    setShowLeagueModal(false);
-    console.log('Navigating to TeamApplication');
-    navigation.navigate('TeamApplication');
+    setShowLeagueTypeModal(false);
+    setShowTeamModal(true);
+  };
+
+  const handleLeagueTypeApplication = () => {
+    setShowLeagueTypeModal(false);
+    console.log('Navigating to LeagueApplication');
+    navigation.navigate('LeagueApplication');
+  };
+  
+  const handlePlayerTransferRequest = () => {
+    navigation.navigate('PlayerTransferRequest');
+  };
+  
+  const handleTeamTransferRequest = () => {
+    navigation.navigate('TeamTransferRequest');
   };
 
   const handleConfirmPlayerApplication = () => {
@@ -116,7 +132,7 @@ const UserAccountScreen = ({ navigation }: any) => {
   };
 
   const handleSettings = () => {
-    Alert.alert('Sozlamalar', 'Sozlamalar sahifasi hozircha mavjud emas');
+    navigation.navigate('Settings');
   };
 
   const handleAbout = () => {
@@ -151,7 +167,7 @@ const UserAccountScreen = ({ navigation }: any) => {
 
       <View style={styles.menuSection}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {isLoggedIn ? 'Transfer arizasi' : 'Liga arizasi'}
+          {isLoggedIn ? 'Transfer arizasi' : 'Ariza berish'}
         </Text>
         {isLoggedIn ? (
           <MenuItem
@@ -162,13 +178,13 @@ const UserAccountScreen = ({ navigation }: any) => {
             colors={colors}
           />
         ) : (
-          <MenuItem
-            icon="add-circle-outline"
-            title="Ligaga ariza berish"
-            subtitle="Yangi o'yinchi sifatida ro'yxatdan o'ting"
-            onPress={handleLeagueApplication}
-            colors={colors}
-          />
+        <MenuItem
+          icon="add-circle-outline"
+          title="Ariza berish"
+          subtitle="O'yinchi, jamoa yoki liga sifatida ro'yxatdan o'ting"
+          onPress={handleLeagueApplication}
+          colors={colors}
+        />
         )}
         <MenuItem
           icon={isLoggedIn ? "person" : "person-outline"}
@@ -221,15 +237,61 @@ const UserAccountScreen = ({ navigation }: any) => {
         type="warning"
       />
 
+      {/* Application Type Modal - 3 ta ariza */}
+      <ApplicationTypeModal
+        visible={showLeagueTypeModal}
+        onClose={() => setShowLeagueTypeModal(false)}
+        onPlayerApplication={handlePlayerApplication}
+        onTeamApplication={handleTeamApplication}
+        onLeagueApplication={handleLeagueTypeApplication}
+      />
+
+      {/* Player Application Modal */}
+      <CustomModal
+        visible={showPlayerModal}
+        title="O'yinchi Ariza"
+        message="O'yinchi sifatida ariza berishni xohlaysizmi?"
+        onClose={() => setShowPlayerModal(false)}
+        onConfirm={handleConfirmPlayerApplication}
+        confirmText="Ha, davom etish"
+        cancelText="Bekor qilish"
+        type="info"
+      />
+
+      {/* Team Application Modal */}
+      <CustomModal
+        visible={showTeamModal}
+        title="Jamoa Ariza"
+        message="Jamoa sifatida ariza berishni xohlaysizmi?"
+        onClose={() => setShowTeamModal(false)}
+        onConfirm={handleTeamApplication}
+        confirmText="Ha, davom etish"
+        cancelText="Bekor qilish"
+        type="info"
+      />
+
       {/* League Application Modal */}
       <CustomModal
         visible={showLeagueModal}
-        title="Ariza Turi"
-        message="Qanday ariza berishni xohlaysiz?"
+        title="Liga Ariza"
+        message="Liga sifatida ariza berishni xohlaysizmi?"
         onClose={() => setShowLeagueModal(false)}
-        onConfirm={handlePlayerApplication}
-        confirmText="O'yinchi sifatida"
-        cancelText="Jamoa sifatida"
+        onConfirm={handleLeagueTypeApplication}
+        confirmText="Ha, davom etish"
+        cancelText="Bekor qilish"
+        type="info"
+      />
+
+      
+      {/* Transfer Request Modal */}
+      <CustomModal
+        visible={false}
+        title="Transfer Ariza"
+        message="Qanday transfer ariza berishni xohlaysiz?"
+        onClose={() => {}}
+        onConfirm={handlePlayerTransferRequest}
+        confirmText="O'yinchi transfer"
+        cancelText="Jamoa transfer"
         type="info"
       />
 

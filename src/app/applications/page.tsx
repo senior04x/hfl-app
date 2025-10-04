@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Check, X, Loader2, User, Users, RefreshCw, Eye, Mail, Phone, Calendar, MapPin } from 'lucide-react';
+import { Check, X, Loader2, User, Users, RefreshCw, Eye, Mail, Phone, Calendar, MapPin, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { smsService } from '@/lib/smsService';
 
 interface PlayerApplication {
   id: string;
@@ -201,37 +202,44 @@ export default function ApplicationsPage() {
       orderBy('createdAt', 'desc')
     );
     
-    const unsubscribeTeams = onSnapshot(teamQuery, (snapshot) => {
-      const teams = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          teamName: data.teamName || data.name || 'Unknown Team',
-          foundedDate: data.foundedDate || '',
-          logo: data.logo || '',
-          teamColor: data.teamColor || data.color || '#3B82F6',
-          description: data.description || '',
-          contactPerson: data.contactPerson || '',
-          contactPhone: data.contactPhone || '',
-          contactEmail: data.contactEmail || '',
-          status: data.status || 'pending',
-          createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-          updatedAt: data.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-        };
-      }) as TeamApplication[];
-      
-      console.log('Real-time team applications update:', teams.length, teams);
-      console.log('Team applications status breakdown:', {
-        total: teams.length,
-        pending: teams.filter(t => t.status === 'pending').length,
-        approved: teams.filter(t => t.status === 'approved').length,
-        rejected: teams.filter(t => t.status === 'rejected').length
-      });
-      setTeamApplications(teams);
-    }, (error) => {
-      console.error('Error listening to team applications:', error);
-      toast.error('Jamoa arizalarini tinglashda xatolik');
-    });
+    // Team applications - using MongoDB API
+    const fetchTeamApplicationsFromAPI = async () => {
+      try {
+        const response = await fetch('https://hfl-backend-360d7733bad1.herokuapp.com/api/team-applications', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error('API returned error');
+        }
+        
+        const teams = result.data || [];
+        console.log('Team applications fetched from MongoDB API:', teams.length);
+        setTeamApplications(teams);
+      } catch (error) {
+        console.error('Error fetching team applications from MongoDB API:', error);
+        toast.error('Jamoa arizalarini olishda xatolik');
+      }
+    };
+    
+    // Fetch team applications initially
+    fetchTeamApplicationsFromAPI();
+    
+    // Set up polling for real-time updates (every 30 seconds)
+    const teamApplicationsInterval = setInterval(fetchTeamApplicationsFromAPI, 30000);
+    
+    const unsubscribeTeams = () => {
+      clearInterval(teamApplicationsInterval);
+    };
 
     setLoading(false);
 
@@ -256,6 +264,34 @@ export default function ApplicationsPage() {
 
       if (response.ok) {
         const result = await response.json();
+        
+        // Send SMS notification
+        const application = playerApplications.find(app => app.id === id);
+        if (application) {
+          try {
+            const smsSent = action === 'approve' 
+              ? await smsService.sendApplicationApprovalSMS(
+                  application.phone, 
+                  `${application.firstName} ${application.lastName}`, 
+                  'player'
+                )
+              : await smsService.sendApplicationRejectionSMS(
+                  application.phone, 
+                  `${application.firstName} ${application.lastName}`, 
+                  'player'
+                );
+            
+            if (smsSent) {
+              toast.success(`SMS xabari yuborildi: ${application.phone}`);
+            } else {
+              toast.warning('Ariza ${action === "approve" ? "tasdiqlandi" : "rad etildi"}, lekin SMS yuborilmadi');
+            }
+          } catch (smsError) {
+            console.error('SMS send error:', smsError);
+            toast.warning('Ariza ${action === "approve" ? "tasdiqlandi" : "rad etildi"}, lekin SMS yuborilmadi');
+          }
+        }
+        
         if (action === 'approve' && result.playerId) {
           toast.success(`O'yinchi arizasi tasdiqlandi va o'yinchilar ro'yxatiga qo'shildi!`);
         } else {
@@ -287,6 +323,34 @@ export default function ApplicationsPage() {
 
       if (response.ok) {
         const result = await response.json();
+        
+        // Send SMS notification
+        const application = teamApplications.find(app => app.id === id);
+        if (application) {
+          try {
+            const smsSent = action === 'approve' 
+              ? await smsService.sendApplicationApprovalSMS(
+                  application.contactPhone, 
+                  application.contactPerson, 
+                  'team'
+                )
+              : await smsService.sendApplicationRejectionSMS(
+                  application.contactPhone, 
+                  application.contactPerson, 
+                  'team'
+                );
+            
+            if (smsSent) {
+              toast.success(`SMS xabari yuborildi: ${application.contactPhone}`);
+            } else {
+              toast.warning('Ariza ${action === "approve" ? "tasdiqlandi" : "rad etildi"}, lekin SMS yuborilmadi');
+            }
+          } catch (smsError) {
+            console.error('SMS send error:', smsError);
+            toast.warning('Ariza ${action === "approve" ? "tasdiqlandi" : "rad etildi"}, lekin SMS yuborilmadi');
+          }
+        }
+        
         if (action === 'approve' && result.teamId) {
           toast.success(`Jamoa arizasi tasdiqlandi va jamoalar ro'yxatiga qo'shildi!`);
         } else {

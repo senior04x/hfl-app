@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
   FlatList,
   Image,
   SafeAreaView,
@@ -29,25 +29,47 @@ const TeamDetailScreen = () => {
   useEffect(() => {
     const loadTeam = async () => {
       try {
-        const teamData = await DataService.getTeam(teamId);
-        console.log('Team data loaded:', teamData);
-        console.log('Team players:', teamData?.players);
-        console.log('Players count:', teamData?.players?.length);
-        setTeam(teamData);
+        console.log('🔍 Loading team with ID:', teamId);
+        console.log('🔍 Route params:', route.params);
+        
+        // teamId ni route.params dan olish
+        const actualTeamId = route.params?.teamId || teamId;
+        
+        if (!actualTeamId) {
+          console.error('❌ No team ID provided in route params');
+          console.error('❌ Route params:', route.params);
+          setIsLoading(false);
+          return;
+        }
+
+        console.log('🔍 Using team ID:', actualTeamId);
+
+        const teamData = await DataService.getTeam(actualTeamId);
+        
+        if (teamData) {
+          console.log('✅ Team data loaded:', teamData);
+          console.log('👥 Team players:', teamData.players?.length || 0);
+          setTeam(teamData);
+        } else {
+          console.log('❌ Team not found in database');
+          setTeam(null);
+        }
       } catch (error) {
-        console.error('Error loading team:', error);
+        console.error('❌ Error loading team:', error);
+        console.error('❌ Error details:', error.message);
+        setTeam(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadTeam();
-  }, [teamId]);
+  }, [teamId, route.params]);
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        {/* Skeleton loading ishlatamiz */}
         <Text style={styles.loadingText}>Loading team details...</Text>
       </View>
     );

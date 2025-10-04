@@ -9,10 +9,18 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "src/*"
+      ]
     }
   },
-  "include": ["src/**/*", "App.tsx", "index.ts"],
+  "include": [
+    "src/**/*",
+    "App.tsx",
+    "index.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
   "exclude": [
     "functions",
     "scripts",

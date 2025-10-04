@@ -117,6 +117,9 @@ export type RootStackParamList = {
   PlayerDashboard: { playerId: string };
   TeamApplication: undefined;
   TransferRequest: { playerId: string; currentTeamId: string; currentTeamName: string };
+  Settings: undefined;
+  PlayerTransferRequest: undefined;
+  TeamTransferRequest: undefined;
 };
 
 export type MainTabParamList = {

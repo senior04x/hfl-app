@@ -19,6 +19,8 @@ import { useTheme } from '../store/useThemeStore';
 import { RootStackParamList, Match } from '../types';
 import { db } from '../services/firebase';
 import MatchCard from '../components/MatchCard';
+import MatchSkeletonCard from '../components/MatchSkeletonCard';
+// import LoadingOverlay from '../components/LoadingOverlay'; // Skeleton loading ishlatamiz
 
 type MatchesScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -28,6 +30,7 @@ const MatchesScreen = () => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // const [showLoadingOverlay, setShowLoadingOverlay] = useState(false); // Skeleton loading ishlatamiz
   const [filter, setFilter] = useState<'all' | 'live' | 'upcoming' | 'finished'>('all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
@@ -39,6 +42,7 @@ const MatchesScreen = () => {
   const fetchMatches = async () => {
     try {
       setLoading(true);
+      // setShowLoadingOverlay(true); // Skeleton loading ishlatamiz
       console.log('Fetching matches from Firebase...');
       
       const q = query(collection(db, 'matches'), orderBy('matchDate', 'desc'));
@@ -69,12 +73,14 @@ const MatchesScreen = () => {
         console.log('Matches fetched:', matchesData);
         setMatches(matchesData);
         setLoading(false);
+        // setShowLoadingOverlay(false); // Skeleton loading ishlatamiz
       });
 
       return unsubscribe;
     } catch (error) {
       console.error('Error fetching matches:', error);
       setLoading(false);
+      // setShowLoadingOverlay(false); // Skeleton loading ishlatamiz
     }
   };
 
@@ -215,10 +221,12 @@ const MatchesScreen = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.header }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Matches</Text>
-      </View>
+    <>
+      {/* LoadingOverlay ni o'chirib qo'yamiz - Skeleton loading ishlatamiz */}
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.header }]}>
+          <Text style={[styles.title, { color: colors.text }]}>Matches</Text>
+        </View>
 
       <View style={[styles.filters, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
         <FilterButton title="All" value="all" isActive={filter === 'all'} />
@@ -228,12 +236,13 @@ const MatchesScreen = () => {
       </View>
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Ma'lumotlar yuklanmoqda...
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.list}
+        >
+          {Array.from({ length: 8 }).map((_, index) => (
+            <MatchSkeletonCard key={index} />
+          ))}
+        </ScrollView>
       ) : (
         <ScrollView
           refreshControl={
@@ -287,7 +296,8 @@ const MatchesScreen = () => {
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 };
 

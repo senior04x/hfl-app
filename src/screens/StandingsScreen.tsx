@@ -7,7 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   SafeAreaView,
-  ActivityIndicator,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
   ScrollView,
   Image,
 } from 'react-native';
@@ -17,6 +17,7 @@ import { onSnapshot, collection, query, orderBy, where, getDocs } from 'firebase
 import { useTheme } from '../store/useThemeStore';
 import { TeamStanding, Team, Match, PlayerStats } from '../types';
 import { db } from '../services/firebase';
+import MatchSkeletonCard from '../components/MatchSkeletonCard';
 
 interface League {
   id: string;
@@ -426,11 +427,24 @@ const StandingsScreen = () => {
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Ma'lumotlar yuklanmoqda...
-          </Text>
+        <View style={[styles.titleHeader, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
+          <Text style={[styles.title, { color: colors.text }]}>Tournament</Text>
+        </View>
+        
+        <View style={styles.list}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <View key={index} style={[styles.leagueItem, { backgroundColor: colors.surface }]}>
+              <View style={styles.leagueHeader}>
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 150, height: 20 }]} />
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 20, height: 20 }]} />
+              </View>
+              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 200, height: 16, marginBottom: 8 }]} />
+              <View style={styles.leagueStats}>
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 80, height: 14 }]} />
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 80, height: 14 }]} />
+              </View>
+            </View>
+          ))}
         </View>
       </SafeAreaView>
     );
@@ -795,6 +809,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginHorizontal: 8,
+  },
+  skeletonText: {
+    borderRadius: 4,
+    marginBottom: 4,
   },
 });
 

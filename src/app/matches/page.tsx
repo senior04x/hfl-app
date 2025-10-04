@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit, Trash2, Eye, RefreshCw, Calendar, Clock, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, RefreshCw, Calendar, Clock, Users, Bell } from 'lucide-react';
 import { onSnapshot, collection, query, orderBy, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { pushNotificationService } from '@/lib/pushNotificationService';
 
 interface Team {
   id: string;
@@ -126,29 +127,33 @@ const MatchesPage = () => {
 
   const fetchTeams = async () => {
     try {
-      console.log('Fetching teams from Firebase...');
+      console.log('Fetching teams from MongoDB API...');
       
-      const q = query(collection(db, 'teams'));
-      
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const teamsData: Team[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          teamsData.push({
-            id: doc.id,
-            name: data.name || '',
-            logo: data.logo || '',
-            color: data.color || '#3B82F6',
-          });
-        });
-        
-        console.log('Teams fetched:', teamsData);
-        setTeams(teamsData);
+      const response = await fetch('https://hfl-backend-360d7733bad1.herokuapp.com/api/teams', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-
-      return unsubscribe;
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('MongoDB API response:', result);
+      
+      if (!result.success) {
+        throw new Error('API returned error');
+      }
+      
+      const teamsData = result.data || [];
+      console.log('Teams fetched from MongoDB API:', teamsData);
+      setTeams(teamsData);
+      
+      return () => {}; // Return empty cleanup function
     } catch (error) {
-      console.error('Error fetching teams:', error);
+      console.error('Error fetching teams from MongoDB API:', error);
     }
   };
 
@@ -191,6 +196,25 @@ const MatchesPage = () => {
       console.log('Adding match:', matchData);
       await addDoc(collection(db, 'matches'), matchData);
       
+      // Send push notification about new match
+      try {
+        const matchDate = new Date(newMatch.matchDate).toLocaleDateString('uz-UZ');
+        const matchInfo = `${homeTeam.name} vs ${awayTeam.name}`;
+        
+        // Send to all users (in real app, get device tokens from database)
+        const success = await pushNotificationService.sendAnnouncement(
+          'HFL Yangi O\'yin',
+          `${matchInfo} o'yini ${matchDate} sanasida bo'lib o'tadi. O'yinni qo'ldan boy bermang!`,
+          'all'
+        );
+        
+        if (success) {
+          console.log('Push notification sent for new match');
+        }
+      } catch (notificationError) {
+        console.error('Push notification error:', notificationError);
+      }
+      
       setNewMatch({
         homeTeamId: '',
         awayTeamId: '',
@@ -201,7 +225,7 @@ const MatchesPage = () => {
       });
       setShowAddDialog(false);
       
-      alert('O\'yin muvaffaqiyatli qo\'shildi');
+      alert('O\'yin muvaffaqiyatli qo\'shildi va push xabari yuborildi');
     } catch (error) {
       console.error('Error adding match:', error);
       alert('Xatolik yuz berdi');

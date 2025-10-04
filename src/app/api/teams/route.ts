@@ -1,58 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import mongoService from '@/lib/mongodb';
 
 // GET /api/teams - Get all teams
 export async function GET() {
   try {
-    console.log('Fetching teams from Firebase...');
+    console.log('Fetching teams from MongoDB...');
     
-    const teamsSnapshot = await getDocs(collection(db, 'teams'));
-    console.log('Teams snapshot size:', teamsSnapshot.size);
+    await mongoService.connect();
+    const teams = await mongoService.getTeams();
     
-    if (teamsSnapshot.empty) {
-      console.log('No teams found in Firebase');
-      return NextResponse.json([]);
-    }
-    
-    const teams = await Promise.all(teamsSnapshot.docs.map(async (doc) => {
-      const data = doc.data();
-      console.log('Team data:', doc.id, data);
-      
-      // Safely handle timestamp conversion
-      const safeToDate = (timestamp: any): Date => {
-        if (!timestamp) return new Date();
-        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-          return timestamp.toDate();
-        }
-        if (timestamp instanceof Date) {
-          return timestamp;
-        }
-        if (typeof timestamp === 'string') {
-          return new Date(timestamp);
-        }
-        return new Date();
-      };
-      
-      // Get players for this team
-      const playersQuery = query(collection(db, 'players'), where('teamId', '==', doc.id));
-      const playersSnapshot = await getDocs(playersQuery);
-      const players = playersSnapshot.docs.map(playerDoc => ({
-        id: playerDoc.id,
-        ...playerDoc.data(),
-        createdAt: safeToDate(playerDoc.data().createdAt),
-        updatedAt: safeToDate(playerDoc.data().updatedAt),
-      }));
-      
-      return {
-        id: doc.id,
-        ...data,
-        players,
-        createdAt: safeToDate(data.createdAt),
-        updatedAt: safeToDate(data.updatedAt),
-      };
-    }));
-
     console.log('Teams fetched successfully:', teams.length);
     return NextResponse.json(teams);
   } catch (error) {
@@ -62,6 +18,8 @@ export async function GET() {
       error: 'Failed to fetch teams',
       details: error.message 
     }, { status: 500 });
+  } finally {
+    await mongoService.disconnect();
   }
 }
 

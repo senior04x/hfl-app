@@ -92,26 +92,44 @@ export default function PlayersPage() {
       toast.error('O\'yinchi ma\'lumotlarini tinglashda xatolik');
     });
 
-    // Teams listener
-    const teamsQuery = query(collection(db, 'teams'));
+    // Teams listener - using MongoDB API
+    const fetchTeamsFromAPI = async () => {
+      try {
+        const response = await fetch('https://hfl-backend-360d7733bad1.herokuapp.com/api/teams', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error('API returned error');
+        }
+        
+        const teamsData = result.data || [];
+        console.log('Teams fetched from MongoDB API:', teamsData.length);
+        setTeams(teamsData);
+      } catch (error) {
+        console.error('Error fetching teams from MongoDB API:', error);
+        toast.error('Jamoa ma\'lumotlarini olishda xatolik');
+      }
+    };
     
-    const unsubscribeTeams = onSnapshot(teamsQuery, (snapshot) => {
-      const teamsData = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name || 'Unknown Team',
-          color: data.color || '#3B82F6',
-          logo: data.logo || '',
-        };
-      }) as Team[];
-      
-      console.log('Real-time teams update:', teamsData.length);
-      setTeams(teamsData);
-    }, (error) => {
-      console.error('Error listening to teams:', error);
-      toast.error('Jamoa ma\'lumotlarini tinglashda xatolik');
-    });
+    // Fetch teams initially
+    fetchTeamsFromAPI();
+    
+    // Set up polling for real-time updates (every 30 seconds)
+    const teamsInterval = setInterval(fetchTeamsFromAPI, 30000);
+    
+    const unsubscribeTeams = () => {
+      clearInterval(teamsInterval);
+    };
 
     setLoading(false);
 

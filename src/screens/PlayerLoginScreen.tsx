@@ -133,6 +133,30 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
           player: playerData 
         });
       } else {
+        // Check if user needs to apply
+        if (result.needsApplication) {
+          Alert.alert(
+            'Ariza kerak',
+            result.reason,
+            [
+              { text: 'Bekor qilish', style: 'cancel' },
+              { text: 'Ariza berish', onPress: () => navigation.navigate('UserAccount') }
+            ]
+          );
+          return;
+        }
+        
+        // Check if user has pending application
+        if (result.hasApplication) {
+          Alert.alert(
+            'Ariza ko\'rib chiqilmoqda',
+            result.reason,
+            [
+              { text: 'OK', onPress: () => navigation.navigate('UserAccount') }
+            ]
+          );
+          return;
+        }
         const newAttempts = attempts + 1;
         setAttempts(newAttempts);
         

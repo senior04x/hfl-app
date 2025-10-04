@@ -85,8 +85,90 @@ const validateRequestBody = (requiredFields) => {
   };
 };
 
+/**
+ * Sanitize input data
+ */
+const sanitizeInput = (req, res, next) => {
+  const sanitizeString = (str) => {
+    if (typeof str !== 'string') return str;
+    return str.trim().replace(/[<>]/g, '');
+  };
+
+  const sanitizeObject = (obj) => {
+    if (typeof obj !== 'object' || obj === null) return obj;
+    
+    const sanitized = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string') {
+        sanitized[key] = sanitizeString(value);
+      } else if (typeof value === 'object' && value !== null) {
+        sanitized[key] = sanitizeObject(value);
+      } else {
+        sanitized[key] = value;
+      }
+    }
+    return sanitized;
+  };
+
+  req.body = sanitizeObject(req.body);
+  req.query = sanitizeObject(req.query);
+  req.params = sanitizeObject(req.params);
+  
+  next();
+};
+
+/**
+ * Validate string length
+ */
+const validateStringLength = (field, minLength = 1, maxLength = 255) => {
+  return (req, res, next) => {
+    const value = req.body[field];
+    
+    if (value && typeof value === 'string') {
+      if (value.length < minLength) {
+        return res.status(400).json({
+          success: false,
+          error: `${field} kamida ${minLength} belgi bo'lishi kerak`
+        });
+      }
+      
+      if (value.length > maxLength) {
+        return res.status(400).json({
+          success: false,
+          error: `${field} ko'pi bilan ${maxLength} belgi bo'lishi kerak`
+        });
+      }
+    }
+    
+    next();
+  };
+};
+
+/**
+ * Validate email format
+ */
+const validateEmail = (req, res, next) => {
+  const { email } = req.body;
+  
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email formati noto\'g\'ri'
+      });
+    }
+  }
+  
+  next();
+};
+
 module.exports = {
   validatePhoneNumber,
   validateOtpCode,
-  validateRequestBody
+  validateRequestBody,
+  sanitizeInput,
+  validateStringLength,
+  validateEmail
 };

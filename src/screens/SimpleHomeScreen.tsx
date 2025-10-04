@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '../store/useAppStore';
 import { RootStackParamList, Match } from '../types';
 import MatchCard from '../components/MatchCard';
-import LoadingScreen from '../components/LoadingScreen';
+import MatchSkeletonCard from '../components/MatchSkeletonCard';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useTheme } from '../store/useThemeStore';
 
@@ -59,7 +59,24 @@ const SimpleHomeScreen = () => {
   );
 
   if (isInitialLoad) {
-    return <LoadingScreen />;
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>Welcome to HFL</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Havas Football League</Text>
+        </View>
+        
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="time" size={20} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming Matches</Text>
+          </View>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <MatchSkeletonCard key={index} />
+          ))}
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -79,7 +96,7 @@ const SimpleHomeScreen = () => {
             <FlatList
               data={liveMatches}
               renderItem={renderMatch}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item, index) => item.id || `live-${index}`}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.verticalList}
             />
@@ -94,7 +111,7 @@ const SimpleHomeScreen = () => {
           <FlatList
             data={upcomingMatches}
             renderItem={renderMatch}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => item.id || `upcoming-${index}`}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="football-outline" size={48} color={colors.textTertiary} />

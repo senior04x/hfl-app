@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -250,7 +250,7 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          {/* Skeleton loading ishlatamiz */}
           <Text style={[styles.loadingText, { color: colors.text }]}>Jamoalar yuklanmoqda...</Text>
         </View>
       </SafeAreaView>
@@ -308,7 +308,7 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
             disabled={submitting}
           >
             {submitting ? (
-              <ActivityIndicator color="white" />
+              <Text style={styles.submitButtonText}>Yuborilmoqda...</Text>
             ) : (
               <Text style={styles.submitButtonText}>
                 {selectedTeam.name} ga Transfer So'rovi Yuborish

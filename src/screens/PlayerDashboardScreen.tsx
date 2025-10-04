@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -157,7 +157,7 @@ const PlayerDashboardScreen: React.FC<PlayerDashboardScreenProps> = ({ navigatio
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        {/* Skeleton loading ishlatamiz */}
         <Text style={[styles.loadingText, { color: colors.text }]}>Ma'lumotlar yuklanmoqda...</Text>
       </View>
     );

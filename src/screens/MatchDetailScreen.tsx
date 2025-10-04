@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
   Linking,
   Alert,
 } from 'react-native';
@@ -18,6 +18,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { useTheme } from '../store/useThemeStore';
 import { RootStackParamList, Match } from '../types';
 import { db } from '../services/firebase';
+import MatchSkeletonCard from '../components/MatchSkeletonCard';
 
 type MatchDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MatchDetail'>;
 type MatchDetailScreenRouteProp = RouteProp<RootStackParamList, 'MatchDetail'>;
@@ -128,12 +129,58 @@ const MatchDetailScreen = () => {
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Ma'lumotlar yuklanmoqda...
-          </Text>
+        <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
+          <Text style={[styles.title, { color: colors.text }]}>O'yin Tafsilotlari</Text>
         </View>
+        
+        <ScrollView style={styles.content}>
+          {/* Match Header Skeleton */}
+          <View style={[styles.matchHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.teamsContainer}>
+              <View style={styles.teamContainer}>
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 100, height: 20 }]} />
+              </View>
+              
+              <View style={styles.scoreContainer}>
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 80, height: 40 }]} />
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 60, height: 20, marginTop: 8 }]} />
+              </View>
+              
+              <View style={styles.teamContainer}>
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 100, height: 20 }]} />
+              </View>
+            </View>
+          </View>
+
+          {/* Match Info Skeleton */}
+          <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 150, height: 20, marginBottom: 16 }]} />
+            
+            <View style={styles.infoRow}>
+              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 20, height: 20 }]} />
+              <View style={styles.infoContent}>
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 100, height: 14, marginBottom: 4 }]} />
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 200, height: 16 }]} />
+              </View>
+            </View>
+
+            <View style={styles.infoRow}>
+              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 20, height: 20 }]} />
+              <View style={styles.infoContent}>
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 80, height: 14, marginBottom: 4 }]} />
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 150, height: 16 }]} />
+              </View>
+            </View>
+
+            <View style={styles.infoRow}>
+              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 20, height: 20 }]} />
+              <View style={styles.infoContent}>
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 60, height: 14, marginBottom: 4 }]} />
+                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 120, height: 16 }]} />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -416,6 +463,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 6,
+  },
+  skeletonText: {
+    borderRadius: 4,
+    marginBottom: 4,
   },
 });
 

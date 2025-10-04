@@ -7,7 +7,7 @@ import {
   Image,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -109,7 +109,7 @@ export default function PlayerStatsScreen({ navigation, route }: PlayerStatsScre
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          {/* Skeleton loading ishlatamiz */}
           <Text style={[styles.loadingText, { color: colors.text }]}>
             O'yinchi ma'lumotlari yuklanmoqda...
           </Text>

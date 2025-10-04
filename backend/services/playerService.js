@@ -100,6 +100,41 @@ const updatePlayer = async (playerId, updateData) => {
 };
 
 /**
+ * Check if player has pending application
+ */
+const checkPendingApplication = async (phone) => {
+  try {
+    // Query MongoDB for pending applications
+    const leagueApp = await mongoService.getCollection('leagueApplications').findOne({
+      phone: phone,
+      status: 'pending'
+    });
+    
+    if (leagueApp) {
+      console.log(`📝 Pending league application found for: ${phone}`);
+      return true;
+    }
+    
+    // Check team applications
+    const teamApp = await mongoService.getCollection('teamApplications').findOne({
+      contactPhone: phone,
+      status: 'pending'
+    });
+    
+    if (teamApp) {
+      console.log(`📝 Pending team application found for: ${phone}`);
+      return true;
+    }
+    
+    return false;
+    
+  } catch (error) {
+    console.error('❌ Error checking pending application:', error);
+    return false;
+  }
+};
+
+/**
  * Get all players (for admin purposes)
  */
 const getAllPlayers = async () => {
@@ -139,5 +174,6 @@ module.exports = {
   createPlayer,
   createPlayerSession,
   updatePlayer,
-  getAllPlayers
+  getAllPlayers,
+  checkPendingApplication
 };

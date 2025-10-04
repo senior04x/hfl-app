@@ -114,6 +114,19 @@ export async function PUT(request: NextRequest) {
           const teamDocRef = await addDoc(collection(db, 'teams'), teamData);
           console.log('Team added to teams collection:', teamDocRef.id);
           
+          // Send SMS notification
+          try {
+            const { smsService } = await import('@/lib/smsService');
+            await smsService.sendApplicationApprovalSMS(
+              applicationData.contactPhone,
+              applicationData.teamName,
+              'team'
+            );
+            console.log('SMS notification sent for team approval');
+          } catch (smsError) {
+            console.error('SMS notification failed:', smsError);
+          }
+          
           return NextResponse.json({ 
             id, 
             status,

@@ -21,6 +21,9 @@ import PlayerVerificationScreen from '../screens/PlayerVerificationScreen';
 import PlayerDashboardScreen from '../screens/PlayerDashboardScreen';
 import TeamApplicationScreen from '../screens/TeamApplicationScreen';
 import TransferRequestScreen from '../screens/TransferRequestScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import PlayerTransferRequestScreen from '../screens/PlayerTransferRequestScreen';
+import TeamTransferRequestScreen from '../screens/TeamTransferRequestScreen';
 
 import LoadingScreen from '../components/LoadingScreen';
 
@@ -118,6 +121,21 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="TransferRequest" 
           component={TransferRequestScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Settings" 
+          component={SettingsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="PlayerTransferRequest" 
+          component={PlayerTransferRequestScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="TeamTransferRequest" 
+          component={TeamTransferRequestScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

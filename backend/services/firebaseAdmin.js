@@ -1,36 +1,53 @@
 const admin = require('firebase-admin');
 
-// Firebase Admin SDK initialization
+let firebaseApp = null;
+
 const initializeFirebaseAdmin = () => {
   try {
+    // Check if Firebase is already initialized
+    if (admin.apps.length > 0) {
+      firebaseApp = admin.apps[0];
+      console.log('🔥 Firebase Admin already initialized');
+      return firebaseApp;
+    }
+
     // Initialize Firebase Admin SDK
-    admin.initializeApp({
-      projectId: 'havas-football-league',
-      // In production, you should use service account key
-      // For development, we'll use default credentials
+    // In production, you should use service account key
+    // For now, we'll use default credentials
+    firebaseApp = admin.initializeApp({
+      // Add your Firebase config here
+      // For now, we'll use default credentials
     });
 
-    console.log('🔥 Firebase Admin SDK initialized successfully');
-    return admin;
+    console.log('🔥 Firebase Admin SDK initialized');
+    return firebaseApp;
   } catch (error) {
-    console.error('❌ Firebase Admin SDK initialization failed:', error);
-    throw error;
+    console.error('❌ Firebase Admin initialization failed:', error);
+    return null;
   }
 };
 
-// Get Firestore instance
-const getFirestore = () => {
-  return admin.firestore();
+const getFirebaseApp = () => {
+  return firebaseApp;
 };
 
-// Get Auth instance
 const getAuth = () => {
+  if (!firebaseApp) {
+    throw new Error('Firebase Admin not initialized');
+  }
   return admin.auth();
+};
+
+const getFirestore = () => {
+  if (!firebaseApp) {
+    throw new Error('Firebase Admin not initialized');
+  }
+  return admin.firestore();
 };
 
 module.exports = {
   initializeFirebaseAdmin,
-  getFirestore,
+  getFirebaseApp,
   getAuth,
-  admin
+  getFirestore
 };

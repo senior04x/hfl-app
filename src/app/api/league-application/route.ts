@@ -133,6 +133,19 @@ export async function PUT(request: NextRequest) {
           const playerDocRef = await addDoc(collection(db, 'players'), playerData);
           console.log('Player added to players collection:', playerDocRef.id);
           
+          // Send SMS notification
+          try {
+            const { smsService } = await import('@/lib/smsService');
+            await smsService.sendApplicationApprovalSMS(
+              applicationData.phone,
+              `${applicationData.firstName} ${applicationData.lastName}`,
+              'player'
+            );
+            console.log('SMS notification sent for player approval');
+          } catch (smsError) {
+            console.error('SMS notification failed:', smsError);
+          }
+          
           return NextResponse.json({ 
             id, 
             status,

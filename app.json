@@ -29,11 +29,21 @@
     "web": {
       "favicon": "./assets/havas-logo.png"
     },
+    "notification": {
+      "vapidPublicKey": "BBwnAjgeF_uD1tgPKocddMF--vikOC97gQFMk3qAzeB8OPDeYnYy8sMDRCJeBsGIGwr8ve_-ZBE5nPc5lujWNz8"
+    },
     "extra": {
       "eas": {
         "projectId": "55652ecc-9c9d-4966-9287-ab72bc39e448"
-      }
+      },
+      "EXPO_PUBLIC_API_BASE_URL": "https://hfl-backend-360d7733bad1.herokuapp.com"
     },
-    "owner": "seniorxo"
+    "owner": "seniorxo",
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

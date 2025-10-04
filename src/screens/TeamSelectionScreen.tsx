@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  ActivityIndicator,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
   SafeAreaView,
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
@@ -72,7 +72,7 @@ const TeamSelectionScreen: React.FC<TeamSelectionScreenProps> = ({ navigation })
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        {/* Skeleton loading ishlatamiz */}
         <Text style={[styles.loadingText, { color: colors.text }]}>Jamoalar yuklanmoqda...</Text>
       </SafeAreaView>
     );
