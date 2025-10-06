@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { useLanguage } from '../store/useLanguageStore';
 import CustomModal from '../components/CustomModal';
 import ApplicationTypeModal from '../components/ApplicationTypeModal';
 
@@ -37,6 +38,7 @@ const MenuItem: React.FC<MenuItemProps & { colors: any }> = ({ icon, title, subt
 const UserAccountScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const { player, isLoggedIn, logout } = usePlayerStore();
+  const { getText } = useLanguage();
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [showLeagueModal, setShowLeagueModal] = React.useState(false);
   const [showPlayerModal, setShowPlayerModal] = React.useState(false);
@@ -125,9 +127,9 @@ const UserAccountScreen = ({ navigation }: any) => {
     setShowLogoutModal(false);
     try {
       await logout();
-      Alert.alert('Muvaffaqiyat', 'Hisobingizdan chiqdingiz');
+      Alert.alert(getText('success'), getText('logoutSuccess'));
     } catch (error) {
-      Alert.alert('Xatolik', 'Chiqishda xatolik yuz berdi');
+      Alert.alert(getText('error'), getText('logoutError'));
     }
   };
 
@@ -136,14 +138,14 @@ const UserAccountScreen = ({ navigation }: any) => {
   };
 
   const handleAbout = () => {
-    Alert.alert('Dastur haqida', 'HFL Mobile App v1.0.0');
+    Alert.alert(getText('about'), getText('appVersion'));
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
-        <Text style={[styles.title, { color: 'white' }]}>Hisob</Text>
+        <Text style={[styles.title, { color: 'white' }]}>{getText('account')}</Text>
         {isLoggedIn && player ? (
           <View style={styles.playerInfo}>
             <Text style={[styles.playerName, { color: 'white' }]}>
@@ -160,44 +162,44 @@ const UserAccountScreen = ({ navigation }: any) => {
           </View>
         ) : (
           <Text style={[styles.subtitle, { color: 'rgba(255, 255, 255, 0.8)' }]}>
-            Hisobingizni boshqaring
+            {getText('manageAccount')}
           </Text>
         )}
       </View>
 
       <View style={styles.menuSection}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {isLoggedIn ? 'Transfer arizasi' : 'Ariza berish'}
+          {isLoggedIn ? getText('transferRequest') : getText('apply')}
         </Text>
         {isLoggedIn ? (
           <MenuItem
             icon="swap-horizontal-outline"
-            title="Transfer ariza berish"
-            subtitle="Boshqa jamoaga o'tish uchun ariza"
+            title={getText('submitTransferRequest')}
+            subtitle={getText('transferRequestSubtitle')}
             onPress={handleTransferRequest}
             colors={colors}
           />
         ) : (
         <MenuItem
           icon="add-circle-outline"
-          title="Ariza berish"
-          subtitle="O'yinchi, jamoa yoki liga sifatida ro'yxatdan o'ting"
+          title={getText('apply')}
+          subtitle={getText('applySubtitle')}
           onPress={handleLeagueApplication}
           colors={colors}
         />
         )}
         <MenuItem
           icon={isLoggedIn ? "person" : "person-outline"}
-          title={isLoggedIn ? "O'yinchi paneli" : "O'yinchi kirish"}
-          subtitle={isLoggedIn ? "Statistikalar va ma'lumotlar" : "Mavjud o'yinchi hisobiga kiring"}
+          title={isLoggedIn ? getText('playerPanel') : getText('playerLogin')}
+          subtitle={isLoggedIn ? getText('playerPanelSubtitle') : getText('playerLoginSubtitle')}
           onPress={handlePlayerLogin}
           colors={colors}
         />
         {isLoggedIn && (
           <MenuItem
             icon="log-out-outline"
-            title="Chiqish"
-            subtitle="Hisobingizdan chiqing"
+            title={getText('logout')}
+            subtitle={getText('logoutSubtitle')}
             onPress={handlePlayerLogout}
             colors={colors}
           />
@@ -206,19 +208,19 @@ const UserAccountScreen = ({ navigation }: any) => {
 
       <View style={styles.menuSection}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Sozlamalar
+          {getText('settings')}
         </Text>
         <MenuItem
           icon="settings-outline"
-          title="Sozlamalar"
-          subtitle="Ilova sozlamalari"
+          title={getText('settings')}
+          subtitle={getText('appSettings')}
           onPress={handleSettings}
           colors={colors}
         />
         <MenuItem
           icon="information-circle-outline"
-          title="Dastur haqida"
-          subtitle="Ilova versiyasi va ma'lumotlar"
+          title={getText('about')}
+          subtitle={getText('aboutSubtitle')}
           onPress={handleAbout}
           colors={colors}
         />
@@ -228,12 +230,12 @@ const UserAccountScreen = ({ navigation }: any) => {
       {/* Logout Modal */}
       <CustomModal
         visible={showLogoutModal}
-        title="Chiqish"
-        message="Hisobingizdan chiqishni xohlaysizmi?"
+        title={getText('logout')}
+        message={getText('logoutConfirm')}
         onClose={() => setShowLogoutModal(false)}
         onConfirm={handleConfirmLogout}
-        confirmText="Chiqish"
-        cancelText="Bekor qilish"
+        confirmText={getText('logout')}
+        cancelText={getText('cancel')}
         type="warning"
       />
 
@@ -249,36 +251,36 @@ const UserAccountScreen = ({ navigation }: any) => {
       {/* Player Application Modal */}
       <CustomModal
         visible={showPlayerModal}
-        title="O'yinchi Ariza"
-        message="O'yinchi sifatida ariza berishni xohlaysizmi?"
+        title={getText('playerApplication')}
+        message={getText('playerApplicationMessage')}
         onClose={() => setShowPlayerModal(false)}
         onConfirm={handleConfirmPlayerApplication}
-        confirmText="Ha, davom etish"
-        cancelText="Bekor qilish"
+        confirmText={getText('yesContinue')}
+        cancelText={getText('cancel')}
         type="info"
       />
 
       {/* Team Application Modal */}
       <CustomModal
         visible={showTeamModal}
-        title="Jamoa Ariza"
-        message="Jamoa sifatida ariza berishni xohlaysizmi?"
+        title={getText('teamApplication')}
+        message={getText('teamApplicationMessage')}
         onClose={() => setShowTeamModal(false)}
         onConfirm={handleTeamApplication}
-        confirmText="Ha, davom etish"
-        cancelText="Bekor qilish"
+        confirmText={getText('yesContinue')}
+        cancelText={getText('cancel')}
         type="info"
       />
 
       {/* League Application Modal */}
       <CustomModal
         visible={showLeagueModal}
-        title="Liga Ariza"
-        message="Liga sifatida ariza berishni xohlaysizmi?"
+        title={getText('leagueApplication')}
+        message={getText('leagueApplicationMessage')}
         onClose={() => setShowLeagueModal(false)}
         onConfirm={handleLeagueTypeApplication}
-        confirmText="Ha, davom etish"
-        cancelText="Bekor qilish"
+        confirmText={getText('yesContinue')}
+        cancelText={getText('cancel')}
         type="info"
       />
 
@@ -286,12 +288,12 @@ const UserAccountScreen = ({ navigation }: any) => {
       {/* Transfer Request Modal */}
       <CustomModal
         visible={false}
-        title="Transfer Ariza"
-        message="Qanday transfer ariza berishni xohlaysiz?"
+        title={getText('transferRequest')}
+        message={getText('transferRequestMessage')}
         onClose={() => {}}
         onConfirm={handlePlayerTransferRequest}
-        confirmText="O'yinchi transfer"
-        cancelText="Jamoa transfer"
+        confirmText={getText('playerTransfer')}
+        cancelText={getText('teamTransfer')}
         type="info"
       />
 

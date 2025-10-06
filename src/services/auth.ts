@@ -6,7 +6,7 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db } from '../lib/firebase';
 import { User } from '../types';
 
 export class AuthService {

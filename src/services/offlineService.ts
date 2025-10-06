@@ -161,12 +161,14 @@ class OfflineService {
       if (useCache) {
         const cachedData = await this.getCachedData(key);
         if (cachedData) {
+          console.log(`📦 Using cached data for ${key}`);
           return cachedData;
         }
       }
 
       // If online, fetch fresh data
       if (this.isOnline) {
+        console.log(`🌐 Fetching fresh data for ${key}`);
         const freshData = await fetchFunction();
         
         // Cache the fresh data
@@ -181,9 +183,19 @@ class OfflineService {
     } catch (error) {
       console.error('Error in fetchWithOfflineSupport:', error);
       
+      // Enhanced error handling
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.log('🌐 Network error detected, trying cached data');
+        this.isOnline = false; // Update online status
+      }
+      
       // If online and error occurred, try cache
       if (this.isOnline) {
-        return await this.getCachedData(key);
+        const cachedData = await this.getCachedData(key);
+        if (cachedData) {
+          console.log(`📦 Fallback to cached data for ${key}`);
+          return cachedData;
+        }
       }
       
       return null;

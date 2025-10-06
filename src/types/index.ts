@@ -1,9 +1,12 @@
 // User types
 export interface User {
   id: string;
+  uid?: string;
   email: string;
   displayName: string;
   isAdmin: boolean;
+  admin?: boolean;
+  role?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,6 +28,7 @@ export interface Player {
   yellowCards: number;
   redCards: number;
   matchesPlayed: number;
+  minutesPlayed?: number;
   status: 'active' | 'inactive' | 'suspended';
   createdAt: Date;
   updatedAt: Date;
@@ -37,6 +41,7 @@ export interface Team {
   logo?: string;
   color: string;
   description?: string;
+  foundedDate?: string;
   players: Player[];
   createdAt: Date;
   updatedAt: Date;
@@ -116,6 +121,7 @@ export type RootStackParamList = {
   PlayerVerification: { phoneNumber: string; verificationCode: string; playerId: string };
   PlayerDashboard: { playerId: string };
   TeamApplication: undefined;
+  LeagueApplication: undefined;
   TransferRequest: { playerId: string; currentTeamId: string; currentTeamName: string };
   Settings: undefined;
   PlayerTransferRequest: undefined;
@@ -145,3 +151,19 @@ export interface AppState {
   standings: TeamStanding[];
   isLoading: boolean;
 }
+
+// API Response types
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+// API Error types
+export interface ApiError {
+  success: false;
+  error: string;
+  details?: string;
+}
+

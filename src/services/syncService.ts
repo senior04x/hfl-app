@@ -113,25 +113,85 @@ class SyncService {
       this.syncStatus.isSyncing = true;
       console.log('🔄 Starting data sync...');
 
+      const syncResults = {
+        teams: false,
+        matches: false,
+        players: false,
+        standings: false
+      };
+
       // Sync teams
-      await this.syncTeams();
+      try {
+        await this.syncTeams();
+        syncResults.teams = true;
+        console.log('✅ Teams synced successfully');
+      } catch (error) {
+        console.error('❌ Teams sync failed:', error);
+        errorService.logError(error, {
+          screen: 'SyncService',
+          action: 'sync_teams',
+        });
+      }
       
       // Sync matches
-      await this.syncMatches();
+      try {
+        await this.syncMatches();
+        syncResults.matches = true;
+        console.log('✅ Matches synced successfully');
+      } catch (error) {
+        console.error('❌ Matches sync failed:', error);
+        errorService.logError(error, {
+          screen: 'SyncService',
+          action: 'sync_matches',
+        });
+      }
       
       // Sync players
-      await this.syncPlayers();
+      try {
+        await this.syncPlayers();
+        syncResults.players = true;
+        console.log('✅ Players synced successfully');
+      } catch (error) {
+        console.error('❌ Players sync failed:', error);
+        errorService.logError(error, {
+          screen: 'SyncService',
+          action: 'sync_players',
+        });
+      }
       
       // Sync standings
-      await this.syncStandings();
+      try {
+        await this.syncStandings();
+        syncResults.standings = true;
+        console.log('✅ Standings synced successfully');
+      } catch (error) {
+        console.error('❌ Standings sync failed:', error);
+        errorService.logError(error, {
+          screen: 'SyncService',
+          action: 'sync_standings',
+        });
+      }
 
       // Update sync status
       this.syncStatus.lastSync = Date.now();
-      this.syncStatus.errors = 0;
+      
+      // Count successful syncs
+      const successfulSyncs = Object.values(syncResults).filter(Boolean).length;
+      const totalSyncs = Object.keys(syncResults).length;
+      
+      if (successfulSyncs === totalSyncs) {
+        this.syncStatus.errors = 0;
+        console.log('✅ All data synced successfully');
+      } else if (successfulSyncs > 0) {
+        this.syncStatus.errors = totalSyncs - successfulSyncs;
+        console.log(`⚠️ Partial sync completed: ${successfulSyncs}/${totalSyncs} successful`);
+      } else {
+        this.syncStatus.errors = totalSyncs;
+        console.log('❌ All sync operations failed');
+      }
       
       await this.saveLastSyncTime();
       
-      console.log('✅ Data sync completed');
     } catch (error) {
       console.error('❌ Data sync failed:', error);
       this.syncStatus.errors++;
@@ -148,22 +208,52 @@ class SyncService {
   // Sync teams data
   private async syncTeams(): Promise<void> {
     try {
-      const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      console.log('🔄 Syncing teams...');
       
-      const response = await fetch(`${apiBaseUrl}/api/teams`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Try local API route first, then fallback to direct backend
+      let response: Response;
+      let apiSource = 'local';
+      
+      try {
+        response = await fetch('/api/teams', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (localError) {
+        console.log('Local API failed, trying direct backend...');
+        apiSource = 'backend';
+        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        response = await fetch(`${backendUrl}/api/teams`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          // Cache teams data
-          await offlineService.cacheData('teams', result.data);
-          console.log('✅ Teams synced');
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response');
+      }
+
+      const result = await response.json();
+      console.log(`📊 Teams response from ${apiSource}:`, result);
+      
+      if (result.success && result.data) {
+        // Cache teams data
+        await offlineService.cacheData('teams', result.data);
+        console.log('✅ Teams synced successfully');
+      } else {
+        throw new Error(result.error || 'Invalid response format');
       }
     } catch (error) {
       console.error('Error syncing teams:', error);
@@ -174,22 +264,52 @@ class SyncService {
   // Sync matches data
   private async syncMatches(): Promise<void> {
     try {
-      const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      console.log('🔄 Syncing matches...');
       
-      const response = await fetch(`${apiBaseUrl}/api/matches`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Try local API route first, then fallback to direct backend
+      let response: Response;
+      let apiSource = 'local';
+      
+      try {
+        response = await fetch('/api/matches', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (localError) {
+        console.log('Local API failed, trying direct backend...');
+        apiSource = 'backend';
+        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        response = await fetch(`${backendUrl}/api/matches`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          // Cache matches data
-          await offlineService.cacheData('matches', result.data);
-          console.log('✅ Matches synced');
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response');
+      }
+
+      const result = await response.json();
+      console.log(`📊 Matches response from ${apiSource}:`, result);
+      
+      if (result.success && result.data) {
+        // Cache matches data
+        await offlineService.cacheData('matches', result.data);
+        console.log('✅ Matches synced successfully');
+      } else {
+        throw new Error(result.error || 'Invalid response format');
       }
     } catch (error) {
       console.error('Error syncing matches:', error);
@@ -200,22 +320,52 @@ class SyncService {
   // Sync players data
   private async syncPlayers(): Promise<void> {
     try {
-      const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      console.log('🔄 Syncing players...');
       
-      const response = await fetch(`${apiBaseUrl}/api/players`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Try local API route first, then fallback to direct backend
+      let response: Response;
+      let apiSource = 'local';
+      
+      try {
+        response = await fetch('/api/players', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (localError) {
+        console.log('Local API failed, trying direct backend...');
+        apiSource = 'backend';
+        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        response = await fetch(`${backendUrl}/api/players`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          // Cache players data
-          await offlineService.cacheData('players', result.data);
-          console.log('✅ Players synced');
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response');
+      }
+
+      const result = await response.json();
+      console.log(`📊 Players response from ${apiSource}:`, result);
+      
+      if (result.success && result.data) {
+        // Cache players data
+        await offlineService.cacheData('players', result.data);
+        console.log('✅ Players synced successfully');
+      } else {
+        throw new Error(result.error || 'Invalid response format');
       }
     } catch (error) {
       console.error('Error syncing players:', error);
@@ -226,22 +376,52 @@ class SyncService {
   // Sync standings data
   private async syncStandings(): Promise<void> {
     try {
-      const apiBaseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      console.log('🔄 Syncing standings...');
       
-      const response = await fetch(`${apiBaseUrl}/api/standings`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Try local API route first, then fallback to direct backend
+      let response: Response;
+      let apiSource = 'local';
+      
+      try {
+        response = await fetch('/api/standings', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (localError) {
+        console.log('Local API failed, trying direct backend...');
+        apiSource = 'backend';
+        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        response = await fetch(`${backendUrl}/api/standings`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          // Cache standings data
-          await offlineService.cacheData('standings', result.data);
-          console.log('✅ Standings synced');
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response');
+      }
+
+      const result = await response.json();
+      console.log(`📊 Standings response from ${apiSource}:`, result);
+      
+      if (result.success && result.data) {
+        // Cache standings data
+        await offlineService.cacheData('standings', result.data);
+        console.log('✅ Standings synced successfully');
+      } else {
+        throw new Error(result.error || 'Invalid response format');
       }
     } catch (error) {
       console.error('Error syncing standings:', error);

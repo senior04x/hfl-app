@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  SafeAreaView,
   // ActivityIndicator, // Skeleton loading ishlatamiz
   Modal,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';

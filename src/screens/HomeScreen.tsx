@@ -6,8 +6,8 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   Animated,
+  SafeAreaView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -17,7 +17,7 @@ import { useAppStore } from '../store/useAppStore';
 import { RootStackParamList, Match } from '../types';
 import MatchCard from '../components/MatchCard';
 import LoadingScreen from '../components/LoadingScreen';
-import ErrorBoundary from '../components/ErrorBoundary';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useTheme } from '../store/useThemeStore';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;

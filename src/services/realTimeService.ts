@@ -28,11 +28,26 @@ class RealTimeService {
   // Connect to WebSocket server
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Skip WebSocket connection for now to avoid errors
+      console.log('🔌 WebSocket connection disabled for development');
+      resolve();
+      return;
       try {
+        console.log('🔌 Attempting WebSocket connection to:', this.config.serverUrl);
         this.ws = new WebSocket(this.config.serverUrl);
         
+        // Set connection timeout
+        const connectionTimeout = setTimeout(() => {
+          if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+            console.error('🔌 WebSocket connection timeout');
+            this.ws.close();
+            reject(new Error('WebSocket connection timeout'));
+          }
+        }, 10000); // 10 second timeout
+        
         this.ws.onopen = () => {
-          console.log('🔌 WebSocket connected');
+          clearTimeout(connectionTimeout);
+          console.log('🔌 WebSocket connected successfully');
           this.isConnected = true;
           this.reconnectAttempts = 0;
           resolve();
@@ -44,17 +59,25 @@ class RealTimeService {
             this.handleMessage(message);
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);
+            console.error('Raw message:', event.data);
           }
         };
 
         this.ws.onclose = (event) => {
+          clearTimeout(connectionTimeout);
           console.log('🔌 WebSocket disconnected:', event.code, event.reason);
           this.isConnected = false;
-          this.scheduleReconnect();
+          
+          // Only schedule reconnect if it wasn't a manual disconnect
+          if (event.code !== 1000) {
+            this.scheduleReconnect();
+          }
         };
 
         this.ws.onerror = (error) => {
+          clearTimeout(connectionTimeout);
           console.error('🔌 WebSocket error:', error);
+          console.error('WebSocket state:', this.ws?.readyState);
           reject(error);
         };
 
@@ -88,13 +111,17 @@ class RealTimeService {
     }
 
     this.reconnectAttempts++;
-    const delay = this.config.reconnectInterval * this.reconnectAttempts;
+    // Exponential backoff with jitter
+    const baseDelay = this.config.reconnectInterval;
+    const jitter = Math.random() * 1000; // Add up to 1 second of jitter
+    const delay = Math.min(baseDelay * Math.pow(2, this.reconnectAttempts - 1) + jitter, 30000); // Max 30 seconds
     
-    console.log(`🔌 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    console.log(`🔌 Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
     
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(error => {
         console.error('Reconnection failed:', error);
+        // Don't schedule another reconnect here, let the error handler do it
       });
     }, delay);
   }
@@ -153,7 +180,7 @@ class RealTimeService {
 
 // Export singleton instance
 export const realTimeService = new RealTimeService({
-  serverUrl: process.env.EXPO_PUBLIC_WEBSOCKET_URL || 'ws://localhost:3001/ws',
+  serverUrl: process.env.EXPO_PUBLIC_WEBSOCKET_URL || 'wss://hfl-backend-360d7733bad1.herokuapp.com',
   reconnectInterval: 5000, // 5 seconds
   maxReconnectAttempts: 5,
 });

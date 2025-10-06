@@ -1,0 +1,734 @@
+// MongoDB Service for HFL Mobile App
+// Handles MongoDB operations for mobile app
+
+interface MongoDBConfig {
+  uri: string;
+  database: string;
+  collections: {
+    teams: string;
+    players: string;
+    matches: string;
+    standings: string;
+    applications: string;
+  };
+}
+
+class MongoDBService {
+  private config: MongoDBConfig;
+  private isConnected: boolean = false;
+
+  constructor() {
+    this.config = {
+      uri: process.env.EXPO_PUBLIC_MONGODB_URI || 'mongodb+srv://hfl_user:HFL2023secure@cluster0.sqbtxra.mongodb.net/hfl_football_league?retryWrites=true&w=majority&appName=Cluster0',
+      database: 'hfl_football_league',
+      collections: {
+        teams: 'teams',
+        players: 'players',
+        matches: 'matches',
+        standings: 'standings',
+        applications: 'leagueApplications'
+      }
+    };
+  }
+
+  // Check if service is connected
+  isServiceConnected(): boolean {
+    return this.isConnected;
+  }
+
+  // Teams operations
+  async getTeams(): Promise<any[]> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/teams`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch teams');
+      }
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      throw error;
+    }
+  }
+
+  async getTeamById(id: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/teams/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch team');
+      }
+    } catch (error) {
+      console.error('Error fetching team:', error);
+      throw error;
+    }
+  }
+
+  // Players operations
+  async getPlayers(): Promise<any[]> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/players`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch players');
+      }
+    } catch (error) {
+      console.error('Error fetching players:', error);
+      throw error;
+    }
+  }
+
+  async getPlayerById(id: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/players/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch player');
+      }
+    } catch (error) {
+      console.error('Error fetching player:', error);
+      throw error;
+    }
+  }
+
+  // Matches operations
+  async getMatches(status?: string): Promise<any[]> {
+    try {
+      const url = status 
+        ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/matches?status=${status}`
+        : `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/matches`;
+        
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch matches');
+      }
+    } catch (error) {
+      console.error('Error fetching matches:', error);
+      throw error;
+    }
+  }
+
+  async getMatchById(id: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/matches/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch match');
+      }
+    } catch (error) {
+      console.error('Error fetching match:', error);
+      throw error;
+    }
+  }
+
+  // Standings operations
+  async getStandings(): Promise<any[]> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/standings`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch standings');
+      }
+    } catch (error) {
+      console.error('Error fetching standings:', error);
+      throw error;
+    }
+  }
+
+  // Applications operations
+  async createApplication(applicationData: any): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(applicationData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to create application');
+      }
+    } catch (error) {
+      console.error('Error creating application:', error);
+      throw error;
+    }
+  }
+
+  async getApplicationsByPhone(phone: string): Promise<any[]> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications/${phone}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch applications');
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      throw error;
+    }
+  }
+
+  // OTP operations
+  async requestOtp(phone: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/request-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to request OTP');
+      }
+    } catch (error) {
+      console.error('Error requesting OTP:', error);
+      throw error;
+    }
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone, code }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to verify OTP');
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      throw error;
+    }
+  }
+
+  // Health check
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        this.isConnected = true;
+        return true;
+      } else {
+        this.isConnected = false;
+        return false;
+      }
+    } catch (error) {
+      console.error('Health check failed:', error);
+      this.isConnected = false;
+      return false;
+    }
+  }
+}
+
+// Export singleton instance
+export const mongodbService = new MongoDBService();
+export default MongoDBService;
+
+// Handles MongoDB operations for mobile app
+
+interface MongoDBConfig {
+  uri: string;
+  database: string;
+  collections: {
+    teams: string;
+    players: string;
+    matches: string;
+    standings: string;
+    applications: string;
+  };
+}
+
+class MongoDBService {
+  private config: MongoDBConfig;
+  private isConnected: boolean = false;
+
+  constructor() {
+    this.config = {
+      uri: process.env.EXPO_PUBLIC_MONGODB_URI || 'mongodb+srv://hfl_user:HFL2023secure@cluster0.sqbtxra.mongodb.net/hfl_football_league?retryWrites=true&w=majority&appName=Cluster0',
+      database: 'hfl_football_league',
+      collections: {
+        teams: 'teams',
+        players: 'players',
+        matches: 'matches',
+        standings: 'standings',
+        applications: 'leagueApplications'
+      }
+    };
+  }
+
+  // Check if service is connected
+  isServiceConnected(): boolean {
+    return this.isConnected;
+  }
+
+  // Teams operations
+  async getTeams(): Promise<any[]> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/teams`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch teams');
+      }
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      throw error;
+    }
+  }
+
+  async getTeamById(id: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/teams/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch team');
+      }
+    } catch (error) {
+      console.error('Error fetching team:', error);
+      throw error;
+    }
+  }
+
+  // Players operations
+  async getPlayers(): Promise<any[]> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/players`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch players');
+      }
+    } catch (error) {
+      console.error('Error fetching players:', error);
+      throw error;
+    }
+  }
+
+  async getPlayerById(id: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/players/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch player');
+      }
+    } catch (error) {
+      console.error('Error fetching player:', error);
+      throw error;
+    }
+  }
+
+  // Matches operations
+  async getMatches(status?: string): Promise<any[]> {
+    try {
+      const url = status 
+        ? `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/matches?status=${status}`
+        : `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/matches`;
+        
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch matches');
+      }
+    } catch (error) {
+      console.error('Error fetching matches:', error);
+      throw error;
+    }
+  }
+
+  async getMatchById(id: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/matches/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch match');
+      }
+    } catch (error) {
+      console.error('Error fetching match:', error);
+      throw error;
+    }
+  }
+
+  // Standings operations
+  async getStandings(): Promise<any[]> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/standings`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch standings');
+      }
+    } catch (error) {
+      console.error('Error fetching standings:', error);
+      throw error;
+    }
+  }
+
+  // Applications operations
+  async createApplication(applicationData: any): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(applicationData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to create application');
+      }
+    } catch (error) {
+      console.error('Error creating application:', error);
+      throw error;
+    }
+  }
+
+  async getApplicationsByPhone(phone: string): Promise<any[]> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications/${phone}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to fetch applications');
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      throw error;
+    }
+  }
+
+  // OTP operations
+  async requestOtp(phone: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/request-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to request OTP');
+      }
+    } catch (error) {
+      console.error('Error requesting OTP:', error);
+      throw error;
+    }
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<any> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone, code }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to verify OTP');
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      throw error;
+    }
+  }
+
+  // Health check
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        this.isConnected = true;
+        return true;
+      } else {
+        this.isConnected = false;
+        return false;
+      }
+    } catch (error) {
+      console.error('Health check failed:', error);
+      this.isConnected = false;
+      return false;
+    }
+  }
+}
+
+// Export singleton instance
+export const mongodbService = new MongoDBService();
+export default MongoDBService;
+
+
+
+

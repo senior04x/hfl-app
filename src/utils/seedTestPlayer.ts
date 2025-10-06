@@ -1,6 +1,6 @@
 // Test Player Data for Firestore
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../lib/firebase';
 
 export const seedTestPlayer = async () => {
   try {

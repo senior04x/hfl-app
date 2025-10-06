@@ -1,10 +1,13 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import SkeletonLoader from './SkeletonLoader';
+import { useTheme } from '../store/useThemeStore';
 
 const MatchSkeletonCard: React.FC = () => {
+  const { colors } = useTheme();
+  
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
       <View style={styles.header}>
         <SkeletonLoader width={80} height={16} />
         <SkeletonLoader width={60} height={16} />
@@ -36,7 +39,7 @@ const MatchSkeletonCard: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
+    // backgroundColor will be set dynamically based on theme
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,

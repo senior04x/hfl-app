@@ -9,13 +9,11 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../store/useThemeStore';
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+// Firebase imports removed - using MongoDB API
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
 import { uploadImageToFirebase } from '../utils/uploadImage';
 
@@ -130,15 +128,24 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
 
       console.log('Submitting team application:', teamApplicationData);
       
-      // Submit directly to Firebase
-      const docRef = await addDoc(collection(db, 'leagueApplications'), {
-        ...teamApplicationData,
-        type: 'team',
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      // Submit to MongoDB via API
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...teamApplicationData,
+          type: 'team',
+        }),
       });
 
-      console.log('Document written with ID: ', docRef.id);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Team application submitted:', result);
       
       Alert.alert(
         'Muvaffaqiyatli',

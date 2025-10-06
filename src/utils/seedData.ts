@@ -1,5 +1,5 @@
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../lib/firebase';
 import { Team, Player, Match } from '../types';
 // Demo teams data
 const teamsData = [

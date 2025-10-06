@@ -8,7 +8,7 @@ import {
   User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db } from '../lib/firebase';
 
 export class FirebaseLoginFlow {
   

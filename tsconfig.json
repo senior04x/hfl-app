@@ -1,5 +1,4 @@
 {
-  "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
     "allowJs": false,
@@ -8,23 +7,33 @@
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "es2020",
+    "lib": [
+      "es2020",
+      "dom",
+      "dom.iterable"
+    ],
     "paths": {
       "@/*": [
         "src/*"
       ]
-    }
+    },
+    "incremental": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true
   },
   "include": [
     "src/**/*",
     "App.tsx",
-    "index.ts",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "index.ts"
   ],
   "exclude": [
     "functions",
     "scripts",
     "node_modules",
     "src/__tests__"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }

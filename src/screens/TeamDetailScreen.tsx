@@ -7,20 +7,22 @@ import {
   // ActivityIndicator, // Skeleton loading ishlatamiz
   FlatList,
   Image,
-  SafeAreaView,
   TouchableOpacity,
+  SafeAreaView,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { DataService } from '../services/data';
 import { Team, Player, RootStackParamList } from '../types';
+import { useTheme } from '../store/useThemeStore';
 
 type TeamDetailRouteProp = RouteProp<RootStackParamList, 'TeamDetail'>;
 
 const TeamDetailScreen = () => {
   const route = useRoute<TeamDetailRouteProp>();
   const navigation = useNavigation();
+  const { colors } = useTheme();
   const { teamId } = route.params;
   
   const [team, setTeam] = useState<Team | null>(null);
@@ -68,19 +70,23 @@ const TeamDetailScreen = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        {/* Skeleton loading ishlatamiz */}
-        <Text style={styles.loadingText}>Loading team details...</Text>
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+          {/* Skeleton loading ishlatamiz */}
+          <Text style={[styles.loadingText, { color: colors.text }]}>Loading team details...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!team) {
     return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={48} color="#FF3B30" />
-        <Text style={styles.errorText}>Team not found</Text>
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+          <Ionicons name="alert-circle" size={48} color={colors.error} />
+          <Text style={[styles.errorText, { color: colors.text }]}>Team not found</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -88,7 +94,7 @@ const TeamDetailScreen = () => {
     console.log('Rendering player:', item);
     return (
       <TouchableOpacity 
-        style={styles.playerCard}
+        style={[styles.playerCard, { backgroundColor: colors.surface }]}
         onPress={() => {
           navigation.navigate('PlayerStats', {
             playerId: item.id,
@@ -96,24 +102,24 @@ const TeamDetailScreen = () => {
           });
         }}
       >
-        <View style={styles.playerNumber}>
-          <Text style={styles.playerNumberText}>{item.number || '?'}</Text>
+        <View style={[styles.playerNumber, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.playerNumberText, { color: 'white' }]}>{item.number || '?'}</Text>
         </View>
         <View style={styles.playerInfo}>
-          <Text style={styles.playerName}>{item.firstName} {item.lastName}</Text>
-          <Text style={styles.playerPosition}>{item.position || 'Unknown'}</Text>
-          <Text style={styles.playerPhone}>{item.phone}</Text>
+          <Text style={[styles.playerName, { color: colors.text }]}>{item.firstName} {item.lastName}</Text>
+          <Text style={[styles.playerPosition, { color: colors.textSecondary }]}>{item.position || 'Unknown'}</Text>
+          <Text style={[styles.playerPhone, { color: colors.textTertiary }]}>{item.phone}</Text>
         </View>
         <View style={[styles.statusBadge, { 
-          backgroundColor: item.status === 'active' ? '#34C759' : 
-                          item.status === 'inactive' ? '#8E8E93' : '#FF3B30' 
+          backgroundColor: item.status === 'active' ? colors.success : 
+                          item.status === 'inactive' ? colors.textTertiary : colors.error 
         }]}>
-          <Text style={styles.statusText}>
+          <Text style={[styles.statusText, { color: 'white' }]}>
             {item.status === 'active' ? 'Faol' : 
              item.status === 'inactive' ? 'Nofaol' : 'Suspensiya'}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
       </TouchableOpacity>
     );
   };
@@ -134,9 +140,9 @@ const TeamDetailScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView style={[styles.scrollView, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.header }]}>
         <View style={styles.teamHeader}>
           {team.logo ? (
             <Image
@@ -147,13 +153,13 @@ const TeamDetailScreen = () => {
           ) : (
             <View style={[styles.teamColor, { backgroundColor: team.color || '#3B82F6' }]} />
           )}
-          <Text style={styles.teamName}>{team.name || 'Unknown Team'}</Text>
+          <Text style={[styles.teamName, { color: colors.text }]}>{team.name || 'Unknown Team'}</Text>
         </View>
-        <Text style={styles.teamStats}>{team.players?.length || 0} players</Text>
+        <Text style={[styles.teamStats, { color: colors.textSecondary }]}>{team.players?.length || 0} players</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Players ({team.players?.length || 0})</Text>
+      <View style={[styles.section, { backgroundColor: colors.background }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Players ({team.players?.length || 0})</Text>
         
         {team.players && team.players.length > 0 ? (
           <FlatList
@@ -163,36 +169,36 @@ const TeamDetailScreen = () => {
             scrollEnabled={false}
           />
         ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>No players found</Text>
+          <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
+            <Ionicons name="people-outline" size={48} color={colors.textTertiary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No players found</Text>
           </View>
         )}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Team Information</Text>
+      <View style={[styles.section, { backgroundColor: colors.background }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Team Information</Text>
         
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
           <View style={styles.infoRow}>
-            <Ionicons name="football" size={20} color="#666" />
-            <Text style={styles.infoLabel}>Team Name:</Text>
-            <Text style={styles.infoValue}>{team.name || 'Unknown Team'}</Text>
+            <Ionicons name="football" size={20} color={colors.textSecondary} />
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Team Name:</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{team.name || 'Unknown Team'}</Text>
           </View>
           
           <View style={styles.infoRow}>
-            <Ionicons name="color-palette" size={20} color="#666" />
-            <Text style={styles.infoLabel}>Team Color:</Text>
+            <Ionicons name="color-palette" size={20} color={colors.textSecondary} />
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Team Color:</Text>
             <View style={styles.colorContainer}>
               <View style={[styles.colorPreview, { backgroundColor: team.color || '#3B82F6' }]} />
-              <Text style={styles.infoValue}>{team.color || '#3B82F6'}</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>{team.color || '#3B82F6'}</Text>
             </View>
           </View>
           
           <View style={styles.infoRow}>
-            <Ionicons name="people" size={20} color="#666" />
-            <Text style={styles.infoLabel}>Total Players:</Text>
-            <Text style={styles.infoValue}>{team.players?.length || 0}</Text>
+            <Ionicons name="people" size={20} color={colors.textSecondary} />
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Total Players:</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{team.players?.length || 0}</Text>
           </View>
         </View>
       </View>

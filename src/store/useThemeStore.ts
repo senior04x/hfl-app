@@ -44,6 +44,6 @@ export const useThemeStore = create<ThemeState>()(
 );
 
 export const useTheme = () => {
-  const { colors, theme, isDarkMode, isTransitioning } = useThemeStore();
-  return { colors, theme, isDarkMode, isTransitioning };
+  const { colors, theme, isDarkMode, isTransitioning, toggleTheme } = useThemeStore();
+  return { colors, theme, isDarkMode, isTransitioning, toggleTheme };
 };

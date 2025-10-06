@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
+import { useTheme } from '../store/useThemeStore';
 
 interface SkeletonLoaderProps {
   width?: number | string;
@@ -16,6 +17,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
   style,
   children
 }) => {
+  const { colors } = useTheme();
   const shimmerAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -62,6 +64,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
           width,
           height,
           borderRadius,
+          backgroundColor: colors.border,
         },
         shimmerStyle,
         style,
@@ -72,7 +75,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
 
 const styles = StyleSheet.create({
   skeleton: {
-    backgroundColor: '#E1E9EE',
+    // backgroundColor will be set dynamically based on theme
   },
 });
 

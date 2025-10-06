@@ -15,9 +15,21 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
-        }
-      }
+          "NSAllowsArbitraryLoads": true,
+          "NSExceptionDomains": {
+            "localhost": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSExceptionMinimumTLSVersion": "1.0"
+            },
+            "hfl-backend-360d7733bad1.herokuapp.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionMinimumTLSVersion": "1.2"
+            }
+          }
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.seniorxo.hfl"
     },
     "android": {
       "adaptiveIcon": {
@@ -38,12 +50,17 @@
       },
       "EXPO_PUBLIC_API_BASE_URL": "https://hfl-backend-360d7733bad1.herokuapp.com"
     },
+    "packagerOpts": {
+      "config": {
+        "metro": {
+          "resolver": {
+            "platforms": ["ios", "android", "native", "web"]
+          }
+        }
+      }
+    },
     "owner": "seniorxo",
-    "plugins": [
-      "expo-router"
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    "plugins": [],
+    "sdkVersion": "54.0.0"
   }
 }

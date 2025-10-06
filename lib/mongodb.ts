@@ -1,6 +1,3 @@
-// HFL Admin MongoDB Service
-// Bitta MongoDB database, turli collections
-
 import { MongoClient, Db } from 'mongodb';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://hfl_user:HFL2023secure@cluster0.sqbtxra.mongodb.net/hfl_football_league?retryWrites=true&w=majority&appName=Cluster0';
@@ -31,196 +28,133 @@ class MongoDBService {
     try {
       if (this.client) {
         await this.client.close();
+        this.client = null;
+        this.db = null;
         this.isConnected = false;
-        console.log('🗄️ HFL Admin MongoDB disconnected');
+        console.log('🔌 MongoDB disconnected');
       }
     } catch (error) {
       console.error('❌ Error disconnecting MongoDB:', error);
     }
   }
 
-  getCollection(name: string) {
-    if (!this.isConnected || !this.db) {
-      throw new Error('MongoDB not connected');
-    }
-    return this.db.collection(name);
-  }
-
-  // Player operations
-  async getPlayers() {
-    const playersCollection = this.getCollection('players');
-    return playersCollection.find({}).toArray();
-  }
-
-  async getPlayerById(id: string) {
-    const playersCollection = this.getCollection('players');
-    return playersCollection.findOne({ _id: id });
-  }
-
-  async createPlayer(playerData: any) {
-    const playersCollection = this.getCollection('players');
-    const result = await playersCollection.insertOne({
-      ...playerData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return { _id: result.insertedId, ...playerData };
-  }
-
-  async updatePlayer(id: string, playerData: any) {
-    const playersCollection = this.getCollection('players');
-    const result = await playersCollection.updateOne(
-      { _id: id },
-      { $set: { ...playerData, updatedAt: new Date() } }
-    );
-    return result;
-  }
-
-  async deletePlayer(id: string) {
-    const playersCollection = this.getCollection('players');
-    return playersCollection.deleteOne({ _id: id });
-  }
-
-  // Team operations
+  // Teams methods
   async getTeams() {
-    const teamsCollection = this.getCollection('teams');
-    return teamsCollection.find({}).toArray();
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('teams').find({}).toArray();
   }
 
   async getTeamById(id: string) {
-    const teamsCollection = this.getCollection('teams');
-    return teamsCollection.findOne({ _id: id });
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('teams').findOne({ _id: id });
   }
 
   async createTeam(teamData: any) {
-    const teamsCollection = this.getCollection('teams');
-    const result = await teamsCollection.insertOne({
+    if (!this.db) throw new Error('Database not connected');
+    const result = await this.db.collection('teams').insertOne({
       ...teamData,
       createdAt: new Date(),
-      updatedAt: new Date(),
+      updatedAt: new Date()
     });
-    return { _id: result.insertedId, ...teamData };
+    return { ...teamData, _id: result.insertedId };
   }
 
-  async updateTeam(id: string, teamData: any) {
-    const teamsCollection = this.getCollection('teams');
-    const result = await teamsCollection.updateOne(
+  async updateTeam(id: string, updateData: any) {
+    if (!this.db) throw new Error('Database not connected');
+    await this.db.collection('teams').updateOne(
       { _id: id },
-      { $set: { ...teamData, updatedAt: new Date() } }
+      { $set: { ...updateData, updatedAt: new Date() } }
     );
-    return result;
+    return await this.getTeamById(id);
   }
 
   async deleteTeam(id: string) {
-    const teamsCollection = this.getCollection('teams');
-    return teamsCollection.deleteOne({ _id: id });
+    if (!this.db) throw new Error('Database not connected');
+    await this.db.collection('teams').deleteOne({ _id: id });
+    return true;
   }
 
-  // Match operations
+  // Players methods
+  async getPlayers() {
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('players').find({}).toArray();
+  }
+
+  async getPlayerById(id: string) {
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('players').findOne({ _id: id });
+  }
+
+  async createPlayer(playerData: any) {
+    if (!this.db) throw new Error('Database not connected');
+    const result = await this.db.collection('players').insertOne({
+      ...playerData,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    return { ...playerData, _id: result.insertedId };
+  }
+
+  async updatePlayer(id: string, updateData: any) {
+    if (!this.db) throw new Error('Database not connected');
+    await this.db.collection('players').updateOne(
+      { _id: id },
+      { $set: { ...updateData, updatedAt: new Date() } }
+    );
+    return await this.getPlayerById(id);
+  }
+
+  async deletePlayer(id: string) {
+    if (!this.db) throw new Error('Database not connected');
+    await this.db.collection('players').deleteOne({ _id: id });
+    return true;
+  }
+
+  // Matches methods
   async getMatches() {
-    const matchesCollection = this.getCollection('matches');
-    return matchesCollection.find({}).toArray();
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('matches').find({}).toArray();
   }
 
-  async getMatchById(id: string) {
-    const matchesCollection = this.getCollection('matches');
-    return matchesCollection.findOne({ _id: id });
+  async getMatchesByStatus(status: string) {
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('matches').find({ status }).toArray();
   }
 
-  async createMatch(matchData: any) {
-    const matchesCollection = this.getCollection('matches');
-    const result = await matchesCollection.insertOne({
-      ...matchData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return { _id: result.insertedId, ...matchData };
+  // Standings methods
+  async getStandings() {
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('standings').find({}).toArray();
   }
 
-  async updateMatch(id: string, matchData: any) {
-    const matchesCollection = this.getCollection('matches');
-    const result = await matchesCollection.updateOne(
-      { _id: id },
-      { $set: { ...matchData, updatedAt: new Date() } }
-    );
-    return result;
-  }
-
-  async deleteMatch(id: string) {
-    const matchesCollection = this.getCollection('matches');
-    return matchesCollection.deleteOne({ _id: id });
-  }
-
-  // Season operations
-  async getSeasons() {
-    const seasonsCollection = this.getCollection('seasons');
-    return seasonsCollection.find({}).toArray();
-  }
-
-  async getSeasonById(id: string) {
-    const seasonsCollection = this.getCollection('seasons');
-    return seasonsCollection.findOne({ _id: id });
-  }
-
-  async createSeason(seasonData: any) {
-    const seasonsCollection = this.getCollection('seasons');
-    const result = await seasonsCollection.insertOne({
-      ...seasonData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return { _id: result.insertedId, ...seasonData };
-  }
-
-  async updateSeason(id: string, seasonData: any) {
-    const seasonsCollection = this.getCollection('seasons');
-    const result = await seasonsCollection.updateOne(
-      { _id: id },
-      { $set: { ...seasonData, updatedAt: new Date() } }
-    );
-    return result;
-  }
-
-  async deleteSeason(id: string) {
-    const seasonsCollection = this.getCollection('seasons');
-    return seasonsCollection.deleteOne({ _id: id });
-  }
-
-  // Application operations
-  async getApplications() {
-    const applicationsCollection = this.getCollection('leagueApplications');
-    return applicationsCollection.find({}).toArray();
-  }
-
-  async getApplicationById(id: string) {
-    const applicationsCollection = this.getCollection('leagueApplications');
-    return applicationsCollection.findOne({ _id: id });
-  }
-
+  // Applications methods
   async createApplication(applicationData: any) {
-    const applicationsCollection = this.getCollection('leagueApplications');
-    const result = await applicationsCollection.insertOne({
+    if (!this.db) throw new Error('Database not connected');
+    const result = await this.db.collection('leagueApplications').insertOne({
       ...applicationData,
       createdAt: new Date(),
-      updatedAt: new Date(),
+      updatedAt: new Date()
     });
-    return { _id: result.insertedId, ...applicationData };
+    return { ...applicationData, _id: result.insertedId };
   }
 
-  async updateApplication(id: string, applicationData: any) {
-    const applicationsCollection = this.getCollection('leagueApplications');
-    const result = await applicationsCollection.updateOne(
-      { _id: id },
-      { $set: { ...applicationData, updatedAt: new Date() } }
-    );
-    return result;
+  async getApplicationsByPhone(phone: string) {
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('leagueApplications').find({ contactPhone: phone }).toArray();
   }
 
-  async deleteApplication(id: string) {
-    const applicationsCollection = this.getCollection('leagueApplications');
-    return applicationsCollection.deleteOne({ _id: id });
+  // Leagues methods
+  async getLeagues() {
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('leagues').find({}).toArray();
+  }
+
+  // Tournaments methods
+  async getTournaments() {
+    if (!this.db) throw new Error('Database not connected');
+    return await this.db.collection('tournaments').find({}).toArray();
   }
 }
 
-export const mongoService = new MongoDBService();
+const mongoService = new MongoDBService();
 export default mongoService;

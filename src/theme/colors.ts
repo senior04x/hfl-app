@@ -23,33 +23,47 @@ export const lightColors = {
   
   header: '#FFFFFF',
   headerText: '#000000',
+  
+  // Additional light mode colors
+  accent: '#007AFF', // Blue accent
+  muted: '#8E8E93', // Muted text
+  placeholder: '#C7C7CC', // Placeholder text
+  shadow: '#000000', // Shadow color
+  overlay: 'rgba(0, 0, 0, 0.5)', // Overlay color
 };
 
 export const darkColors = {
-  primary: '#0A84FF',
-  secondary: '#5E5CE6',
-  success: '#30D158',
-  warning: '#FF9F0A',
-  error: '#FF453A',
-  info: '#64D2FF',
+  primary: '#1E40AF', // Dark blue primary
+  secondary: '#3B82F6', // Blue secondary
+  success: '#10B981', // Green success
+  warning: '#F59E0B', // Amber warning
+  error: '#EF4444', // Red error
+  info: '#06B6D4', // Cyan info
   
-  background: '#000000',
-  surface: '#1C1C1E',
-  card: '#2C2C2E',
+  background: '#0F172A', // Very dark blue background
+  surface: '#1E293B', // Dark blue surface
+  card: '#334155', // Dark blue-gray card
   
-  text: '#FFFFFF',
-  textSecondary: '#8E8E93',
-  textTertiary: '#48484A',
+  text: '#F8FAFC', // Very light text
+  textSecondary: '#94A3B8', // Light gray secondary text
+  textTertiary: '#64748B', // Medium gray tertiary text
   
-  border: '#38383A',
-  separator: '#38383A',
+  border: '#475569', // Blue-gray border
+  separator: '#475569', // Blue-gray separator
   
-  tabBar: '#1C1C1E',
-  tabBarActive: '#0A84FF',
-  tabBarInactive: '#8E8E93',
+  tabBar: '#1E293B', // Dark blue tab bar
+  tabBarActive: '#3B82F6', // Blue active tab
+  tabBarInactive: '#64748B', // Gray inactive tab
   
-  header: '#1C1C1E',
-  headerText: '#FFFFFF',
+  header: '#1E293B', // Dark blue header
+  headerText: '#F8FAFC', // Light header text
+  
+  // Additional dark mode colors
+  accent: '#3B82F6', // Blue accent
+  muted: '#64748B', // Muted text
+  placeholder: '#94A3B8', // Placeholder text
+  shadow: '#000000', // Shadow color
+  overlay: 'rgba(0, 0, 0, 0.8)', // Overlay color
 };
 
 export type Colors = typeof lightColors;

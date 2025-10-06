@@ -7,8 +7,8 @@ import {
   Image,
   TouchableOpacity,
   Alert,
-  // ActivityIndicator, // Skeleton loading ishlatamiz
   SafeAreaView,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';

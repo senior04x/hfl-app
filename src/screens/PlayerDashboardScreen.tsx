@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db } from '../lib/firebase';
 
 interface PlayerDashboardScreenProps {
   navigation: any;

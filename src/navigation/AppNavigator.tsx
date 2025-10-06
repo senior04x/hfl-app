@@ -3,6 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
 import { RootStackParamList, MainTabParamList } from '../types';
 import SplashScreen from '../screens/SplashScreen';
@@ -20,6 +22,7 @@ import PlayerLoginScreen from '../screens/PlayerLoginScreen';
 import PlayerVerificationScreen from '../screens/PlayerVerificationScreen';
 import PlayerDashboardScreen from '../screens/PlayerDashboardScreen';
 import TeamApplicationScreen from '../screens/TeamApplicationScreen';
+import LeagueApplicationScreen from '../screens/LeagueApplicationScreen';
 import TransferRequestScreen from '../screens/TransferRequestScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import PlayerTransferRequestScreen from '../screens/PlayerTransferRequestScreen';
@@ -31,11 +34,14 @@ const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainTabNavigator = () => {
+  const { colors } = useTheme();
+  const { getText } = useLanguage();
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
+        tabBarIcon: ({ focused, color }) => {
+          let iconName: string;
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
@@ -51,37 +57,111 @@ const MainTabNavigator = () => {
             iconName = 'help-outline';
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName as any} size={26} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
+        tabBarStyle: {
+          backgroundColor: colors.tabBar,
+          borderTopColor: colors.border,
+          height: 50,
+          paddingBottom: 6,
+          paddingTop: 3,
+          marginHorizontal: 6,
+          marginBottom: 25,
+          borderRadius: 60,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
+        },
+        tabBarShowLabel: false,
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Home" component={SimpleHomeScreen} />
-      <Tab.Screen name="Matches" component={MatchesScreen} />
-      <Tab.Screen name="Teams" component={TeamsScreen} />
-      <Tab.Screen name="Standings" component={StandingsScreen} />
-      <Tab.Screen name="Account" component={UserAccountScreen} />
+      <Tab.Screen 
+        name="Home" 
+        component={SimpleHomeScreen} 
+        options={{ title: '' }}
+      />
+      <Tab.Screen 
+        name="Matches" 
+        component={MatchesScreen} 
+        options={{ title: '' }}
+      />
+      <Tab.Screen 
+        name="Teams" 
+        component={TeamsScreen} 
+        options={{ title: '' }}
+      />
+      <Tab.Screen 
+        name="Standings" 
+        component={StandingsScreen} 
+        options={{ title: '' }}
+      />
+      <Tab.Screen 
+        name="Account" 
+        component={UserAccountScreen}
+        options={{ title: '' }}
+      />
     </Tab.Navigator>
   );
 };
 
 const AppNavigator = () => {
+  const { colors, isDarkMode } = useTheme();
+  const { getText } = useLanguage();
+  
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
+    <NavigationContainer
+      theme={{
+        dark: isDarkMode,
+        colors: {
+          primary: colors.primary,
+          background: colors.background,
+          card: colors.card,
+          text: colors.text,
+          border: colors.border,
+          notification: colors.primary,
+        },
+      }}
+    >
+      <Stack.Navigator 
+        screenOptions={{ 
+          headerShown: false,
+          cardStyle: { backgroundColor: colors.background },
+        }} 
+        initialRouteName="Splash"
+      >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Main" component={MainTabNavigator} />
         <Stack.Screen 
           name="MatchDetail" 
           component={MatchDetailScreen}
-          options={{ headerShown: true, title: 'Match Details' }}
+          options={{ 
+            headerShown: true, 
+            title: getText('matchDetails'),
+            headerStyle: { backgroundColor: colors.header },
+            headerTintColor: colors.headerText,
+            headerTitleStyle: { color: colors.headerText },
+          }}
         />
         <Stack.Screen 
           name="TeamDetail" 
           component={TeamDetailScreen}
-          options={{ headerShown: true, title: 'Team Details' }}
+          options={{ 
+            headerShown: true, 
+            title: getText('teamDetails'),
+            headerStyle: { backgroundColor: colors.header },
+            headerTintColor: colors.headerText,
+            headerTitleStyle: { color: colors.headerText },
+          }}
         />
         <Stack.Screen 
           name="PlayerStats" 
@@ -116,6 +196,11 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="TeamApplication" 
           component={TeamApplicationScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="LeagueApplication" 
+          component={LeagueApplicationScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen 

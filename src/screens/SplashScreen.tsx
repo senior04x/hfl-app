@@ -6,12 +6,14 @@ import {
   Animated,
   Text,
 } from 'react-native';
+import { useTheme } from '../store/useThemeStore';
 
 interface SplashScreenProps {
   navigation: any;
 }
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
+  const { colors } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
@@ -39,7 +41,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   }, [navigation, fadeAnim, scaleAnim]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Animated.View
         style={[
           styles.logoContainer,
@@ -54,8 +56,8 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.appName}>HFL Sports</Text>
-        <Text style={styles.subtitle}>Havas Football League</Text>
+        <Text style={[styles.appName, { color: colors.text }]}>HFL Sports</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Havas Football League</Text>
       </Animated.View>
     </View>
   );

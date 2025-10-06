@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   // ActivityIndicator, // Skeleton loading ishlatamiz
   Linking,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,8 +17,9 @@ import { doc, getDoc } from 'firebase/firestore';
 
 import { useTheme } from '../store/useThemeStore';
 import { RootStackParamList, Match } from '../types';
-import { db } from '../services/firebase';
+import { db } from '../lib/firebase';
 import MatchSkeletonCard from '../components/MatchSkeletonCard';
+import { truncateTeamName } from '../utils/textUtils';
 
 type MatchDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MatchDetail'>;
 type MatchDetailScreenRouteProp = RouteProp<RootStackParamList, 'MatchDetail'>;
@@ -215,7 +216,9 @@ const MatchDetailScreen = () => {
         <View style={[styles.matchHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.teamsContainer}>
             <View style={styles.teamContainer}>
-              <Text style={[styles.teamName, { color: colors.text }]}>{match.homeTeamName}</Text>
+              <Text style={[styles.teamName, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                {truncateTeamName(match.homeTeamName)}
+              </Text>
             </View>
             
             <View style={styles.scoreContainer}>
@@ -230,7 +233,9 @@ const MatchDetailScreen = () => {
             </View>
             
             <View style={styles.teamContainer}>
-              <Text style={[styles.teamName, { color: colors.text }]}>{match.awayTeamName}</Text>
+              <Text style={[styles.teamName, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                {truncateTeamName(match.awayTeamName)}
+              </Text>
             </View>
           </View>
         </View>

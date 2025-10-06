@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { useLanguage } from '../store/useLanguageStore';
 import { Player } from '../types';
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
 import { apiService } from '../services/apiService';
@@ -23,6 +24,7 @@ interface PlayerLoginScreenProps {
 const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
   const { login } = usePlayerStore();
+  const { getText } = useLanguage();
   const [phoneNumber, setPhoneNumber] = useState('+998 93 378 68 86');
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,12 +46,12 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
 
   const requestOtp = async () => {
     if (!phoneNumber.trim()) {
-      Alert.alert('Xatolik', 'Telefon raqamini kiriting');
+      Alert.alert(getText('error'), getText('enterPhoneNumber'));
       return;
     }
 
     if (!validatePhoneNumber(phoneNumber)) {
-      Alert.alert('Xatolik', 'Telefon raqami noto\'g\'ri formatda. +998 90 123 45 67 ko\'rinishida kiriting');
+      Alert.alert(getText('error'), getText('invalidPhoneFormat'));
       return;
     }
 
@@ -65,19 +67,19 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       if (result.success) {
         setStep('otp');
         setCountdown(60); // 60 seconds countdown
-        Alert.alert('Muvaffaqiyat', 'Tasdiqlash kodi yuborildi');
+        Alert.alert(getText('success'), getText('otpSent'));
       } else {
-        Alert.alert('Xatolik', result.error || 'Kod yuborishda xatolik');
+        Alert.alert(getText('error'), result.error || getText('otpSendError'));
       }
     } catch (error: any) {
       console.error('OTP request error:', error);
       
       if (error.name === 'AbortError') {
-        Alert.alert('Xatolik', 'Server bilan bog\'lanishda timeout. Qayta urinib ko\'ring.');
+        Alert.alert(getText('error'), getText('serverTimeout'));
       } else if (error.message.includes('ERR_CONNECTION_REFUSED')) {
-        Alert.alert('Xatolik', 'Server ishlamayapti. Iltimos, keyinroq urinib ko\'ring.');
+        Alert.alert(getText('error'), getText('serverDown'));
       } else {
-        Alert.alert('Xatolik', error.message || 'Kod yuborishda xatolik yuz berdi. Qayta urinib ko\'ring.');
+        Alert.alert(getText('error'), error.message || getText('otpSendError'));
       }
     } finally {
       setLoading(false);
@@ -86,12 +88,12 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
 
   const verifyOtp = async () => {
     if (!otpCode.trim()) {
-      Alert.alert('Xatolik', 'Tasdiqlash kodini kiriting');
+      Alert.alert(getText('error'), getText('enterOtpCode'));
       return;
     }
 
     if (otpCode.length !== 4) {
-      Alert.alert('Xatolik', 'Tasdiqlash kodi 4 xonali bo\'lishi kerak');
+      Alert.alert(getText('error'), getText('otpCodeLength'));
       return;
     }
 
@@ -162,20 +164,20 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
         
         if (newAttempts >= 3) {
           setIsBlocked(true);
-          Alert.alert('Bloklangan', 'Juda ko\'p noto\'g\'ri urinish. 15 daqiqa kutib turing');
+          Alert.alert(getText('blocked'), getText('tooManyAttempts'));
         } else {
-          Alert.alert('Xatolik', result.reason || 'Noto\'g\'ri kod');
+          Alert.alert(getText('error'), result.reason || getText('wrongCode'));
         }
       }
     } catch (error: any) {
       console.error('OTP verification error:', error);
       
       if (error.name === 'AbortError') {
-        Alert.alert('Xatolik', 'Server bilan bog\'lanishda timeout. Qayta urinib ko\'ring.');
+        Alert.alert(getText('error'), getText('serverTimeout'));
       } else if (error.message.includes('ERR_CONNECTION_REFUSED')) {
-        Alert.alert('Xatolik', 'Server ishlamayapti. Iltimos, keyinroq urinib ko\'ring.');
+        Alert.alert(getText('error'), getText('serverDown'));
       } else {
-        Alert.alert('Xatolik', error.message || 'Kod tekshirishda xatolik yuz berdi. Qayta urinib ko\'ring.');
+        Alert.alert(getText('error'), error.message || getText('otpVerifyError'));
       }
     } finally {
       setLoading(false);
@@ -184,7 +186,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
 
   const resendOtp = async () => {
     if (countdown > 0) {
-      Alert.alert('Kuting', `${countdown} soniya kutib turing`);
+      Alert.alert(getText('wait'), `${countdown} ${getText('secondsWait')}`);
       return;
     }
     
@@ -198,11 +200,11 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>O'yinchi Kirish</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{getText('playerLogin')}</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           {step === 'phone' 
-            ? 'Telefon raqamingizni kiriting va tasdiqlash kodi oling'
-            : 'Telefoningizga yuborilgan tasdiqlash kodini kiriting'
+            ? getText('phoneStepSubtitle')
+            : getText('otpStepSubtitle')
           }
         </Text>
       </View>
@@ -216,7 +218,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
           {step === 'phone' ? (
             <>
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Telefon raqam</Text>
+                <Text style={[styles.label, { color: colors.text }]}>{getText('phoneNumber')}</Text>
                 <TextInput
                   style={[styles.input, { 
                     backgroundColor: colors.surface, 
@@ -242,14 +244,14 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
                 disabled={loading || isBlocked}
               >
                 <Text style={styles.loginButtonText}>
-                  {loading ? 'Kod yuborilmoqda...' : 'Tasdiqlash kodi yuborish'}
+                  {loading ? getText('sendingCode') : getText('sendVerificationCode')}
                 </Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Tasdiqlash kodi</Text>
+                <Text style={[styles.label, { color: colors.text }]}>{getText('verificationCode')}</Text>
                 <TextInput
                   style={[styles.input, { 
                     backgroundColor: colors.surface, 
@@ -265,7 +267,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
                   autoFocus
                 />
                 <Text style={[styles.phoneDisplay, { color: colors.textSecondary }]}>
-                  {phoneNumber} raqamiga yuborildi
+                  {getText('sentTo')} {phoneNumber}
                 </Text>
               </View>
 
@@ -275,7 +277,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
                 disabled={loading || isBlocked}
               >
                 <Text style={styles.loginButtonText}>
-                  {loading ? 'Tekshirilmoqda...' : 'Tasdiqlash'}
+                  {loading ? getText('verifying') : getText('verify')}
                 </Text>
               </TouchableOpacity>
 
@@ -285,7 +287,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
                 disabled={countdown > 0 || loading}
               >
                 <Text style={[styles.resendButtonText, { color: colors.primary }]}>
-                  {countdown > 0 ? `Qayta yuborish (${countdown}s)` : 'Qayta yuborish'}
+                  {countdown > 0 ? `${getText('resend')} (${countdown}s)` : getText('resend')}
                 </Text>
               </TouchableOpacity>
 
@@ -294,7 +296,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
                 onPress={() => setStep('phone')}
               >
                 <Text style={[styles.backToPhoneButtonText, { color: colors.textSecondary }]}>
-                  Telefon raqamni o'zgartirish
+                  {getText('changePhoneNumber')}
                 </Text>
               </TouchableOpacity>
             </>
@@ -305,7 +307,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
             onPress={() => navigation.goBack()}
           >
             <Text style={[styles.backButtonText, { color: colors.textSecondary }]}>
-              Orqaga qaytish
+              {getText('goBack')}
             </Text>
           </TouchableOpacity>
         </View>

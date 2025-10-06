@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  SafeAreaView,
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +17,7 @@ import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 
 import { useTheme } from '../store/useThemeStore';
 import { RootStackParamList, Match } from '../types';
-import { db } from '../services/firebase';
+import { db } from '../lib/firebase';
 import MatchCard from '../components/MatchCard';
 import MatchSkeletonCard from '../components/MatchSkeletonCard';
 // import LoadingOverlay from '../components/LoadingOverlay'; // Skeleton loading ishlatamiz
@@ -306,6 +306,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -313,6 +316,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    flex: 1,
   },
   filters: {
     flexDirection: 'row',

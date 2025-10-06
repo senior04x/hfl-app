@@ -9,6 +9,7 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '../store/useLanguageStore';
 
 interface ApplicationTypeModalProps {
   visible: boolean;
@@ -27,6 +28,7 @@ const ApplicationTypeModal: React.FC<ApplicationTypeModalProps> = ({
   onTeamApplication,
   onLeagueApplication,
 }) => {
+  const { getText } = useLanguage();
   const scaleValue = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -67,8 +69,8 @@ const ApplicationTypeModal: React.FC<ApplicationTypeModalProps> = ({
               <Ionicons name="information-circle" size={48} color="#3B82F6" />
             </View>
             
-            <Text style={styles.title}>Ariza Turi</Text>
-            <Text style={styles.message}>Qanday ariza berishni xohlaysiz?</Text>
+            <Text style={styles.title}>{getText('applicationType')}</Text>
+            <Text style={styles.message}>{getText('applicationTypeMessage')}</Text>
             
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -76,7 +78,7 @@ const ApplicationTypeModal: React.FC<ApplicationTypeModalProps> = ({
                 onPress={onPlayerApplication}
               >
                 <Ionicons name="person" size={24} color="white" />
-                <Text style={styles.buttonText}>O'yinchi Ariza</Text>
+                <Text style={styles.buttonText}>{getText('playerApplication')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -84,7 +86,7 @@ const ApplicationTypeModal: React.FC<ApplicationTypeModalProps> = ({
                 onPress={onTeamApplication}
               >
                 <Ionicons name="people" size={24} color="white" />
-                <Text style={styles.buttonText}>Jamoa Ariza</Text>
+                <Text style={styles.buttonText}>{getText('teamApplication')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -92,7 +94,7 @@ const ApplicationTypeModal: React.FC<ApplicationTypeModalProps> = ({
                 onPress={onLeagueApplication}
               >
                 <Ionicons name="trophy" size={24} color="white" />
-                <Text style={styles.buttonText}>Liga Ariza</Text>
+                <Text style={styles.buttonText}>{getText('leagueApplication')}</Text>
               </TouchableOpacity>
             </View>
             
@@ -100,7 +102,7 @@ const ApplicationTypeModal: React.FC<ApplicationTypeModalProps> = ({
               style={styles.closeButton}
               onPress={onClose}
             >
-              <Text style={styles.closeButtonText}>Bekor qilish</Text>
+              <Text style={styles.closeButtonText}>{getText('cancel')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

@@ -1,142 +1,167 @@
-// HFL Mobile API Service
-// Backend server bilan bog'lanish uchun
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
-
-export interface OtpRequestResponse {
-  success: boolean;
-  message: string;
-  phone: string;
-  expiresIn: number;
-  error?: string;
-}
-
-export interface OtpVerifyResponse {
-  success: boolean;
-  message: string;
-  player: {
-    id: string;
-    phone: string;
-    firstName: string;
-    lastName: string;
-    position: string;
-    number: string;
-    status: string;
-    createdAt: string;
-    updatedAt: string;
-  };
-  session: {
-    playerId: string;
-    sessionId: string;
-    createdAt: string;
-    expiresAt: string;
-  };
-  reason?: string;
-  error?: string;
-}
-
-export interface ApiError {
-  success: false;
-  error: string;
-  details?: string;
-}
+import { ApiResponse, ApiError } from '../types';
+import { env } from '../types/env';
 
 class ApiService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = API_BASE_URL;
-    console.log('🌐 API Service initialized with base URL:', this.baseUrl);
+    // Use local Next.js API routes instead of direct backend calls
+    this.baseUrl = ''; // Empty for relative URLs to local API routes
+    console.log('API Base URL:', this.baseUrl || 'Using local Next.js API routes');
   }
 
-  /**
-   * Send OTP request to phone number
-   */
-  async requestOtp(phone: string): Promise<OtpRequestResponse> {
-    try {
-      console.log('📱 Requesting OTP for phone:', phone);
-      
-      const response = await fetch(`${this.baseUrl}/api/request-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phone }),
-      });
+  private async request<T>(
+    endpoint: string, 
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+    };
 
-      const data = await response.json();
+    const config: RequestInit = {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    };
+
+    try {
+      const response = await fetch(url, config);
       
       if (!response.ok) {
-        throw new Error(data.error || 'OTP request failed');
+        const errorData: ApiError = await response.json().catch(() => ({
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
+        }));
+        
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      console.log('✅ OTP request successful');
-      return data;
-      
-    } catch (error: any) {
-      console.error('❌ OTP request error:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Verify OTP code
-   */
-  async verifyOtp(phone: string, code: string): Promise<OtpVerifyResponse> {
-    try {
-      console.log('🔍 Verifying OTP for phone:', phone, 'code:', code);
-      
-      const response = await fetch(`${this.baseUrl}/api/verify-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phone, code }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'OTP verification failed');
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response');
       }
 
-      console.log('✅ OTP verification successful');
+      const data: ApiResponse<T> = await response.json();
       return data;
+    } catch (error) {
+      console.error(`API request failed for ${endpoint}:`, error);
       
-    } catch (error: any) {
-      console.error('❌ OTP verification error:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      
+      throw new Error('Network error occurred');
+    }
+  }
+
+  // Teams API
+  async getTeams(): Promise<ApiResponse<any[]>> {
+    try {
+      const response = await this.request('/api/teams');
+      console.log('Raw API response:', response);
+      
+      // Backend returns {success: true, data: [...]} format
+      if (response && response.success && response.data) {
+        return {
+          success: true,
+          data: response.data
+        };
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error in getTeams:', error);
       throw error;
     }
   }
 
-  /**
-   * Check server health
-   */
-  async checkHealth(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl}/health`);
-      const data = await response.json();
-      return data.success === true;
-    } catch (error) {
-      console.error('❌ Health check failed:', error);
-      return false;
-    }
+  async getTeam(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/teams/${id}`);
   }
 
-  /**
-   * Get server status
-   */
-  async getServerStatus(): Promise<any> {
-    try {
-      const response = await fetch(`${this.baseUrl}/health`);
-      return await response.json();
-    } catch (error) {
-      console.error('❌ Server status check failed:', error);
-      throw error;
-    }
+  async createTeam(teamData: any): Promise<ApiResponse<any>> {
+    return this.request('/api/teams', {
+      method: 'POST',
+      body: JSON.stringify(teamData),
+    });
+  }
+
+  async updateTeam(id: string, teamData: any): Promise<ApiResponse<any>> {
+    return this.request(`/api/teams/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(teamData),
+    });
+  }
+
+  async deleteTeam(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/teams/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Matches API
+  async getMatches(status?: string): Promise<ApiResponse<any[]>> {
+    const endpoint = status ? `/api/matches?status=${status}` : '/api/matches';
+    return this.request(endpoint);
+  }
+
+  async getMatch(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/matches/${id}`);
+  }
+
+  // Players API
+  async getPlayers(): Promise<ApiResponse<any[]>> {
+    return this.request('/api/players');
+  }
+
+  async getPlayer(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/players/${id}`);
+  }
+
+  // Standings API
+  async getStandings(): Promise<ApiResponse<any[]>> {
+    return this.request('/api/standings');
+  }
+
+  // Applications API
+  async createApplication(applicationData: any): Promise<ApiResponse<any>> {
+    return this.request('/api/applications', {
+      method: 'POST',
+      body: JSON.stringify(applicationData),
+    });
+  }
+
+  async getApplicationsByPhone(phone: string): Promise<ApiResponse<any[]>> {
+    return this.request(`/api/applications/${phone}`);
+  }
+
+  // OTP API
+  async requestOtp(phone: string): Promise<ApiResponse<any>> {
+    return this.request('/api/request-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<ApiResponse<any>> {
+    return this.request('/api/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code }),
+    });
+  }
+
+  // Health check
+  async healthCheck(): Promise<ApiResponse<any>> {
+    return this.request('/health');
   }
 }
 
-// Export singleton instance
 export const apiService = new ApiService();
 export default apiService;

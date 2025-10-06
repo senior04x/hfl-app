@@ -15,8 +15,9 @@ import { useAppStore } from '../store/useAppStore';
 import { RootStackParamList, Match } from '../types';
 import MatchCard from '../components/MatchCard';
 import MatchSkeletonCard from '../components/MatchSkeletonCard';
-import ErrorBoundary from '../components/ErrorBoundary';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -25,6 +26,7 @@ const SimpleHomeScreen = () => {
   const { matches, loadMatches, isLoading } = useAppStore();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const { colors } = useTheme();
+  const { getText } = useLanguage();
 
   useEffect(() => {
     const initializeData = async () => {
@@ -62,14 +64,14 @@ const SimpleHomeScreen = () => {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Welcome to HFL</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Havas Football League</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{getText('welcomeToHFL')}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{getText('havasFootballLeague')}</Text>
         </View>
         
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Ionicons name="time" size={20} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming Matches</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('upcomingMatches')}</Text>
           </View>
           {Array.from({ length: 3 }).map((_, index) => (
             <MatchSkeletonCard key={index} />
@@ -83,15 +85,15 @@ const SimpleHomeScreen = () => {
     <ErrorBoundary>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Welcome to HFL</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Havas Football League</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{getText('welcomeToHFL')}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{getText('havasFootballLeague')}</Text>
         </View>
 
         {liveMatches.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="radio" size={20} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Live Matches</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('liveMatches')}</Text>
             </View>
             <FlatList
               data={liveMatches}
@@ -106,7 +108,7 @@ const SimpleHomeScreen = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Ionicons name="time" size={20} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming Matches</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('upcomingMatches')}</Text>
           </View>
           <FlatList
             data={upcomingMatches}
@@ -115,7 +117,7 @@ const SimpleHomeScreen = () => {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="football-outline" size={48} color={colors.textTertiary} />
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No upcoming matches</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{getText('noUpcomingMatches')}</Text>
               </View>
             }
           />
@@ -131,7 +133,7 @@ const SimpleHomeScreen = () => {
           }}
         >
           <Ionicons name="list" size={24} color={colors.primary} />
-          <Text style={[styles.quickActionText, { color: colors.text }]}>View All Matches</Text>
+          <Text style={[styles.quickActionText, { color: colors.text }]}>{getText('viewAllMatches')}</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.primary} />
         </TouchableOpacity>
       </SafeAreaView>

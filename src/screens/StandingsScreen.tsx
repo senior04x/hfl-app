@@ -6,17 +6,17 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
-  SafeAreaView,
   // ActivityIndicator, // Skeleton loading ishlatamiz
   ScrollView,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { onSnapshot, collection, query, orderBy, where, getDocs } from 'firebase/firestore';
 
 import { useTheme } from '../store/useThemeStore';
 import { TeamStanding, Team, Match, PlayerStats } from '../types';
-import { db } from '../services/firebase';
+import { db } from '../lib/firebase';
 import MatchSkeletonCard from '../components/MatchSkeletonCard';
 
 interface League {

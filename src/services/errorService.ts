@@ -135,7 +135,7 @@ class ErrorService {
     let userMessage = 'Noma\'lum xatolik yuz berdi';
 
     if (error.message) {
-      if (error.message.includes('Network request failed')) {
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
         userMessage = 'Internet aloqasi yo\'q. Internet aloqangizni tekshiring.';
       } else if (error.message.includes('timeout')) {
         userMessage = 'Server javob bermayapti. Keyinroq urinib ko\'ring.';
@@ -147,6 +147,10 @@ class ErrorService {
         userMessage = 'Ruxsat yo\'q.';
       } else if (error.message.includes('401')) {
         userMessage = 'Autentifikatsiya kerak.';
+      } else if (error.message.includes('Unexpected token')) {
+        userMessage = 'Server javob noto\'g\'ri. Keyinroq urinib ko\'ring.';
+      } else if (error.message.includes('WebSocket')) {
+        userMessage = 'Real-time aloqa uzildi. Qayta ulanish...';
       } else {
         userMessage = error.message;
       }
@@ -238,7 +242,7 @@ class ErrorService {
       
       if (unreportedErrors.length === 0) return;
 
-      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
       
       const response = await fetch(`${apiBaseUrl}/api/errors/report`, {
         method: 'POST',

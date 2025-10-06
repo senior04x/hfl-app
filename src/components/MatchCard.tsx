@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Match } from '../types';
+import { useTheme } from '../store/useThemeStore';
 
 interface MatchCardProps {
   match: Match;
@@ -14,6 +15,7 @@ interface MatchCardProps {
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
+  const { colors } = useTheme();
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('uz-UZ', {
       month: 'short',
@@ -59,7 +61,7 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
   };
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
+    <TouchableOpacity style={[styles.container, { backgroundColor: colors.card }]} onPress={onPress}>
       <View style={styles.header}>
         <View style={styles.statusContainer}>
           <Ionicons 
@@ -71,34 +73,34 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
             {getStatusText(match.status)}
           </Text>
         </View>
-        <Text style={styles.date}>{formatDate(match.matchDate)}</Text>
+        <Text style={[styles.date, { color: colors.textSecondary }]}>{formatDate(match.matchDate)}</Text>
       </View>
 
       <View style={styles.teams}>
         <View style={styles.team}>
-          <Text style={styles.teamName}>{match.homeTeamName}</Text>
+          <Text style={[styles.teamName, { color: colors.text }]}>{match.homeTeamName}</Text>
         </View>
 
         <View style={styles.scoreContainer}>
-          <Text style={styles.score}>
+          <Text style={[styles.score, { color: colors.text }]}>
             {match.status === 'scheduled' ? 'VS' : `${match.homeScore} - ${match.awayScore}`}
           </Text>
         </View>
 
         <View style={styles.team}>
-          <Text style={styles.teamName}>{match.awayTeamName}</Text>
+          <Text style={[styles.teamName, { color: colors.text }]}>{match.awayTeamName}</Text>
         </View>
       </View>
 
       {match.venue && (
         <View style={styles.venueContainer}>
-          <Ionicons name="location-outline" size={14} color="#666" />
-          <Text style={styles.venue}>{match.venue}</Text>
+          <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+          <Text style={[styles.venue, { color: colors.textSecondary }]}>{match.venue}</Text>
         </View>
       )}
 
       {match.status === 'live' && (
-        <View style={styles.liveIndicator}>
+        <View style={[styles.liveIndicator, { borderTopColor: colors.border }]}>
           <View style={styles.liveDot} />
           <Text style={styles.liveText}>LIVE</Text>
         </View>
@@ -109,7 +111,6 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
     marginHorizontal: 16,
@@ -139,7 +140,6 @@ const styles = StyleSheet.create({
   },
   date: {
     fontSize: 14,
-    color: '#666',
     fontWeight: '500',
   },
   teams: {
@@ -155,7 +155,6 @@ const styles = StyleSheet.create({
   teamName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     textAlign: 'center',
   },
   teamColor: {
@@ -171,7 +170,6 @@ const styles = StyleSheet.create({
   score: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
   },
   liveIndicator: {
     flexDirection: 'row',
@@ -180,7 +178,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   liveDot: {
     width: 8,
@@ -201,7 +198,6 @@ const styles = StyleSheet.create({
   },
   venue: {
     fontSize: 14,
-    color: '#666',
     marginLeft: 4,
     fontWeight: '500',
   },

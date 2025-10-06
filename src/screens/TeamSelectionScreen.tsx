@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  // ActivityIndicator, // Skeleton loading ishlatamiz
   SafeAreaView,
+  // ActivityIndicator, // Skeleton loading ishlatamiz
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
 import { DataService } from '../services/data';

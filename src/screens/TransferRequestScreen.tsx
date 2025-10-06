@@ -98,7 +98,7 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
   const checkTransferStatus = async () => {
     try {
       const { collection, query, where, orderBy, getDocs } = await import('firebase/firestore');
-      const { db } = await import('../services/firebase');
+      const { db } = await import('../lib/firebase');
       
       const transferQuery = query(
         collection(db, 'transferRequests'),
@@ -169,12 +169,24 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
       console.log('Current team ID:', currentTeamId);
       console.log('New team ID:', selectedTeam!.id);
 
-      // Submit directly to Firebase
-      const { collection, addDoc } = await import('firebase/firestore');
-      const { db } = await import('../services/firebase');
-      
-      const transferRequestsCollection = collection(db, 'transferRequests');
-      const docRef = await addDoc(transferRequestsCollection, transferData);
+      // Submit to MongoDB via API
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...transferData,
+          type: 'transfer',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Transfer request submitted:', result);
 
       setShowSuccessModal(true);
 

@@ -5,10 +5,12 @@ import { Platform } from 'react-native';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { initializePlayerStore } from './src/store/usePlayerStore';
-import ErrorBoundary from './src/components/ErrorBoundary';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { notificationService } from './src/services/notificationService';
 import { syncService } from './src/services/syncService';
 import { offlineService } from './src/services/offlineService';
+import { realTimeService } from './src/services/realTimeService';
+import { ThemeProvider } from './src/providers/ThemeProvider';
 
 export default function App() {
   useEffect(() => {
@@ -69,6 +71,38 @@ export default function App() {
     
     initSync();
     
+    // Initialize real-time service
+    const initRealTime = async () => {
+      try {
+        console.log('🔌 Initializing real-time service...');
+        await realTimeService.connect();
+        console.log('✅ Real-time service connected');
+        
+        // Set up real-time listeners
+        realTimeService.subscribe('match_update', (data) => {
+          console.log('📊 Match update received:', data);
+          // Trigger sync when real-time update received
+          syncService.forceSync();
+        });
+        
+        realTimeService.subscribe('team_update', (data) => {
+          console.log('👥 Team update received:', data);
+          syncService.forceSync();
+        });
+        
+        realTimeService.subscribe('player_update', (data) => {
+          console.log('⚽ Player update received:', data);
+          syncService.forceSync();
+        });
+        
+      } catch (error) {
+        console.error('❌ Error initializing real-time service:', error);
+        console.log('💡 Real-time updates will not be available');
+      }
+    };
+    
+    initRealTime();
+    
     // Ensure Platform is available
     if (Platform.OS) {
       console.log('Platform detected:', Platform.OS);
@@ -78,14 +112,17 @@ export default function App() {
     return () => {
       notificationService.cleanup();
       syncService.cleanup();
+      realTimeService.disconnect();
     };
   }, []);
 
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <AppNavigator />
-        <StatusBar style="auto" />
+        <ThemeProvider>
+          <AppNavigator />
+          <StatusBar style="auto" />
+        </ThemeProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );

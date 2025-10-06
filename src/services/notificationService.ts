@@ -1,5 +1,5 @@
 // Push Notification Service for HFL Mobile App
-// Uses Firebase Cloud Messaging (FCM)
+// Uses Expo Notifications with MongoDB backend
 
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -135,27 +135,31 @@ class NotificationService {
         return false;
       }
 
-      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiBaseUrl}/api/notifications/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token,
-          userId,
-          platform: Platform.OS,
-          deviceId: Device.osInternalBuildId,
-        }),
-      });
+      // Skip server registration for development
+      console.log('🔔 Push token registration skipped for development');
+      return true;
 
-      if (response.ok) {
-        console.log('✅ Push token sent to server');
-        return true;
-      } else {
-        console.error('❌ Failed to send token to server');
-        return false;
-      }
+      // const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      // const response = await fetch(`${apiBaseUrl}/api/notifications/register`, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify({
+      //     token,
+      //     userId,
+      //     platform: Platform.OS,
+      //     deviceId: Device.osInternalBuildId,
+      //   }),
+      // });
+
+      // if (response.ok) {
+      //   console.log('✅ Push token sent to server');
+      //   return true;
+      // } else {
+      //   console.error('❌ Failed to send token to server');
+      //   return false;
+      // }
     } catch (error) {
       console.error('Error sending token to server:', error);
       return false;
@@ -276,10 +280,22 @@ class NotificationService {
   // Cleanup listeners
   cleanup(): void {
     if (this.notificationListener) {
-      Notifications.removeNotificationSubscription(this.notificationListener);
+      try {
+        if (typeof Notifications.removeNotificationSubscription === 'function') {
+          Notifications.removeNotificationSubscription(this.notificationListener);
+        }
+      } catch (error) {
+        console.log('Notification listener cleanup error:', error);
+      }
     }
     if (this.responseListener) {
-      Notifications.removeNotificationSubscription(this.responseListener);
+      try {
+        if (typeof Notifications.removeNotificationSubscription === 'function') {
+          Notifications.removeNotificationSubscription(this.responseListener);
+        }
+      } catch (error) {
+        console.log('Response listener cleanup error:', error);
+      }
     }
   }
 
