@@ -14,10 +14,12 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 import { Team } from '../types';
 // Firebase imports removed - using MongoDB API
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
 import { uploadImageToFirebase } from '../utils/uploadImage';
+import { mongodbService } from '../services/mongodbService';
 
 interface PlayerRegistrationScreenProps {
   navigation: any;
@@ -30,6 +32,7 @@ interface PlayerRegistrationScreenProps {
 
 const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ navigation, route }) => {
   const { colors } = useTheme();
+  const { getText } = useLanguage();
   const { team } = route.params;
   
   console.log('PlayerRegistrationScreen mounted with team:', team);
@@ -38,7 +41,6 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
     firstName: '',
     lastName: '',
     phone: '',
-    password: '',
     email: '',
     position: '',
     number: '',
@@ -46,6 +48,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
   });
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'phone') {
@@ -100,24 +103,31 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Xatolik', 'Rasm tanlashda xatolik yuz berdi');
+      Alert.alert(getText('error'), getText('imageSelectionError'));
       setUploadingPhoto(false);
     }
   };
 
   const handleSubmit = async () => {
     if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.phone.trim()) {
-      Alert.alert('Xatolik', 'Barcha majburiy maydonlarni to\'ldiring');
+      Alert.alert(getText('error'), getText('fillAllFields'));
       return;
     }
 
     if (!validatePhoneNumber(formData.phone)) {
-      Alert.alert('Xatolik', 'Telefon raqami noto\'g\'ri formatda. +998 90 123 45 67 ko\'rinishida kiriting');
+      Alert.alert(getText('error'), getText('invalidPhoneFormat'));
       return;
     }
 
     try {
       setLoading(true);
+
+      // First check network connectivity
+      console.log('Checking network connectivity...');
+      const isHealthy = await mongodbService.healthCheck();
+      if (!isHealthy) {
+        throw new Error(getText('serverConnectionError'));
+      }
 
       const cleanPhone = parsePhoneNumberForAPI(formData.phone);
       console.log('Phone formatting:', formData.phone, '->', cleanPhone);
@@ -126,51 +136,40 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         phone: cleanPhone,
-        password: formData.password.trim(),
         email: formData.email.trim(),
         position: formData.position.trim(),
         number: parseInt(formData.number) || 0,
         photo: formData.photo, // Firebase Storage URL
         teamId: team?.id || '',
-        teamName: team?.name || 'Unknown Team',
+        teamName: team?.name || getText('unknownTeam'),
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
 
       console.log('Submitting player registration:', registrationData);
       
-      // Submit to MongoDB via API
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...registrationData,
-          type: 'player',
-        }),
+      // Submit to MongoDB via Service
+      const result = await mongodbService.createApplication({
+        ...registrationData,
+        type: 'player',
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       console.log('Player application submitted:', result);
       
       Alert.alert(
-        'Muvaffaqiyatli',
-        'Arizangiz yuborildi. Admin tomonidan ko\'rib chiqilgandan so\'ng sizga xabar beriladi.',
+        getText('success'),
+        getText('applicationSubmitted'),
         [
           {
-            text: 'OK',
+            text: getText('ok'),
             onPress: () => navigation.navigate('Main'),
           },
         ]
       );
     } catch (error) {
       console.error('Registration error:', error);
-      Alert.alert('Xatolik', 'Ariza yuborishda xatolik yuz berdi. Internet aloqasini tekshiring.');
+      const errorMessage = error instanceof Error ? error.message : getText('unknownError');
+      Alert.alert(getText('error'), `${getText('applicationError')}: ${errorMessage}. ${getText('checkInternetConnection')}`);
     } finally {
       setLoading(false);
     }
@@ -189,15 +188,15 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>O'yinchi Ro'yxatdan O'tish</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{getText('playerRegistration')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {team?.name || 'Unknown Team'} jamoasi uchun ma'lumotlaringizni kiriting
+            {team?.name || getText('unknownTeam')} {getText('teamForRegistration')}
           </Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Ism *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('firstName')} *</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -206,13 +205,13 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
               }]}
               value={formData.firstName}
               onChangeText={(value) => handleInputChange('firstName', value)}
-              placeholder="Ismingizni kiriting"
+              placeholder={getText('enterFirstName')}
               placeholderTextColor={colors.textSecondary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Familiya *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('lastName')} *</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -221,13 +220,13 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
               }]}
               value={formData.lastName}
               onChangeText={(value) => handleInputChange('lastName', value)}
-              placeholder="Familiyangizni kiriting"
+              placeholder={getText('enterLastName')}
               placeholderTextColor={colors.textSecondary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Telefon raqam *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('phoneNumber')} *</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -243,24 +242,9 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Parol *</Text>
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: colors.surface, 
-                color: colors.text,
-                borderColor: colors.border 
-              }]}
-              value={formData.password}
-              onChangeText={(value) => handleInputChange('password', value)}
-              placeholder="Parolni kiriting"
-              placeholderTextColor={colors.textSecondary}
-              secureTextEntry
-            />
-          </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('email')}</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -277,30 +261,30 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Pozitsiya</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('position')}</Text>
             <View style={[styles.pickerContainer, { 
               backgroundColor: colors.surface, 
               borderColor: colors.border 
             }]}>
               <Text style={[styles.pickerText, { color: colors.text }]}>
-                {formData.position || 'Pozitsiya tanlang'}
+                {formData.position || getText('selectPosition')}
               </Text>
             </View>
             <View style={styles.positionGrid}>
               {[
-                { value: 'GK', label: 'Darvozabon' },
-                { value: 'CB', label: 'Markaziy himoyachi' },
-                { value: 'LB', label: 'Chap qanot himoyachisi' },
-                { value: 'RB', label: 'O\'ng qanot himoyachisi' },
-                { value: 'CDM', label: 'Defensiv yarim himoyachi' },
-                { value: 'CM', label: 'Markaziy yarim himoyachi' },
-                { value: 'CAM', label: 'Hujumkor yarim himoyachi' },
-                { value: 'LM', label: 'Chap qanot yarim himoyachisi' },
-                { value: 'RM', label: 'O\'ng qanot yarim himoyachisi' },
-                { value: 'LW', label: 'Chap qanot hujumchisi' },
-                { value: 'RW', label: 'O\'ng qanot hujumchisi' },
-                { value: 'ST', label: 'Markaziy hujumchi' },
-                { value: 'CF', label: 'Soxta hujumchi' },
+                { value: 'GK', label: getText('goalkeeper') },
+                { value: 'CB', label: getText('centerBack') },
+                { value: 'LB', label: getText('leftBack') },
+                { value: 'RB', label: getText('rightBack') },
+                { value: 'CDM', label: getText('defensiveMidfielder') },
+                { value: 'CM', label: getText('centerMidfielder') },
+                { value: 'CAM', label: getText('attackingMidfielder') },
+                { value: 'LM', label: getText('leftMidfielder') },
+                { value: 'RM', label: getText('rightMidfielder') },
+                { value: 'LW', label: getText('leftWinger') },
+                { value: 'RW', label: getText('rightWinger') },
+                { value: 'ST', label: getText('striker') },
+                { value: 'CF', label: getText('centerForward') },
               ].map((position) => (
                 <TouchableOpacity
                   key={position.value}
@@ -327,7 +311,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Forma raqami</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('jerseyNumber')}</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -344,7 +328,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>3x4 rasm</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('photo')}</Text>
             
             {formData.photo ? (
               <View style={styles.photoContainer}>
@@ -356,14 +340,14 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
                     disabled={uploadingPhoto}
                   >
                     <Text style={styles.photoActionText}>
-                      {uploadingPhoto ? 'Yuklanmoqda...' : 'O\'zgartirish'}
+                      {uploadingPhoto ? getText('uploading') : getText('change')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.photoActionButton, { backgroundColor: '#FF3B30' }]}
                     onPress={() => setFormData(prev => ({ ...prev, photo: null }))}
                   >
-                    <Text style={styles.photoActionText}>O'chirish</Text>
+                    <Text style={styles.photoActionText}>{getText('delete')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -377,7 +361,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
                 disabled={uploadingPhoto}
               >
                 <Text style={[styles.photoButtonText, { color: colors.textSecondary }]}>
-                  {uploadingPhoto ? 'Yuklanmoqda...' : 'Rasm tanlash'}
+                  {uploadingPhoto ? getText('uploading') : getText('selectPhoto')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -389,7 +373,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
             disabled={loading}
           >
             <Text style={styles.submitButtonText}>
-              {loading ? 'Yuborilmoqda...' : 'Arizani yuborish'}
+              {loading ? getText('submitting') : getText('submitApplication')}
             </Text>
           </TouchableOpacity>
         </View>

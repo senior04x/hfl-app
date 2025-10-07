@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 import { RootStackParamList, Match } from '../types';
 import { db } from '../lib/firebase';
 import MatchSkeletonCard from '../components/MatchSkeletonCard';
@@ -28,6 +29,7 @@ const MatchDetailScreen = () => {
   const navigation = useNavigation<MatchDetailScreenNavigationProp>();
   const route = useRoute<MatchDetailScreenRouteProp>();
   const { colors } = useTheme();
+  const { getText, language } = useLanguage();
   const { matchId } = route.params;
   
   const [match, setMatch] = useState<Match | null>(null);
@@ -92,18 +94,25 @@ const MatchDetailScreen = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return 'Rejalashtirilgan';
+        return getText('scheduled');
       case 'live':
-        return 'Jarayonda';
+        return getText('live');
       case 'finished':
-        return 'Tugagan';
+        return getText('finished');
       default:
-        return 'Noma\'lum';
+        return getText('unknown');
     }
   };
 
   const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('uz-UZ', {
+    let locale = 'uz-UZ';
+    if (language === 'en') {
+      locale = 'en-US';
+    } else if (language === 'ru') {
+      locale = 'ru-RU';
+    }
+    
+    return new Intl.DateTimeFormat(locale, {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -119,11 +128,11 @@ const MatchDetailScreen = () => {
       if (supported) {
         await Linking.openURL(url);
       } else {
-        Alert.alert('Xatolik', 'YouTube linkini ochish mumkin emas');
+        Alert.alert(getText('error'), getText('cannotOpenYouTubeLink'));
       }
     } catch (error) {
       console.error('Error opening YouTube link:', error);
-      Alert.alert('Xatolik', 'YouTube linkini ochishda xatolik yuz berdi');
+      Alert.alert(getText('error'), getText('errorOpeningYouTubeLink'));
     }
   };
 
@@ -131,7 +140,7 @@ const MatchDetailScreen = () => {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.text }]}>O'yin Tafsilotlari</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{getText('matchDetails')}</Text>
         </View>
         
         <ScrollView style={styles.content}>
@@ -198,7 +207,7 @@ const MatchDetailScreen = () => {
             style={[styles.backToHomeButton, { backgroundColor: colors.primary }]}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backToHomeText}>Orqaga qaytish</Text>
+            <Text style={styles.backToHomeText}>{getText('goBack')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -208,7 +217,7 @@ const MatchDetailScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>O'yin Tafsilotlari</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{getText('matchDetails')}</Text>
       </View>
 
       <ScrollView style={styles.content}>
@@ -242,12 +251,12 @@ const MatchDetailScreen = () => {
 
         {/* Match Info */}
         <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>O'yin Ma'lumotlari</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{getText('matchInformation')}</Text>
           
           <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={20} color={colors.primary} />
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Sana va Vaqt</Text>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('dateAndTime')}</Text>
               <Text style={[styles.infoValue, { color: colors.text }]}>
                 {formatDate(match.matchDate)}
               </Text>
@@ -258,7 +267,7 @@ const MatchDetailScreen = () => {
             <View style={styles.infoRow}>
               <Ionicons name="location-outline" size={20} color={colors.primary} />
               <View style={styles.infoContent}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Maydon</Text>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('venue')}</Text>
                 <Text style={[styles.infoValue, { color: colors.text }]}>{match.venue}</Text>
               </View>
             </View>
@@ -268,7 +277,7 @@ const MatchDetailScreen = () => {
             <View style={styles.infoRow}>
               <Ionicons name="person-outline" size={20} color={colors.primary} />
               <View style={styles.infoContent}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Hakam</Text>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('referee')}</Text>
                 <Text style={[styles.infoValue, { color: colors.text }]}>{match.referee}</Text>
               </View>
             </View>
@@ -278,13 +287,13 @@ const MatchDetailScreen = () => {
             <View style={styles.infoRow}>
               <Ionicons name="play-circle-outline" size={20} color={colors.primary} />
               <View style={styles.infoContent}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Jonli Ko'rish</Text>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('liveStream')}</Text>
                 <TouchableOpacity
                   style={[styles.youtubeButton, { backgroundColor: colors.primary }]}
                   onPress={() => openYouTubeLink(match.youtubeLink!)}
                 >
                   <Ionicons name="play" size={16} color="white" />
-                  <Text style={styles.youtubeButtonText}>YouTube da Ko'rish</Text>
+                  <Text style={styles.youtubeButtonText}>{getText('watchOnYouTube')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -300,7 +309,7 @@ const MatchDetailScreen = () => {
               <Text style={styles.liveText}>LIVE</Text>
             </View>
             <Text style={styles.liveDescription}>
-              O'yin hozir jarayonda. Hisoblar real vaqtda yangilanadi.
+              {getText('matchInProgress')}
             </Text>
           </View>
         )}

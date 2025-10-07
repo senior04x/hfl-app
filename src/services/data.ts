@@ -22,27 +22,18 @@ export class DataService {
           let response: Response;
           let apiSource = 'local';
           
-          try {
-            console.log('DataService: Trying local API first...');
-            response = await fetch('/api/teams', {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-          } catch (localError) {
-            console.log('DataService: Local API failed, trying direct backend...');
-            apiSource = 'backend';
-            const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
-            console.log('DataService: Fetching from backend API:', backendUrl);
-            
-            response = await fetch(`${backendUrl}/api/teams`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-          }
+          // Use Heroku backend directly
+          console.log('DataService: Using Heroku backend...');
+          apiSource = 'heroku';
+          const localBackendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+          console.log('DataService: Fetching from Heroku backend:', localBackendUrl);
+          
+          response = await fetch(`${localBackendUrl}/api/teams`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
           
           if (!response.ok) {
             throw new Error(`API Error: ${response.status} - ${response.statusText}`);
@@ -64,7 +55,8 @@ export class DataService {
             const { _id, ...teamWithoutId } = team;
             return {
               ...teamWithoutId,
-              id: _id ? _id.toString() : (team.id ? team.id.toString() : null),
+              _id: _id ? _id.toString() : team._id,
+              id: _id ? _id.toString() : (team.id ? team.id.toString() : Math.random().toString(36).substr(2, 9)),
             };
           });
           
@@ -110,27 +102,18 @@ export class DataService {
       let response: Response;
       let apiSource = 'local';
       
-      try {
-        console.log('DataService: Trying local API first...');
-        response = await fetch(`/api/teams/${teamId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-      } catch (localError) {
-        console.log('DataService: Local API failed, trying direct backend...');
-        apiSource = 'backend';
-        const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
-        console.log('DataService: Fetching from backend API:', backendUrl);
-        
-        response = await fetch(`${backendUrl}/api/teams/${teamId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-      }
+      // Use Heroku backend directly
+      console.log('DataService: Using Heroku backend...');
+      apiSource = 'heroku';
+      const localBackendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      console.log('DataService: Fetching from Heroku backend:', localBackendUrl);
+      
+      response = await fetch(`${localBackendUrl}/api/teams/${teamId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
       if (!response.ok) {
         console.log('❌ Team not found in MongoDB API:', teamId);
@@ -436,27 +419,18 @@ export class DataService {
       let response: Response;
       let apiSource = 'local';
       
-      try {
-        console.log('DataService: Trying local API first...');
-        response = await fetch(`/api/players/${playerId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-      } catch (localError) {
-        console.log('DataService: Local API failed, trying direct backend...');
-        apiSource = 'backend';
-        const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
-        console.log('DataService: Fetching from backend API:', backendUrl);
-        
-        response = await fetch(`${backendUrl}/api/players/${playerId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-      }
+      // Use Heroku backend directly
+      console.log('DataService: Using Heroku backend...');
+      apiSource = 'heroku';
+      const localBackendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      console.log('DataService: Fetching from Heroku backend:', localBackendUrl);
+      
+      response = await fetch(`${localBackendUrl}/api/players/${playerId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
       if (!response.ok) {
         console.log('❌ Player not found in MongoDB API:', playerId);

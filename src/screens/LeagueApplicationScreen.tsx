@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
+import { mongodbService } from '../services/mongodbService';
 
 interface LeagueApplicationScreenProps {
   navigation: any;
@@ -46,17 +47,24 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
 
   const handleSubmit = async () => {
     if (!formData.leagueName.trim() || !formData.contactPerson.trim() || !formData.contactPhone.trim()) {
-      Alert.alert('Xatolik', 'Barcha majburiy maydonlarni to\'ldiring');
+      Alert.alert(getText('error'), getText('fillAllFields'));
       return;
     }
 
     if (!validatePhoneNumber(formData.contactPhone)) {
-      Alert.alert('Xatolik', 'Telefon raqami noto\'g\'ri formatda. +998 90 123 45 67 ko\'rinishida kiriting');
+      Alert.alert(getText('error'), getText('invalidPhoneFormat'));
       return;
     }
 
     try {
       setLoading(true);
+      
+      // First check network connectivity
+      console.log('Checking network connectivity...');
+      const isHealthy = await mongodbService.healthCheck();
+      if (!isHealthy) {
+        throw new Error(getText('serverConnectionError'));
+      }
       
       const cleanPhone = parsePhoneNumberForAPI(formData.contactPhone);
       console.log('Phone formatting:', formData.contactPhone, '->', cleanPhone);
@@ -76,38 +84,28 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
 
       console.log('Submitting league application:', leagueApplicationData);
       
-      // Submit to MongoDB via API
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...leagueApplicationData,
-          type: 'league',
-        }),
+      // Submit to MongoDB via Service
+      const result = await mongodbService.createApplication({
+        ...leagueApplicationData,
+        type: 'league',
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       console.log('League application submitted:', result);
       
       Alert.alert(
-        'Muvaffaqiyatli',
-        'Liga arizasi yuborildi. Admin tomonidan ko\'rib chiqilgandan so\'ng sizga xabar beriladi.',
+        getText('success'),
+        getText('leagueApplicationSubmitted'),
         [
           {
-            text: 'OK',
+            text: getText('ok'),
             onPress: () => navigation.navigate('Main'),
           },
         ]
       );
     } catch (error) {
       console.error('League application error:', error);
-      Alert.alert('Xatolik', 'Ariza yuborishda xatolik yuz berdi. Internet aloqasini tekshiring.');
+      const errorMessage = error instanceof Error ? error.message : getText('unknownError');
+      Alert.alert(getText('error'), `${getText('applicationError')}: ${errorMessage}. ${getText('checkInternetConnection')}`);
     } finally {
       setLoading(false);
     }
@@ -122,10 +120,10 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Liga Ariza
+              {getText('leagueApplication')}
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Yangi liga sifatida ariza berish
+              {getText('leagueApplicationSubtitle')}
             </Text>
           </View>
 
@@ -133,7 +131,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
             {/* League Name */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                Liga nomi *
+                {getText('leagueName')} *
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -143,7 +141,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
                 }]}
                 value={formData.leagueName}
                 onChangeText={(value) => handleInputChange('leagueName', value)}
-                placeholder="Liga nomini kiriting"
+                placeholder={getText('enterLeagueName')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -151,7 +149,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
             {/* Founded Date */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                Tashkil etilgan sana
+                {getText('foundedDate')}
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -169,7 +167,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
             {/* Description */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                Liga haqida
+                {getText('leagueDescription')}
               </Text>
               <TextInput
                 style={[styles.textArea, { 
@@ -179,7 +177,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
                 }]}
                 value={formData.description}
                 onChangeText={(value) => handleInputChange('description', value)}
-                placeholder="Liga haqida qisqacha ma'lumot"
+                placeholder={getText('enterLeagueDescription')}
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={4}
@@ -189,7 +187,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
             {/* Contact Person */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                Aloqa shaxsi *
+                {getText('contactPerson')} *
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -199,7 +197,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
                 }]}
                 value={formData.contactPerson}
                 onChangeText={(value) => handleInputChange('contactPerson', value)}
-                placeholder="To'liq ism"
+                placeholder={getText('enterFullName')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -207,7 +205,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
             {/* Contact Phone */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                Telefon raqami *
+                {getText('phoneNumber')} *
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -226,7 +224,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
             {/* Contact Email */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                Email
+                {getText('email')}
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -246,7 +244,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
             {/* Address */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                Manzil
+                {getText('address')}
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -256,7 +254,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
                 }]}
                 value={formData.address}
                 onChangeText={(value) => handleInputChange('address', value)}
-                placeholder="Liga manzili"
+                placeholder={getText('enterLeagueAddress')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -264,7 +262,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
             {/* Website */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                Veb-sayt
+                {getText('website')}
               </Text>
               <TextInput
                 style={[styles.input, { 
@@ -292,7 +290,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
               disabled={loading}
             >
               <Text style={styles.submitButtonText}>
-                {loading ? 'Yuborilmoqda...' : 'Arizani yuborish'}
+                {loading ? getText('submitting') : getText('submitApplication')}
               </Text>
             </TouchableOpacity>
           </View>

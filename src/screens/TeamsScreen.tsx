@@ -17,10 +17,12 @@ import { DataService } from '../services/data';
 import { handleError } from '../utils/errorHandling';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
 export default function TeamsScreen() {
   const navigation = useNavigation();
   const { colors } = useTheme();
+  const { getText } = useLanguage();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -98,17 +100,21 @@ export default function TeamsScreen() {
   const handleShowDetails = (team: Team) => {
     console.log('🔍 Team details clicked:', team);
     console.log('🔍 Team ID:', team.id);
+    console.log('🔍 Team _id:', team._id);
     console.log('🔍 Team name:', team.name);
     
-    if (!team.id) {
+    // Use _id if id is not available
+    const teamId = team.id || team._id;
+    
+    if (!teamId) {
       console.error('❌ Team ID is missing!');
-      Alert.alert('Xatolik', 'Jamoa ID topilmadi');
+      Alert.alert(getText('error'), getText('teamIdNotFound'));
       return;
     }
     
     // Navigate to team detail screen
-    navigation.navigate('TeamDetail', { teamId: team.id });
-    console.log('✅ Navigating to team detail page');
+    navigation.navigate('TeamDetail', { teamId: teamId });
+    console.log('✅ Navigating to team detail page with ID:', teamId);
   };
 
   const renderTeam = ({ item }: { item: Team }) => (
@@ -127,9 +133,6 @@ export default function TeamsScreen() {
           )}
           <View style={styles.teamDetails}>
             <Text style={[styles.teamName, { color: colors.text }]}>{item.name}</Text>
-            <Text style={[styles.teamPlayers, { color: colors.textSecondary }]}>
-              {item.players?.length || 0} o'yinchi
-            </Text>
           </View>
         </View>
         <View style={styles.teamActions}>
@@ -146,7 +149,7 @@ export default function TeamsScreen() {
           <View
             style={[styles.colorDot, { backgroundColor: item.color || '#3B82F6' }]}
           />
-          <Text style={[styles.colorText, { color: colors.textSecondary }]}>Jamoa rangi</Text>
+          <Text style={[styles.colorText, { color: colors.textSecondary }]}>{getText('teamColor')}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -156,7 +159,7 @@ export default function TeamsScreen() {
     return (
       <SafeAreaView style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.text }]}>Jamoalar yuklanmoqda...</Text>
+        <Text style={[styles.loadingText, { color: colors.text }]}>{getText('teamsLoading')}</Text>
       </SafeAreaView>
     );
   }
@@ -164,14 +167,14 @@ export default function TeamsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Jamoalar</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{getText('teams')}</Text>
       </View>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {teams && teams.length > 0 ? (
           <View style={styles.teamsList}>
-            {teams.map((team) => (
-              <View key={team.id}>
+            {teams.map((team, index) => (
+              <View key={team.id || team._id || index}>
                 {renderTeam({ item: team })}
               </View>
             ))}
@@ -180,7 +183,7 @@ export default function TeamsScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="people-outline" size={64} color={colors.textSecondary} />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Hozircha jamoalar yo'q
+              {getText('noTeamsAvailable')}
             </Text>
           </View>
         )}

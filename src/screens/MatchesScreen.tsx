@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 import { RootStackParamList, Match } from '../types';
 import { db } from '../lib/firebase';
 import MatchCard from '../components/MatchCard';
@@ -27,6 +28,7 @@ type MatchesScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main
 const MatchesScreen = () => {
   const navigation = useNavigation<MatchesScreenNavigationProp>();
   const { colors } = useTheme();
+  const { getText, language } = useLanguage();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -120,7 +122,15 @@ const MatchesScreen = () => {
 
   const formatDateHeader = (dateString: string) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('uz-UZ', {
+    
+    let locale = 'uz-UZ';
+    if (language === 'en') {
+      locale = 'en-US';
+    } else if (language === 'ru') {
+      locale = 'ru-RU';
+    }
+    
+    return new Intl.DateTimeFormat(locale, {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -168,7 +178,7 @@ const MatchesScreen = () => {
             <Text style={[styles.leagueName, { color: colors.text }]}>{leagueType}</Text>
             <View style={styles.leagueInfo}>
               <Text style={[styles.matchCount, { color: colors.primary }]}>
-                {leagueMatches.length} o'yin
+                {leagueMatches.length} {getText('matches')}
               </Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
             </View>
@@ -225,14 +235,14 @@ const MatchesScreen = () => {
       {/* LoadingOverlay ni o'chirib qo'yamiz - Skeleton loading ishlatamiz */}
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { backgroundColor: colors.header }]}>
-          <Text style={[styles.title, { color: colors.text }]}>Matches</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{getText('matches')}</Text>
         </View>
 
       <View style={[styles.filters, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
-        <FilterButton title="All" value="all" isActive={filter === 'all'} />
-        <FilterButton title="Live" value="live" isActive={filter === 'live'} />
-        <FilterButton title="Upcoming" value="upcoming" isActive={filter === 'upcoming'} />
-        <FilterButton title="Finished" value="finished" isActive={filter === 'finished'} />
+        <FilterButton title={getText('all')} value="all" isActive={filter === 'all'} />
+        <FilterButton title={getText('live')} value="live" isActive={filter === 'live'} />
+        <FilterButton title={getText('upcoming')} value="upcoming" isActive={filter === 'upcoming'} />
+        <FilterButton title={getText('finished')} value="finished" isActive={filter === 'finished'} />
       </View>
 
       {loading ? (
@@ -286,8 +296,8 @@ const MatchesScreen = () => {
                   <Ionicons name="football-outline" size={48} color={colors.textTertiary} />
                   <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                     {filter === 'all' 
-                      ? 'O\'yinlar topilmadi' 
-                      : `${filter} o\'yinlar topilmadi`
+                      ? getText('noMatchesFound') 
+                      : `${getText('noMatchesFoundForFilter')} ${getText(filter)}`
                     }
                   </Text>
                 </View>

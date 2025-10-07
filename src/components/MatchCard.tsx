@@ -8,6 +8,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Match } from '../types';
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
 interface MatchCardProps {
   match: Match;
@@ -16,8 +17,16 @@ interface MatchCardProps {
 
 const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
   const { colors } = useTheme();
+  const { getText, language } = useLanguage();
   const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('uz-UZ', {
+    let locale = 'uz-UZ';
+    if (language === 'en') {
+      locale = 'en-US';
+    } else if (language === 'ru') {
+      locale = 'ru-RU';
+    }
+    
+    return new Intl.DateTimeFormat(locale, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -50,13 +59,13 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return 'REJALASHTIRILGAN';
+        return getText('scheduled').toUpperCase();
       case 'live':
-        return 'JARAYONDA';
+        return getText('live').toUpperCase();
       case 'finished':
-        return 'TUGAGAN';
+        return getText('finished').toUpperCase();
       default:
-        return 'NOMA\'LUM';
+        return getText('unknown').toUpperCase();
     }
   };
 

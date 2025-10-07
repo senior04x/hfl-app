@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DataService } from '../services/data';
 import { Team, Player, RootStackParamList } from '../types';
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
 type TeamDetailRouteProp = RouteProp<RootStackParamList, 'TeamDetail'>;
 
@@ -23,6 +24,7 @@ const TeamDetailScreen = () => {
   const route = useRoute<TeamDetailRouteProp>();
   const navigation = useNavigation();
   const { colors } = useTheme();
+  const { getText } = useLanguage();
   const { teamId } = route.params;
   
   const [team, setTeam] = useState<Team | null>(null);
@@ -36,6 +38,10 @@ const TeamDetailScreen = () => {
         
         // teamId ni route.params dan olish
         const actualTeamId = route.params?.teamId || teamId;
+        
+        console.log('🔍 Route params teamId:', route.params?.teamId);
+        console.log('🔍 Component teamId:', teamId);
+        console.log('🔍 Actual teamId:', actualTeamId);
         
         if (!actualTeamId) {
           console.error('❌ No team ID provided in route params');
@@ -96,8 +102,13 @@ const TeamDetailScreen = () => {
       <TouchableOpacity 
         style={[styles.playerCard, { backgroundColor: colors.surface }]}
         onPress={() => {
+          console.log('Player clicked:', item);
+          console.log('Player ID:', item.id);
+          console.log('Player _id:', item._id);
+          const playerId = item.id || item._id;
+          console.log('Using player ID:', playerId);
           navigation.navigate('PlayerStats', {
-            playerId: item.id,
+            playerId: playerId,
             playerName: `${item.firstName} ${item.lastName}`
           });
         }}
@@ -107,7 +118,7 @@ const TeamDetailScreen = () => {
         </View>
         <View style={styles.playerInfo}>
           <Text style={[styles.playerName, { color: colors.text }]}>{item.firstName} {item.lastName}</Text>
-          <Text style={[styles.playerPosition, { color: colors.textSecondary }]}>{item.position || 'Unknown'}</Text>
+          <Text style={[styles.playerPosition, { color: colors.textSecondary }]}>{item.position || getText('unknown')}</Text>
           <Text style={[styles.playerPhone, { color: colors.textTertiary }]}>{item.phone}</Text>
         </View>
         <View style={[styles.statusBadge, { 
@@ -115,8 +126,8 @@ const TeamDetailScreen = () => {
                           item.status === 'inactive' ? colors.textTertiary : colors.error 
         }]}>
           <Text style={[styles.statusText, { color: 'white' }]}>
-            {item.status === 'active' ? 'Faol' : 
-             item.status === 'inactive' ? 'Nofaol' : 'Suspensiya'}
+            {item.status === 'active' ? getText('active') : 
+             item.status === 'inactive' ? getText('inactive') : getText('suspended')}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
@@ -153,13 +164,13 @@ const TeamDetailScreen = () => {
           ) : (
             <View style={[styles.teamColor, { backgroundColor: team.color || '#3B82F6' }]} />
           )}
-          <Text style={[styles.teamName, { color: colors.text }]}>{team.name || 'Unknown Team'}</Text>
+          <Text style={[styles.teamName, { color: colors.text }]}>{team.name || getText('unknownTeam')}</Text>
         </View>
-        <Text style={[styles.teamStats, { color: colors.textSecondary }]}>{team.players?.length || 0} players</Text>
+        <Text style={[styles.teamStats, { color: colors.textSecondary }]}>{team.players?.length || 0} {getText('players')}</Text>
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.background }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Players ({team.players?.length || 0})</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('players')} ({team.players?.length || 0})</Text>
         
         {team.players && team.players.length > 0 ? (
           <FlatList
@@ -171,24 +182,24 @@ const TeamDetailScreen = () => {
         ) : (
           <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
             <Ionicons name="people-outline" size={48} color={colors.textTertiary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No players found</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{getText('noPlayersFound')}</Text>
           </View>
         )}
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.background }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Team Information</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('teamInformation')}</Text>
         
         <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
           <View style={styles.infoRow}>
             <Ionicons name="football" size={20} color={colors.textSecondary} />
-            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Team Name:</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{team.name || 'Unknown Team'}</Text>
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('teamName')}:</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{team.name || getText('unknownTeam')}</Text>
           </View>
           
           <View style={styles.infoRow}>
             <Ionicons name="color-palette" size={20} color={colors.textSecondary} />
-            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Team Color:</Text>
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('teamColor')}:</Text>
             <View style={styles.colorContainer}>
               <View style={[styles.colorPreview, { backgroundColor: team.color || '#3B82F6' }]} />
               <Text style={[styles.infoValue, { color: colors.text }]}>{team.color || '#3B82F6'}</Text>
@@ -197,14 +208,14 @@ const TeamDetailScreen = () => {
           
           <View style={styles.infoRow}>
             <Ionicons name="people" size={20} color={colors.textSecondary} />
-            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Total Players:</Text>
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('totalPlayers')}:</Text>
             <Text style={[styles.infoValue, { color: colors.text }]}>{team.players?.length || 0}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Position Breakdown</Text>
+        <Text style={styles.sectionTitle}>{getText('positionBreakdown')}</Text>
         
         <View style={styles.positionStats}>
           {['GK', 'DEF', 'MID', 'FWD'].map((position) => {
@@ -219,6 +230,27 @@ const TeamDetailScreen = () => {
             );
           })}
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Players ({team.players?.length || 0})</Text>
+        
+        {team.players && team.players.length > 0 ? (
+          <FlatList
+            data={team.players}
+            keyExtractor={(item, index) => item.id || item._id || index.toString()}
+            renderItem={renderPlayer}
+            scrollEnabled={false}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <View style={styles.noPlayersContainer}>
+            <Ionicons name="people-outline" size={48} color={colors.textSecondary} />
+            <Text style={[styles.noPlayersText, { color: colors.textSecondary }]}>
+              No players found
+            </Text>
+          </View>
+        )}
       </View>
       </ScrollView>
     </SafeAreaView>
@@ -415,6 +447,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+  },
+  noPlayersContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  noPlayersText: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
 

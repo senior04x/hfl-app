@@ -11,6 +11,7 @@ import {
   // ActivityIndicator, // Skeleton loading ishlatamiz
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 import { DataService } from '../services/data';
 import { Team } from '../types';
 
@@ -20,6 +21,7 @@ interface TeamSelectionScreenProps {
 
 const TeamSelectionScreen: React.FC<TeamSelectionScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
+  const { getText } = useLanguage();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +36,7 @@ const TeamSelectionScreen: React.FC<TeamSelectionScreenProps> = ({ navigation })
       setTeams(teamsData);
     } catch (error) {
       console.error('Error loading teams:', error);
-      Alert.alert('Xatolik', 'Jamoalar yuklanmadi');
+      Alert.alert(getText('error'), getText('teams') + ' yuklanmadi');
     } finally {
       setLoading(false);
     }
@@ -60,9 +62,9 @@ const TeamSelectionScreen: React.FC<TeamSelectionScreenProps> = ({ navigation })
           </View>
         )}
         <View style={styles.teamDetails}>
-          <Text style={[styles.teamName, { color: colors.text }]}>{item.name || 'Unknown Team'}</Text>
+          <Text style={[styles.teamName, { color: colors.text }]}>{item.name || getText('unknownTeam')}</Text>
           <Text style={[styles.teamDescription, { color: colors.textSecondary }]}>
-            {item.description || 'Jamoa haqida ma\'lumot yo\'q'}
+            {item.description || getText('noTeamInfo')}
           </Text>
         </View>
       </View>
@@ -73,7 +75,7 @@ const TeamSelectionScreen: React.FC<TeamSelectionScreenProps> = ({ navigation })
     return (
       <SafeAreaView style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
         {/* Skeleton loading ishlatamiz */}
-        <Text style={[styles.loadingText, { color: colors.text }]}>Jamoalar yuklanmoqda...</Text>
+        <Text style={[styles.loadingText, { color: colors.text }]}>{getText('teams')} {getText('loading')}</Text>
       </SafeAreaView>
     );
   }
@@ -81,9 +83,9 @@ const TeamSelectionScreen: React.FC<TeamSelectionScreenProps> = ({ navigation })
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Jamoa Tanlang</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{getText('selectTeam')}</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Qaysi jamoa uchun o'ynashni xohlaysiz?
+          {getText('whichTeamToPlay')}
         </Text>
       </View>
 
@@ -96,7 +98,7 @@ const TeamSelectionScreen: React.FC<TeamSelectionScreenProps> = ({ navigation })
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Hozircha jamoalar yo'q
+              {getText('noTeamsAvailable')}
             </Text>
           </View>
         }

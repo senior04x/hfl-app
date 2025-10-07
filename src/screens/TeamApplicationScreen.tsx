@@ -13,9 +13,11 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 // Firebase imports removed - using MongoDB API
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
 import { uploadImageToFirebase } from '../utils/uploadImage';
+import { mongodbService } from '../services/mongodbService';
 
 interface TeamApplicationScreenProps {
   navigation: any;
@@ -23,6 +25,7 @@ interface TeamApplicationScreenProps {
 
 const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
+  const { getText } = useLanguage();
   
   console.log('TeamApplicationScreen mounted');
   
@@ -53,7 +56,7 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (permissionResult.granted === false) {
-        Alert.alert('Ruxsat kerak', 'Logo tanlash uchun galereya ruxsati kerak');
+        Alert.alert(getText('permissionRequired'), getText('galleryPermissionRequired'));
         return;
       }
 
@@ -81,34 +84,41 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
           }));
           
           console.log('Logo uploaded:', downloadURL);
-          Alert.alert('Muvaffaqiyat', 'Logo muvaffaqiyatli yuklandi');
+          Alert.alert(getText('success'), getText('logoUploadedSuccessfully'));
         } catch (error) {
           console.error('Error uploading logo:', error);
-          Alert.alert('Xatolik', 'Logo yuklashda xatolik yuz berdi');
+          Alert.alert(getText('error'), getText('logoUploadError'));
         } finally {
           setUploadingLogo(false);
         }
       }
     } catch (error) {
       console.error('Error picking logo:', error);
-      Alert.alert('Xatolik', 'Logo tanlashda xatolik yuz berdi');
+      Alert.alert(getText('error'), getText('logoSelectionError'));
       setUploadingLogo(false);
     }
   };
 
   const handleSubmit = async () => {
     if (!formData.teamName.trim() || !formData.contactPerson.trim() || !formData.contactPhone.trim()) {
-      Alert.alert('Xatolik', 'Barcha majburiy maydonlarni to\'ldiring');
+      Alert.alert(getText('error'), getText('fillAllFields'));
       return;
     }
 
     if (!validatePhoneNumber(formData.contactPhone)) {
-      Alert.alert('Xatolik', 'Telefon raqami noto\'g\'ri formatda. +998 90 123 45 67 ko\'rinishida kiriting');
+      Alert.alert(getText('error'), getText('invalidPhoneFormat'));
       return;
     }
 
     try {
       setLoading(true);
+      
+      // First check network connectivity
+      console.log('Checking network connectivity...');
+      const isHealthy = await mongodbService.healthCheck();
+      if (!isHealthy) {
+        throw new Error(getText('serverConnectionError'));
+      }
       
       const cleanPhone = parsePhoneNumberForAPI(formData.contactPhone);
       console.log('Phone formatting:', formData.contactPhone, '->', cleanPhone);
@@ -128,38 +138,28 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
 
       console.log('Submitting team application:', teamApplicationData);
       
-      // Submit to MongoDB via API
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/applications`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...teamApplicationData,
-          type: 'team',
-        }),
+      // Submit to MongoDB via Service
+      const result = await mongodbService.createApplication({
+        ...teamApplicationData,
+        type: 'team',
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       console.log('Team application submitted:', result);
       
       Alert.alert(
-        'Muvaffaqiyatli',
-        'Jamoa arizasi yuborildi. Admin tomonidan ko\'rib chiqilgandan so\'ng sizga xabar beriladi.',
+        getText('success'),
+        getText('teamApplicationSubmitted'),
         [
           {
-            text: 'OK',
+            text: getText('ok'),
             onPress: () => navigation.navigate('Main'),
           },
         ]
       );
     } catch (error) {
       console.error('Team application error:', error);
-      Alert.alert('Xatolik', 'Ariza yuborishda xatolik yuz berdi. Internet aloqasini tekshiring.');
+      const errorMessage = error instanceof Error ? error.message : getText('unknownError');
+      Alert.alert(getText('error'), `${getText('applicationError')}: ${errorMessage}. ${getText('checkInternetConnection')}`);
     } finally {
       setLoading(false);
     }
@@ -177,15 +177,15 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Jamoa Ariza Berish</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{getText('teamApplication')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Yangi jamoa sifatida ligaga qo'shilish uchun ariza
+            {getText('teamApplicationSubtitle')}
           </Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Jamoa nomi *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('teamName')} *</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -194,13 +194,13 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
               }]}
               value={formData.teamName}
               onChangeText={(value) => handleInputChange('teamName', value)}
-              placeholder="Jamoa nomini kiriting"
+              placeholder={getText('enterTeamName')}
               placeholderTextColor={colors.textSecondary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Tashkil topgan sana</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('foundedDate')}</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -215,7 +215,7 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Jamoa logosi</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('teamLogo')}</Text>
             
             {formData.logo ? (
               <View style={styles.logoContainer}>
@@ -227,14 +227,14 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
                     disabled={uploadingLogo}
                   >
                     <Text style={styles.logoActionText}>
-                      {uploadingLogo ? 'Yuklanmoqda...' : 'O\'zgartirish'}
+                      {uploadingLogo ? getText('uploading') : getText('change')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.logoActionButton, { backgroundColor: '#FF3B30' }]}
                     onPress={() => setFormData(prev => ({ ...prev, logo: null }))}
                   >
-                    <Text style={styles.logoActionText}>O'chirish</Text>
+                    <Text style={styles.logoActionText}>{getText('delete')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -248,14 +248,14 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
                 disabled={uploadingLogo}
               >
                 <Text style={[styles.logoButtonText, { color: colors.textSecondary }]}>
-                  {uploadingLogo ? 'Yuklanmoqda...' : 'Logo tanlash'}
+                  {uploadingLogo ? getText('uploading') : getText('selectLogo')}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Jamoa rangi</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('teamColor')}</Text>
             <View style={styles.colorInputContainer}>
               <View style={[styles.colorPreview, { backgroundColor: formData.teamColor }]} />
               <TextInput
@@ -273,7 +273,7 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Jamoa haqida</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('teamDescription')}</Text>
             <TextInput
               style={[styles.textArea, { 
                 backgroundColor: colors.surface, 
@@ -282,7 +282,7 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
               }]}
               value={formData.description}
               onChangeText={(value) => handleInputChange('description', value)}
-              placeholder="Jamoa haqida qisqacha ma'lumot"
+              placeholder={getText('enterTeamDescription')}
               placeholderTextColor={colors.textSecondary}
               multiline
               numberOfLines={3}
@@ -290,7 +290,7 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Aloqa shaxsi *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('contactPerson')} *</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -299,13 +299,13 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
               }]}
               value={formData.contactPerson}
               onChangeText={(value) => handleInputChange('contactPerson', value)}
-              placeholder="Aloqa shaxsi ismi"
+              placeholder={getText('enterContactPerson')}
               placeholderTextColor={colors.textSecondary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Telefon raqam *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('phoneNumber')} *</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -322,7 +322,7 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{getText('email')}</Text>
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colors.surface, 
@@ -343,7 +343,7 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
             disabled={loading}
           >
             <Text style={styles.submitButtonText}>
-              {loading ? 'Yuborilmoqda...' : 'Arizani yuborish'}
+              {loading ? getText('submitting') : getText('submitApplication')}
             </Text>
           </TouchableOpacity>
         </View>

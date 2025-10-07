@@ -5,9 +5,9 @@ class ApiService {
   private baseUrl: string;
 
   constructor() {
-    // Use local Next.js API routes instead of direct backend calls
-    this.baseUrl = ''; // Empty for relative URLs to local API routes
-    console.log('API Base URL:', this.baseUrl || 'Using local Next.js API routes');
+    // Use backend API directly
+    this.baseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+    console.log('API Base URL:', this.baseUrl);
   }
 
   private async request<T>(

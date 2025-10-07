@@ -12,9 +12,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
 const AdminMatchEditScreen = ({ route, navigation }: any) => {
   const { colors } = useThemeStore();
+  const { getText } = useLanguage();
   const { matchId } = route.params || {};
 
   const [homeScore, setHomeScore] = useState('');
@@ -23,7 +25,7 @@ const AdminMatchEditScreen = ({ route, navigation }: any) => {
 
   const handleSave = () => {
     if (!homeScore || !awayScore) {
-      Alert.alert('Xatolik', 'Hisobni kiriting');
+      Alert.alert(getText('error'), getText('enterScore'));
       return;
     }
 
@@ -35,8 +37,8 @@ const AdminMatchEditScreen = ({ route, navigation }: any) => {
       status
     });
 
-    Alert.alert('Muvaffaqiyat', 'O\'yin yangilandi', [
-      { text: 'OK', onPress: () => navigation.goBack() }
+    Alert.alert(getText('success'), getText('matchUpdated'), [
+      { text: getText('ok'), onPress: () => navigation.goBack() }
     ]);
   };
 
@@ -53,16 +55,16 @@ const AdminMatchEditScreen = ({ route, navigation }: any) => {
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>O'yin Tahrirlash</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{getText('editMatch')}</Text>
         </View>
 
         <View style={styles.content}>
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Hisob</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('score')}</Text>
             
             <View style={styles.scoreContainer}>
               <View style={styles.scoreInput}>
-                <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>Uy jamoasi</Text>
+                <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{getText('homeTeam')}</Text>
                 <TextInput
                   style={[styles.scoreField, { 
                     backgroundColor: colors.card,
@@ -80,7 +82,7 @@ const AdminMatchEditScreen = ({ route, navigation }: any) => {
               <Text style={[styles.vsText, { color: colors.text }]}>VS</Text>
 
               <View style={styles.scoreInput}>
-                <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>Mehmon jamoasi</Text>
+                <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{getText('awayTeam')}</Text>
                 <TextInput
                   style={[styles.scoreField, { 
                     backgroundColor: colors.card,
@@ -98,7 +100,7 @@ const AdminMatchEditScreen = ({ route, navigation }: any) => {
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Holat</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('status')}</Text>
             
             <View style={styles.statusContainer}>
               {['scheduled', 'live', 'finished'].map((statusOption) => (
@@ -119,8 +121,8 @@ const AdminMatchEditScreen = ({ route, navigation }: any) => {
                       color: status === statusOption ? '#fff' : colors.text 
                     }
                   ]}>
-                    {statusOption === 'scheduled' ? 'Rejalashtirilgan' :
-                     statusOption === 'live' ? 'Jonli' : 'Tugallangan'}
+                    {statusOption === 'scheduled' ? getText('scheduled') :
+                     statusOption === 'live' ? getText('live') : getText('finished')}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -131,7 +133,7 @@ const AdminMatchEditScreen = ({ route, navigation }: any) => {
             style={[styles.saveButton, { backgroundColor: colors.primary }]}
             onPress={handleSave}
           >
-            <Text style={styles.saveButtonText}>Saqlash</Text>
+            <Text style={styles.saveButtonText}>{getText('save')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

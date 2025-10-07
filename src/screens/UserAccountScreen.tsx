@@ -86,6 +86,12 @@ const UserAccountScreen = ({ navigation }: any) => {
     setShowTeamModal(true);
   };
 
+  const handleConfirmTeamApplication = () => {
+    setShowTeamModal(false);
+    console.log('Navigating to TeamApplication');
+    navigation.navigate('TeamApplication');
+  };
+
   const handleLeagueTypeApplication = () => {
     setShowLeagueTypeModal(false);
     console.log('Navigating to LeagueApplication');
@@ -266,7 +272,7 @@ const UserAccountScreen = ({ navigation }: any) => {
         title={getText('teamApplication')}
         message={getText('teamApplicationMessage')}
         onClose={() => setShowTeamModal(false)}
-        onConfirm={handleTeamApplication}
+        onConfirm={handleConfirmTeamApplication}
         confirmText={getText('yesContinue')}
         cancelText={getText('cancel')}
         type="info"
