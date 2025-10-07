@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/havas-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1a1a2e"
+      "backgroundColor": "#0f0f23"
     },
     "ios": {
       "supportsTablet": true,
@@ -34,7 +34,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/havas-logo.png",
-        "backgroundColor": "#1a1a2e"
+        "backgroundColor": "#0f0f23"
       },
       "package": "com.seniorxo.hfl"
     },
