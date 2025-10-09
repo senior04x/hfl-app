@@ -26,6 +26,7 @@ interface ApiSliderProps {
   autoPlay?: boolean;
   autoPlayInterval?: number;
   refreshTrigger?: number; // Add refresh trigger prop
+  navigation?: any; // Add navigation prop
 }
 
 const ApiSlider: React.FC<ApiSliderProps> = ({ 
@@ -33,6 +34,7 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
   autoPlay = true,
   autoPlayInterval = 6000,
   refreshTrigger,
+  navigation,
 }) => {
   const { colors } = useTheme();
   const [sliderItems, setSliderItems] = useState<SliderItem[]>([]);
@@ -166,9 +168,42 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
       } else if (item.linkType === 'internal') {
         // Handle internal navigation
         console.log('Internal navigation to:', item.link);
-        // Bu yerda navigation logic qo'shiladi
-        // Masalan: navigation.navigate(item.link)
-        Alert.alert('Ichki sahifa', `${item.link} sahifasiga o'tish`);
+        if (navigation) {
+          switch (item.link) {
+            case 'Home':
+              // Already on home screen
+              break;
+            case 'Matches':
+              const tabNavigator = navigation.getParent();
+              if (tabNavigator) {
+                tabNavigator.navigate('Matches');
+              }
+              break;
+            case 'Teams':
+              const tabNavigator2 = navigation.getParent();
+              if (tabNavigator2) {
+                tabNavigator2.navigate('Teams');
+              }
+              break;
+            case 'Standings':
+              const tabNavigator3 = navigation.getParent();
+              if (tabNavigator3) {
+                tabNavigator3.navigate('Standings');
+              }
+              break;
+            case 'Account':
+              const tabNavigator4 = navigation.getParent();
+              if (tabNavigator4) {
+                tabNavigator4.navigate('Account');
+              }
+              break;
+            default:
+              console.log('Unknown internal page:', item.link);
+              Alert.alert('Xatolik', `Noma'lum sahifa: ${item.link}`);
+          }
+        } else {
+          Alert.alert('Ichki sahifa', `${item.link} sahifasiga o'tish`);
+        }
       }
     } else {
       console.log('No link specified for this slider item');
