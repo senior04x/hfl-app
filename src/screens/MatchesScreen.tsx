@@ -36,6 +36,12 @@ const MatchesScreen = () => {
   const [filter, setFilter] = useState<'all' | 'live' | 'upcoming' | 'finished'>('all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
+  const [fromDate, setFromDate] = useState('11 Okt 2025, Ses');
+  const [toDate, setToDate] = useState('25 Okt 2025, Ses');
+  const [showDatePicker, setShowDatePicker] = useState<'from' | 'to' | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [fromDay, setFromDay] = useState(11);
+  const [toDay, setToDay] = useState(25);
 
   useEffect(() => {
     fetchMatches();
@@ -166,24 +172,31 @@ const MatchesScreen = () => {
             {formatDateHeader(dateString)}
           </Text>
         </View>
-        {Object.entries(leagueGroups).map(([leagueType, leagueMatches]) => (
-          <TouchableOpacity
-            key={leagueType}
-            style={[styles.leagueItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => {
-              setSelectedDate(dateString);
-              setSelectedLeague(leagueType);
-            }}
-          >
-            <Text style={[styles.leagueName, { color: colors.text }]}>{leagueType}</Text>
-            <View style={styles.leagueInfo}>
-              <Text style={[styles.matchCount, { color: colors.primary }]}>
-                {leagueMatches.length} {getText('matches')}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+        {Object.entries(leagueGroups).map(([leagueType, leagueMatches]) => {
+          return (
+            <View key={leagueType}>
+              <TouchableOpacity
+                style={[styles.leagueItem, { backgroundColor: colors.surface }]}
+                onPress={() => {
+                  // Navigate to a new screen with matches for this league and date
+                  navigation.navigate('LeagueMatches', { 
+                    leagueType, 
+                    dateString, 
+                    matches: leagueMatches 
+                  });
+                }}
+              >
+                <Text style={[styles.leagueName, { color: colors.text }]}>{leagueType}</Text>
+                <View style={styles.leagueInfo}>
+                  <Text style={[styles.matchCount, { color: colors.primary }]}>
+                    {leagueMatches.length} {getText('matches')}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        ))}
+          );
+        })}
       </View>
     );
   };
@@ -235,77 +248,138 @@ const MatchesScreen = () => {
       {/* LoadingOverlay ni o'chirib qo'yamiz - Skeleton loading ishlatamiz */}
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { backgroundColor: colors.header }]}>
-          <Text style={[styles.title, { color: colors.text }]}>{getText('matches')}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{getText('calendar')}</Text>
         </View>
 
-      <View style={[styles.filters, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
-        <FilterButton title={getText('all')} value="all" isActive={filter === 'all'} />
-        <FilterButton title={getText('live')} value="live" isActive={filter === 'live'} />
-        <FilterButton title={getText('upcoming')} value="upcoming" isActive={filter === 'upcoming'} />
-        <FilterButton title={getText('finished')} value="finished" isActive={filter === 'finished'} />
-      </View>
 
-      {loading ? (
-        <ScrollView
-          contentContainerStyle={styles.list}
-        >
-          {Array.from({ length: 8 }).map((_, index) => (
-            <MatchSkeletonCard key={index} />
-          ))}
-        </ScrollView>
-      ) : (
+        {/* Date Range Selector */}
+        <View style={[styles.dateRangeSelector, { backgroundColor: colors.background }]}>
+          <View style={styles.dateSelector}>
+            <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>{getText('from')}</Text>
+            <TouchableOpacity 
+              style={[styles.dateButton, { backgroundColor: colors.surface }]}
+              onPress={() => setShowDatePicker('from')}
+            >
+              <Text style={[styles.dateText, { color: colors.text }]}>{fromDate}</Text>
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.dateSelector}>
+            <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>{getText('to')}</Text>
+            <TouchableOpacity 
+              style={[styles.dateButton, { backgroundColor: colors.surface }]}
+              onPress={() => setShowDatePicker('to')}
+            >
+              <Text style={[styles.dateText, { color: colors.text }]}>{toDate}</Text>
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Date Picker Modal */}
+        {showDatePicker && (
+          <View style={[styles.datePickerOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+            <View style={[styles.datePickerModal, { backgroundColor: colors.background }]}>
+              <View style={[styles.datePickerHeader, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>
+                  {showDatePicker === 'from' ? getText('startDate') : getText('endDate')}
+                </Text>
+                <View style={{ width: 24 }} />
+              </View>
+              
+              <View style={[styles.calendarGrid, { backgroundColor: colors.surface }]}>
+                <View style={styles.calendarHeader}>
+                  <TouchableOpacity>
+                    <Ionicons name="chevron-back" size={20} color={colors.text} />
+                  </TouchableOpacity>
+                  <Text style={[styles.monthYear, { color: colors.text }]}>{getText('october')} 2025</Text>
+                  <TouchableOpacity>
+                    <Ionicons name="chevron-forward" size={20} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.weekDays}>
+                  {[getText('mon'), getText('tue'), getText('wed'), getText('thu'), getText('fri'), getText('sat'), getText('sun')].map((day, index) => (
+                    <Text key={index} style={[styles.weekDay, { color: colors.textSecondary }]}>{day}</Text>
+                  ))}
+                </View>
+                
+                <View style={styles.calendarDays}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                    const isSelected = selectedDay === day;
+                    const isInRange = day >= fromDay && day <= toDay;
+                    const isStartDay = day === fromDay;
+                    const isEndDay = day === toDay;
+                    const isCurrentlySelecting = selectedDay === day;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={day}
+                        style={[
+                          styles.calendarDay,
+                          { backgroundColor: colors.background },
+                          isInRange && styles.selectedRange,
+                          isSelected && styles.selectedDay,
+                          isStartDay && styles.rangeStart,
+                          isEndDay && styles.rangeEnd,
+                          isCurrentlySelecting && styles.currentlySelecting,
+                        ]}
+                        onPress={() => {
+                          setSelectedDay(day);
+                        }}
+                      >
+                        <Text style={[
+                          styles.dayText,
+                          { color: colors.text },
+                          isSelected && styles.selectedDayText,
+                          isInRange && !isSelected && styles.rangeDayText,
+                          isStartDay && styles.rangeStartText,
+                          isEndDay && styles.rangeEndText,
+                          isCurrentlySelecting && styles.currentlySelectingText,
+                        ]}>
+                          {day}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.confirmButton, { backgroundColor: colors.primary }]}
+                onPress={() => {
+                  if (selectedDay && showDatePicker) {
+                    const dayNames = [getText('mon'), getText('tue'), getText('wed'), getText('thu'), getText('fri'), getText('sat'), getText('sun')];
+                    const dayName = dayNames[selectedDay % 7];
+                    const monthShort = getText('october').substring(0, 3);
+                    
+                    if (showDatePicker === 'from') {
+                      setFromDate(`${selectedDay} ${monthShort} 2025, ${dayName}`);
+                      setFromDay(selectedDay);
+                    } else {
+                      setToDate(`${selectedDay} ${monthShort} 2025, ${dayName}`);
+                      setToDay(selectedDay);
+                    }
+                  }
+                  setSelectedDay(null);
+                  setShowDatePicker(null);
+                }}
+              >
+                <Text style={[styles.confirmButtonText, { color: 'white' }]}>{getText('confirm')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Calendar Events */}
         <ScrollView
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
-          contentContainerStyle={styles.list}
+          contentContainerStyle={styles.calendarEvents}
         >
-          {selectedDate && selectedLeague ? (
-            <View style={styles.matchesView}>
-              <View style={[styles.backHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={() => {
-                    setSelectedDate(null);
-                    setSelectedLeague(null);
-                  }}
-                >
-                  <Ionicons name="arrow-back" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.backTitle, { color: colors.text }]}>
-                  {selectedLeague} - {formatDateHeader(selectedDate)}
-                </Text>
-              </View>
-              
-              {groupedMatches[selectedDate]
-                ?.filter(match => getLeagueType(match) === selectedLeague)
-                .map((match) => (
-                  <MatchCard 
-                    key={match.id}
-                    match={match} 
-                    onPress={() => navigation.navigate('MatchDetail', { matchId: match.id })}
-                  />
-                ))}
-            </View>
-          ) : (
-            <>
-              {sortedDates.length > 0 ? (
-                sortedDates.map(renderDateGroup)
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="football-outline" size={48} color={colors.textTertiary} />
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    {filter === 'all' 
-                      ? getText('noMatchesFound') 
-                      : `${getText('noMatchesFoundForFilter')} ${getText(filter)}`
-                    }
-                  </Text>
-                </View>
-              )}
-            </>
-          )}
+          {sortedDates.map(renderDateGroup)}
         </ScrollView>
-      )}
       </SafeAreaView>
     </>
   );
@@ -319,20 +393,183 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#333',
   },
   title: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     flex: 1,
   },
-  filters: {
+  dateRangeSelector: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    padding: 16,
+    gap: 16,
+  },
+  dateSelector: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  dateText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  calendarEvents: {
+    paddingHorizontal: 16,
+  },
+  eventItem: {
     paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    marginBottom: 2,
+    borderRadius: 8,
+  },
+  eventInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  eventTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  eventMatches: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // Date Picker Modal Styles
+  datePickerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  datePickerModal: {
+    width: '100%',
+    maxHeight: '80%',
+    borderRadius: 16,
+    padding: 16,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  calendarGrid: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  monthYear: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  weekDays: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  weekDay: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '500',
+    paddingVertical: 8,
+  },
+  calendarDays: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calendarDay: {
+    width: '14.28%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  selectedRange: {
+    backgroundColor: '#007AFF20',
+  },
+  dayText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  selectedDay: {
+    backgroundColor: '#007AFF',
+    borderRadius: 25,
+  },
+  selectedDayText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  rangeDayText: {
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  rangeStart: {
+    backgroundColor: '#007AFF',
+    borderTopLeftRadius: 25,
+    borderBottomLeftRadius: 25,
+  },
+  rangeEnd: {
+    backgroundColor: '#007AFF',
+    borderTopRightRadius: 25,
+    borderBottomRightRadius: 25,
+  },
+  rangeStartText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  rangeEndText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  currentlySelecting: {
+    backgroundColor: '#007AFF',
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  currentlySelectingText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  confirmButton: {
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   filterButton: {
     paddingHorizontal: 16,
@@ -372,17 +609,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   dateGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   dateHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 4,
   },
   dateHeaderText: {
-    color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   leagueItem: {
@@ -390,10 +625,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    borderWidth: 1,
+    paddingVertical: 14,
+    marginBottom: 6,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   leagueName: {
     fontSize: 16,

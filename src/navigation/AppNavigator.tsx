@@ -14,6 +14,7 @@ import TeamsScreen from '../screens/TeamsScreen';
 import StandingsScreen from '../screens/StandingsScreen';
 import UserAccountScreen from '../screens/UserAccountScreen';
 import MatchDetailScreen from '../screens/MatchDetailScreen';
+import LeagueMatchesScreen from '../screens/LeagueMatchesScreen';
 import TeamDetailScreen from '../screens/TeamDetailScreen';
 import PlayerStatsScreen from '../screens/PlayerStatsScreen';
 import TeamSelectionScreen from '../screens/TeamSelectionScreen';
@@ -46,7 +47,7 @@ const MainTabNavigator = () => {
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Matches') {
-            iconName = focused ? 'football' : 'football-outline';
+            iconName = focused ? 'calendar' : 'calendar-outline';
           } else if (route.name === 'Teams') {
             iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Standings') {
@@ -69,9 +70,16 @@ const MainTabNavigator = () => {
           paddingTop: 3,
           marginHorizontal: 6,
           marginBottom: 25,
+          marginTop: 0,
           borderRadius: 60,
           justifyContent: 'center',
           alignItems: 'center',
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -83,6 +91,7 @@ const MainTabNavigator = () => {
         },
         tabBarShowLabel: false,
         headerShown: false,
+        tabBarBackground: () => null,
       })}
     >
       <Tab.Screen 
@@ -124,7 +133,7 @@ const AppNavigator = () => {
         dark: isDarkMode,
         colors: {
           primary: colors.primary,
-          background: colors.background,
+          background: 'transparent',
           card: colors.card,
           text: colors.text,
           border: colors.border,
@@ -150,6 +159,13 @@ const AppNavigator = () => {
             headerStyle: { backgroundColor: colors.header },
             headerTintColor: colors.headerText,
             headerTitleStyle: { color: colors.headerText },
+          }}
+        />
+        <Stack.Screen 
+          name="LeagueMatches" 
+          component={LeagueMatchesScreen}
+          options={{ 
+            headerShown: false,
           }}
         />
         <Stack.Screen 

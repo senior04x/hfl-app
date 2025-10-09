@@ -118,10 +118,10 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
+      <SafeAreaProvider style={{ backgroundColor: 'transparent' }}>
         <ThemeProvider>
           <AppNavigator />
-          <StatusBar style="auto" />
+          <StatusBar style="auto" backgroundColor="transparent" translucent />
         </ThemeProvider>
       </SafeAreaProvider>
     </ErrorBoundary>

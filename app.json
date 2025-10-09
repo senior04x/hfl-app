@@ -4,7 +4,7 @@
     "slug": "hfl",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/havas-logo.png",
+    "icon": "./assets/image.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/havas-logo.png",
@@ -33,13 +33,13 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/havas-logo.png",
+        "foregroundImage": "./assets/image.png",
         "backgroundColor": "#0f0f23"
       },
       "package": "com.seniorxo.hfl"
     },
     "web": {
-      "favicon": "./assets/havas-logo.png"
+      "favicon": "./assets/image.png"
     },
     "extra": {
       "eas": {
@@ -49,6 +49,12 @@
     },
     "owner": "seniorxo",
     "plugins": [],
-    "sdkVersion": "54.0.0"
+    "sdkVersion": "54.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/55652ecc-9c9d-4966-9287-ab72bc39e448"
+    }
   }
 }

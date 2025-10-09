@@ -112,7 +112,13 @@ export type RootStackParamList = {
   Splash: undefined;
   Auth: undefined;
   Main: undefined;
+  Home: undefined;
+  Matches: undefined;
+  Teams: undefined;
+  Standings: undefined;
+  Account: undefined;
   MatchDetail: { matchId: string };
+  LeagueMatches: { leagueType: string; dateString: string; matches: Match[] };
   TeamDetail: { teamId: string };
   PlayerStats: { playerId: string; playerName?: string };
   TeamSelection: undefined;
@@ -165,5 +171,15 @@ export interface ApiError {
   success: false;
   error: string;
   details?: string;
+}
+
+// Slider types
+export interface SliderItem {
+  id: string;
+  title: string;
+  imageUrl?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 

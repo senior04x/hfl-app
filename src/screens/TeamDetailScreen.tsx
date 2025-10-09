@@ -232,26 +232,6 @@ const TeamDetailScreen = () => {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Players ({team.players?.length || 0})</Text>
-        
-        {team.players && team.players.length > 0 ? (
-          <FlatList
-            data={team.players}
-            keyExtractor={(item, index) => item.id || item._id || index.toString()}
-            renderItem={renderPlayer}
-            scrollEnabled={false}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          <View style={styles.noPlayersContainer}>
-            <Ionicons name="people-outline" size={48} color={colors.textSecondary} />
-            <Text style={[styles.noPlayersText, { color: colors.textSecondary }]}>
-              No players found
-            </Text>
-          </View>
-        )}
-      </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -447,15 +427,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-  },
-  noPlayersContainer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  noPlayersText: {
-    fontSize: 16,
-    marginTop: 12,
-    textAlign: 'center',
   },
 });
 

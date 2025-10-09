@@ -6,15 +6,18 @@ import {
   FlatList,
   TouchableOpacity,
   SafeAreaView,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAppStore } from '../store/useAppStore';
-import { RootStackParamList, Match } from '../types';
-import MatchCard from '../components/MatchCard';
-import MatchSkeletonCard from '../components/MatchSkeletonCard';
+import { RootStackParamList, SliderItem } from '../types';
+import CardSlider from '../components/CardSlider';
+import ApiSlider from '../components/ApiSlider';
+import TopPlayersSection from '../components/TopPlayersSection';
+import QuickStatsCard from '../components/QuickStatsCard';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
@@ -23,10 +26,147 @@ type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 const SimpleHomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const { matches, loadMatches, isLoading } = useAppStore();
+  const { loadMatches } = useAppStore();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const { colors } = useTheme();
   const { getText } = useLanguage();
+
+  // Sample data for card slider - only images
+  const sliderCards = [
+    {
+      id: '1',
+      imageUrl: 'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=400&h=200&fit=crop',
+      onPress: () => {
+        const tabNavigator = navigation.getParent();
+        if (tabNavigator) {
+          tabNavigator.navigate('Standings');
+        }
+      },
+    },
+    {
+      id: '2',
+      imageUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=200&fit=crop',
+      onPress: () => {
+        const tabNavigator = navigation.getParent();
+        if (tabNavigator) {
+          tabNavigator.navigate('Matches');
+        }
+      },
+    },
+    {
+      id: '3',
+      imageUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=400&h=200&fit=crop',
+      onPress: () => {
+        const tabNavigator = navigation.getParent();
+        if (tabNavigator) {
+          tabNavigator.navigate('Teams');
+        }
+      },
+    },
+  ];
+
+  // Sample top players data
+  const topPlayers = [
+    {
+      id: '1',
+      name: 'Ahmad Karimov',
+      team: 'FC Tashkent',
+      position: 'Forward',
+      goals: 15,
+      assists: 8,
+      rating: 9.2,
+    },
+    {
+      id: '2',
+      name: 'Sardor Rashidov',
+      team: 'FC Bunyodkor',
+      position: 'Midfielder',
+      goals: 12,
+      assists: 12,
+      rating: 8.9,
+    },
+    {
+      id: '3',
+      name: 'Eldor Shomurodov',
+      team: 'FC Nasaf',
+      position: 'Forward',
+      goals: 14,
+      assists: 6,
+      rating: 8.7,
+    },
+    {
+      id: '4',
+      name: 'Jaloliddin Masharipov',
+      team: 'FC Pakhtakor',
+      position: 'Winger',
+      goals: 10,
+      assists: 15,
+      rating: 8.5,
+    },
+    {
+      id: '5',
+      name: 'Otabek Shukurov',
+      team: 'FC AGMK',
+      position: 'Midfielder',
+      goals: 8,
+      assists: 10,
+      rating: 8.3,
+    },
+  ];
+
+
+  // Quick stats data
+  const quickStats = [
+    {
+      id: '1',
+      title: getText('totalMatches'),
+      value: '156',
+      icon: 'football',
+      color: '#3B82F6',
+      onPress: () => {
+        const tabNavigator = navigation.getParent();
+        if (tabNavigator) {
+          tabNavigator.navigate('Matches');
+        }
+      },
+    },
+    {
+      id: '2',
+      title: getText('activeTeams'),
+      value: '24',
+      icon: 'people',
+      color: '#10B981',
+      onPress: () => {
+        const tabNavigator = navigation.getParent();
+        if (tabNavigator) {
+          tabNavigator.navigate('Teams');
+        }
+      },
+    },
+    {
+      id: '3',
+      title: getText('liveMatches'),
+      value: '3',
+      icon: 'radio',
+      color: '#EF4444',
+      onPress: () => {
+        const tabNavigator = navigation.getParent();
+        if (tabNavigator) {
+          tabNavigator.navigate('Matches');
+        }
+      },
+    },
+    {
+      id: '4',
+      title: getText('topScorer'),
+      value: '15',
+      icon: 'trophy',
+      color: '#F59E0B',
+      onPress: () => {
+        // Navigate to player stats or standings
+      },
+    },
+  ];
 
   useEffect(() => {
     const initializeData = async () => {
@@ -42,41 +182,29 @@ const SimpleHomeScreen = () => {
     initializeData();
   }, []);
 
-  const onRefresh = () => {
-    loadMatches();
-  };
-
-  const upcomingMatches = matches.filter(match => 
-    match.status === 'scheduled' && 
-    new Date(match.matchDate) > new Date()
-  ).slice(0, 5);
-
-  const liveMatches = matches.filter(match => match.status === 'live');
-
-  const renderMatch = ({ item }: { item: Match }) => (
-    <MatchCard 
-      match={item} 
-      onPress={() => navigation.navigate('MatchDetail', { matchId: item.id })}
-    />
-  );
 
   if (isInitialLoad) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{getText('welcomeToHFL')}</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{getText('havasFootballLeague')}</Text>
-        </View>
-        
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="time" size={20} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('upcomingMatches')}</Text>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>{getText('welcomeToHFL')}</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{getText('havasFootballLeague')}</Text>
           </View>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <MatchSkeletonCard key={index} />
-          ))}
-        </View>
+          
+          {/* Card Slider Skeleton */}
+          <View style={styles.sliderSkeleton}>
+            <View style={[styles.skeletonCard, { backgroundColor: colors.surface }]} />
+          </View>
+          
+          {/* Quick Stats Skeleton */}
+          <View style={styles.statsSkeleton}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View key={index} style={[styles.skeletonStat, { backgroundColor: colors.surface }]} />
+            ))}
+          </View>
+          
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -84,58 +212,57 @@ const SimpleHomeScreen = () => {
   return (
     <ErrorBoundary>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{getText('welcomeToHFL')}</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{getText('havasFootballLeague')}</Text>
-        </View>
-
-        {liveMatches.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="radio" size={20} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('liveMatches')}</Text>
-            </View>
-            <FlatList
-              data={liveMatches}
-              renderItem={renderMatch}
-              keyExtractor={(item, index) => item.id || `live-${index}`}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.verticalList}
-            />
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>{getText('welcomeToHFL')}</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{getText('havasFootballLeague')}</Text>
           </View>
-        )}
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="time" size={20} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('upcomingMatches')}</Text>
-          </View>
-          <FlatList
-            data={upcomingMatches}
-            renderItem={renderMatch}
-            keyExtractor={(item, index) => item.id || `upcoming-${index}`}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="football-outline" size={48} color={colors.textTertiary} />
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{getText('noUpcomingMatches')}</Text>
-              </View>
-            }
+          {/* API Slider */}
+          <ApiSlider 
+            autoPlay={true}
+            autoPlayInterval={4000}
+            onItemPress={(item: SliderItem) => {
+              console.log('Slider item pressed:', item.title);
+              // You can add navigation logic here based on the slider item
+            }}
           />
-        </View>
 
-        <TouchableOpacity
-          style={[styles.quickAction, { backgroundColor: colors.surface }]}
-          onPress={() => {
-            const tabNavigator = navigation.getParent();
-            if (tabNavigator) {
-              tabNavigator.navigate('Matches');
-            }
-          }}
-        >
-          <Ionicons name="list" size={24} color={colors.primary} />
-          <Text style={[styles.quickActionText, { color: colors.text }]}>{getText('viewAllMatches')}</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-        </TouchableOpacity>
+          {/* Quick Stats */}
+          <QuickStatsCard stats={quickStats} />
+
+          {/* Top Players Section */}
+          <TopPlayersSection 
+            players={topPlayers}
+            onPlayerPress={(player) => {
+              console.log('Player pressed:', player.name);
+              // Navigate to player details
+            }}
+            onViewAllPress={() => {
+              const tabNavigator = navigation.getParent();
+              if (tabNavigator) {
+                tabNavigator.navigate('Standings');
+              }
+            }}
+          />
+
+
+          {/* Quick Action Button */}
+          <TouchableOpacity
+            style={[styles.quickAction, { backgroundColor: colors.surface }]}
+            onPress={() => {
+              const tabNavigator = navigation.getParent();
+              if (tabNavigator) {
+                tabNavigator.navigate('Matches');
+              }
+            }}
+          >
+            <Ionicons name="list" size={24} color={colors.primary} />
+            <Text style={[styles.quickActionText, { color: colors.text }]}>{getText('viewAllMatches')}</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        </ScrollView>
       </SafeAreaView>
     </ErrorBoundary>
   );
@@ -195,6 +322,30 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     marginLeft: 12,
+  },
+  // Skeleton loading styles
+  sliderSkeleton: {
+    paddingHorizontal: 40, // Adjusted for 80% width with better peek effect
+    marginVertical: 10,
+  },
+  skeletonCard: {
+    height: 130, // Increased height for better visibility
+    borderRadius: 16,
+    opacity: 0.3,
+  },
+  statsSkeleton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    marginVertical: 10,
+  },
+  skeletonStat: {
+    width: '48%',
+    height: 120,
+    borderRadius: 12,
+    marginBottom: 15,
+    opacity: 0.3,
   },
 });
 

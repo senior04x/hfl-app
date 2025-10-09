@@ -41,7 +41,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   }, [navigation, fadeAnim, scaleAnim]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: '#0f0f23' }]}>
       <Animated.View
         style={[
           styles.logoContainer,
@@ -56,8 +56,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={[styles.appName, { color: colors.text }]}>HFL Sports</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Havas Football League</Text>
+        <Text style={[styles.subtitle, { color: '#cccccc' }]}>HFL Sports</Text>
       </Animated.View>
     </View>
   );
@@ -66,7 +65,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#0f0f23',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -75,20 +74,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 150,
-    height: 150,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginTop: 20,
-    textAlign: 'center',
+    width: 200,
+    height: 200,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#cccccc',
-    marginTop: 8,
+    marginTop: -40,
     textAlign: 'center',
   },
 });

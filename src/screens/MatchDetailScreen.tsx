@@ -2,15 +2,15 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
   TouchableOpacity,
-  // ActivityIndicator, // Skeleton loading ishlatamiz
-  Linking,
+  ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
@@ -19,15 +19,13 @@ import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
 import { RootStackParamList, Match } from '../types';
 import { db } from '../lib/firebase';
-import MatchSkeletonCard from '../components/MatchSkeletonCard';
-import { truncateTeamName } from '../utils/textUtils';
 
-type MatchDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MatchDetail'>;
 type MatchDetailScreenRouteProp = RouteProp<RootStackParamList, 'MatchDetail'>;
+type MatchDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MatchDetail'>;
 
 const MatchDetailScreen = () => {
-  const navigation = useNavigation<MatchDetailScreenNavigationProp>();
   const route = useRoute<MatchDetailScreenRouteProp>();
+  const navigation = useNavigation<MatchDetailScreenNavigationProp>();
   const { colors } = useTheme();
   const { getText, language } = useLanguage();
   const { matchId } = route.params;
@@ -36,48 +34,63 @@ const MatchDetailScreen = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchMatch();
+    fetchMatchDetails();
   }, [matchId]);
 
-  const fetchMatch = async () => {
+  const fetchMatchDetails = async () => {
     try {
       setLoading(true);
-      console.log('Fetching match details:', matchId);
+      const matchDoc = await getDoc(doc(db, 'matches', matchId));
       
-      const matchRef = doc(db, 'matches', matchId);
-      const matchSnap = await getDoc(matchRef);
-      
-      if (matchSnap.exists()) {
-        const data = matchSnap.data();
+      if (matchDoc.exists()) {
+        const data = matchDoc.data();
         const matchData: Match = {
-          id: matchSnap.id,
+          id: matchDoc.id,
           homeTeamId: data.homeTeamId || '',
           homeTeamName: data.homeTeamName || '',
           awayTeamId: data.awayTeamId || '',
           awayTeamName: data.awayTeamName || '',
           homeScore: data.homeScore || 0,
           awayScore: data.awayScore || 0,
-            matchDate: data.matchDate?.toDate ? data.matchDate.toDate() : new Date(data.matchDate),
-            status: data.status || 'scheduled',
-            venue: data.venue || '',
-            referee: data.referee || '',
-            youtubeLink: data.youtubeLink || '',
-            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
-            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
+          matchDate: data.matchDate?.toDate ? data.matchDate.toDate() : new Date(data.matchDate),
+          status: data.status || 'scheduled',
+          venue: data.venue || '',
+          referee: data.referee || '',
+          youtubeLink: data.youtubeLink || '',
+          leagueType: data.leagueType || '',
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
         };
-        
-        console.log('Match details fetched:', matchData);
         setMatch(matchData);
       } else {
-        console.log('Match not found');
-        setMatch(null);
+        Alert.alert(getText('error'), 'Match not found');
+        navigation.goBack();
       }
     } catch (error) {
       console.error('Error fetching match details:', error);
-      setMatch(null);
+      Alert.alert(getText('error'), 'Failed to load match details');
+      navigation.goBack();
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatDate = (date: Date) => {
+    let locale = 'uz-UZ';
+    if (language === 'en') {
+      locale = 'en-US';
+    } else if (language === 'ru') {
+      locale = 'ru-RU';
+    }
+    
+    return new Intl.DateTimeFormat(locale, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
   };
 
   const getStatusColor = (status: string) => {
@@ -104,93 +117,35 @@ const MatchDetailScreen = () => {
     }
   };
 
-  const formatDate = (date: Date) => {
-    let locale = 'uz-UZ';
-    if (language === 'en') {
-      locale = 'en-US';
-    } else if (language === 'ru') {
-      locale = 'ru-RU';
-    }
-    
-    return new Intl.DateTimeFormat(locale, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
-
-  const openYouTubeLink = async (url: string) => {
-    try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert(getText('error'), getText('cannotOpenYouTubeLink'));
+  const openYouTubeLink = async () => {
+    if (match?.youtubeLink) {
+      try {
+        const supported = await Linking.canOpenURL(match.youtubeLink);
+        if (supported) {
+          await Linking.openURL(match.youtubeLink);
+        } else {
+          Alert.alert(getText('error'), 'Cannot open YouTube link');
+        }
+      } catch (error) {
+        Alert.alert(getText('error'), 'Error opening YouTube link');
       }
-    } catch (error) {
-      console.error('Error opening YouTube link:', error);
-      Alert.alert(getText('error'), getText('errorOpeningYouTubeLink'));
     }
   };
 
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.text }]}>{getText('matchDetails')}</Text>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{getText('matchDetails')}</Text>
+          <View style={{ width: 24 }} />
         </View>
-        
-        <ScrollView style={styles.content}>
-          {/* Match Header Skeleton */}
-          <View style={[styles.matchHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.teamsContainer}>
-              <View style={styles.teamContainer}>
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 100, height: 20 }]} />
-              </View>
-              
-              <View style={styles.scoreContainer}>
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 80, height: 40 }]} />
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 60, height: 20, marginTop: 8 }]} />
-              </View>
-              
-              <View style={styles.teamContainer}>
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 100, height: 20 }]} />
-              </View>
-            </View>
-          </View>
-
-          {/* Match Info Skeleton */}
-          <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 150, height: 20, marginBottom: 16 }]} />
-            
-            <View style={styles.infoRow}>
-              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 20, height: 20 }]} />
-              <View style={styles.infoContent}>
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 100, height: 14, marginBottom: 4 }]} />
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 200, height: 16 }]} />
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 20, height: 20 }]} />
-              <View style={styles.infoContent}>
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 80, height: 14, marginBottom: 4 }]} />
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 150, height: 16 }]} />
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 20, height: 20 }]} />
-              <View style={styles.infoContent}>
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 60, height: 14, marginBottom: 4 }]} />
-                <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 120, height: 16 }]} />
-              </View>
-            </View>
-          </View>
-        </ScrollView>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>{getText('loading')}</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -198,17 +153,15 @@ const MatchDetailScreen = () => {
   if (!match) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color={colors.textTertiary} />
-          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-            O'yin topilmadi
-          </Text>
-          <TouchableOpacity
-            style={[styles.backToHomeButton, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backToHomeText}>{getText('goBack')}</Text>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{getText('matchDetails')}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: colors.text }]}>{getText('noData')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -217,101 +170,89 @@ const MatchDetailScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>{getText('matchDetails')}</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{getText('matchDetails')}</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Match Header */}
-        <View style={[styles.matchHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Match Status */}
+        <View style={[styles.statusCard, { backgroundColor: colors.surface }]}>
+          <View style={styles.statusContainer}>
+            <View style={[styles.statusDot, { backgroundColor: getStatusColor(match.status) }]} />
+            <Text style={[styles.statusText, { color: getStatusColor(match.status) }]}>
+              {getStatusText(match.status).toUpperCase()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Teams and Score */}
+        <View style={[styles.matchCard, { backgroundColor: colors.surface }]}>
           <View style={styles.teamsContainer}>
             <View style={styles.teamContainer}>
-              <Text style={[styles.teamName, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-                {truncateTeamName(match.homeTeamName)}
-              </Text>
+              <Text style={[styles.teamName, { color: colors.text }]}>{match.homeTeamName}</Text>
             </View>
             
             <View style={styles.scoreContainer}>
               <Text style={[styles.score, { color: colors.text }]}>
                 {match.status === 'scheduled' ? 'VS' : `${match.homeScore} - ${match.awayScore}`}
               </Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(match.status) }]}>
-                <Text style={styles.statusText}>
-                  {getStatusText(match.status)}
-                </Text>
-              </View>
             </View>
             
             <View style={styles.teamContainer}>
-              <Text style={[styles.teamName, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-                {truncateTeamName(match.awayTeamName)}
-              </Text>
+              <Text style={[styles.teamName, { color: colors.text }]}>{match.awayTeamName}</Text>
             </View>
           </View>
         </View>
 
-        {/* Match Info */}
-        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {/* Match Information */}
+        <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>{getText('matchInformation')}</Text>
           
           <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-            <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('dateAndTime')}</Text>
-              <Text style={[styles.infoValue, { color: colors.text }]}>
-                {formatDate(match.matchDate)}
-              </Text>
-            </View>
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('dateAndTime')}:</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{formatDate(match.matchDate)}</Text>
           </View>
-
+          
           {match.venue && (
             <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={20} color={colors.primary} />
-              <View style={styles.infoContent}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('venue')}</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>{match.venue}</Text>
-              </View>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('venue')}:</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>{match.venue}</Text>
             </View>
           )}
-
+          
           {match.referee && (
             <View style={styles.infoRow}>
-              <Ionicons name="person-outline" size={20} color={colors.primary} />
-              <View style={styles.infoContent}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('referee')}</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>{match.referee}</Text>
-              </View>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('referee')}:</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>{match.referee}</Text>
             </View>
           )}
-
-          {match.youtubeLink && (
+          
+          {match.leagueType && (
             <View style={styles.infoRow}>
-              <Ionicons name="play-circle-outline" size={20} color={colors.primary} />
-              <View style={styles.infoContent}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('liveStream')}</Text>
-                <TouchableOpacity
-                  style={[styles.youtubeButton, { backgroundColor: colors.primary }]}
-                  onPress={() => openYouTubeLink(match.youtubeLink!)}
-                >
-                  <Ionicons name="play" size={16} color="white" />
-                  <Text style={styles.youtubeButtonText}>{getText('watchOnYouTube')}</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{getText('league')}:</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>{match.leagueType}</Text>
             </View>
           )}
         </View>
 
-
-        {/* Live Match Indicator */}
-        {match.status === 'live' && (
-          <View style={[styles.liveCard, { backgroundColor: '#FF3B30' }]}>
-            <View style={styles.liveIndicator}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>LIVE</Text>
+        {/* YouTube Link */}
+        {match.youtubeLink && (
+          <TouchableOpacity 
+            style={[styles.youtubeCard, { backgroundColor: colors.surface }]}
+            onPress={openYouTubeLink}
+          >
+            <View style={styles.youtubeContent}>
+              <Ionicons name="logo-youtube" size={24} color="#FF0000" />
+              <View style={styles.youtubeText}>
+                <Text style={[styles.youtubeTitle, { color: colors.text }]}>{getText('liveStream')}</Text>
+                <Text style={[styles.youtubeSubtitle, { color: colors.textSecondary }]}>{getText('watchOnYouTube')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </View>
-            <Text style={styles.liveDescription}>
-              {getText('matchInProgress')}
-            </Text>
-          </View>
+          </TouchableOpacity>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -325,13 +266,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  title: {
+  headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -341,40 +283,43 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   loadingText: {
-    fontSize: 16,
     marginTop: 12,
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
   },
   errorText: {
     fontSize: 16,
-    marginTop: 12,
-    textAlign: 'center',
   },
-  backToHomeButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 20,
+  statusCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    alignItems: 'center',
   },
-  backToHomeText: {
-    color: 'white',
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  statusText: {
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
   },
-  matchHeader: {
+  matchCard: {
+    padding: 24,
     borderRadius: 12,
-    padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
   },
   teamsContainer: {
     flexDirection: 'row',
@@ -386,103 +331,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   teamName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     textAlign: 'center',
   },
   scoreContainer: {
     alignItems: 'center',
-    marginHorizontal: 20,
+    minWidth: 80,
   },
   score: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
   },
   infoCard: {
-    borderRadius: 12,
     padding: 16,
+    borderRadius: 12,
     marginBottom: 16,
-    borderWidth: 1,
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 16,
   },
   infoRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  infoContent: {
-    marginLeft: 12,
-    flex: 1,
+    marginBottom: 12,
   },
   infoLabel: {
-    fontSize: 14,
-    marginBottom: 2,
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
   },
   infoValue: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    flex: 2,
+    textAlign: 'right',
   },
-  liveCard: {
-    borderRadius: 12,
+  youtubeCard: {
     padding: 16,
+    borderRadius: 12,
     marginBottom: 16,
   },
-  liveIndicator: {
+  youtubeContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'white',
-    marginRight: 8,
+  youtubeText: {
+    flex: 1,
+    marginLeft: 12,
   },
-  liveText: {
-    color: 'white',
+  youtubeTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  liveDescription: {
-    color: 'white',
-    fontSize: 14,
-    opacity: 0.9,
-  },
-  youtubeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  youtubeButtonText: {
-    color: 'white',
-    fontSize: 14,
     fontWeight: '600',
-    marginLeft: 6,
-  },
-  skeletonText: {
-    borderRadius: 4,
     marginBottom: 4,
+  },
+  youtubeSubtitle: {
+    fontSize: 14,
   },
 });
 
 export default MatchDetailScreen;
-
