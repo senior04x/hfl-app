@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -28,6 +29,7 @@ const SimpleHomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { loadMatches } = useAppStore();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { colors } = useTheme();
   const { getText } = useLanguage();
 
@@ -182,6 +184,18 @@ const SimpleHomeScreen = () => {
     initializeData();
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadMatches();
+      console.log('Data refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
 
   if (isInitialLoad) {
     return (
@@ -212,7 +226,17 @@ const SimpleHomeScreen = () => {
   return (
     <ErrorBoundary>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>{getText('welcomeToHFL')}</Text>
