@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -25,6 +26,7 @@ const LeagueMatchesScreen = () => {
   const { colors } = useTheme();
   const { getText, language } = useLanguage();
   const { leagueType, dateString, matches } = route.params;
+  const [refreshing, setRefreshing] = useState(false);
 
   const formatDateHeader = (dateString: string) => {
     const date = new Date(dateString);
@@ -51,6 +53,19 @@ const LeagueMatchesScreen = () => {
     />
   );
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Go back to refresh the data
+      navigation.goBack();
+      console.log('League matches refreshed');
+    } catch (error) {
+      console.error('Error refreshing league matches:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
@@ -73,6 +88,14 @@ const LeagueMatchesScreen = () => {
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.matchesList}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       </View>
     </SafeAreaView>
