@@ -151,7 +151,7 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
     }
     
     // Handle link navigation
-    if (item.link) {
+    if (item.link && item.link.trim() !== '') {
       if (item.linkType === 'external') {
         // Open external URL
         try {
