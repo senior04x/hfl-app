@@ -26,9 +26,9 @@ class SyncService {
 
   constructor() {
     this.config = {
-      syncInterval: 30 * 1000, // 30 seconds
+      syncInterval: 5 * 60 * 1000, // 5 minutes
       maxRetries: 3,
-      retryDelay: 1000, // 1 second
+      retryDelay: 5000, // 5 seconds
     };
 
     this.syncStatus = {

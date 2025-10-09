@@ -206,7 +206,8 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
         }
       }
     } else {
-      console.log('No link specified for this slider item');
+      console.log('No link specified for this slider item:', item.title);
+      // Don't show error for sliders without links - this is normal
     }
   };
 
