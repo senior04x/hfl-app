@@ -8,6 +8,8 @@ import {
   Image,
   Dimensions,
   Animated,
+  Linking,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SliderItem } from '../types';
@@ -130,11 +132,37 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
     }
   };
 
-  const handleItemPress = (item: SliderItem) => {
+  const handleItemPress = async (item: SliderItem) => {
+    console.log('Slider item pressed:', item.title, 'Link:', item.link, 'Type:', item.linkType);
+    
     if (onItemPress) {
       onItemPress(item);
+    }
+    
+    // Handle link navigation
+    if (item.link) {
+      if (item.linkType === 'external') {
+        // Open external URL
+        try {
+          const supported = await Linking.canOpenURL(item.link);
+          if (supported) {
+            await Linking.openURL(item.link);
+          } else {
+            Alert.alert('Xatolik', 'Bu linkni ochish mumkin emas');
+          }
+        } catch (error) {
+          console.error('Error opening external link:', error);
+          Alert.alert('Xatolik', 'Link ochishda xatolik yuz berdi');
+        }
+      } else if (item.linkType === 'internal') {
+        // Handle internal navigation
+        console.log('Internal navigation to:', item.link);
+        // Bu yerda navigation logic qo'shiladi
+        // Masalan: navigation.navigate(item.link)
+        Alert.alert('Ichki sahifa', `${item.link} sahifasiga o'tish`);
+      }
     } else {
-      console.log('Slider item pressed:', item.title);
+      console.log('No link specified for this slider item');
     }
   };
 
@@ -175,29 +203,12 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
           onPress={() => handleItemPress(item)}
           activeOpacity={0.8}
         >
-          {item.imageUrl ? (
-            <>
-              <Image
-                source={{ uri: item.imageUrl }}
-                style={styles.cardImage}
-                resizeMode="cover"
-              />
-              <View style={styles.overlay}>
-                <View style={styles.content}>
-                  <Text style={styles.title}>{item.title}</Text>
-                  <View style={styles.indicator}>
-                    <Ionicons name="chevron-forward" size={20} color="white" />
-                  </View>
-                </View>
-              </View>
-            </>
-          ) : (
-            <View style={[styles.content, styles.noImageContent]}>
-              <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-              <View style={styles.indicator}>
-                <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-              </View>
-            </View>
+          {item.imageUrl && (
+            <Image
+              source={{ uri: item.imageUrl }}
+              style={styles.cardImage}
+              resizeMode="cover"
+            />
           )}
         </TouchableOpacity>
       </Animated.View>

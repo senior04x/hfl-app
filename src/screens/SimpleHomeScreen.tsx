@@ -225,7 +225,40 @@ const SimpleHomeScreen = () => {
             autoPlayInterval={4000}
             onItemPress={(item: SliderItem) => {
               console.log('Slider item pressed:', item.title);
-              // You can add navigation logic here based on the slider item
+              // Handle internal navigation
+              if (item.link && item.linkType === 'internal') {
+                switch (item.link) {
+                  case 'Home':
+                    // Already on home screen
+                    break;
+                  case 'Matches':
+                    const tabNavigator = navigation.getParent();
+                    if (tabNavigator) {
+                      tabNavigator.navigate('Matches');
+                    }
+                    break;
+                  case 'Teams':
+                    const tabNavigator2 = navigation.getParent();
+                    if (tabNavigator2) {
+                      tabNavigator2.navigate('Teams');
+                    }
+                    break;
+                  case 'Standings':
+                    const tabNavigator3 = navigation.getParent();
+                    if (tabNavigator3) {
+                      tabNavigator3.navigate('Standings');
+                    }
+                    break;
+                  case 'Account':
+                    const tabNavigator4 = navigation.getParent();
+                    if (tabNavigator4) {
+                      tabNavigator4.navigate('Account');
+                    }
+                    break;
+                  default:
+                    console.log('Unknown internal page:', item.link);
+                }
+              }
             }}
           />
 

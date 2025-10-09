@@ -178,6 +178,8 @@ export interface SliderItem {
   id: string;
   title: string;
   imageUrl?: string;
+  link?: string;
+  linkType?: 'internal' | 'external';
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
