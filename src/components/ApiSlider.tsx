@@ -30,7 +30,7 @@ interface ApiSliderProps {
 const ApiSlider: React.FC<ApiSliderProps> = ({ 
   onItemPress,
   autoPlay = true,
-  autoPlayInterval = 4000,
+  autoPlayInterval = 6000,
 }) => {
   const { colors } = useTheme();
   const [sliderItems, setSliderItems] = useState<SliderItem[]>([]);

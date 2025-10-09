@@ -34,7 +34,7 @@ interface CardSliderProps {
 const CardSlider: React.FC<CardSliderProps> = ({
   cards,
   autoPlay = true,
-  autoPlayInterval = 4000,
+  autoPlayInterval = 6000,
   onCardPress,
 }) => {
   const { colors } = useTheme();

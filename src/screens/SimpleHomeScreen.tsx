@@ -246,7 +246,7 @@ const SimpleHomeScreen = () => {
           {/* API Slider */}
           <ApiSlider 
             autoPlay={true}
-            autoPlayInterval={4000}
+            autoPlayInterval={6000}
             onItemPress={(item: SliderItem) => {
               console.log('Slider item pressed:', item.title);
               // Handle internal navigation
