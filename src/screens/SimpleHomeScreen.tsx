@@ -30,6 +30,7 @@ const SimpleHomeScreen = () => {
   const { loadMatches } = useAppStore();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { colors } = useTheme();
   const { getText } = useLanguage();
 
@@ -188,6 +189,8 @@ const SimpleHomeScreen = () => {
     setRefreshing(true);
     try {
       await loadMatches();
+      // Trigger slider refresh
+      setRefreshTrigger(prev => prev + 1);
       console.log('Data refreshed successfully');
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -247,6 +250,7 @@ const SimpleHomeScreen = () => {
           <ApiSlider 
             autoPlay={true}
             autoPlayInterval={6000}
+            refreshTrigger={refreshTrigger}
             onItemPress={(item: SliderItem) => {
               console.log('Slider item pressed:', item.title);
               // Handle internal navigation

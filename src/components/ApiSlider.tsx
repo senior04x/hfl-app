@@ -25,12 +25,14 @@ interface ApiSliderProps {
   onItemPress?: (item: SliderItem) => void;
   autoPlay?: boolean;
   autoPlayInterval?: number;
+  refreshTrigger?: number; // Add refresh trigger prop
 }
 
 const ApiSlider: React.FC<ApiSliderProps> = ({ 
   onItemPress,
   autoPlay = true,
   autoPlayInterval = 6000,
+  refreshTrigger,
 }) => {
   const { colors } = useTheme();
   const [sliderItems, setSliderItems] = useState<SliderItem[]>([]);
@@ -42,6 +44,13 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
   useEffect(() => {
     loadSliderItems();
   }, []);
+
+  // Reload slider items when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      loadSliderItems();
+    }
+  }, [refreshTrigger]);
 
   const loadSliderItems = async () => {
     try {
