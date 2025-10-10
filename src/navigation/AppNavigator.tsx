@@ -28,6 +28,8 @@ import TransferRequestScreen from '../screens/TransferRequestScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import PlayerTransferRequestScreen from '../screens/PlayerTransferRequestScreen';
 import TeamTransferRequestScreen from '../screens/TeamTransferRequestScreen';
+import LeagueTournamentsScreen from '../screens/LeagueTournamentsScreen';
+import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 
 import LoadingScreen from '../components/LoadingScreen';
 
@@ -238,6 +240,28 @@ const AppNavigator = () => {
           name="TeamTransferRequest" 
           component={TeamTransferRequestScreen}
           options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="LeagueTournaments" 
+          component={LeagueTournamentsScreen}
+          options={{ 
+            headerShown: true,
+            title: 'Liga Turnirlari',
+            headerStyle: { backgroundColor: colors.header },
+            headerTintColor: colors.headerText,
+            headerTitleStyle: { color: colors.headerText },
+          }}
+        />
+        <Stack.Screen 
+          name="TournamentDetail" 
+          component={TournamentDetailScreen}
+          options={{ 
+            headerShown: true,
+            title: 'Turnir Detallari',
+            headerStyle: { backgroundColor: colors.header },
+            headerTintColor: colors.headerText,
+            headerTitleStyle: { color: colors.headerText },
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>

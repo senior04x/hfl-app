@@ -185,3 +185,34 @@ export interface SliderItem {
   updatedAt: Date;
 }
 
+// Navigation types
+export type RootStackParamList = {
+  Splash: undefined;
+  Main: undefined;
+  MatchDetail: { matchId: string; matchName?: string };
+  LeagueMatches: { leagueId: string; leagueName?: string };
+  TeamDetail: { teamId: string; teamName?: string };
+  PlayerStats: { playerId: string; playerName?: string };
+  TeamSelection: undefined;
+  PlayerRegistration: undefined;
+  PlayerLogin: undefined;
+  PlayerVerification: { phone: string };
+  PlayerDashboard: undefined;
+  TeamApplication: undefined;
+  LeagueApplication: undefined;
+  TransferRequest: undefined;
+  Settings: undefined;
+  PlayerTransferRequest: undefined;
+  TeamTransferRequest: undefined;
+  LeagueTournaments: { leagueId: string; leagueName: string };
+  TournamentDetail: { tournamentId: string; tournamentName: string; leagueName?: string };
+};
+
+export type MainTabParamList = {
+  Home: undefined;
+  Matches: undefined;
+  Teams: undefined;
+  Standings: undefined;
+  Account: undefined;
+};
+

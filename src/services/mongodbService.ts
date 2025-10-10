@@ -356,6 +356,80 @@ class MongoDBService {
     }
   }
 
+  // Leagues operations
+  async getLeagues(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('Fetching leagues from:', `${this.baseUrl}/api/leagues`);
+      const response = await fetch(`${this.baseUrl}/api/leagues`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Leagues fetched successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Error fetching leagues:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Tournaments operations
+  async getTournamentsByLeague(leagueId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('Fetching tournaments for league:', leagueId);
+      const response = await fetch(`${this.baseUrl}/api/tournaments/${leagueId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Tournaments fetched successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Error fetching tournaments:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async getTournamentById(tournamentId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      console.log('Fetching tournament by ID:', tournamentId);
+      const response = await fetch(`${this.baseUrl}/api/tournaments/${tournamentId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Tournament fetched successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Error fetching tournament:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
   // Health check
   async healthCheck(): Promise<boolean> {
     try {

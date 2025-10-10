@@ -10,9 +10,12 @@ import {
   ScrollView,
   Image,
   TextInput,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
 import { onSnapshot, collection, query, orderBy, where, getDocs } from 'firebase/firestore';
 
 import { useTheme } from '../store/useThemeStore';
@@ -20,31 +23,56 @@ import { useLanguage } from '../store/useLanguageStore';
 import { TeamStanding, Team, Match, PlayerStats } from '../types';
 import { db } from '../lib/firebase';
 import MatchSkeletonCard from '../components/MatchSkeletonCard';
+import { mongodbService } from '../services/mongodbService';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+interface Tournament {
+  _id: string;
+  name: string;
+  description?: string;
+  maxTeams?: number;
+  status: 'active' | 'inactive' | 'completed';
+  leagueId: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface League {
-  id: string;
+  _id: string;
   name: string;
-  displayName: string;
-  startDate: string;
-  endDate: string;
-  currentRound: number;
-  totalRounds: number;
-  standings: TeamStanding[];
-  recentMatches: Match[];
-  topPlayers: PlayerStats[];
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+  maxTeams?: number;
+  logo?: string;
+  status: 'active' | 'inactive' | 'completed';
+  tournaments?: Tournament[];
+  createdAt: string;
+  updatedAt: string;
+  // Legacy fields for backward compatibility
+  id?: string;
+  displayName?: string;
+  currentRound?: number;
+  totalRounds?: number;
+  standings?: TeamStanding[];
+  recentMatches?: Match[];
+  topPlayers?: PlayerStats[];
   subLeagues?: League[];
   parentLeague?: string;
-  level: number; // 0: Main league, 1: Sub league
+  level?: number;
 }
 
 const StandingsScreen = () => {
+  const navigation = useNavigation<NavigationProp<any>>();
   const { colors } = useTheme();
   const { getText } = useLanguage();
   const [leagues, setLeagues] = useState<League[]>([]);
   const [selectedLeague, setSelectedLeague] = useState<League | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'standings' | 'players' | 'matches'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tournaments' | 'standings' | 'players' | 'matches'>('overview');
   const [playersFilter, setPlayersFilter] = useState<'goals' | 'assists' | 'played' | 'yellowCards' | 'redCards'>('goals');
   const [showFilterOptions, setShowFilterOptions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -238,81 +266,131 @@ const StandingsScreen = () => {
   const fetchLeagues = async () => {
     try {
       setLoading(true);
-      console.log('Fetching leagues from Firebase...');
+      console.log('Fetching leagues from backend...');
+      
+      // Backend'dan ligalar ma'lumotlarini olish
+      const result = await mongodbService.getLeagues();
+      
+      if (result.success && result.data) {
+        console.log('Leagues fetched successfully:', result.data);
+        // Filter only active leagues and add mock data for missing fields
+        const activeLeagues = result.data.filter((league: any) => league.status === 'active').map((league: any) => ({
+          ...league,
+          description: league.description || `${league.name} professional football league`,
+          location: league.location || 'Toshkent',
+          startDate: league.startDate || '2024-09-01',
+          maxTeams: league.maxTeams || 16,
+        }));
+        setLeagues(activeLeagues);
+        setLoading(false);
+        return;
+      } else {
+        console.error('Failed to fetch leagues:', result.error);
+      }
+      
+      // Fallback to mock data if backend fails
+      console.log('Using mock data as fallback...');
       
       // Liga ma'lumotlarini olish - Hierarchical structure
-      const leaguesData: League[] = [
+              const leaguesData: League[] = [
+                {
+                  _id: 'havas-liga',
+                  id: 'havas-liga',
+                  name: 'Havas Liga',
+                  displayName: 'Havas Liga',
+                  description: 'Professional football league in Uzbekistan',
+                  location: 'Toshkent',
+                  startDate: '2024-09-01',
+                  endDate: '2024-12-31',
+                  currentRound: 3,
+                  totalRounds: 18,
+                  maxTeams: 16,
+                  level: 0,
+                  standings: [],
+                  recentMatches: [],
+                  topPlayers: [],
+                  status: 'active',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+          subLeagues: [
+                {
+                  _id: 'hfl-3-liga',
+                  id: 'hfl-3-liga',
+                  name: 'HFL 3-liga',
+                  displayName: 'HFL 3-liga',
+                  startDate: '2024-09-01',
+                  endDate: '2024-12-31',
+                  currentRound: 3,
+                  totalRounds: 18,
+                  level: 1,
+                  parentLeague: 'havas-liga',
+                  standings: [],
+                  recentMatches: [],
+                  topPlayers: [],
+                  status: 'active',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
         {
-          id: 'havas-liga',
-          name: 'Havas Liga',
-          displayName: 'Havas Liga',
+          _id: 'hfl-pro-liga',
+          id: 'hfl-pro-liga',
+          name: 'HFL Pro Liga',
+          displayName: 'HFL Pro Liga',
           startDate: '2024-09-01',
           endDate: '2024-12-31',
           currentRound: 3,
           totalRounds: 18,
-          level: 0,
+          level: 1,
+          parentLeague: 'havas-liga',
           standings: [],
           recentMatches: [],
           topPlayers: [],
-          subLeagues: [
-        {
-          id: 'hfl-3-liga',
-          name: 'HFL 3-liga',
-              displayName: 'HFL 3-liga',
-          startDate: '2024-09-01',
-          endDate: '2024-12-31',
-              currentRound: 3,
-              totalRounds: 18,
-              level: 1,
-              parentLeague: 'havas-liga',
-          standings: [],
-          recentMatches: [],
-          topPlayers: [],
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
         {
-          id: 'hfl-pro-liga',
-          name: 'HFL Pro Liga',
-              displayName: 'HFL Pro Liga',
-          startDate: '2024-09-01',
-          endDate: '2024-12-31',
-              currentRound: 3,
-              totalRounds: 18,
-              level: 1,
-              parentLeague: 'havas-liga',
-          standings: [],
-          recentMatches: [],
-          topPlayers: [],
-        },
-        {
+          _id: 'hfl-super-liga',
           id: 'hfl-super-liga',
           name: 'HFL Super Liga',
-              displayName: 'HFL Super Liga',
+          displayName: 'HFL Super Liga',
           startDate: '2024-09-01',
           endDate: '2024-12-31',
-              currentRound: 3,
-              totalRounds: 18,
-              level: 1,
-              parentLeague: 'havas-liga',
+          currentRound: 3,
+          totalRounds: 18,
+          level: 1,
+          parentLeague: 'havas-liga',
           standings: [],
           recentMatches: [],
           topPlayers: [],
-            },
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
           ],
         },
         {
+          _id: 'poytaxt-liga',
           id: 'poytaxt-liga',
           name: 'Poytaxt Liga',
           displayName: 'Poytaxt Liga',
+          description: 'Capital city football championship',
+          location: 'Toshkent',
           startDate: '2024-09-01',
           endDate: '2024-12-31',
           currentRound: 2,
           totalRounds: 16,
+          maxTeams: 12,
           level: 0,
           standings: [],
           recentMatches: [],
           topPlayers: [],
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           subLeagues: [
             {
+              _id: 'poytaxt-premier',
               id: 'poytaxt-premier',
               name: 'Poytaxt Premier',
               displayName: 'Poytaxt Premier',
@@ -322,11 +400,15 @@ const StandingsScreen = () => {
               totalRounds: 16,
               level: 1,
               parentLeague: 'poytaxt-liga',
-          standings: [],
-          recentMatches: [],
-          topPlayers: [],
+              standings: [],
+              recentMatches: [],
+              topPlayers: [],
+              status: 'active',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             },
             {
+              _id: 'poytaxt-championship',
               id: 'poytaxt-championship',
               name: 'Poytaxt Championship',
               displayName: 'Poytaxt Championship',
@@ -339,10 +421,14 @@ const StandingsScreen = () => {
               standings: [],
               recentMatches: [],
               topPlayers: [],
+              status: 'active',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             },
           ],
         },
         {
+          _id: 'alijahon-liga',
           id: 'alijahon-liga',
           name: 'Alijahon Liga',
           displayName: 'Alijahon Liga',
@@ -354,8 +440,12 @@ const StandingsScreen = () => {
           standings: [],
           recentMatches: [],
           topPlayers: [],
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           subLeagues: [
             {
+              _id: 'alijahon-elite',
               id: 'alijahon-elite',
               name: 'Alijahon Elite',
               displayName: 'Alijahon Elite',
@@ -368,8 +458,12 @@ const StandingsScreen = () => {
               standings: [],
               recentMatches: [],
               topPlayers: [],
+              status: 'active',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             },
             {
+              _id: 'alijahon-masters',
               id: 'alijahon-masters',
               name: 'Alijahon Masters',
               displayName: 'Alijahon Masters',
@@ -382,6 +476,9 @@ const StandingsScreen = () => {
               standings: [],
               recentMatches: [],
               topPlayers: [],
+              status: 'active',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             },
           ],
         },
@@ -501,57 +598,108 @@ const StandingsScreen = () => {
   };
 
   const renderLeagueItem = ({ item }: { item: League }) => (
-    <View style={[styles.leagueItem, { backgroundColor: colors.surface }]}>
-      {/* Main League Header - Non-clickable, just for display */}
-      <View style={styles.leagueHeader}>
-        <View style={styles.leagueInfo}>
-        <Text style={[styles.leagueName, { color: colors.text }]}>
-            {item.displayName}
-        </Text>
-          <View style={styles.roundInfo}>
-            <Text style={[styles.roundText, { color: colors.primary }]}>
-              {item.currentRound}-tur / {item.totalRounds}
+    <TouchableOpacity
+      style={[styles.leagueCard, { backgroundColor: colors.surface }]}
+      onPress={() => {
+        // Navigate to LeagueTournaments screen
+        navigation.navigate('LeagueTournaments', { 
+          leagueId: item._id, 
+          leagueName: item.name 
+        });
+        console.log('League pressed, navigating to tournaments:', item.name);
+      }}
+    >
+      <View style={styles.logoContainer}>
+        {item.logo ? (
+          <Image
+            source={{ uri: item.logo }}
+            style={styles.leagueLogo}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.defaultLogo, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.defaultLogoText, { color: colors.surface }]}>
+              {item.name.charAt(0).toUpperCase()}
             </Text>
-      </View>
-        </View>
-      </View>
-      
-      <Text style={[styles.leagueDate, { color: colors.textSecondary }]}>
-        {formatDate(item.startDate)} - {formatDate(item.endDate)}
-      </Text>
-      
-      <View style={styles.leagueStats}>
-        <Text style={[styles.leagueStat, { color: colors.textSecondary }]}>
-          {item.standings.length} {getText('team').toLowerCase()}
-        </Text>
-        <Text style={[styles.leagueStat, { color: colors.textSecondary }]}>
-          {item.recentMatches.length} {getText('games').toLowerCase()}
-        </Text>
+          </View>
+        )}
       </View>
 
-      {/* Sub-leagues - Direct access */}
-      {item.subLeagues && item.subLeagues.length > 0 && (
-        <View style={styles.subLeaguesContainer}>
-          {item.subLeagues.map((subLeague) => (
-            <TouchableOpacity
-              key={subLeague.id}
-              style={[styles.subLeagueItem, { backgroundColor: colors.background }]}
-              onPress={() => setSelectedLeague(subLeague)}
-            >
-              <View style={styles.subLeagueInfo}>
-                <Text style={[styles.subLeagueName, { color: colors.text }]}>
-                  {subLeague.displayName}
+      <View style={styles.leagueInfo}>
+        <Text style={[styles.leagueName, { color: colors.text }]}>
+          {item.name}
+        </Text>
+
+        {item.description && (
+          <Text style={[styles.leagueDescription, { color: colors.textSecondary }]}>
+            {item.description}
+          </Text>
+        )}
+
+        {/* Tournaments List */}
+        {item.tournaments && item.tournaments.length > 0 && (
+          <View style={styles.tournamentsContainer}>
+            <Text style={[styles.tournamentsTitle, { color: colors.textSecondary }]}>
+              Turnirlar:
+            </Text>
+            {item.tournaments.slice(0, 3).map((tournament, index) => (
+              <View key={tournament._id} style={styles.tournamentItem}>
+                <Text style={[styles.tournamentName, { color: colors.text }]}>
+                  • {tournament.name}
                 </Text>
-                <Text style={[styles.subLeagueRound, { color: colors.textSecondary }]}>
-                  {subLeague.currentRound}-tur
+                {tournament.maxTeams && (
+                  <Text style={[styles.tournamentTeams, { color: colors.textSecondary }]}>
+                    ({tournament.maxTeams} jamoa)
+                  </Text>
+                )}
+              </View>
+            ))}
+            {item.tournaments.length > 3 && (
+              <Text style={[styles.moreTournaments, { color: colors.textSecondary }]}>
+                +{item.tournaments.length - 3} boshqa turnir
+              </Text>
+            )}
+          </View>
+        )}
+
+        <View style={styles.leagueStats}>
+          <View style={styles.statRow}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                Jamoalar
+              </Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {item.maxTeams || 0}
+              </Text>
+            </View>
+
+            {item.location && (
+              <View style={styles.statItem}>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                  Joylashuv
+                </Text>
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  {item.location}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-    </TouchableOpacity>
-          ))}
+            )}
+          </View>
+
+          {item.startDate && (
+            <View style={styles.statRow}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                  Since
+                </Text>
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  {item.startDate ? new Date(item.startDate).toLocaleDateString('uz-UZ') : 'N/A'}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
-      )}
-    </View>
+      </View>
+    </TouchableOpacity>
   );
 
   const renderLeagueDetail = () => {
@@ -640,6 +788,14 @@ const StandingsScreen = () => {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
+            style={[styles.tab, activeTab === 'tournaments' && styles.activeTab, { borderBottomColor: colors.primary }]}
+            onPress={() => setActiveTab('tournaments')}
+          >
+            <Text style={[styles.tabText, activeTab === 'tournaments' && styles.activeTabText, { color: activeTab === 'tournaments' ? colors.primary : colors.textSecondary }]}>
+              Turnirlar
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
             style={[styles.tab, activeTab === 'standings' && styles.activeTab, { borderBottomColor: colors.primary }]}
             onPress={() => setActiveTab('standings')}
           >
@@ -711,7 +867,7 @@ const StandingsScreen = () => {
                     {getText('startDate')}:
               </Text>
                   <Text style={[styles.overviewValue, { color: colors.text }]}>
-                    {new Date(selectedLeague.startDate).toLocaleDateString('uz-UZ')}
+                    {selectedLeague.startDate ? new Date(selectedLeague.startDate).toLocaleDateString('uz-UZ') : 'N/A'}
               </Text>
             </View>
                 <View style={styles.overviewRow}>
@@ -719,7 +875,7 @@ const StandingsScreen = () => {
                     {getText('finishDate')}:
                   </Text>
                   <Text style={[styles.overviewValue, { color: colors.text }]}>
-                    {new Date(selectedLeague.endDate).toLocaleDateString('uz-UZ')}
+                    {selectedLeague.endDate ? new Date(selectedLeague.endDate).toLocaleDateString('uz-UZ') : 'N/A'}
                   </Text>
                 </View>
                 <View style={styles.overviewRow}>
@@ -738,7 +894,7 @@ const StandingsScreen = () => {
                     {getText('teams')}:
                   </Text>
                   <Text style={[styles.overviewValue, { color: colors.text }]}>
-                    {selectedLeague.standings.length || getMockDataForLeague(selectedLeague.name).teams.length}
+                    {selectedLeague.standings?.length || getMockDataForLeague(selectedLeague.name).teams.length}
                   </Text>
                 </View>
                 <View style={styles.overviewRow}>
@@ -746,7 +902,7 @@ const StandingsScreen = () => {
                     {getText('games')}:
                   </Text>
                   <Text style={[styles.overviewValue, { color: colors.text }]}>
-                    {selectedLeague.recentMatches.length || getMockDataForLeague(selectedLeague.name).matches.length} / {selectedLeague.totalRounds * 2}
+                    {selectedLeague.recentMatches?.length || getMockDataForLeague(selectedLeague.name).matches.length} / {(selectedLeague.totalRounds || 0) * 2}
                   </Text>
                 </View>
               </View>
@@ -782,7 +938,7 @@ const StandingsScreen = () => {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {getText('lastGames')}
               </Text>
-              {(selectedLeague.recentMatches.length > 0 ? selectedLeague.recentMatches : getMockDataForLeague(selectedLeague.name).matches).slice(0, 3).map((match, index) => {
+              {((selectedLeague.recentMatches?.length || 0) > 0 ? selectedLeague.recentMatches! : getMockDataForLeague(selectedLeague.name).matches).slice(0, 3).map((match, index) => {
                 // Handle both Match objects and mock match objects
                 const matchData = 'matchDate' in match ? match : {
                   homeTeamName: match.home,
@@ -843,7 +999,7 @@ const StandingsScreen = () => {
           <ScrollView style={styles.contentContainer}>
             {/* Matches List */}
         <View style={styles.section}>
-                      {(selectedLeague.recentMatches.length > 0 ? selectedLeague.recentMatches : getMockDataForLeague(selectedLeague.name).matches)
+                      {((selectedLeague.recentMatches?.length || 0) > 0 ? selectedLeague.recentMatches! : getMockDataForLeague(selectedLeague.name).matches)
                       .filter(match => {
                         const matchData = 'matchDate' in match ? match : {
                           homeTeamName: match.home,
@@ -923,6 +1079,79 @@ const StandingsScreen = () => {
                 );
               })}
         </View>
+          </ScrollView>
+        )}
+
+        {activeTab === 'tournaments' && (
+          <ScrollView style={styles.contentContainer}>
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Turnirlar
+              </Text>
+              {selectedLeague.tournaments && selectedLeague.tournaments.length > 0 ? (
+                selectedLeague.tournaments.map((tournament, index) => (
+                  <View key={tournament._id} style={[styles.tournamentDetailCard, { backgroundColor: colors.surface }]}>
+                    <View style={styles.tournamentDetailHeader}>
+                      <View style={[styles.tournamentDetailIcon, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="trophy" size={20} color="white" />
+                      </View>
+                      <View style={styles.tournamentDetailInfo}>
+                        <Text style={[styles.tournamentDetailName, { color: colors.text }]}>
+                          {tournament.name}
+                        </Text>
+                        {tournament.description && (
+                          <Text style={[styles.tournamentDetailDescription, { color: colors.textSecondary }]}>
+                            {tournament.description}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.tournamentDetailStatus}>
+                        <View style={[
+                          styles.tournamentStatusBadge, 
+                          { 
+                            backgroundColor: tournament.status === 'active' ? '#4CAF50' : 
+                                           tournament.status === 'completed' ? '#2196F3' : '#9E9E9E'
+                          }
+                        ]}>
+                          <Text style={styles.tournamentStatusText}>
+                            {tournament.status === 'active' ? 'Faol' :
+                             tournament.status === 'completed' ? 'Tugallangan' : 'Nofaol'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <View style={styles.tournamentDetailStats}>
+                      <View style={styles.tournamentDetailStat}>
+                        <Text style={[styles.tournamentDetailStatLabel, { color: colors.textSecondary }]}>
+                          Jamoalar soni
+                        </Text>
+                        <Text style={[styles.tournamentDetailStatValue, { color: colors.text }]}>
+                          {tournament.maxTeams || 0}
+                        </Text>
+                      </View>
+                      <View style={styles.tournamentDetailStat}>
+                        <Text style={[styles.tournamentDetailStatLabel, { color: colors.textSecondary }]}>
+                          Yaratilgan
+                        </Text>
+                        <Text style={[styles.tournamentDetailStatValue, { color: colors.text }]}>
+                          {new Date(tournament.createdAt).toLocaleDateString('uz-UZ')}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
+                  <Ionicons name="trophy-outline" size={48} color={colors.textSecondary} />
+                  <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
+                    Turnirlar yo'q
+                  </Text>
+                  <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                    Hozircha bu ligada turnirlar mavjud emas
+                  </Text>
+                </View>
+              )}
+            </View>
           </ScrollView>
         )}
 
@@ -1056,7 +1285,7 @@ const StandingsScreen = () => {
 
             {/* Players List */}
         <View style={styles.section}>
-              {(selectedLeague.topPlayers.length > 0 ? selectedLeague.topPlayers : getMockDataForLeague(selectedLeague.name).players.map((player, index) => ({
+              {((selectedLeague.topPlayers?.length || 0) > 0 ? selectedLeague.topPlayers! : getMockDataForLeague(selectedLeague.name).players.map((player, index) => ({
                 id: `player-${selectedLeague.id}-${index}`,
                 playerId: `player-${selectedLeague.id}-${index}`,
                 playerName: player.name,
@@ -1165,7 +1394,7 @@ const StandingsScreen = () => {
                 </View>
               </View>
 
-                      {(selectedLeague.standings.length > 0 ? selectedLeague.standings : getMockDataForLeague(selectedLeague.name).teams.map((team, index) => ({
+                      {((selectedLeague.standings?.length || 0) > 0 ? selectedLeague.standings! : getMockDataForLeague(selectedLeague.name).teams.map((team, index) => ({
                         teamId: `team-${selectedLeague.id}-${index}`,
                         team: {
                           id: `team-${selectedLeague.id}-${index}`,
@@ -1451,9 +1680,9 @@ const StandingsScreen = () => {
           <Text style={[styles.title, { color: colors.text }]}>{getText('tournament')}</Text>
         </View>
         
-        <View style={styles.list}>
+        <View style={[styles.list, { paddingBottom: 70 }]}>
           {Array.from({ length: 4 }).map((_, index) => (
-            <View key={index} style={[styles.leagueItem, { backgroundColor: colors.surface }]}>
+            <View key={index} style={[styles.leagueCard, { backgroundColor: colors.surface }]}>
               <View style={styles.leagueHeader}>
                 <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 150, height: 20 }]} />
                 <View style={[styles.skeletonText, { backgroundColor: colors.border, width: 20, height: 20 }]} />
@@ -1493,11 +1722,11 @@ const StandingsScreen = () => {
       <FlatList
         data={leagues}
         renderItem={renderLeagueItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id || item.name}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: 70 }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -1619,28 +1848,123 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 12,
   },
-  leagueItem: {
-    padding: 16,
-    marginBottom: 8,
-    borderRadius: 12,
+  leagueCard: {
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+  },
+  logoContainer: {
+    width: '100%',
+    aspectRatio: 1, // 1:1 aspect ratio
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leagueLogo: {
+    width: '100%',
+    height: '100%',
+  },
+  defaultLogo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  defaultLogoText: {
+    fontSize: 40,
+    fontWeight: 'bold',
+  },
+  leagueInfo: {
+    padding: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  leagueName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    textAlign: 'center',
+    paddingHorizontal: 10,
+    lineHeight: 22,
+  },
+  leagueDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+    opacity: 0.8,
+    paddingHorizontal: 10,
+  },
+  tournamentsContainer: {
+    marginBottom: 8,
+  },
+  tournamentsTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  tournamentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  tournamentName: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  tournamentTeams: {
+    fontSize: 10,
+  },
+  moreTournaments: {
+    fontSize: 10,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  leagueStats: {
+    marginTop: 8,
+    paddingHorizontal: 10,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+    paddingHorizontal: 10,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+    marginBottom: 2,
+    textAlign: 'center',
+    opacity: 0.7,
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
   },
   leagueHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
-  },
-  leagueInfo: {
-    flex: 1,
-  },
-  leagueName: {
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   roundInfo: {
     marginTop: 4,
@@ -1686,10 +2010,6 @@ const styles = StyleSheet.create({
   leagueDate: {
     fontSize: 14,
     marginBottom: 8,
-  },
-  leagueStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   leagueStat: {
     fontSize: 12,
@@ -2307,6 +2627,91 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Tournament detail styles (for tournament tab)
+  tournamentDetailCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  tournamentDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  tournamentDetailIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  tournamentDetailInfo: {
+    flex: 1,
+  },
+  tournamentDetailName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  tournamentDetailDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  tournamentDetailStatus: {
+    alignItems: 'flex-end',
+  },
+  tournamentStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  tournamentStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
+  },
+  tournamentDetailStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  tournamentDetailStat: {
+    alignItems: 'center',
+  },
+  tournamentDetailStatLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  tournamentDetailStatValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 
