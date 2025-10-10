@@ -430,6 +430,51 @@ class MongoDBService {
     }
   }
 
+  // Slider operations
+  async getSliderItems(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('Fetching slider items from:', `${this.baseUrl}/api/slider`);
+      const response = await fetch(`${this.baseUrl}/api/slider`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Slider items fetched successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Error fetching slider items:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async getActiveSliderItems(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const response = await this.getSliderItems();
+      
+      if (response.success && response.data) {
+        // Filter only active items
+        const activeItems = response.data.filter((item: any) => item.isActive);
+        return {
+          success: true,
+          data: activeItems
+        };
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error getting active slider items:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
   // Health check
   async healthCheck(): Promise<boolean> {
     try {
