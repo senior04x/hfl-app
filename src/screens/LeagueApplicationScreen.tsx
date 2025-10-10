@@ -192,6 +192,8 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
       console.log('Submitting league application:', leagueApplicationData);
       console.log('Logo data:', formData.logo ? 'Present' : 'Missing');
       console.log('MaxTeams data:', formData.maxTeams ? formData.maxTeams : 'Missing');
+      console.log('FormData maxTeams value:', formData.maxTeams);
+      console.log('LeagueApplicationData maxTeams value:', leagueApplicationData.maxTeams);
       
       // Submit to MongoDB via Service
       const result = await mongodbService.createApplication({
