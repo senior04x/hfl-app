@@ -9,12 +9,16 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
 import { mongodbService } from '../services/mongodbService';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { uploadImageToBase64 } from '../lib/cloudinary';
 
 interface LeagueApplicationScreenProps {
   navigation: any;
@@ -34,6 +38,8 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
     contactEmail: '',
     address: '',
     website: '',
+    logo: '', // Liga logosi uchun
+    maxTeams: '', // Maksimal jamoalar soni
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -43,6 +49,105 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
+  };
+
+  const handleImageUpload = async () => {
+    try {
+      // Ruxsat so'raish
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Ruxsat kerak', 'Rasm tanlash uchun galereya ruxsatini bering');
+        return;
+      }
+
+      // Rasm tanlash
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        
+        // Rasmni optimizatsiya qilish
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [
+            { resize: { width: 800 } },
+          ],
+          {
+            compress: 0.8,
+            format: ImageManipulator.SaveFormat.JPEG
+          }
+        );
+
+        // Base64'ga aylantirish
+        const base64Image = await uploadImageToBase64(manipulatedImage.uri, 'leagues/logos');
+        
+        setFormData(prev => ({ ...prev, logo: base64Image }));
+        Alert.alert('Muvaffaqiyat', 'Liga logosi yuklandi');
+      }
+    } catch (error) {
+      console.error('Rasm yuklash xatoligi:', error);
+      Alert.alert('Xatolik', 'Rasm yuklashda xatolik yuz berdi');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      // Ruxsat so'raish
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Ruxsat kerak', 'Kamera ruxsatini bering');
+        return;
+      }
+
+      // Rasm olish
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        
+        // Rasmni optimizatsiya qilish
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [
+            { resize: { width: 800 } },
+          ],
+          {
+            compress: 0.8,
+            format: ImageManipulator.SaveFormat.JPEG
+          }
+        );
+
+        // Base64'ga aylantirish
+        const base64Image = await uploadImageToBase64(manipulatedImage.uri, 'leagues/logos');
+        
+        setFormData(prev => ({ ...prev, logo: base64Image }));
+        Alert.alert('Muvaffaqiyat', 'Liga logosi yuklandi');
+      }
+    } catch (error) {
+      console.error('Rasm olish xatoligi:', error);
+      Alert.alert('Xatolik', 'Rasm olishda xatolik yuz berdi');
+    }
+  };
+
+  const showImageOptions = () => {
+    Alert.alert(
+      'Liga logosi',
+      'Qanday usulda rasm qo\'shmoqchisiz?',
+      [
+        { text: 'Galereyadan tanlash', onPress: handleImageUpload },
+        { text: 'Kameradan olish', onPress: handleTakePhoto },
+        { text: 'Bekor qilish', style: 'cancel' },
+      ]
+    );
   };
 
   const handleSubmit = async () => {
@@ -78,6 +183,8 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
         contactEmail: formData.contactEmail.trim(),
         address: formData.address.trim(),
         website: formData.website.trim(),
+        logo: formData.logo, // Liga logosi
+        maxTeams: formData.maxTeams, // Jamoalar soni
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
@@ -146,6 +253,40 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
               />
             </View>
 
+            {/* League Logo */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                Liga logosi
+              </Text>
+              <View style={styles.imageUploadContainer}>
+                {formData.logo ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image source={{ uri: formData.logo }} style={styles.imagePreview} />
+                    <TouchableOpacity
+                      style={[styles.changeImageButton, { backgroundColor: colors.primary }]}
+                      onPress={showImageOptions}
+                    >
+                      <Text style={[styles.changeImageButtonText, { color: colors.surface }]}>
+                        O'zgartirish
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.uploadButton, { 
+                      backgroundColor: colors.surface, 
+                      borderColor: colors.border 
+                    }]}
+                    onPress={showImageOptions}
+                  >
+                    <Text style={[styles.uploadButtonText, { color: colors.text }]}>
+                      📷 Liga logosi qo'shish
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
             {/* Founded Date */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
@@ -161,6 +302,25 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
                 onChangeText={(value) => handleInputChange('foundedDate', value)}
                 placeholder="YYYY-MM-DD"
                 placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            {/* Max Teams */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                Jamoalar soni
+              </Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: colors.surface, 
+                  borderColor: colors.border,
+                  color: colors.text 
+                }]}
+                value={formData.maxTeams}
+                onChangeText={(value) => handleInputChange('maxTeams', value)}
+                placeholder="Masalan: 16"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
               />
             </View>
 
@@ -361,6 +521,39 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
+  },
+  imageUploadContainer: {
+    marginTop: 8,
+  },
+  imagePreviewContainer: {
+    alignItems: 'center',
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 10,
+  },
+  changeImageButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  changeImageButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  uploadButton: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  uploadButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

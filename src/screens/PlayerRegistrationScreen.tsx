@@ -81,11 +81,10 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         
-        // Upload to Firebase Storage
+        // Upload to Cloudinary
         setUploadingPhoto(true);
         try {
-          const fileName = `players/${Date.now()}-${team.id}-${asset.fileName || 'photo.jpg'}`;
-          const downloadURL = await uploadImageToFirebase(asset.uri, fileName);
+          const downloadURL = await uploadImageToFirebase(asset.uri, 'hfl-app/players/photos');
           
           setFormData(prev => ({ 
             ...prev, 

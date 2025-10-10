@@ -72,11 +72,10 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         
-        // Upload to Firebase Storage
+        // Upload to Cloudinary
         setUploadingLogo(true);
         try {
-          const fileName = `teams/${Date.now()}-${asset.fileName || 'logo.jpg'}`;
-          const downloadURL = await uploadImageToFirebase(asset.uri, fileName);
+          const downloadURL = await uploadImageToFirebase(asset.uri, 'hfl-app/teams/logos');
           
           setFormData(prev => ({ 
             ...prev, 

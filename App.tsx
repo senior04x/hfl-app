@@ -11,9 +11,16 @@ import { syncService } from './src/services/syncService';
 import { offlineService } from './src/services/offlineService';
 import { realTimeService } from './src/services/realTimeService';
 import { ThemeProvider } from './src/providers/ThemeProvider';
+import { UpdateModal } from './src/components/UpdateModal';
+import { useUpdateModal } from './src/hooks/useUpdateModal';
+import UpdateService from './src/services/updateService';
 
 export default function App() {
+  const updateModal = useUpdateModal();
+
   useEffect(() => {
+    // Set up update modal callback
+    updateModal.setupUpdateCallback();
     // Initialize player store in background
     initializePlayerStore().catch(error => {
       console.error('Error initializing player store:', error);
@@ -103,6 +110,19 @@ export default function App() {
     
     initRealTime();
     
+    // Initialize update checking
+    const initUpdates = async () => {
+      try {
+        console.log('🔄 Initializing update service...');
+        await UpdateService.checkUpdateOnAppStart();
+        console.log('✅ Update service initialized');
+      } catch (error) {
+        console.error('❌ Error initializing update service:', error);
+      }
+    };
+    
+    initUpdates();
+    
     // Ensure Platform is available
     if (Platform.OS) {
       console.log('Platform detected:', Platform.OS);
@@ -122,6 +142,17 @@ export default function App() {
         <ThemeProvider>
           <AppNavigator />
           <StatusBar style="auto" backgroundColor="transparent" translucent />
+          
+          {/* Update Modal */}
+          <UpdateModal
+            visible={updateModal.isVisible}
+            updateInfo={updateModal.updateInfo}
+            onUpdate={updateModal.handleUpdate}
+            onLater={updateModal.handleLater}
+            onClose={updateModal.hideUpdateModal}
+            isUpdating={updateModal.isUpdating}
+            updateProgress={updateModal.updateProgress}
+          />
         </ThemeProvider>
       </SafeAreaProvider>
     </ErrorBoundary>

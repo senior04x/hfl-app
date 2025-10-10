@@ -14,6 +14,7 @@ import { usePlayerStore } from '../store/usePlayerStore';
 import { useLanguage } from '../store/useLanguageStore';
 import CustomModal from '../components/CustomModal';
 import ApplicationTypeModal from '../components/ApplicationTypeModal';
+import UpdateService from '../services/updateService';
 
 interface MenuItemProps {
   icon: string;
@@ -147,6 +148,53 @@ const UserAccountScreen = ({ navigation }: any) => {
     Alert.alert(getText('about'), getText('appVersion'));
   };
 
+  const handleCheckForUpdates = async () => {
+    try {
+      const success = await UpdateService.manualUpdateCheck();
+      if (!success) {
+        Alert.alert(
+          'Xatolik',
+          'Yangilanishni tekshirishda xatolik yuz berdi. Internet aloqasini tekshiring.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Update check error:', error);
+      Alert.alert(
+        'Xatolik',
+        'Yangilanishni tekshirishda xatolik yuz berdi.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleUpdateInfo = async () => {
+    try {
+      const updateInfo = await UpdateService.getUpdateInfo();
+      const currentVersion = UpdateService.getCurrentVersion();
+      const isUpdatesEnabled = UpdateService.isUpdatesEnabled();
+      
+      let message = `Joriy versiya: ${currentVersion}\n`;
+      message += `OTA yangilanishlar: ${isUpdatesEnabled ? 'Yoqilgan' : 'O\'chirilgan'}\n\n`;
+      
+      if (updateInfo.hasUpdate) {
+        message += `Yangi versiya mavjud: ${updateInfo.version}\n\n`;
+        if (updateInfo.releaseNotes) {
+          message += `Yangiliklar:\n${updateInfo.releaseNotes}`;
+        }
+      } else {
+        message += 'Ilova eng so\'nggi versiyada.';
+      }
+      
+      Alert.alert('Yangilanish ma\'lumoti', message, [
+        { text: 'OK' }
+      ]);
+    } catch (error) {
+      console.error('Update info error:', error);
+      Alert.alert('Xatolik', 'Ma\'lumotni olishda xatolik yuz berdi.');
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
@@ -228,6 +276,20 @@ const UserAccountScreen = ({ navigation }: any) => {
           title={getText('about')}
           subtitle={getText('aboutSubtitle')}
           onPress={handleAbout}
+          colors={colors}
+        />
+        <MenuItem
+          icon="refresh-outline"
+          title="Yangilanishni tekshirish"
+          subtitle="Yangi versiyalarni qidirish"
+          onPress={handleCheckForUpdates}
+          colors={colors}
+        />
+        <MenuItem
+          icon="information-outline"
+          title="Yangilanish ma'lumoti"
+          subtitle="Joriy versiya va yangilanishlar haqida"
+          onPress={handleUpdateInfo}
           colors={colors}
         />
       </View>

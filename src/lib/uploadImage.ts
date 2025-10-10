@@ -1,19 +1,37 @@
 import * as ImagePicker from 'expo-image-picker';
-import { ImageUploadService } from '../services/imageUpload';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { uploadImageToBase64 } from './cloudinary';
 
-export const uploadImageToFirebase = async (uri: string, path: string): Promise<string> => {
+export const uploadImageToBase64Service = async (uri: string, folder?: string): Promise<string> => {
   try {
-    console.log('Starting upload:', uri, 'to path:', path);
+    console.log('Starting upload to Base64:', uri);
     
-    // For now, just return the original URI
-    // This is a temporary solution to avoid Firebase Storage issues
-    // In production, you would upload to Firebase Storage here
-    return uri;
+    // Optimize image with expo-image-manipulator
+    const manipulatedImage = await ImageManipulator.manipulateAsync(
+      uri,
+      [
+        { resize: { width: 800 } }, // Resize to max width of 800px
+      ],
+      { 
+        compress: 0.8, // Compress to 80% quality
+        format: ImageManipulator.SaveFormat.JPEG 
+      }
+    );
+
+    // Convert to Base64
+    const base64Image = await uploadImageToBase64(manipulatedImage.uri, folder);
+    
+    console.log('Image uploaded successfully to Base64');
+    return base64Image;
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error('Error uploading image to Base64:', error);
     throw new Error('Failed to upload image');
   }
 };
+
+// Backward compatibility
+export const uploadImageToFirebase = uploadImageToBase64Service;
+export const uploadImageToCloudinaryService = uploadImageToBase64Service;
 
 export const pickImage = async (): Promise<string | null> => {
   try {
@@ -30,11 +48,23 @@ export const pickImage = async (): Promise<string | null> => {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 1, // Use full quality initially, we'll optimize later
     });
 
     if (!result.canceled && result.assets[0]) {
-      return result.assets[0].uri;
+      // Optimize the picked image
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [
+          { resize: { width: 800 } }, // Resize to max width of 800px
+        ],
+        { 
+          compress: 0.8, // Compress to 80% quality
+          format: ImageManipulator.SaveFormat.JPEG 
+        }
+      );
+      
+      return manipulatedImage.uri;
     }
 
     return null;
@@ -58,11 +88,23 @@ export const takePhoto = async (): Promise<string | null> => {
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 1, // Use full quality initially, we'll optimize later
     });
 
     if (!result.canceled && result.assets[0]) {
-      return result.assets[0].uri;
+      // Optimize the taken photo
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [
+          { resize: { width: 800 } }, // Resize to max width of 800px
+        ],
+        { 
+          compress: 0.8, // Compress to 80% quality
+          format: ImageManipulator.SaveFormat.JPEG 
+        }
+      );
+      
+      return manipulatedImage.uri;
     }
 
     return null;
