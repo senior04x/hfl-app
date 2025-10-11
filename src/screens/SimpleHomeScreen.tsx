@@ -203,7 +203,7 @@ const SimpleHomeScreen = () => {
   if (isInitialLoad) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>{getText('welcomeToHFL')}</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{getText('havasFootballLeague')}</Text>
@@ -231,6 +231,7 @@ const SimpleHomeScreen = () => {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView 
           showsVerticalScrollIndicator={false}
+          bounces={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

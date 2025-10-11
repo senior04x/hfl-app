@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Switch,
   Alert,
@@ -13,6 +12,7 @@ import {
   Dimensions,
   SafeAreaView,
 } from 'react-native';
+import SafeScrollView from '../components/SafeScrollView';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -152,7 +152,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <SafeScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -252,7 +252,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
         {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
-      </ScrollView>
+      </SafeScrollView>
 
 
 

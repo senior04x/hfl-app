@@ -63,6 +63,65 @@ const TournamentDetailScreen = () => {
     fetchTournamentDetails();
   }, [tournamentId, tournamentName]);
 
+  // WebSocket event handlers
+  useEffect(() => {
+    // Connect to WebSocket
+    websocketService.connect();
+    
+    // Join tournament room
+    websocketService.joinTournament(tournamentId);
+    
+    // Set up event listeners
+    const handleStandingsUpdate = (data: any) => {
+      console.log('📊 Tournament standings updated via WebSocket:', data);
+      if (data.tournamentId === tournamentId) {
+        // Refresh tournament details to get updated standings
+        fetchTournamentDetails();
+      }
+    };
+    
+    const handleTopScorersUpdate = (data: any) => {
+      console.log('🥅 Tournament top scorers updated via WebSocket:', data);
+      if (data.tournamentId === tournamentId) {
+        // Refresh tournament details to get updated top scorers
+        fetchTournamentDetails();
+      }
+    };
+    
+    const handleTopAssistsUpdate = (data: any) => {
+      console.log('🎯 Tournament top assists updated via WebSocket:', data);
+      if (data.tournamentId === tournamentId) {
+        // Refresh tournament details to get updated top assists
+        fetchTournamentDetails();
+      }
+    };
+    
+    const handleMatchFinished = (data: any) => {
+      console.log('⚽ Tournament match finished via WebSocket:', data);
+      if (data.tournamentId === tournamentId) {
+        // Refresh tournament details to get updated matches
+        fetchTournamentDetails();
+      }
+    };
+    
+    // Register event listeners
+    websocketService.on('standings-updated', handleStandingsUpdate);
+    websocketService.on('top-scorers-updated', handleTopScorersUpdate);
+    websocketService.on('top-assists-updated', handleTopAssistsUpdate);
+    websocketService.on('match-finished', handleMatchFinished);
+    
+    // Cleanup on unmount
+    return () => {
+      websocketService.off('standings-updated', handleStandingsUpdate);
+      websocketService.off('top-scorers-updated', handleTopScorersUpdate);
+      websocketService.off('top-assists-updated', handleTopAssistsUpdate);
+      websocketService.off('match-finished', handleMatchFinished);
+      
+      // Leave tournament room
+      websocketService.leaveTournament(tournamentId);
+    };
+  }, [tournamentId]);
+
   const fetchTournamentDetails = async () => {
     try {
       setLoading(true);

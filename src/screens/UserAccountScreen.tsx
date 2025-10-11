@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Alert,
   SafeAreaView,
 } from 'react-native';
+import SafeScrollView from '../components/SafeScrollView';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -109,8 +109,8 @@ const UserAccountScreen = ({ navigation }: any) => {
 
   const handleConfirmPlayerApplication = () => {
     setShowPlayerModal(false);
-    console.log('Navigating to TeamSelection');
-    navigation.navigate('TeamSelection');
+    console.log('Navigating to PlayerRegistration');
+    navigation.navigate('PlayerRegistration');
   };
 
   const handlePlayerLogin = () => {
@@ -197,7 +197,7 @@ const UserAccountScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView}>
+      <SafeScrollView style={styles.scrollView}>
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <Text style={[styles.title, { color: 'white' }]}>{getText('account')}</Text>
         {isLoggedIn && player ? (
@@ -293,7 +293,7 @@ const UserAccountScreen = ({ navigation }: any) => {
           colors={colors}
         />
       </View>
-      </ScrollView>
+      </SafeScrollView>
 
       {/* Logout Modal */}
       <CustomModal

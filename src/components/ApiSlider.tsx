@@ -32,7 +32,7 @@ interface ApiSliderProps {
 const ApiSlider: React.FC<ApiSliderProps> = ({ 
   onItemPress,
   autoPlay = true,
-  autoPlayInterval = 6000,
+  autoPlayInterval = 4000,
   refreshTrigger,
   navigation,
 }) => {
@@ -72,7 +72,7 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
               x: (CARD_WIDTH + CARD_SPACING),
               animated: false,
             });
-          }, 100);
+          }, 50);
         }
       } else {
         console.error('Failed to load slider items:', response.error);
@@ -112,7 +112,7 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: false }
+    { useNativeDriver: true }
   );
 
   const handleScrollEnd = (event: any) => {
@@ -128,7 +128,7 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
           animated: false,
         });
         setCurrentIndex(sliderItems.length);
-      }, 50);
+      }, 10);
     } else if (index === infiniteCards.length - 1) {
       // If at the last (duplicate) card, jump to the real first card
       setTimeout(() => {
@@ -137,7 +137,7 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
           animated: false,
         });
         setCurrentIndex(1);
-      }, 50);
+      }, 10);
     } else {
       setCurrentIndex(index);
     }
@@ -220,13 +220,13 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
 
     const scale = scrollX.interpolate({
       inputRange,
-      outputRange: [0.9, 1, 0.9],
+      outputRange: [0.95, 1, 0.95],
       extrapolate: 'clamp',
     });
 
     const opacity = scrollX.interpolate({
       inputRange,
-      outputRange: [0.7, 1, 0.7],
+      outputRange: [0.8, 1, 0.8],
       extrapolate: 'clamp',
     });
 
@@ -246,13 +246,15 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
         <TouchableOpacity
           style={styles.cardContent}
           onPress={() => handleItemPress(item)}
-          activeOpacity={0.8}
+          activeOpacity={0.9}
         >
           {item.imageUrl && (
             <Image
               source={{ uri: item.imageUrl }}
               style={styles.cardImage}
               resizeMode="cover"
+              fadeDuration={200}
+              loadingIndicatorSource={require('../../assets/icon.png')}
             />
           )}
         </TouchableOpacity>
@@ -282,11 +284,11 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
         showsHorizontalScrollIndicator={false}
         snapToInterval={CARD_WIDTH + CARD_SPACING}
         snapToAlignment="center"
-        decelerationRate="fast"
+        decelerationRate="normal"
         onScroll={handleScroll}
         onMomentumScrollEnd={handleScrollEnd}
         contentContainerStyle={styles.scrollContent}
-        scrollEventThrottle={16}
+        scrollEventThrottle={8}
       >
         {infiniteCards.map((item, index) => (
           <React.Fragment key={item.id}>
@@ -319,14 +321,14 @@ const styles = StyleSheet.create({
   card: {
     height: 200,
     borderRadius: 16,
-    elevation: 8,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   cardContent: {
     flex: 1,

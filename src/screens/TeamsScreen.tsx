@@ -170,7 +170,7 @@ export default function TeamsScreen() {
         <Text style={[styles.title, { color: colors.text }]}>{getText('teams')}</Text>
       </View>
       
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
         {teams && teams.length > 0 ? (
           <View style={styles.teamsList}>
             {teams.map((team, index) => (

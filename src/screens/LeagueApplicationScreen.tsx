@@ -228,7 +228,7 @@ const LeagueApplicationScreen: React.FC<LeagueApplicationScreenProps> = ({ navig
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
               {getText('leagueApplication')}

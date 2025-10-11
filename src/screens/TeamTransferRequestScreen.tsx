@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   Alert,
   SafeAreaView,
 } from 'react-native';
+import SafeScrollView from '../components/SafeScrollView';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
@@ -61,7 +61,7 @@ const TeamTransferRequestScreen = () => {
   
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView}>
+      <SafeScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>
@@ -163,7 +163,7 @@ const TeamTransferRequestScreen = () => {
             <Text style={styles.submitButtonText}>Ariza yuborish</Text>
           )}
         </TouchableOpacity>
-      </ScrollView>
+      </SafeScrollView>
     </SafeAreaView>
   );
 };

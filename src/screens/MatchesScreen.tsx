@@ -377,6 +377,8 @@ const MatchesScreen = () => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           contentContainerStyle={styles.calendarEvents}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
         >
           {sortedDates.map(renderDateGroup)}
         </ScrollView>

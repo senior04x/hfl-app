@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,12 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Image,
+  SafeAreaView,
 } from 'react-native';
+import SafeScrollView from '../components/SafeScrollView';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
@@ -37,16 +38,75 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
     contactPerson: '',
     contactPhone: '',
     contactEmail: '',
+    selectedLeague: '',
+    selectedTournament: '',
   });
   const [loading, setLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [leagues, setLeagues] = useState<any[]>([]);
+  const [loadingLeagues, setLoadingLeagues] = useState(false);
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [loadingTournaments, setLoadingTournaments] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'contactPhone') {
       const formatted = formatPhoneNumber(value);
       setFormData(prev => ({ ...prev, [field]: formatted }));
+    } else if (field === 'selectedLeague') {
+      // Liga tanlanganda turnirni reset qilish va yangi turnirlarni yuklash
+      setFormData(prev => ({ 
+        ...prev, 
+        [field]: value,
+        selectedTournament: '' // Turnirni reset qilish
+      }));
+      if (value) {
+        loadTournaments(value);
+      } else {
+        setTournaments([]);
+      }
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  // Load leagues on component mount
+  useEffect(() => {
+    loadLeagues();
+  }, []);
+
+  const loadLeagues = async () => {
+    try {
+      setLoadingLeagues(true);
+      const result = await mongodbService.getLeagues();
+      if (result.success && result.data) {
+        setLeagues(result.data);
+      } else {
+        console.error('Failed to load leagues:', result.error);
+        Alert.alert(getText('error'), getText('failedToLoadLeagues'));
+      }
+    } catch (error) {
+      console.error('Error loading leagues:', error);
+      Alert.alert(getText('error'), getText('failedToLoadLeagues'));
+    } finally {
+      setLoadingLeagues(false);
+    }
+  };
+
+  const loadTournaments = async (leagueId: string) => {
+    try {
+      setLoadingTournaments(true);
+      const result = await mongodbService.getTournamentsByLeague(leagueId);
+      if (result.success && result.data) {
+        setTournaments(result.data);
+      } else {
+        console.error('Failed to load tournaments:', result.error);
+        Alert.alert(getText('error'), 'Turnirlar yuklanmadi');
+      }
+    } catch (error) {
+      console.error('Error loading tournaments:', error);
+      Alert.alert(getText('error'), 'Turnirlar yuklanmadi');
+    } finally {
+      setLoadingTournaments(false);
     }
   };
 
@@ -99,7 +159,7 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
   };
 
   const handleSubmit = async () => {
-    if (!formData.teamName.trim() || !formData.contactPerson.trim() || !formData.contactPhone.trim()) {
+    if (!formData.teamName.trim() || !formData.contactPerson.trim() || !formData.contactPhone.trim() || !formData.selectedLeague || !formData.selectedTournament) {
       Alert.alert(getText('error'), getText('fillAllFields'));
       return;
     }
@@ -131,11 +191,16 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
         contactPerson: formData.contactPerson.trim(),
         contactPhone: cleanPhone,
         contactEmail: formData.contactEmail.trim(),
+        selectedLeague: formData.selectedLeague,
+        selectedTournament: formData.selectedTournament,
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
 
-      console.log('Submitting team application:', teamApplicationData);
+      console.log('🔍 Form data:', formData);
+      console.log('🔍 Selected League:', formData.selectedLeague);
+      console.log('🔍 Selected Tournament:', formData.selectedTournament);
+      console.log('🔍 Submitting team application:', teamApplicationData);
       
       // Submit to MongoDB via Service
       const result = await mongodbService.createApplication({
@@ -165,16 +230,17 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <SafeScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>{getText('teamApplication')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -212,6 +278,84 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
               placeholderTextColor={colors.textSecondary}
             />
           </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Liga tanlang *</Text>
+            {loadingLeagues ? (
+              <View style={[styles.input, { 
+                backgroundColor: colors.surface, 
+                borderColor: colors.border,
+                justifyContent: 'center',
+                alignItems: 'center'
+              }]}>
+                <Text style={{ color: colors.textSecondary }}>Ligalar yuklanmoqda...</Text>
+              </View>
+            ) : (
+              <View style={[styles.input, { 
+                backgroundColor: colors.surface, 
+                borderColor: colors.border 
+              }]}>
+                {leagues.map((league) => (
+                  <TouchableOpacity
+                    key={league._id || league.id}
+                    style={[
+                      styles.leagueOption,
+                      formData.selectedLeague === (league._id || league.id) && styles.selectedLeagueOption
+                    ]}
+                    onPress={() => handleInputChange('selectedLeague', league._id || league.id)}
+                  >
+                    <Text style={[
+                      styles.leagueOptionText,
+                      { color: colors.text },
+                      formData.selectedLeague === (league._id || league.id) && styles.selectedLeagueText
+                    ]}>
+                      {league.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {formData.selectedLeague && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Turnir tanlang *</Text>
+              {loadingTournaments ? (
+                <View style={[styles.input, { 
+                  backgroundColor: colors.surface, 
+                  borderColor: colors.border,
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }]}>
+                  <Text style={{ color: colors.textSecondary }}>Turnirlar yuklanmoqda...</Text>
+                </View>
+              ) : (
+                <View style={[styles.input, { 
+                  backgroundColor: colors.surface, 
+                  borderColor: colors.border 
+                }]}>
+                  {tournaments.map((tournament) => (
+                    <TouchableOpacity
+                      key={tournament._id || tournament.id}
+                      style={[
+                        styles.tournamentOption,
+                        formData.selectedTournament === (tournament._id || tournament.id) && styles.selectedTournamentOption
+                      ]}
+                      onPress={() => handleInputChange('selectedTournament', tournament._id || tournament.id)}
+                    >
+                      <Text style={[
+                        styles.tournamentOptionText,
+                        { color: colors.text },
+                        formData.selectedTournament === (tournament._id || tournament.id) && styles.selectedTournamentText
+                      ]}>
+                        {tournament.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>{getText('teamLogo')}</Text>
@@ -346,13 +490,17 @@ const TeamApplicationScreen: React.FC<TeamApplicationScreenProps> = ({ navigatio
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </SafeScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  keyboardView: {
     flex: 1,
   },
   scrollView: {
@@ -461,6 +609,42 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  leagueOption: {
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedLeagueOption: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  leagueOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  selectedLeagueText: {
+    color: 'white',
+  },
+  tournamentOption: {
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedTournamentOption: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  tournamentOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  selectedTournamentText: {
+    color: 'white',
   },
 });
 

@@ -147,6 +147,8 @@ const PlayerVerificationScreen: React.FC<PlayerVerificationScreenProps> = ({ nav
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>

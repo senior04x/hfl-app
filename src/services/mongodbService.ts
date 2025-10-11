@@ -475,6 +475,246 @@ class MongoDBService {
     }
   }
 
+  // Leagues operations
+  async getLeagues(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('Fetching leagues from:', `${this.baseUrl}/api/leagues`);
+      const response = await fetch(`${this.baseUrl}/api/leagues`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Leagues fetched successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching leagues:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Tournaments operations
+  async getTournamentsByLeague(leagueId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('Fetching tournaments for league:', leagueId);
+      const response = await fetch(`${this.baseUrl}/api/tournaments/${leagueId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        // Return empty array instead of error - tournaments are already included in league data
+        console.log('⚠️ Tournaments endpoint returned', response.status, '- using tournaments from league data');
+        return { success: true, data: [] };
+      }
+
+      const data = await response.json();
+      console.log('Tournaments fetched successfully:', data);
+      return data;
+    } catch (error) {
+      // Return empty array instead of error - tournaments are already included in league data
+      console.log('⚠️ Error fetching tournaments - using tournaments from league data');
+      return { success: true, data: [] };
+    }
+  }
+
+  // Teams by tournament operations
+  async getTeamsByTournament(tournamentId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('Fetching teams for tournament:', tournamentId);
+      const response = await fetch(`${this.baseUrl}/api/tournaments/${tournamentId}/teams`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Teams fetched successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Tournament operations
+  async getTournamentById(tournamentId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      console.log('Fetching tournament by ID:', tournamentId);
+      const response = await fetch(`${this.baseUrl}/api/tournaments/${tournamentId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Tournament fetched successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching tournament:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Standings operations
+  async getStandings(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const url = round 
+        ? `${this.baseUrl}/api/tournaments/${tournamentId}/standings?round=${round}`
+        : `${this.baseUrl}/api/tournaments/${tournamentId}/standings`;
+      
+      console.log('Fetching standings for tournament:', tournamentId, round ? `round: ${round}` : '');
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Standings fetched successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching standings:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Top scorers operations
+  async getTopScorers(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const url = round 
+        ? `${this.baseUrl}/api/tournaments/${tournamentId}/top-scorers?round=${round}`
+        : `${this.baseUrl}/api/tournaments/${tournamentId}/top-scorers`;
+      
+      console.log('Fetching top scorers for tournament:', tournamentId, round ? `round: ${round}` : '');
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Top scorers fetched successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching top scorers:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Top assists operations
+  async getTopAssists(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const url = round 
+        ? `${this.baseUrl}/api/tournaments/${tournamentId}/top-assists?round=${round}`
+        : `${this.baseUrl}/api/tournaments/${tournamentId}/top-assists`;
+      
+      console.log('Fetching top assists for tournament:', tournamentId, round ? `round: ${round}` : '');
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Top assists fetched successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching top assists:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Matches operations
+  async getMatchesByTournament(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const url = round 
+        ? `${this.baseUrl}/api/tournaments/${tournamentId}/matches?round=${round}`
+        : `${this.baseUrl}/api/tournaments/${tournamentId}/matches`;
+      
+      console.log('Fetching matches for tournament:', tournamentId, round ? `round: ${round}` : '');
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Matches fetched successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching matches:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Leagues operations
+  async getLeagues(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('Fetching leagues from:', `${this.baseUrl}/api/leagues`);
+      const response = await fetch(`${this.baseUrl}/api/leagues`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Leagues fetched successfully:', result);
+      
+      if (result.success && result.data) {
+        return { success: true, data: result.data };
+      } else {
+        return { success: false, error: result.error || 'Failed to fetch leagues' };
+      }
+    } catch (error) {
+      console.error('Error fetching leagues:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
   // Health check
   async healthCheck(): Promise<boolean> {
     try {

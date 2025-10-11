@@ -59,7 +59,7 @@ const AuthScreen = () => {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={styles.header}>
           <Text style={styles.title}>HFL Mobile</Text>
           <Text style={styles.subtitle}>Havas Football League</Text>

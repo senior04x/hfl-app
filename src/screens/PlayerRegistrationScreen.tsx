@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,12 +20,13 @@ import { Team } from '../types';
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
 import { uploadImageToFirebase } from '../utils/uploadImage';
 import { mongodbService } from '../services/mongodbService';
+import SafeScrollView from '../components/SafeScrollView';
 
 interface PlayerRegistrationScreenProps {
   navigation: any;
-  route: {
-    params: {
-      team: Team;
+  route?: {
+    params?: {
+      team?: Team;
     };
   };
 }
@@ -33,7 +34,7 @@ interface PlayerRegistrationScreenProps {
 const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ navigation, route }) => {
   const { colors } = useTheme();
   const { getText } = useLanguage();
-  const { team } = route.params;
+  const { team } = route?.params || {};
   
   console.log('PlayerRegistrationScreen mounted with team:', team);
   
@@ -45,15 +46,96 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
     position: '',
     number: '',
     photo: null as string | null,
+    selectedLeague: '',
+    selectedTournament: '',
+    selectedTeam: '',
   });
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [leagues, setLeagues] = useState<any[]>([]);
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [loadingLeagues, setLoadingLeagues] = useState(false);
+  const [loadingTournaments, setLoadingTournaments] = useState(false);
+  const [loadingTeams, setLoadingTeams] = useState(false);
 
+  useEffect(() => {
+    fetchLeagues();
+  }, []);
+
+  const fetchLeagues = async () => {
+    try {
+      setLoadingLeagues(true);
+      const result = await mongodbService.getLeagues();
+      if (result.success && result.data) {
+        setLeagues(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching leagues:', error);
+    } finally {
+      setLoadingLeagues(false);
+    }
+  };
+
+  const fetchTournaments = async (leagueId: string) => {
+    try {
+      setLoadingTournaments(true);
+      const result = await mongodbService.getTournamentsByLeague(leagueId);
+      if (result.success && result.data) {
+        setTournaments(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching tournaments:', error);
+    } finally {
+      setLoadingTournaments(false);
+    }
+  };
+
+  const fetchTeams = async (tournamentId: string) => {
+    try {
+      setLoadingTeams(true);
+      const result = await mongodbService.getTeamsByTournament(tournamentId);
+      if (result.success && result.data) {
+        // Handle nested data structure
+        let teamsData = result.data;
+        if (result.data.data && Array.isArray(result.data.data)) {
+          teamsData = result.data.data;
+        }
+        setTeams(teamsData);
+      }
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    } finally {
+      setLoadingTeams(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'phone') {
       const formatted = formatPhoneNumber(value);
       setFormData(prev => ({ ...prev, [field]: formatted }));
+    } else if (field === 'selectedLeague') {
+      setFormData(prev => ({ 
+        ...prev, 
+        [field]: value,
+        selectedTournament: '',
+        selectedTeam: ''
+      }));
+      setTournaments([]);
+      setTeams([]);
+      if (value) {
+        fetchTournaments(value);
+      }
+    } else if (field === 'selectedTournament') {
+      setFormData(prev => ({ 
+        ...prev, 
+        [field]: value,
+        selectedTeam: ''
+      }));
+      setTeams([]);
+      if (value) {
+        fetchTeams(value);
+      }
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
@@ -73,7 +155,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [3, 4], // 3x4 nisbat
+        aspect: [1, 1], // 1x1 kvadrat nisbat
         quality: 0.8,
         base64: true,
       });
@@ -118,6 +200,11 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
       return;
     }
 
+    if (!formData.selectedLeague || !formData.selectedTournament || !formData.selectedTeam) {
+      Alert.alert('Xatolik', 'Liga, turnir va jamoa tanlanishi shart');
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -131,6 +218,10 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
       const cleanPhone = parsePhoneNumberForAPI(formData.phone);
       console.log('Phone formatting:', formData.phone, '->', cleanPhone);
       
+      const selectedTeam = teams.find(t => t._id === formData.selectedTeam);
+      const selectedTournament = tournaments.find(t => t._id === formData.selectedTournament);
+      const selectedLeague = leagues.find(l => l._id === formData.selectedLeague);
+
       const registrationData = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
@@ -138,9 +229,13 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
         email: formData.email.trim(),
         position: formData.position.trim(),
         number: parseInt(formData.number) || 0,
-        photo: formData.photo, // Firebase Storage URL
-        teamId: team?.id || '',
-        teamName: team?.name || getText('unknownTeam'),
+        photo: formData.photo,
+        teamId: formData.selectedTeam,
+        teamName: selectedTeam?.name || '',
+        tournamentId: formData.selectedTournament,
+        tournamentName: selectedTournament?.name || '',
+        leagueId: formData.selectedLeague,
+        leagueName: selectedLeague?.name || '',
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
@@ -181,7 +276,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-      <ScrollView 
+      <SafeScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -189,7 +284,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>{getText('playerRegistration')}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {team?.name || getText('unknownTeam')} {getText('teamForRegistration')}
+            Liga, turnir va jamoa tanlab ariza to'ldiring
           </Text>
         </View>
 
@@ -258,6 +353,127 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
               autoCapitalize="none"
             />
           </View>
+
+          {/* Liga tanlash */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Liga *</Text>
+            {loadingLeagues ? (
+              <View style={[styles.input, { 
+                backgroundColor: colors.surface, 
+                borderColor: colors.border,
+                justifyContent: 'center',
+                alignItems: 'center'
+              }]}>
+                <Text style={{ color: colors.textSecondary }}>Ligalar yuklanmoqda...</Text>
+              </View>
+            ) : (
+              <View style={[styles.input, { 
+                backgroundColor: colors.surface, 
+                borderColor: colors.border 
+              }]}>
+                {leagues.map((league) => (
+                  <TouchableOpacity
+                    key={league._id || league.id}
+                    style={[
+                      styles.leagueOption,
+                      formData.selectedLeague === (league._id || league.id) && styles.selectedLeagueOption
+                    ]}
+                    onPress={() => handleInputChange('selectedLeague', league._id || league.id)}
+                  >
+                    <Text style={[
+                      styles.leagueOptionText,
+                      { color: colors.text },
+                      formData.selectedLeague === (league._id || league.id) && styles.selectedLeagueText
+                    ]}>
+                      {league.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Turnir tanlash */}
+          {formData.selectedLeague && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Turnir *</Text>
+              {loadingTournaments ? (
+                <View style={[styles.input, { 
+                  backgroundColor: colors.surface, 
+                  borderColor: colors.border,
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }]}>
+                  <Text style={{ color: colors.textSecondary }}>Turnirlar yuklanmoqda...</Text>
+                </View>
+              ) : (
+                <View style={[styles.input, { 
+                  backgroundColor: colors.surface, 
+                  borderColor: colors.border 
+                }]}>
+                  {tournaments.map((tournament) => (
+                    <TouchableOpacity
+                      key={tournament._id || tournament.id}
+                      style={[
+                        styles.tournamentOption,
+                        formData.selectedTournament === (tournament._id || tournament.id) && styles.selectedTournamentOption
+                      ]}
+                      onPress={() => handleInputChange('selectedTournament', tournament._id || tournament.id)}
+                    >
+                      <Text style={[
+                        styles.tournamentOptionText,
+                        { color: colors.text },
+                        formData.selectedTournament === (tournament._id || tournament.id) && styles.selectedTournamentText
+                      ]}>
+                        {tournament.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Jamoa tanlash */}
+          {formData.selectedTournament && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Jamoa *</Text>
+              {loadingTeams ? (
+                <View style={[styles.input, { 
+                  backgroundColor: colors.surface, 
+                  borderColor: colors.border,
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }]}>
+                  <Text style={{ color: colors.textSecondary }}>Jamoalar yuklanmoqda...</Text>
+                </View>
+              ) : (
+                <View style={[styles.input, { 
+                  backgroundColor: colors.surface, 
+                  borderColor: colors.border 
+                }]}>
+                  {teams.map((team) => (
+                    <TouchableOpacity
+                      key={team._id || team.id}
+                      style={[
+                        styles.teamOption,
+                        formData.selectedTeam === (team._id || team.id) && styles.selectedTeamOption
+                      ]}
+                      onPress={() => handleInputChange('selectedTeam', team._id || team.id)}
+                    >
+                      <Text style={[
+                        styles.teamOptionText,
+                        { color: colors.text },
+                        formData.selectedTeam === (team._id || team.id) && styles.selectedTeamText
+                      ]}>
+                        {team.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>{getText('position')}</Text>
@@ -376,7 +592,7 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </SafeScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -440,7 +656,7 @@ const styles = StyleSheet.create({
   },
   photoPreview: {
     width: 120,
-    height: 160,
+    height: 120,
     borderRadius: 8,
     marginBottom: 12,
   },
@@ -495,6 +711,60 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  leagueOption: {
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedLeagueOption: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  leagueOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  selectedLeagueText: {
+    color: 'white',
+  },
+  tournamentOption: {
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedTournamentOption: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  tournamentOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  selectedTournamentText: {
+    color: 'white',
+  },
+  teamOption: {
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedTeamOption: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  teamOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  selectedTeamText: {
+    color: 'white',
   },
 });
 

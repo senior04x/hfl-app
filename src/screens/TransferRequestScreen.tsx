@@ -281,7 +281,7 @@ const TransferRequestScreen: React.FC<TransferRequestScreenProps> = ({ navigatio
         <Text style={[styles.title, { color: colors.text }]}>Transfer So'rovi</Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={[styles.currentTeamCard, { backgroundColor: colors.surface }]}>
           <Text style={[styles.currentTeamTitle, { color: colors.text }]}>Joriy Jamoa</Text>
           <Text style={[styles.currentTeamName, { color: colors.primary }]}>

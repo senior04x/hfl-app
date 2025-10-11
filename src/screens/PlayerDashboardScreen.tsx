@@ -180,7 +180,7 @@ const PlayerDashboardScreen: React.FC<PlayerDashboardScreenProps> = ({ navigatio
         </Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Shaxsiy Ma'lumotlar</Text>
           

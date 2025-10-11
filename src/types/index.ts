@@ -121,8 +121,7 @@ export type RootStackParamList = {
   LeagueMatches: { leagueType: string; dateString: string; matches: Match[] };
   TeamDetail: { teamId: string };
   PlayerStats: { playerId: string; playerName?: string };
-  TeamSelection: undefined;
-  PlayerRegistration: { team: Team };
+  PlayerRegistration: { team?: Team };
   PlayerLogin: undefined;
   PlayerVerification: { phoneNumber: string; verificationCode: string; playerId: string };
   PlayerDashboard: { playerId: string };
@@ -193,7 +192,6 @@ export type RootStackParamList = {
   LeagueMatches: { leagueId: string; leagueName?: string };
   TeamDetail: { teamId: string; teamName?: string };
   PlayerStats: { playerId: string; playerName?: string };
-  TeamSelection: undefined;
   PlayerRegistration: undefined;
   PlayerLogin: undefined;
   PlayerVerification: { phone: string };

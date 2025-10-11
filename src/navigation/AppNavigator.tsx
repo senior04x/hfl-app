@@ -17,7 +17,6 @@ import MatchDetailScreen from '../screens/MatchDetailScreen';
 import LeagueMatchesScreen from '../screens/LeagueMatchesScreen';
 import TeamDetailScreen from '../screens/TeamDetailScreen';
 import PlayerStatsScreen from '../screens/PlayerStatsScreen';
-import TeamSelectionScreen from '../screens/TeamSelectionScreen';
 import PlayerRegistrationScreen from '../screens/PlayerRegistrationScreen';
 import PlayerLoginScreen from '../screens/PlayerLoginScreen';
 import PlayerVerificationScreen from '../screens/PlayerVerificationScreen';
@@ -184,11 +183,6 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="PlayerStats" 
           component={PlayerStatsScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="TeamSelection" 
-          component={TeamSelectionScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen 

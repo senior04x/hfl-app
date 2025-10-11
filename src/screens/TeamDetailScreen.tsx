@@ -152,7 +152,7 @@ const TeamDetailScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={[styles.scrollView, { backgroundColor: colors.background }]}>
+      <ScrollView style={[styles.scrollView, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false} bounces={false}>
       <View style={[styles.header, { backgroundColor: colors.header }]}>
         <View style={styles.teamHeader}>
           {team.logo ? (

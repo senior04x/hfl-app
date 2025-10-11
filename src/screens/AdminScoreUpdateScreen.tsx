@@ -62,7 +62,7 @@ const AdminScoreUpdateScreen = ({ route, navigation }: any) => {
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}

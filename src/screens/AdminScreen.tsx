@@ -46,7 +46,7 @@ const AdminScreen = () => {
   ];
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false} bounces={false}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Admin Panel</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>

@@ -139,7 +139,7 @@ export default function PlayerStatsScreen({ navigation, route }: PlayerStatsScre
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity

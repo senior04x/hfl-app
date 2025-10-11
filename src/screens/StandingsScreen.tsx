@@ -7,11 +7,11 @@ import {
   RefreshControl,
   TouchableOpacity,
   // ActivityIndicator, // Skeleton loading ishlatamiz
-  ScrollView,
   Image,
   TextInput,
   Dimensions,
 } from 'react-native';
+import SafeScrollView from '../components/SafeScrollView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -263,6 +263,11 @@ const StandingsScreen = () => {
     };
   };
 
+  // WebSocket event handlers - removed for now
+  // useEffect(() => {
+  //   // WebSocket functionality removed
+  // }, [selectedLeague]);
+
   const fetchLeagues = async () => {
     try {
       setLoading(true);
@@ -280,7 +285,12 @@ const StandingsScreen = () => {
           location: league.location || 'Toshkent',
           startDate: league.startDate || '2024-09-01',
           maxTeams: league.maxTeams || 16,
+          tournaments: league.tournaments || [], // Ensure tournaments array exists
         }));
+        console.log('Active leagues with tournaments:', activeLeagues.map(l => ({ 
+          name: l.name, 
+          tournaments: l.tournaments?.length || 0 
+        })));
         setLeagues(activeLeagues);
         setLoading(false);
         return;
@@ -1702,13 +1712,13 @@ const StandingsScreen = () => {
   if (selectedLeague) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView
+        <SafeScrollView
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
           {renderLeagueDetail()}
-        </ScrollView>
+        </SafeScrollView>
       </SafeAreaView>
     );
   }

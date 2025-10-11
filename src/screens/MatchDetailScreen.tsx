@@ -177,7 +177,7 @@ const MatchDetailScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} bounces={false}>
         {/* Match Status */}
         <View style={[styles.statusCard, { backgroundColor: colors.surface }]}>
           <View style={styles.statusContainer}>
