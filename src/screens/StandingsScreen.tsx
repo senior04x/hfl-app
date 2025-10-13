@@ -6,6 +6,7 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
+  ScrollView,
   // ActivityIndicator, // Skeleton loading ishlatamiz
   Image,
   TextInput,
@@ -614,7 +615,8 @@ const StandingsScreen = () => {
         // Navigate to LeagueTournaments screen
         navigation.navigate('LeagueTournaments', { 
           leagueId: item._id, 
-          leagueName: item.name 
+          leagueName: item.name,
+          tournaments: item.tournaments || []
         });
         console.log('League pressed, navigating to tournaments:', item.name);
       }}
@@ -646,31 +648,6 @@ const StandingsScreen = () => {
           </Text>
         )}
 
-        {/* Tournaments List */}
-        {item.tournaments && item.tournaments.length > 0 && (
-          <View style={styles.tournamentsContainer}>
-            <Text style={[styles.tournamentsTitle, { color: colors.textSecondary }]}>
-              Turnirlar:
-            </Text>
-            {item.tournaments.slice(0, 3).map((tournament, index) => (
-              <View key={tournament._id} style={styles.tournamentItem}>
-                <Text style={[styles.tournamentName, { color: colors.text }]}>
-                  • {tournament.name}
-                </Text>
-                {tournament.maxTeams && (
-                  <Text style={[styles.tournamentTeams, { color: colors.textSecondary }]}>
-                    ({tournament.maxTeams} jamoa)
-                  </Text>
-                )}
-              </View>
-            ))}
-            {item.tournaments.length > 3 && (
-              <Text style={[styles.moreTournaments, { color: colors.textSecondary }]}>
-                +{item.tournaments.length - 3} boshqa turnir
-              </Text>
-            )}
-          </View>
-        )}
 
         <View style={styles.leagueStats}>
           <View style={styles.statRow}>
@@ -1912,35 +1889,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.8,
     paddingHorizontal: 10,
-  },
-  tournamentsContainer: {
-    marginBottom: 8,
-  },
-  tournamentsTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  tournamentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  tournamentName: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginRight: 4,
-  },
-  tournamentTeams: {
-    fontSize: 10,
-  },
-  moreTournaments: {
-    fontSize: 10,
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginTop: 2,
   },
   leagueStats: {
     marginTop: 8,

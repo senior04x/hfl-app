@@ -239,11 +239,7 @@ const AppNavigator = () => {
           name="LeagueTournaments" 
           component={LeagueTournamentsScreen}
           options={{ 
-            headerShown: true,
-            title: 'Liga Turnirlari',
-            headerStyle: { backgroundColor: colors.header },
-            headerTintColor: colors.headerText,
-            headerTitleStyle: { color: colors.headerText },
+            headerShown: false,
           }}
         />
         <Stack.Screen 

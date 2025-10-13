@@ -4,6 +4,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { mongodbService } from '../services/mongodbService';
+import { websocketService } from '../services/websocketService';
 
 interface Tournament {
   _id: string;
@@ -51,6 +52,39 @@ const TournamentDetailScreen = () => {
   const [showRoundFilter, setShowRoundFilter] = useState(false);
   const [selectedPlayerFilter, setSelectedPlayerFilter] = useState<string>('goals');
   const [showPlayerFilter, setShowPlayerFilter] = useState(false);
+  const [tournamentData, setTournamentData] = useState<{
+    teams: any[];
+    players: any[];
+    matches: any[];
+  }>({ teams: [], players: [], matches: [] });
+
+  // Get real data for tournament
+  const getTournamentData = async (tournamentId: string) => {
+    try {
+      // Fetch teams for this tournament
+      const teamsResult = await mongodbService.getTeamsByTournament(tournamentId);
+      const teams = teamsResult.success ? teamsResult.data || [] : [];
+
+      // Fetch players for this tournament (get all players and filter by tournament teams)
+      let players = [];
+      try {
+        const playersResult = await mongodbService.getPlayers();
+        players = Array.isArray(playersResult) ? playersResult : [];
+      } catch (error) {
+        console.error('Error fetching players:', error);
+        players = [];
+      }
+
+      // Fetch matches for this tournament
+      const matchesResult = await mongodbService.getMatchesByTournament(tournamentId);
+      const matches = matchesResult.success ? matchesResult.data || [] : [];
+
+      return { teams, players, matches };
+    } catch (error) {
+      console.error('Error fetching tournament data:', error);
+      return { teams: [], players: [], matches: [] };
+    }
+  };
 
   useEffect(() => {
     navigation.setOptions({ 
@@ -128,6 +162,7 @@ const TournamentDetailScreen = () => {
       setError(null);
       console.log('Fetching tournament details for:', tournamentId);
       
+      // Fetch tournament basic info
       const result = await mongodbService.getTournamentById(tournamentId);
       if (result.success && result.data) {
         console.log('Tournament details fetched successfully:', result.data);
@@ -136,6 +171,11 @@ const TournamentDetailScreen = () => {
         console.error('Failed to fetch tournament details:', result.error);
         setError(result.error || 'Turnir ma\'lumotlarini yuklashda xatolik yuz berdi.');
       }
+
+      // Fetch tournament data (teams, players, matches)
+      const data = await getTournamentData(tournamentId);
+      setTournamentData(data);
+      
     } catch (err: any) {
       console.error('Error fetching tournament details:', err);
       setError('Turnir ma\'lumotlarini yuklashda kutilmagan xatolik yuz berdi.');
@@ -199,8 +239,7 @@ const TournamentDetailScreen = () => {
     }
   };
 
-  // Mock data for recent matches
-  // Mock data function from StandingsScreen
+  // Fallback mock data function (only used if API fails)
   const getMockDataForTournament = (tournamentName: string) => {
     // HFL 3-liga teams
     if (tournamentName.includes('3-liga') || tournamentName.includes('3 Liga')) {
@@ -301,27 +340,28 @@ const TournamentDetailScreen = () => {
     };
   };
 
-  const mockData = getMockDataForTournament(tournamentName);
-  const recentMatches: Match[] = mockData.matches.map((match, index) => ({
-    _id: `m${index + 1}`,
-    homeTeamName: match.home,
-    awayTeamName: match.away,
-    homeScore: match.homeScore,
-    awayScore: match.awayScore,
-    matchDate: match.date.toISOString(),
-    venue: match.venue,
-    status: 'finished' as const,
-    round: match.stage
+  // Use real data if available, fallback to mock data
+  const dataToUse = tournamentData.teams.length > 0 ? tournamentData : getMockDataForTournament(tournamentName);
+  const recentMatches: Match[] = dataToUse.matches.map((match, index) => ({
+    _id: match._id || `m${index + 1}`,
+    homeTeamName: match.homeTeamName || match.home,
+    awayTeamName: match.awayTeamName || match.away,
+    homeScore: match.homeScore || 0,
+    awayScore: match.awayScore || 0,
+    matchDate: match.matchDate || match.date?.toISOString() || new Date().toISOString(),
+    venue: match.venue || 'Unknown Venue',
+    status: match.status || 'finished' as const,
+    round: match.round || match.stage || 'group'
   }));
 
   // Helper functions for player table
   const getTeamColor = (teamName: string) => {
-    const team = mockData.teams.find(t => t.name === teamName);
+    const team = dataToUse.teams.find(t => t.name === teamName);
     return team ? team.color : '#3B82F6';
   };
 
   const getTeamShortName = (teamName: string) => {
-    const team = mockData.teams.find(t => t.name === teamName);
+    const team = dataToUse.teams.find(t => t.name === teamName);
     return team ? team.shortName : teamName.substring(0, 3).toUpperCase();
   };
 
@@ -356,11 +396,11 @@ const TournamentDetailScreen = () => {
               </View>
               <View style={styles.infoRow}>
                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Jamoalar:</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>4</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{dataToUse.teams.length}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>O'yinlar:</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>1/0</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{dataToUse.matches.length}</Text>
               </View>
             </View>
 
@@ -383,27 +423,34 @@ const TournamentDetailScreen = () => {
 
             {/* Oxirgi o'yinlar */}
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Oxirgi o'yinlar</Text>
-            <View style={[styles.card, styles.matchCard, { backgroundColor: colors.surface, marginBottom: 0 }]}>
-              <View style={styles.matchHeader}>
-                <Text style={[styles.matchRound, { color: colors.textSecondary }]}>final</Text>
-                <Text style={[styles.matchDateTime, { color: colors.textSecondary }]}>06/07/2024 21:20</Text>
-              </View>
-              <View style={styles.matchTeams}>
-                <View style={styles.teamScore}>
-                  <View style={[styles.teamLogoPlaceholder, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.teamLogoTextSmall}>DT1</Text>
-                  </View>
-                  <Text style={[styles.teamName, { color: colors.text }]}>Default Team 1</Text>
+            {recentMatches.slice(0, 1).map((match, index) => (
+              <View key={match._id} style={[styles.card, styles.matchCard, { backgroundColor: colors.surface, marginBottom: 0 }]}>
+                <View style={styles.matchHeader}>
+                  <Text style={[styles.matchRound, { color: colors.textSecondary }]}>{match.round}</Text>
+                  <Text style={[styles.matchDateTime, { color: colors.textSecondary }]}>
+                    {new Date(match.matchDate).toLocaleDateString('uz-UZ')} {new Date(match.matchDate).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
                 </View>
-                <Text style={[styles.matchScore, { color: colors.text }]}>2:1</Text>
-                <View style={styles.teamScore}>
-                  <Text style={[styles.teamName, { color: colors.text }]}>Default Team 2</Text>
-                  <View style={[styles.teamLogoPlaceholder, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.teamLogoTextSmall}>DT2</Text>
+                <View style={styles.matchTeams}>
+                  <View style={styles.teamScore}>
+                    <View style={[styles.teamLogoPlaceholder, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.teamLogoTextSmall}>{match.homeTeamName.substring(0, 3).toUpperCase()}</Text>
+                    </View>
+                    <Text style={[styles.teamName, { color: colors.text }]}>{match.homeTeamName}</Text>
+                  </View>
+                  <Text style={[styles.matchScore, { color: colors.text }]}>{match.homeScore}:{match.awayScore}</Text>
+                  <View style={styles.teamScore}>
+                    <Text style={[styles.teamName, { color: colors.text }]}>{match.awayTeamName}</Text>
+                    <View style={[styles.teamLogoPlaceholder, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.teamLogoTextSmall}>{match.awayTeamName.substring(0, 3).toUpperCase()}</Text>
+                    </View>
                   </View>
                 </View>
+                {match.venue && (
+                  <Text style={[styles.matchVenueText, { color: colors.textSecondary }]}>{match.venue}</Text>
+                )}
               </View>
-            </View>
+            ))}
           </ScrollView>
         );
 
@@ -489,7 +536,7 @@ const TournamentDetailScreen = () => {
               </View>
               
               {/* Table Rows */}
-              {mockData.teams.map((team, index) => (
+              {dataToUse.teams.map((team, index) => (
                 <View key={team.name} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
                   <Text style={[styles.rankCell, { color: colors.text }]}>{index + 1}</Text>
                   <View style={styles.teamCell}>
@@ -632,7 +679,7 @@ const TournamentDetailScreen = () => {
               </View>
               
               {/* Players Rows */}
-              {mockData.players.map((player, index) => (
+              {dataToUse.players.map((player, index) => (
                 <View key={player.name} style={[styles.playerRow, { borderBottomColor: colors.border }]}>
                   <Text style={[styles.playerRankCell, { color: colors.text }]}>{index + 1}</Text>
                   <View style={styles.playerNameCell}>

@@ -17,6 +17,7 @@ import { DataService } from '../services/data';
 import { Team, Player, RootStackParamList } from '../types';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
+import TeamFormationScreen from './TeamFormationScreen';
 
 type TeamDetailRouteProp = RouteProp<RootStackParamList, 'TeamDetail'>;
 
@@ -29,6 +30,7 @@ const TeamDetailScreen = () => {
   
   const [team, setTeam] = useState<Team | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showFormation, setShowFormation] = useState(false);
 
   useEffect(() => {
     const loadTeam = async () => {
@@ -150,6 +152,24 @@ const TeamDetailScreen = () => {
     }
   };
 
+  const handleShowFormation = () => {
+    setShowFormation(true);
+  };
+
+  const handleCloseFormation = () => {
+    setShowFormation(false);
+  };
+
+  // Show formation screen if requested
+  if (showFormation) {
+    return (
+      <TeamFormationScreen 
+        team={team}
+        onClose={handleCloseFormation}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={[styles.scrollView, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false} bounces={false}>
@@ -230,6 +250,18 @@ const TeamDetailScreen = () => {
             );
           })}
         </View>
+      </View>
+
+      {/* Formation Button Section */}
+      <View style={[styles.formationSection, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity 
+          style={[styles.formationButton, { backgroundColor: colors.primary }]}
+          onPress={handleShowFormation}
+        >
+          <Ionicons name="football" size={24} color="white" />
+          <Text style={styles.formationButtonText}>Tarkibni Ko'rish</Text>
+          <Ionicons name="chevron-forward" size={20} color="white" />
+        </TouchableOpacity>
       </View>
 
       </ScrollView>
@@ -427,6 +459,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+  },
+  formationSection: {
+    margin: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  formationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  formationButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
   },
 });
 

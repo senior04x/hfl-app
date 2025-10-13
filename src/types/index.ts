@@ -202,7 +202,7 @@ export type RootStackParamList = {
   Settings: undefined;
   PlayerTransferRequest: undefined;
   TeamTransferRequest: undefined;
-  LeagueTournaments: { leagueId: string; leagueName: string };
+  LeagueTournaments: { leagueId: string; leagueName: string; tournaments: any[] };
   TournamentDetail: { tournamentId: string; tournamentName: string; leagueName?: string };
 };
 

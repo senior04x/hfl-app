@@ -18,6 +18,7 @@ import { handleError } from '../utils/errorHandling';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
+import TeamFormationScreen from './TeamFormationScreen';
 
 export default function TeamsScreen() {
   const navigation = useNavigation();
@@ -25,6 +26,8 @@ export default function TeamsScreen() {
   const { getText } = useLanguage();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFormation, setShowFormation] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
   useEffect(() => {
     loadTeams();
@@ -117,6 +120,16 @@ export default function TeamsScreen() {
     console.log('✅ Navigating to team detail page with ID:', teamId);
   };
 
+  const handleShowFormation = (team: Team) => {
+    setSelectedTeam(team);
+    setShowFormation(true);
+  };
+
+  const handleCloseFormation = () => {
+    setShowFormation(false);
+    setSelectedTeam(null);
+  };
+
   const renderTeam = ({ item }: { item: Team }) => (
     <TouchableOpacity 
       style={[styles.teamCard, { backgroundColor: colors.surface }]}
@@ -134,14 +147,6 @@ export default function TeamsScreen() {
           <View style={styles.teamDetails}>
             <Text style={[styles.teamName, { color: colors.text }]}>{item.name}</Text>
           </View>
-        </View>
-        <View style={styles.teamActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => handleShowDetails(item)}
-          >
-            <Ionicons name="eye" size={16} color="white" />
-          </TouchableOpacity>
         </View>
       </View>
       <View style={styles.teamFooter}>
@@ -164,10 +169,25 @@ export default function TeamsScreen() {
     );
   }
 
+  if (showFormation && selectedTeam) {
+    return (
+      <TeamFormationScreen
+        teamName={selectedTeam.name}
+        onSave={(formation) => {
+          console.log('Formation saved:', formation);
+          handleCloseFormation();
+        }}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.text }]}>{getText('teams')}</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Tap team card to view details
+        </Text>
       </View>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
@@ -209,6 +229,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  subtitle: {
+    fontSize: 14,
+    marginTop: 4,
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
@@ -268,17 +293,6 @@ const styles = StyleSheet.create({
   },
   teamPlayers: {
     fontSize: 14,
-  },
-  teamActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   teamFooter: {
     marginTop: 12,
