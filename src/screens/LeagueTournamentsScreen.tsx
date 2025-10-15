@@ -7,11 +7,13 @@ import {
   TouchableOpacity,
   SafeAreaView,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
+import { mongodbService } from '../services/mongodbService';
 
 interface Tournament {
   _id: string;
@@ -20,6 +22,7 @@ interface Tournament {
   maxTeams?: number;
   status: 'active' | 'inactive' | 'completed';
   leagueId: string;
+  league?: string; // Alternative field name for league ID
   createdAt: string;
   updatedAt: string;
 }
@@ -40,15 +43,77 @@ const LeagueTournamentsScreen = () => {
   const { colors } = useTheme();
   const { getText } = useLanguage();
   
-  const { leagueId, leagueName, tournaments } = route.params;
+  const { leagueId, leagueName, tournaments: initialTournaments } = route.params;
+  const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments || []);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // If no initial tournaments provided, fetch them
+    if (!initialTournaments || initialTournaments.length === 0) {
+      fetchTournaments();
+    }
+  }, [leagueId]);
+
+  const fetchTournaments = async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching tournaments for league ID:', leagueId);
+      
+      const result = await mongodbService.getTournamentsByLeague(leagueId);
+      
+      if (result.success) {
+        if (result.data && result.data.length > 0) {
+          // Additional client-side filtering to ensure tournaments belong to this league
+          const filteredTournaments = result.data.filter((tournament: Tournament) => {
+            const belongsToLeague = tournament.leagueId === leagueId || tournament.league === leagueId;
+            if (!belongsToLeague) {
+              console.log('⚠️ Client-side filter: Tournament', tournament.name, 'does not belong to league', leagueId, 'actual leagueId:', tournament.leagueId || tournament.league);
+            }
+            return belongsToLeague;
+          });
+          
+          console.log('✅ Tournaments fetched and filtered for league ID', leagueId, ':', filteredTournaments.length, 'tournaments (from', result.data.length, 'total)');
+          setTournaments(filteredTournaments);
+        } else {
+          console.log('No tournaments found for league ID:', leagueId);
+          setTournaments([]);
+        }
+      } else {
+        console.error('Failed to fetch tournaments for league ID', leagueId, ':', result.error);
+        
+        // Try fallback: get all tournaments and filter client-side
+        console.log('🔄 Trying fallback method for league ID', leagueId);
+        try {
+          const allTournamentsResult = await mongodbService.getAllTournaments();
+          if (allTournamentsResult.success && allTournamentsResult.data) {
+            const filteredTournaments = allTournamentsResult.data.filter((tournament: Tournament) => {
+              const belongsToLeague = tournament.leagueId === leagueId || tournament.league === leagueId;
+              return belongsToLeague;
+            });
+            
+            console.log('✅ Fallback successful: Found', filteredTournaments.length, 'tournaments for league ID', leagueId);
+            setTournaments(filteredTournaments);
+            return;
+          }
+        } catch (fallbackError) {
+          console.error('Fallback also failed:', fallbackError);
+        }
+        
+        setTournaments([]);
+      }
+    } catch (error) {
+      console.error('Error fetching tournaments for league ID', leagueId, ':', error);
+      setTournaments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // Refresh logic here
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    await fetchTournaments();
+    setRefreshing(false);
   };
 
   const renderTournamentItem = ({ item }: { item: Tournament }) => (
@@ -91,7 +156,6 @@ const LeagueTournamentsScreen = () => {
           </View>
         </View>
       </View>
-
     </TouchableOpacity>
   );
 
@@ -116,28 +180,40 @@ const LeagueTournamentsScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
+      {/* Loading State */}
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Turnirlar yuklanmoqda...
+          </Text>
+        </View>
+      )}
+
       {/* Tournaments List */}
-      <FlatList
-        data={tournaments}
-        renderItem={renderTournamentItem}
-        keyExtractor={(item) => item._id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        contentContainerStyle={[styles.list, { paddingBottom: 70 }]}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="trophy-outline" size={48} color={colors.textSecondary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Turnirlar mavjud emas
-            </Text>
-            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-              Bu ligada hozircha turnirlar yo'q
-            </Text>
-          </View>
-        }
-      />
+      {!loading && (
+        <FlatList
+          data={tournaments}
+          renderItem={renderTournamentItem}
+          keyExtractor={(item) => item._id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          contentContainerStyle={[styles.list, { paddingBottom: 70 }]}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="trophy-outline" size={48} color={colors.textSecondary} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                Turnirlar mavjud emas
+              </Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                Bu ligada hozircha turnirlar yo'q
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -239,6 +315,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
 

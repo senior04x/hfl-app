@@ -35,6 +35,7 @@ interface Tournament {
   maxTeams?: number;
   status: 'active' | 'inactive' | 'completed';
   leagueId: string;
+  league?: string; // Alternative field name for league ID
   createdAt: string;
   updatedAt: string;
 }
@@ -611,14 +612,88 @@ const StandingsScreen = () => {
   const renderLeagueItem = ({ item }: { item: League }) => (
     <TouchableOpacity
       style={[styles.leagueCard, { backgroundColor: colors.surface }]}
-      onPress={() => {
-        // Navigate to LeagueTournaments screen
-        navigation.navigate('LeagueTournaments', { 
-          leagueId: item._id, 
-          leagueName: item.name,
-          tournaments: item.tournaments || []
-        });
-        console.log('League pressed, navigating to tournaments:', item.name);
+      onPress={async () => {
+        try {
+          console.log('🏆 League pressed, fetching tournaments for league ID:', item._id, 'name:', item.name);
+          console.log('🔍 League details:', { 
+            _id: item._id, 
+            name: item.name, 
+            status: item.status,
+            tournaments: item.tournaments?.length || 0 
+          });
+          
+          // Fetch tournaments from backend by league ID
+          const tournamentsResult = await mongodbService.getTournamentsByLeague(item._id);
+          
+          if (tournamentsResult.success) {
+            if (tournamentsResult.data && tournamentsResult.data.length > 0) {
+              // Additional filtering to ensure tournaments belong to this league
+              const filteredTournaments = tournamentsResult.data.filter((tournament: any) => {
+                const belongsToLeague = tournament.leagueId === item._id || tournament.league === item._id;
+                if (!belongsToLeague) {
+                  console.log('⚠️ StandingsScreen filter: Tournament', tournament.name, 'does not belong to league', item.name, 'actual leagueId:', tournament.leagueId || tournament.league);
+                }
+                return belongsToLeague;
+              });
+              
+              console.log('✅ Tournaments fetched and filtered for league', item.name, ':', filteredTournaments.length, 'tournaments (from', tournamentsResult.data.length, 'total)');
+              
+              // Navigate to LeagueTournaments screen with filtered tournaments
+              navigation.navigate('LeagueTournaments', { 
+                leagueId: item._id, 
+                leagueName: item.name,
+                tournaments: filteredTournaments
+              });
+            } else {
+              console.log('No tournaments found for league:', item.name);
+              // Navigate with empty tournaments array if none found
+              navigation.navigate('LeagueTournaments', { 
+                leagueId: item._id, 
+                leagueName: item.name,
+                tournaments: []
+              });
+            }
+          } else {
+            console.error('Failed to fetch tournaments for league', item.name, ':', tournamentsResult.error);
+            
+            // Try fallback: get all tournaments and filter client-side
+            console.log('🔄 Trying fallback method for league', item.name);
+            try {
+              const allTournamentsResult = await mongodbService.getAllTournaments();
+              if (allTournamentsResult.success && allTournamentsResult.data) {
+                const filteredTournaments = allTournamentsResult.data.filter((tournament: any) => {
+                  const belongsToLeague = tournament.leagueId === item._id || tournament.league === item._id;
+                  return belongsToLeague;
+                });
+                
+                console.log('✅ Fallback successful: Found', filteredTournaments.length, 'tournaments for league', item.name);
+                navigation.navigate('LeagueTournaments', { 
+                  leagueId: item._id, 
+                  leagueName: item.name,
+                  tournaments: filteredTournaments
+                });
+                return;
+              }
+            } catch (fallbackError) {
+              console.error('Fallback also failed:', fallbackError);
+            }
+            
+            // Navigate with empty tournaments array if all methods failed
+            navigation.navigate('LeagueTournaments', { 
+              leagueId: item._id, 
+              leagueName: item.name,
+              tournaments: []
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching tournaments for league', item.name, ':', error);
+          // Navigate with empty tournaments array on error
+          navigation.navigate('LeagueTournaments', { 
+            leagueId: item._id, 
+            leagueName: item.name,
+            tournaments: []
+          });
+        }
       }}
     >
       <View style={styles.logoContainer}>

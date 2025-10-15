@@ -56,33 +56,159 @@ const TournamentDetailScreen = () => {
     teams: any[];
     players: any[];
     matches: any[];
-  }>({ teams: [], players: [], matches: [] });
+    standings: any[];
+    topScorers: any[];
+    topAssists: any[];
+  }>({ 
+    teams: [], 
+    players: [], 
+    matches: [], 
+    standings: [],
+    topScorers: [],
+    topAssists: []
+  });
 
   // Get real data for tournament
-  const getTournamentData = async (tournamentId: string) => {
+  const getTournamentData = async (tournamentId: string, round?: string) => {
     try {
+      console.log('🏆 Fetching real tournament data for:', tournamentId, round ? `round: ${round}` : '');
+      
       // Fetch teams for this tournament
       const teamsResult = await mongodbService.getTeamsByTournament(tournamentId);
       const teams = teamsResult.success ? teamsResult.data || [] : [];
+      console.log('📊 Teams fetched:', teams.length);
 
-      // Fetch players for this tournament (get all players and filter by tournament teams)
-      let players = [];
+      // Fetch tournament standings (real data) with round filter
+      let standings = [];
       try {
-        const playersResult = await mongodbService.getPlayers();
-        players = Array.isArray(playersResult) ? playersResult : [];
+        const standingsResult = await mongodbService.getTournamentStandings(tournamentId, round);
+        standings = standingsResult.success ? standingsResult.data || [] : [];
+        console.log('🏆 Standings fetched:', standings.length, 'success:', standingsResult.success, 'error:', standingsResult.error);
+        
+        // If new API fails, try to get standings from teams data
+        if (!standingsResult.success || standings.length === 0) {
+          console.log('🔄 Trying fallback: getting standings from teams data');
+          standings = teams.map((team, index) => ({
+            position: index + 1,
+            teamName: team.name,
+            points: team.points || 0,
+            played: team.played || 0,
+            goalDifference: (team.goalsFor || 0) - (team.goalsAgainst || 0),
+            teamColor: team.color,
+            teamShortName: team.shortName
+          }));
+          console.log('✅ Fallback standings created:', standings.length);
+        }
       } catch (error) {
-        console.error('Error fetching players:', error);
-        players = [];
+        console.error('Error fetching standings:', error);
+        standings = [];
+      }
+
+      // Fetch tournament top scorers (real data) with round filter
+      let topScorers = [];
+      try {
+        const topScorersResult = await mongodbService.getTournamentTopScorers(tournamentId, round);
+        topScorers = topScorersResult.success ? topScorersResult.data || [] : [];
+        console.log('🥅 Top scorers fetched:', topScorers.length, 'success:', topScorersResult.success, 'error:', topScorersResult.error);
+        
+        // If new API fails, try to get players from existing API
+        if (!topScorersResult.success || topScorers.length === 0) {
+          console.log('🔄 Trying fallback: getting players from existing API');
+          try {
+            const playersResult = await mongodbService.getPlayers();
+            const allPlayers = Array.isArray(playersResult) ? playersResult : [];
+            
+            // Filter players by tournament teams and sort by goals
+            const tournamentPlayers = allPlayers.filter(player => 
+              teams.some(team => team.name === player.team || team._id === player.teamId)
+            ).sort((a, b) => (b.goals || 0) - (a.goals || 0));
+            
+            topScorers = tournamentPlayers.map((player, index) => ({
+              position: index + 1,
+              playerName: player.name,
+              teamName: player.team,
+              goalsScored: player.goals || 0,
+              assistsCount: player.assists || 0
+            }));
+            
+            console.log('✅ Fallback top scorers created:', topScorers.length);
+          } catch (fallbackError) {
+            console.error('Fallback players fetch failed:', fallbackError);
+            topScorers = [];
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching top scorers:', error);
+        topScorers = [];
+      }
+
+      // Fetch tournament top assists (real data) with round filter
+      let topAssists = [];
+      try {
+        const topAssistsResult = await mongodbService.getTournamentTopAssists(tournamentId, round);
+        topAssists = topAssistsResult.success ? topAssistsResult.data || [] : [];
+        console.log('🎯 Top assists fetched:', topAssists.length, 'success:', topAssistsResult.success, 'error:', topAssistsResult.error);
+        
+        // If new API fails, try to get assists from existing players data
+        if (!topAssistsResult.success || topAssists.length === 0) {
+          console.log('🔄 Trying fallback: getting assists from existing players data');
+          try {
+            const playersResult = await mongodbService.getPlayers();
+            const allPlayers = Array.isArray(playersResult) ? playersResult : [];
+            
+            // Filter players by tournament teams and sort by assists
+            const tournamentPlayers = allPlayers.filter(player => 
+              teams.some(team => team.name === player.team || team._id === player.teamId)
+            ).sort((a, b) => (b.assists || 0) - (a.assists || 0));
+            
+            topAssists = tournamentPlayers.map((player, index) => ({
+              position: index + 1,
+              playerName: player.name,
+              teamName: player.team,
+              goalsScored: player.goals || 0,
+              assistsCount: player.assists || 0
+            }));
+            
+            console.log('✅ Fallback top assists created:', topAssists.length);
+          } catch (fallbackError) {
+            console.error('Fallback assists fetch failed:', fallbackError);
+            topAssists = [];
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching top assists:', error);
+        topAssists = [];
       }
 
       // Fetch matches for this tournament
       const matchesResult = await mongodbService.getMatchesByTournament(tournamentId);
       const matches = matchesResult.success ? matchesResult.data || [] : [];
+      console.log('⚽ Matches fetched:', matches.length);
 
-      return { teams, players, matches };
+      // Combine all player data (scorers + assists)
+      const allPlayers = [...topScorers, ...topAssists];
+      const uniquePlayers = allPlayers.filter((player, index, self) => 
+        index === self.findIndex(p => p._id === player._id || p.playerId === player.playerId)
+      );
+
+      return { 
+        teams, 
+        players: uniquePlayers, 
+        matches, 
+        standings,
+        topScorers,
+        topAssists
+      };
     } catch (error) {
       console.error('Error fetching tournament data:', error);
-      return { teams: [], players: [], matches: [] };
+      return { 
+        teams: [], 
+        players: [], 
+        matches: [], 
+        standings: [],
+        topScorers: [],
+        topAssists: []
+      };
     }
   };
 
@@ -156,11 +282,11 @@ const TournamentDetailScreen = () => {
     };
   }, [tournamentId]);
 
-  const fetchTournamentDetails = async () => {
+  const fetchTournamentDetails = async (round?: string) => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching tournament details for:', tournamentId);
+      console.log('Fetching tournament details for:', tournamentId, round ? `round: ${round}` : '');
       
       // Fetch tournament basic info
       const result = await mongodbService.getTournamentById(tournamentId);
@@ -172,8 +298,16 @@ const TournamentDetailScreen = () => {
         setError(result.error || 'Turnir ma\'lumotlarini yuklashda xatolik yuz berdi.');
       }
 
-      // Fetch tournament data (teams, players, matches)
-      const data = await getTournamentData(tournamentId);
+      // Fetch tournament data (teams, players, matches) with round filter
+      const data = await getTournamentData(tournamentId, round);
+      console.log('🔍 Tournament data received:', {
+        teams: data.teams.length,
+        players: data.players.length,
+        matches: data.matches.length,
+        standings: data.standings.length,
+        topScorers: data.topScorers.length,
+        topAssists: data.topAssists.length
+      });
       setTournamentData(data);
       
     } catch (err: any) {
@@ -341,7 +475,23 @@ const TournamentDetailScreen = () => {
   };
 
   // Use real data if available, fallback to mock data
-  const dataToUse = tournamentData.teams.length > 0 ? tournamentData : getMockDataForTournament(tournamentName);
+  const hasRealData = tournamentData.teams.length > 0 || 
+                     tournamentData.standings.length > 0 || 
+                     tournamentData.topScorers.length > 0 || 
+                     tournamentData.topAssists.length > 0;
+  
+  const dataToUse = hasRealData ? tournamentData : getMockDataForTournament(tournamentName);
+  
+  console.log('🎯 Data source decision:', {
+    hasRealData,
+    realDataCounts: {
+      teams: tournamentData.teams.length,
+      standings: tournamentData.standings.length,
+      topScorers: tournamentData.topScorers.length,
+      topAssists: tournamentData.topAssists.length
+    },
+    usingMockData: !hasRealData
+  });
   const recentMatches: Match[] = dataToUse.matches.map((match, index) => ({
     _id: match._id || `m${index + 1}`,
     homeTeamName: match.homeTeamName || match.home,
@@ -483,6 +633,7 @@ const TournamentDetailScreen = () => {
                   onPress={() => {
                     setSelectedRound('all');
                     setShowRoundFilter(false);
+                    fetchTournamentDetails();
                   }}
                 >
                   <Text style={[styles.filterOptionText, selectedRound === 'all' && styles.selectedFilterOptionText]}>
@@ -494,6 +645,7 @@ const TournamentDetailScreen = () => {
                   onPress={() => {
                     setSelectedRound('1');
                     setShowRoundFilter(false);
+                    fetchTournamentDetails('1');
                   }}
                 >
                   <Text style={[styles.filterOptionText, selectedRound === '1' && styles.selectedFilterOptionText]}>
@@ -505,6 +657,7 @@ const TournamentDetailScreen = () => {
                   onPress={() => {
                     setSelectedRound('2');
                     setShowRoundFilter(false);
+                    fetchTournamentDetails('2');
                   }}
                 >
                   <Text style={[styles.filterOptionText, selectedRound === '2' && styles.selectedFilterOptionText]}>
@@ -516,6 +669,7 @@ const TournamentDetailScreen = () => {
                   onPress={() => {
                     setSelectedRound('3');
                     setShowRoundFilter(false);
+                    fetchTournamentDetails('3');
                   }}
                 >
                   <Text style={[styles.filterOptionText, selectedRound === '3' && styles.selectedFilterOptionText]}>
@@ -535,19 +689,19 @@ const TournamentDetailScreen = () => {
                 <Text style={[styles.numberHeader, { color: colors.text }]}>O</Text>
               </View>
               
-              {/* Table Rows */}
-              {dataToUse.teams.map((team, index) => (
-                <View key={team.name} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.rankCell, { color: colors.text }]}>{index + 1}</Text>
+              {/* Table Rows - Use real standings data if available, otherwise use teams data */}
+              {(dataToUse.standings && dataToUse.standings.length > 0 ? dataToUse.standings : dataToUse.teams).map((team, index) => (
+                <View key={team.name || team.teamName || team._id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.rankCell, { color: colors.text }]}>{team.position || index + 1}</Text>
                   <View style={styles.teamCell}>
-                    <View style={[styles.teamLogo, { backgroundColor: team.color }]}>
-                      <Text style={styles.teamLogoText}>{team.shortName}</Text>
+                    <View style={[styles.teamLogo, { backgroundColor: team.color || team.teamColor || '#3B82F6' }]}>
+                      <Text style={styles.teamLogoText}>{team.shortName || team.teamShortName || (team.name || team.teamName || 'T').substring(0, 3).toUpperCase()}</Text>
                     </View>
-                    <Text style={[styles.teamNameTable, { color: colors.text }]}>{team.name}</Text>
+                    <Text style={[styles.teamNameTable, { color: colors.text }]}>{team.name || team.teamName || 'Unknown Team'}</Text>
                   </View>
-                  <Text style={[styles.numberCell, { color: colors.text }]}>{team.played}</Text>
-                  <Text style={[styles.numberCell, { color: colors.text }]}>{team.goalsFor - team.goalsAgainst}</Text>
-                  <Text style={[styles.numberCell, { color: colors.text }]}>{team.points}</Text>
+                  <Text style={[styles.numberCell, { color: colors.text }]}>{team.played || team.gamesPlayed || 0}</Text>
+                  <Text style={[styles.numberCell, { color: colors.text }]}>{team.goalDifference || (team.goalsFor || 0) - (team.goalsAgainst || 0)}</Text>
+                  <Text style={[styles.numberCell, { color: colors.text }]}>{team.points || 0}</Text>
                 </View>
               ))}
             </View>
@@ -592,6 +746,8 @@ const TournamentDetailScreen = () => {
                   onPress={() => {
                     setSelectedPlayerFilter('games');
                     setShowPlayerFilter(false);
+                    // Refresh data for games filter
+                    fetchTournamentDetails(selectedRound === 'all' ? undefined : selectedRound);
                   }}
                 >
                   <Ionicons name="trophy" size={20} color={colors.text} style={styles.filterIcon} />
@@ -608,6 +764,8 @@ const TournamentDetailScreen = () => {
                   onPress={() => {
                     setSelectedPlayerFilter('goals');
                     setShowPlayerFilter(false);
+                    // Refresh data for goals filter
+                    fetchTournamentDetails(selectedRound === 'all' ? undefined : selectedRound);
                   }}
                 >
                   <Ionicons name="football" size={20} color={colors.text} style={styles.filterIcon} />
@@ -624,6 +782,8 @@ const TournamentDetailScreen = () => {
                   onPress={() => {
                     setSelectedPlayerFilter('assists');
                     setShowPlayerFilter(false);
+                    // Refresh data for assists filter
+                    fetchTournamentDetails(selectedRound === 'all' ? undefined : selectedRound);
                   }}
                 >
                   <Ionicons name="footsteps" size={20} color={colors.text} style={styles.filterIcon} />
@@ -678,20 +838,32 @@ const TournamentDetailScreen = () => {
                 <Text style={[styles.playerAssistsHeader, { color: colors.text }]}>ASSISTS</Text>
               </View>
               
-              {/* Players Rows */}
-              {dataToUse.players.map((player, index) => (
-                <View key={player.name} style={[styles.playerRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.playerRankCell, { color: colors.text }]}>{index + 1}</Text>
-                  <View style={styles.playerNameCell}>
-                    <View style={[styles.playerTeamLogo, { backgroundColor: getTeamColor(player.team) }]}>
-                      <Text style={styles.playerTeamLogoText}>{getTeamShortName(player.team)}</Text>
+              {/* Players Rows - Use real player data based on selected filter */}
+              {(() => {
+                let playersToShow = [];
+                
+                if (selectedPlayerFilter === 'goals' && dataToUse.topScorers && dataToUse.topScorers.length > 0) {
+                  playersToShow = dataToUse.topScorers;
+                } else if (selectedPlayerFilter === 'assists' && dataToUse.topAssists && dataToUse.topAssists.length > 0) {
+                  playersToShow = dataToUse.topAssists;
+                } else {
+                  playersToShow = dataToUse.players;
+                }
+                
+                return playersToShow.map((player, index) => (
+                  <View key={player.name || player.playerName || player._id} style={[styles.playerRow, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.playerRankCell, { color: colors.text }]}>{player.position || index + 1}</Text>
+                    <View style={styles.playerNameCell}>
+                      <View style={[styles.playerTeamLogo, { backgroundColor: getTeamColor(player.team || player.teamName) }]}>
+                        <Text style={styles.playerTeamLogoText}>{getTeamShortName(player.team || player.teamName)}</Text>
+                      </View>
+                      <Text style={[styles.playerName, { color: colors.text }]}>{player.name || player.playerName || 'Unknown Player'}</Text>
                     </View>
-                    <Text style={[styles.playerName, { color: colors.text }]}>{player.name}</Text>
+                    <Text style={[styles.playerGoalsCell, { color: colors.primary, fontWeight: 'bold' }]}>{player.goals || player.goalsScored || 0}</Text>
+                    <Text style={[styles.playerAssistsCell, { color: colors.text }]}>{player.assists || player.assistsCount || 0}</Text>
                   </View>
-                  <Text style={[styles.playerGoalsCell, { color: colors.primary, fontWeight: 'bold' }]}>{player.goals}</Text>
-                  <Text style={[styles.playerAssistsCell, { color: colors.text }]}>{player.assists}</Text>
-                </View>
-              ))}
+                ));
+              })()}
             </View>
           </ScrollView>
         );

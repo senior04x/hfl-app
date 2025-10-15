@@ -499,30 +499,116 @@ class MongoDBService {
     }
   }
 
+  // Get all tournaments (for debugging)
+  async getAllTournaments(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('🔍 Fetching all tournaments for debugging...');
+      const response = await fetch(`${this.baseUrl}/api/tournaments`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      console.log('All tournaments API response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('All tournaments API error:', response.status, errorText);
+        return { 
+          success: false, 
+          error: `HTTP ${response.status}: ${response.statusText}` 
+        };
+      }
+
+      const result = await response.json();
+      console.log('All tournaments API response:', result);
+      return result;
+    } catch (error) {
+      console.error('Error fetching all tournaments:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
   // Tournaments operations
   async getTournamentsByLeague(leagueId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      console.log('Fetching tournaments for league:', leagueId);
+      console.log('🏆 Fetching tournaments for league ID:', leagueId);
       const response = await fetch(`${this.baseUrl}/api/tournaments/${leagueId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
       });
 
+      console.log('Tournaments API response status:', response.status);
+
       if (!response.ok) {
-        // Return empty array instead of error - tournaments are already included in league data
-        console.log('⚠️ Tournaments endpoint returned', response.status, '- using tournaments from league data');
-        return { success: true, data: [] };
+        const errorText = await response.text();
+        console.error('Tournaments API error:', response.status, errorText);
+        
+        // If 404 error, try to get all tournaments and filter client-side
+        if (response.status === 404) {
+          console.log('🔄 404 error - trying to get all tournaments and filter client-side...');
+          try {
+            const allTournamentsResult = await this.getAllTournaments();
+            if (allTournamentsResult.success && allTournamentsResult.data) {
+              // Filter tournaments by league ID
+              const filteredTournaments = allTournamentsResult.data.filter((tournament: any) => {
+                const belongsToLeague = tournament.leagueId === leagueId || tournament.league === leagueId;
+                return belongsToLeague;
+              });
+              
+              console.log('✅ Fallback: Found', filteredTournaments.length, 'tournaments for league', leagueId, 'from all tournaments');
+              return { success: true, data: filteredTournaments };
+            }
+          } catch (fallbackError) {
+            console.error('Fallback also failed:', fallbackError);
+          }
+        }
+        
+        return { 
+          success: false, 
+          error: `HTTP ${response.status}: ${response.statusText}` 
+        };
       }
 
-      const data = await response.json();
-      console.log('Tournaments fetched successfully:', data);
-      return data;
+      const result = await response.json();
+      console.log('Tournaments API response:', result);
+      console.log('🔍 Raw tournaments data:', result.data?.map((t: any) => ({ 
+        name: t.name, 
+        leagueId: t.leagueId, 
+        league: t.league,
+        _id: t._id 
+      })));
+      
+      if (result.success && result.data) {
+        // Filter tournaments by league ID to ensure they belong to the correct league
+        const filteredTournaments = result.data.filter((tournament: any) => {
+          const belongsToLeague = tournament.leagueId === leagueId || tournament.league === leagueId;
+          if (!belongsToLeague) {
+            console.log('⚠️ Tournament', tournament.name, 'does not belong to league', leagueId, 'actual leagueId:', tournament.leagueId || tournament.league);
+          }
+          return belongsToLeague;
+        });
+        
+        console.log('✅ Tournaments fetched successfully for league', leagueId, ':', filteredTournaments.length, 'tournaments (filtered from', result.data.length, 'total)');
+        return { success: true, data: filteredTournaments };
+      } else {
+        console.log('No tournaments found for league:', leagueId);
+        return { success: true, data: [] };
+      }
     } catch (error) {
-      // Return empty array instead of error - tournaments are already included in league data
-      console.log('⚠️ Error fetching tournaments - using tournaments from league data');
-      return { success: true, data: [] };
+      console.error('Error fetching tournaments for league', leagueId, ':', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
   }
 
@@ -712,6 +798,144 @@ class MongoDBService {
     } catch (error) {
       console.error('Error fetching leagues:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Get tournament standings (real data)
+  async getTournamentStandings(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const url = round 
+        ? `${this.baseUrl}/api/tournaments/${tournamentId}/standings?round=${round}`
+        : `${this.baseUrl}/api/tournaments/${tournamentId}/standings`;
+      
+      console.log('🏆 Fetching tournament standings for:', tournamentId, round ? `round: ${round}` : '');
+      console.log('🌐 API URL:', url);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      console.log('Tournament standings API response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Tournament standings API error:', response.status, errorText);
+        return { 
+          success: false, 
+          error: `HTTP ${response.status}: ${response.statusText}` 
+        };
+      }
+
+      const result = await response.json();
+      console.log('✅ Tournament standings fetched successfully:', result);
+      
+      if (result.success && result.data) {
+        return { success: true, data: result.data };
+      } else {
+        console.log('No standings found for tournament:', tournamentId);
+        return { success: true, data: [] };
+      }
+    } catch (error) {
+      console.error('Error fetching tournament standings:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  // Get tournament top scorers (real data)
+  async getTournamentTopScorers(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const url = round 
+        ? `${this.baseUrl}/api/tournaments/${tournamentId}/top-scorers?round=${round}`
+        : `${this.baseUrl}/api/tournaments/${tournamentId}/top-scorers`;
+      
+      console.log('🥅 Fetching tournament top scorers for:', tournamentId, round ? `round: ${round}` : '');
+      console.log('🌐 API URL:', url);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      console.log('Tournament top scorers API response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Tournament top scorers API error:', response.status, errorText);
+        return { 
+          success: false, 
+          error: `HTTP ${response.status}: ${response.statusText}` 
+        };
+      }
+
+      const result = await response.json();
+      console.log('✅ Tournament top scorers fetched successfully:', result);
+      
+      if (result.success && result.data) {
+        return { success: true, data: result.data };
+      } else {
+        console.log('No top scorers found for tournament:', tournamentId);
+        return { success: true, data: [] };
+      }
+    } catch (error) {
+      console.error('Error fetching tournament top scorers:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  // Get tournament top assists (real data)
+  async getTournamentTopAssists(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const url = round 
+        ? `${this.baseUrl}/api/tournaments/${tournamentId}/top-assists?round=${round}`
+        : `${this.baseUrl}/api/tournaments/${tournamentId}/top-assists`;
+      
+      console.log('🎯 Fetching tournament top assists for:', tournamentId, round ? `round: ${round}` : '');
+      console.log('🌐 API URL:', url);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
+      console.log('Tournament top assists API response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Tournament top assists API error:', response.status, errorText);
+        return { 
+          success: false, 
+          error: `HTTP ${response.status}: ${response.statusText}` 
+        };
+      }
+
+      const result = await response.json();
+      console.log('✅ Tournament top assists fetched successfully:', result);
+      
+      if (result.success && result.data) {
+        return { success: true, data: result.data };
+      } else {
+        console.log('No top assists found for tournament:', tournamentId);
+        return { success: true, data: [] };
+      }
+    } catch (error) {
+      console.error('Error fetching tournament top assists:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
   }
 
