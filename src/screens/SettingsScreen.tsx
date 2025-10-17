@@ -189,6 +189,21 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           </View>
         )}
 
+        {/* Login Section */}
+        {!player && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Kirish</Text>
+            
+            <SettingItem
+              icon="log-in-outline"
+              title="Tizimga kirish"
+              subtitle="O'yinchi, murabbiy yoki liga admini sifatida kiring"
+              onPress={() => navigation.navigate('PlayerLogin')}
+              colors={colors}
+            />
+          </View>
+        )}
+
                {/* Appearance Settings */}
                <View style={styles.section}>
                  <Text style={[styles.sectionTitle, { color: colors.text }]}>{getText('appearance')}</Text>

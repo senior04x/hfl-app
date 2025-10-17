@@ -21,6 +21,12 @@ import PlayerRegistrationScreen from '../screens/PlayerRegistrationScreen';
 import PlayerLoginScreen from '../screens/PlayerLoginScreen';
 import PlayerVerificationScreen from '../screens/PlayerVerificationScreen';
 import PlayerDashboardScreen from '../screens/PlayerDashboardScreen';
+import RoleSelectionScreen from '../screens/RoleSelectionScreen';
+import TrainerLoginScreen from '../screens/TrainerLoginScreen';
+import TrainerDashboard from '../screens/TrainerDashboard';
+import TeamManagement from '../screens/TeamManagement';
+import CaptainSelection from '../screens/CaptainSelection';
+import TeamTactics from '../screens/TeamTactics';
 import TeamApplicationScreen from '../screens/TeamApplicationScreen';
 import LeagueApplicationScreen from '../screens/LeagueApplicationScreen';
 import TransferRequestScreen from '../screens/TransferRequestScreen';
@@ -203,6 +209,36 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="PlayerDashboard" 
           component={PlayerDashboardScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="RoleSelection" 
+          component={RoleSelectionScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="TrainerLogin" 
+          component={TrainerLoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="TrainerDashboard" 
+          component={TrainerDashboard}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="TeamManagement" 
+          component={TeamManagement}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="CaptainSelection" 
+          component={CaptainSelection}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="TeamTactics" 
+          component={TeamTactics}
           options={{ headerShown: false }}
         />
         <Stack.Screen 

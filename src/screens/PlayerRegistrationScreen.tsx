@@ -94,17 +94,25 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
   const fetchTeams = async (tournamentId: string) => {
     try {
       setLoadingTeams(true);
+      console.log('🔍 Fetching teams for tournament:', tournamentId);
       const result = await mongodbService.getTeamsByTournament(tournamentId);
+      console.log('📋 Raw result from getTeamsByTournament:', JSON.stringify(result, null, 2));
+      
       if (result.success && result.data) {
         // Handle nested data structure
         let teamsData = result.data;
         if (result.data.data && Array.isArray(result.data.data)) {
           teamsData = result.data.data;
         }
+        console.log('✅ Final teams data to display:', JSON.stringify(teamsData, null, 2));
         setTeams(teamsData);
+      } else {
+        console.log('❌ No teams found for tournament:', tournamentId);
+        setTeams([]);
       }
     } catch (error) {
-      console.error('Error fetching teams:', error);
+      console.error('❌ Error fetching teams:', error);
+      setTeams([]);
     } finally {
       setLoadingTeams(false);
     }
@@ -452,24 +460,27 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
                   backgroundColor: colors.surface, 
                   borderColor: colors.border 
                 }]}>
-                  {teams.map((team) => (
-                    <TouchableOpacity
-                      key={team._id || team.id}
-                      style={[
-                        styles.teamOption,
-                        formData.selectedTeam === (team._id || team.id) && styles.selectedTeamOption
-                      ]}
-                      onPress={() => handleInputChange('selectedTeam', team._id || team.id)}
-                    >
-                      <Text style={[
-                        styles.teamOptionText,
-                        { color: colors.text },
-                        formData.selectedTeam === (team._id || team.id) && styles.selectedTeamText
-                      ]}>
-                        {team.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {teams.map((team, index) => {
+                    console.log(`🎯 Team ${index}:`, JSON.stringify(team, null, 2));
+                    return (
+                      <TouchableOpacity
+                        key={team._id || team.id}
+                        style={[
+                          styles.teamOption,
+                          formData.selectedTeam === (team._id || team.id) && styles.selectedTeamOption
+                        ]}
+                        onPress={() => handleInputChange('selectedTeam', team._id || team.id)}
+                      >
+                        <Text style={[
+                          styles.teamOptionText,
+                          { color: colors.text },
+                          formData.selectedTeam === (team._id || team.id) && styles.selectedTeamText
+                        ]}>
+                          {team.name || team.teamName || 'Unknown Team'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
             </View>

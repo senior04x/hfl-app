@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -26,25 +26,33 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
   const { login } = usePlayerStore();
   const { getText } = useLanguage();
   const [phoneNumber, setPhoneNumber] = useState('+998 93 378 68 86');
-  const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [countdown, setCountdown] = useState(0);
-  const [attempts, setAttempts] = useState(0);
-  const [isBlocked, setIsBlocked] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<'player' | 'trainer' | 'admin' | null>(null);
+  const [currentStep, setCurrentStep] = useState<'role' | 'phone'>('role');
+  const phoneInputRef = useRef<TextInput>(null);
 
-  // Countdown timer effect
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (countdown > 0) {
-      interval = setInterval(() => {
-        setCountdown(countdown - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [countdown]);
+  // Role tanlanganda telefon raqam sahifasiga o'tish
+  const handleRoleSelect = (role: 'player' | 'trainer' | 'admin') => {
+    setSelectedRole(role);
+    setCurrentStep('phone');
+    // Kichik kechikish bilan focus qilish
+    setTimeout(() => {
+      phoneInputRef.current?.focus();
+    }, 300);
+  };
+
+  // Orqaga qaytish funksiyasi
+  const handleGoBack = () => {
+    setCurrentStep('role');
+    setSelectedRole(null);
+  };
 
   const requestOtp = async () => {
+    if (!selectedRole) {
+      Alert.alert('Xatolik', 'Iltimos, rolni tanlang');
+      return;
+    }
+
     if (!phoneNumber.trim()) {
       Alert.alert(getText('error'), getText('enterPhoneNumber'));
       return;
@@ -59,139 +67,106 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       setLoading(true);
       
       const cleanPhone = parsePhoneNumberForAPI(phoneNumber);
-      console.log('Requesting OTP for:', cleanPhone);
+      console.log(`${selectedRole} login for phone:`, cleanPhone);
       
-      // Use API service
-      const result = await apiService.requestOtp(cleanPhone);
+      let result;
+      if (selectedRole === 'player') {
+        result = await apiService.simpleLogin(cleanPhone);
+      } else if (selectedRole === 'trainer') {
+        result = await apiService.trainerLogin(cleanPhone);
+      } else if (selectedRole === 'admin') {
+        // Admin uchun alohida login logic
+        result = await apiService.simpleLogin(cleanPhone);
+      }
 
       if (result.success) {
-        setStep('otp');
-        setCountdown(60); // 60 seconds countdown
-        Alert.alert(getText('success'), getText('otpSent'));
+        if (selectedRole === 'player') {
+          // Get player data and map to Player type
+          const apiPlayer = result.player;
+          const playerData: Player = {
+            id: apiPlayer.id,
+            firstName: apiPlayer.firstName,
+            lastName: apiPlayer.lastName,
+            phone: apiPlayer.phone,
+            teamId: '', // Will be set from team data
+            teamName: apiPlayer.teamName || '',
+            position: apiPlayer.position || '',
+            number: apiPlayer.number || 0,
+            goals: apiPlayer.goals || 0,
+            assists: apiPlayer.assists || 0,
+            yellowCards: apiPlayer.yellowCards || 0,
+            redCards: apiPlayer.redCards || 0,
+            matchesPlayed: apiPlayer.matchesPlayed || 0,
+            status: apiPlayer.status || 'active',
+            createdAt: new Date(apiPlayer.createdAt || Date.now()),
+            updatedAt: new Date(apiPlayer.updatedAt || Date.now()),
+          };
+
+          console.log('Player data mapped:', playerData);
+          
+          // Login to store
+          await login(playerData);
+          
+          // Navigate to dashboard
+          navigation.navigate('PlayerDashboard', { 
+            playerId: playerData.id,
+            player: playerData 
+          });
+        } else if (selectedRole === 'trainer') {
+          // Navigate to trainer dashboard
+          navigation.navigate('TrainerDashboard', {
+            trainerId: result.trainer.id,
+            trainer: result.trainer
+          });
+        } else if (selectedRole === 'admin') {
+          // Admin uchun alohida navigation
+          // Hozircha player dashboard'ga o'tamiz, keyin admin panel qo'shamiz
+          const apiPlayer = result.player;
+          const playerData: Player = {
+            id: apiPlayer.id,
+            firstName: apiPlayer.firstName,
+            lastName: apiPlayer.lastName,
+            phone: apiPlayer.phone,
+            teamId: '',
+            teamName: apiPlayer.teamName || '',
+            position: apiPlayer.position || '',
+            number: apiPlayer.number || 0,
+            goals: apiPlayer.goals || 0,
+            assists: apiPlayer.assists || 0,
+            yellowCards: apiPlayer.yellowCards || 0,
+            redCards: apiPlayer.redCards || 0,
+            matchesPlayed: apiPlayer.matchesPlayed || 0,
+            status: apiPlayer.status || 'active',
+            createdAt: new Date(apiPlayer.createdAt || Date.now()),
+            updatedAt: new Date(apiPlayer.updatedAt || Date.now()),
+          };
+          
+          await login(playerData);
+          navigation.navigate('PlayerDashboard', { 
+            playerId: playerData.id,
+            player: playerData 
+          });
+        }
+        
+        Alert.alert(getText('success'), 'Muvaffaqiyatli kirildi!');
       } else {
-        Alert.alert(getText('error'), result.error || getText('otpSendError'));
+        Alert.alert(getText('error'), result.reason || 'Telefon raqami topilmadi yoki ariza berish kerak');
       }
     } catch (error: any) {
-      console.error('OTP request error:', error);
+      console.error('Auto-login error:', error);
       
       if (error.name === 'AbortError') {
         Alert.alert(getText('error'), getText('serverTimeout'));
       } else if (error.message.includes('ERR_CONNECTION_REFUSED')) {
         Alert.alert(getText('error'), getText('serverDown'));
       } else {
-        Alert.alert(getText('error'), error.message || getText('otpSendError'));
+        Alert.alert(getText('error'), error.message || 'Kirishda xatolik yuz berdi');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const verifyOtp = async () => {
-    if (!otpCode.trim()) {
-      Alert.alert(getText('error'), getText('enterOtpCode'));
-      return;
-    }
-
-    if (otpCode.length !== 4) {
-      Alert.alert(getText('error'), getText('otpCodeLength'));
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      const cleanPhone = parsePhoneNumberForAPI(phoneNumber);
-      console.log('Verifying OTP:', cleanPhone, otpCode);
-      
-      // Use API service
-      const result = await apiService.verifyOtp(cleanPhone, otpCode);
-
-      if (result.success) {
-        // Get player data and map to Player type
-        const apiPlayer = result.player;
-        const playerData: Player = {
-          id: apiPlayer.id,
-          firstName: apiPlayer.firstName,
-          lastName: apiPlayer.lastName,
-          phone: apiPlayer.phone,
-          teamId: '', // Will be set from team data
-          teamName: '', // Will be set from team data
-          position: apiPlayer.position,
-          number: parseInt(apiPlayer.number) || 0,
-          goals: 0,
-          assists: 0,
-          yellowCards: 0,
-          redCards: 0,
-          matchesPlayed: 0,
-          status: apiPlayer.status as 'active' | 'inactive' | 'suspended',
-          createdAt: new Date(apiPlayer.createdAt),
-          updatedAt: new Date(apiPlayer.updatedAt),
-        };
-        await login(playerData);
-        
-        // Navigate to player dashboard
-        navigation.navigate('PlayerDashboard', { 
-          playerId: playerData.id,
-          player: playerData 
-        });
-      } else {
-        // Check if user needs to apply
-        if (result.needsApplication) {
-          Alert.alert(
-            'Ariza kerak',
-            result.reason,
-            [
-              { text: 'Bekor qilish', style: 'cancel' },
-              { text: 'Ariza berish', onPress: () => navigation.navigate('UserAccount') }
-            ]
-          );
-          return;
-        }
-        
-        // Check if user has pending application
-        if (result.hasApplication) {
-          Alert.alert(
-            'Ariza ko\'rib chiqilmoqda',
-            result.reason,
-            [
-              { text: 'OK', onPress: () => navigation.navigate('UserAccount') }
-            ]
-          );
-          return;
-        }
-        const newAttempts = attempts + 1;
-        setAttempts(newAttempts);
-        
-        if (newAttempts >= 3) {
-          setIsBlocked(true);
-          Alert.alert(getText('blocked'), getText('tooManyAttempts'));
-        } else {
-          Alert.alert(getText('error'), result.reason || getText('wrongCode'));
-        }
-      }
-    } catch (error: any) {
-      console.error('OTP verification error:', error);
-      
-      if (error.name === 'AbortError') {
-        Alert.alert(getText('error'), getText('serverTimeout'));
-      } else if (error.message.includes('ERR_CONNECTION_REFUSED')) {
-        Alert.alert(getText('error'), getText('serverDown'));
-      } else {
-        Alert.alert(getText('error'), error.message || getText('otpVerifyError'));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resendOtp = async () => {
-    if (countdown > 0) {
-      Alert.alert(getText('wait'), `${countdown} ${getText('secondsWait')}`);
-      return;
-    }
-    
-    await requestOtp();
-  };
 
   return (
     <KeyboardAvoidingView 
@@ -200,11 +175,13 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>{getText('playerLogin')}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>
+          {currentStep === 'role' ? 'Tizimga kirish' : 'Telefon raqami'}
+        </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {step === 'phone' 
-            ? getText('phoneStepSubtitle')
-            : getText('otpStepSubtitle')
+          {currentStep === 'role' 
+            ? 'Rolni tanlang' 
+            : `${selectedRole === 'player' ? 'O\'yinchi' : selectedRole === 'trainer' ? 'Murabbiy' : 'Liga Admini'} sifatida telefon raqamingizni kiriting`
           }
         </Text>
       </View>
@@ -217,11 +194,73 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
         bounces={false}
       >
         <View style={styles.content}>
-          {step === 'phone' ? (
+          {currentStep === 'role' ? (
+            /* Role Selection Step */
+            <View style={styles.roleSelection}>
+              <Text style={[styles.label, { color: colors.text }]}>Rolni tanlang</Text>
+              <View style={styles.roleButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    { 
+                      backgroundColor: selectedRole === 'player' ? colors.primary : colors.surface,
+                      borderColor: colors.border
+                    }
+                  ]}
+                  onPress={() => handleRoleSelect('player')}
+                >
+                  <Text style={[
+                    styles.roleButtonText,
+                    { color: selectedRole === 'player' ? 'white' : colors.text }
+                  ]}>
+                    O'yinchi
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    { 
+                      backgroundColor: selectedRole === 'trainer' ? colors.primary : colors.surface,
+                      borderColor: colors.border
+                    }
+                  ]}
+                  onPress={() => handleRoleSelect('trainer')}
+                >
+                  <Text style={[
+                    styles.roleButtonText,
+                    { color: selectedRole === 'trainer' ? 'white' : colors.text }
+                  ]}>
+                    Murabbiy
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    { 
+                      backgroundColor: selectedRole === 'admin' ? colors.primary : colors.surface,
+                      borderColor: colors.border
+                    }
+                  ]}
+                  onPress={() => handleRoleSelect('admin')}
+                >
+                  <Text style={[
+                    styles.roleButtonText,
+                    { color: selectedRole === 'admin' ? 'white' : colors.text }
+                  ]}>
+                    Liga Admini
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            /* Phone Input Step */
             <>
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>{getText('phoneNumber')}</Text>
                 <TextInput
+                  ref={phoneInputRef}
                   style={[styles.input, { 
                     backgroundColor: colors.surface, 
                     color: colors.text,
@@ -236,69 +275,17 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
                   placeholder="+998 90 123 45 67"
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="phone-pad"
-                  autoFocus
+                  autoFocus={false}
                 />
               </View>
 
               <TouchableOpacity
                 style={[styles.loginButton, { backgroundColor: colors.primary }]}
                 onPress={requestOtp}
-                disabled={loading || isBlocked}
+                disabled={loading}
               >
                 <Text style={styles.loginButtonText}>
-                  {loading ? getText('sendingCode') : getText('sendVerificationCode')}
-                </Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>{getText('verificationCode')}</Text>
-                <TextInput
-                  style={[styles.input, { 
-                    backgroundColor: colors.surface, 
-                    color: colors.text,
-                    borderColor: colors.border 
-                  }]}
-                  value={otpCode}
-                  onChangeText={setOtpCode}
-                  placeholder="1234"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  autoFocus
-                />
-                <Text style={[styles.phoneDisplay, { color: colors.textSecondary }]}>
-                  {getText('sentTo')} {phoneNumber}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.loginButton, { backgroundColor: colors.primary }]}
-                onPress={verifyOtp}
-                disabled={loading || isBlocked}
-              >
-                <Text style={styles.loginButtonText}>
-                  {loading ? getText('verifying') : getText('verify')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.resendButton}
-                onPress={resendOtp}
-                disabled={countdown > 0 || loading}
-              >
-                <Text style={[styles.resendButtonText, { color: colors.primary }]}>
-                  {countdown > 0 ? `${getText('resend')} (${countdown}s)` : getText('resend')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.backToPhoneButton}
-                onPress={() => setStep('phone')}
-              >
-                <Text style={[styles.backToPhoneButtonText, { color: colors.textSecondary }]}>
-                  {getText('changePhoneNumber')}
+                  {loading ? 'Kirilmoqda...' : 'Kirish'}
                 </Text>
               </TouchableOpacity>
             </>
@@ -306,10 +293,10 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
 
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={currentStep === 'role' ? () => navigation.goBack() : handleGoBack}
           >
             <Text style={[styles.backButtonText, { color: colors.textSecondary }]}>
-              {getText('goBack')}
+              {currentStep === 'role' ? getText('goBack') : 'Orqaga'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -347,6 +334,25 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     justifyContent: 'center',
+  },
+  roleSelection: {
+    marginBottom: 30,
+  },
+  roleButtons: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  roleButton: {
+    width: '100%',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  roleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   inputGroup: {
     marginBottom: 30,

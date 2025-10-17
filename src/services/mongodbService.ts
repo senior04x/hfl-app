@@ -57,15 +57,18 @@ class MongoDBService {
       }
 
       const result = await response.json();
+      console.log('📋 Raw teams response from backend:', JSON.stringify(result, null, 2));
       
       if (result.success && result.data) {
+        console.log('✅ Teams data extracted:', result.data);
         return result.data;
       } else {
-        throw new Error(result.error || 'Failed to fetch teams');
+        console.log('❌ No teams data in response');
+        return [];
       }
     } catch (error) {
       console.error('Error fetching teams:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -615,8 +618,38 @@ class MongoDBService {
   // Teams by tournament operations
   async getTeamsByTournament(tournamentId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      console.log('Fetching teams for tournament:', tournamentId);
-      const response = await fetch(`${this.baseUrl}/api/tournaments/${tournamentId}/teams`, {
+      // Backend'da tournamentId filter ishlamayapti, shuning uchun frontend'da filter qilamiz
+      console.log('🔍 Fetching all teams and filtering by tournamentId:', tournamentId);
+      const allTeams = await this.getTeams();
+      console.log('📋 All teams from backend:', allTeams);
+      
+      if (Array.isArray(allTeams) && allTeams.length > 0) {
+        const filteredTeams = allTeams.filter(team => 
+          team.tournamentId === tournamentId
+        );
+        console.log('✅ Filtered teams for tournament:', filteredTeams);
+        return {
+          success: true,
+          data: filteredTeams
+        };
+      } else {
+        console.log('❌ No teams found or empty array');
+        return {
+          success: true,
+          data: []
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Team management operations
+  async getTeamById(teamId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      console.log('🔍 Fetching team by ID:', teamId);
+      const response = await fetch(`${this.baseUrl}/api/teams/${teamId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -627,11 +660,112 @@ class MongoDBService {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
-      console.log('Teams fetched successfully:', data);
-      return data;
+      const result = await response.json();
+      console.log('📋 Team data result:', result);
+
+      if (result.success && result.data) {
+        return {
+          success: true,
+          data: result.data
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Team not found'
+        };
+      }
     } catch (error) {
-      console.error('Error fetching teams:', error);
+      console.error('Error fetching team:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async updateTeam(teamId: string, updateData: any): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🔧 Updating team:', teamId, updateData);
+      const response = await fetch(`${this.baseUrl}/api/teams/${teamId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('📋 Update team result:', result);
+
+      return {
+        success: result.success || false,
+        error: result.error
+      };
+    } catch (error) {
+      console.error('Error updating team:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async getPlayersByTeam(teamId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      console.log('🔍 Fetching players by team:', teamId);
+      const response = await fetch(`${this.baseUrl}/api/teams/${teamId}/players`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('📋 Team players result:', result);
+
+      if (result.success && result.data) {
+        return {
+          success: true,
+          data: result.data
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'No players found'
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching team players:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async removePlayerFromTeam(playerId: string, teamId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🗑️ Removing player from team:', playerId, teamId);
+      const response = await fetch(`${this.baseUrl}/api/players/${playerId}/remove-from-team`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ teamId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('📋 Remove player result:', result);
+
+      return {
+        success: result.success || false,
+        error: result.error
+      };
+    } catch (error) {
+      console.error('Error removing player from team:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }

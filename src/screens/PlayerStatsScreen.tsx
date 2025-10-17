@@ -8,12 +8,14 @@ import {
   TouchableOpacity,
   Alert,
   SafeAreaView,
+  Linking,
   // ActivityIndicator, // Skeleton loading ishlatamiz
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { Player } from '../types';
 import { DataService } from '../services/data';
+import { mongodbService } from '../services/mongodbService';
 
 interface PlayerStatsScreenProps {
   navigation: any;
@@ -40,19 +42,20 @@ export default function PlayerStatsScreen({ navigation, route }: PlayerStatsScre
       setLoading(true);
       console.log('Loading player data for ID:', playerId);
       
-      // Get player directly from Firebase
-      const playerData = await DataService.getPlayer(playerId);
+      // Get player from MongoDB via mongodbService
+      const result = await mongodbService.getPlayerById(playerId);
+      console.log('📋 Player data result:', JSON.stringify(result, null, 2));
       
-      if (playerData) {
-        console.log('Player found:', playerData);
-        setPlayer(playerData);
+      if (result.success && result.data) {
+        console.log('✅ Player found:', result.data);
+        setPlayer(result.data);
       } else {
-        console.log('Player not found');
+        console.log('❌ Player not found:', result.error);
         Alert.alert('Xatolik', 'O\'yinchi ma\'lumotlari topilmadi');
         navigation.goBack();
       }
     } catch (error) {
-      console.error('Error loading player data:', error);
+      console.error('❌ Error loading player data:', error);
       Alert.alert('Xatolik', 'O\'yinchi ma\'lumotlarini yuklashda xatolik yuz berdi');
       navigation.goBack();
     } finally {
@@ -102,6 +105,37 @@ export default function PlayerStatsScreen({ navigation, route }: PlayerStatsScre
         return 'Suspensiya';
       default:
         return 'Noma\'lum';
+    }
+  };
+
+  const handlePhoneCall = async (phoneNumber: string) => {
+    try {
+      // Telefon raqamini tozalash va + qo'shish
+      let cleanPhone = phoneNumber.replace(/\D/g, ''); // Faqat raqamlarni qoldirish
+      
+      // Agar +998 bilan boshlanmasa, qo'shish
+      if (!cleanPhone.startsWith('998')) {
+        cleanPhone = '998' + cleanPhone;
+      }
+      
+      // + qo'shish
+      const phoneUrl = `tel:+${cleanPhone}`;
+      
+      console.log('Original phone:', phoneNumber);
+      console.log('Cleaned phone:', cleanPhone);
+      console.log('Calling phone number:', phoneUrl);
+      
+      // Telefon qilish imkoniyatini tekshirish
+      const canOpen = await Linking.canOpenURL(phoneUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(phoneUrl);
+      } else {
+        Alert.alert('Xatolik', 'Telefon qilish imkoniyati yo\'q');
+      }
+    } catch (error) {
+      console.error('Error making phone call:', error);
+      Alert.alert('Xatolik', 'Telefon qilishda xatolik yuz berdi');
     }
   };
 
@@ -167,19 +201,19 @@ export default function PlayerStatsScreen({ navigation, route }: PlayerStatsScre
             
             <View style={styles.playerInfo}>
               <Text style={[styles.playerName, { color: colors.text }]}>
-                {player.firstName || 'Noma\'lum'} {player.lastName || 'Noma\'lum'}
+                {player.firstName || player.name || 'Noma\'lum'} {player.lastName || player.surname || ''}
               </Text>
               <Text style={[styles.playerTeam, { color: colors.textSecondary }]}>
-                {player.teamName || 'Jamoa nomi yo\'q'}
+                {player.teamName || player.team || 'Jamoa nomi yo\'q'}
               </Text>
-              {player.position && (
+              {(player.position || player.role) && (
                 <Text style={[styles.playerPosition, { color: colors.textSecondary }]}>
-                  {getPositionName(player.position)}
+                  {getPositionName(player.position || player.role)}
                 </Text>
               )}
-              {player.number && (
+              {(player.number || player.jerseyNumber) && (
                 <Text style={[styles.playerNumber, { color: colors.primary }]}>
-                  #{player.number}
+                  #{player.number || player.jerseyNumber}
                 </Text>
               )}
             </View>
@@ -277,12 +311,22 @@ export default function PlayerStatsScreen({ navigation, route }: PlayerStatsScre
           </Text>
           
           <View style={[styles.contactCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.contactItem}>
+            <TouchableOpacity 
+              style={styles.contactItem}
+              onPress={() => player.phone && handlePhoneCall(player.phone)}
+              disabled={!player.phone}
+            >
               <Ionicons name="call" size={20} color={colors.primary} />
-              <Text style={[styles.contactText, { color: colors.text }]}>
+              <Text style={[
+                styles.contactText, 
+                { 
+                  color: player.phone ? colors.primary : colors.text,
+                  textDecorationLine: player.phone ? 'underline' : 'none'
+                }
+              ]}>
                 {player.phone || 'Telefon raqami yo\'q'}
               </Text>
-            </View>
+            </TouchableOpacity>
             
             {player.email && (
               <View style={styles.contactItem}>

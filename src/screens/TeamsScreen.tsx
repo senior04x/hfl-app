@@ -45,51 +45,7 @@ export default function TeamsScreen() {
         setTeams(teams);
       } else {
         console.log('No teams returned from DataService');
-        // Fallback: Mock data for testing
-        const mockTeams = [
-          {
-            id: 'mock-1',
-            name: 'Real Madrid',
-            logo: 'https://example.com/real-madrid.png',
-            league: 'La Liga',
-            founded: 1902,
-            city: 'Madrid',
-            country: 'Spain',
-            color: '#FFD700',
-            players: [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: 'mock-2',
-            name: 'Barcelona',
-            logo: 'https://example.com/barcelona.png',
-            league: 'La Liga',
-            founded: 1899,
-            city: 'Barcelona',
-            country: 'Spain',
-            color: '#004D98',
-            players: [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: 'mock-3',
-            name: 'Manchester United',
-            logo: 'https://example.com/manchester-united.png',
-            league: 'Premier League',
-            founded: 1878,
-            city: 'Manchester',
-            country: 'England',
-            color: '#DA020E',
-            players: [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }
-        ];
-        
-        console.log('Mock teams loaded:', mockTeams.length);
-        setTeams(mockTeams);
+        setTeams([]);
       }
       
     } catch (error) {

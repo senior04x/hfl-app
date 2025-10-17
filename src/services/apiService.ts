@@ -157,6 +157,20 @@ class ApiService {
     });
   }
 
+  async simpleLogin(phone: string): Promise<ApiResponse<any>> {
+    return this.request('/api/simple-login', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  async trainerLogin(phone: string): Promise<ApiResponse<any>> {
+    return this.request('/api/teams', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  }
+
   // Health check
   async healthCheck(): Promise<ApiResponse<any>> {
     return this.request('/health');

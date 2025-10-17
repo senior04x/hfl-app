@@ -30,6 +30,26 @@ export interface Player {
   matchesPlayed: number;
   minutesPlayed?: number;
   status: 'active' | 'inactive' | 'suspended';
+  isCaptain?: boolean; // Kapitan yoki yo'q
+  createdAt: Date;
+  updatedAt: Date;
+  // Backend'dan kelishi mumkin bo'lgan qo'shimcha fieldlar
+  name?: string;
+  surname?: string;
+  team?: string;
+  role?: string;
+  jerseyNumber?: number;
+  _id?: string; // MongoDB _id
+}
+
+// Trainer types
+export interface Trainer {
+  id: string;
+  name: string;
+  teamId: string;
+  teamName: string;
+  teamPhone: string;
+  status: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +63,11 @@ export interface Team {
   description?: string;
   foundedDate?: string;
   players: Player[];
+  // Trainer boshqaruvi uchun
+  tactics?: string; // Taktika
+  formation?: string; // Formatsiya (4-4-2, 3-5-2, va h.k.)
+  captainId?: string; // Kapitan ID
+  trainerId?: string; // Trainer ID
   createdAt: Date;
   updatedAt: Date;
 }
@@ -196,6 +221,12 @@ export type RootStackParamList = {
   PlayerLogin: undefined;
   PlayerVerification: { phone: string };
   PlayerDashboard: undefined;
+  RoleSelection: undefined;
+  TrainerLogin: undefined;
+  TrainerDashboard: { trainerId: string; trainer: Trainer };
+  TeamManagement: { teamId: string; trainer: Trainer };
+  CaptainSelection: { teamId: string; players: Player[]; trainer: Trainer };
+  TeamTactics: { teamId: string; team: Team; trainer: Trainer };
   TeamApplication: undefined;
   LeagueApplication: undefined;
   TransferRequest: undefined;
