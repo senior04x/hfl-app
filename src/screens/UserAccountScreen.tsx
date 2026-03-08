@@ -11,6 +11,7 @@ import SafeScrollView from '../components/SafeScrollView';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { useTeamStore } from '../store/useTeamStore';
 import { useLanguage } from '../store/useLanguageStore';
 import CustomModal from '../components/CustomModal';
 import ApplicationTypeModal from '../components/ApplicationTypeModal';
@@ -39,6 +40,7 @@ const MenuItem: React.FC<MenuItemProps & { colors: any }> = ({ icon, title, subt
 const UserAccountScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const { player, isLoggedIn, logout } = usePlayerStore();
+  const { team, isLoggedIn: isTeamLoggedIn, logout: logoutTeam } = useTeamStore();
   const { getText } = useLanguage();
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [showLeagueModal, setShowLeagueModal] = React.useState(false);
@@ -54,6 +56,21 @@ const UserAccountScreen = ({ navigation }: any) => {
         currentTeamId: player.teamId,
         currentTeamName: player.teamName,
       });
+    } else if (isTeamLoggedIn && team) {
+      Alert.alert(
+        'Xatolik',
+        'Transfer ariza berish uchun o\'yinchi sifatida kirish kerak',
+        [
+          {
+            text: 'Kirish',
+            onPress: () => navigation.navigate('PlayerLogin'),
+          },
+          {
+            text: 'Bekor qilish',
+            style: 'cancel',
+          },
+        ]
+      );
     } else {
       Alert.alert(
         'Xatolik',
@@ -114,11 +131,26 @@ const UserAccountScreen = ({ navigation }: any) => {
   };
 
   const handlePlayerLogin = () => {
-    if (isLoggedIn) {
+    if (isLoggedIn && player) {
       // Navigate to player dashboard
       navigation.navigate('PlayerDashboard', { 
         playerId: player?.id,
         player: player 
+      });
+    } else if (isTeamLoggedIn && team) {
+      // Navigate to trainer dashboard
+      navigation.navigate('TrainerDashboard', { 
+        trainerId: team.id,
+        trainer: {
+          id: team.id,
+          name: team.name,
+          teamId: team.id,
+          teamName: team.name,
+          teamPhone: team.captainPhone,
+          status: team.status,
+          createdAt: team.createdAt,
+          updatedAt: team.updatedAt,
+        }
       });
     } else {
       // Navigate to login screen
@@ -133,7 +165,12 @@ const UserAccountScreen = ({ navigation }: any) => {
   const handleConfirmLogout = async () => {
     setShowLogoutModal(false);
     try {
-      await logout();
+      if (isLoggedIn && player) {
+        await logout();
+      }
+      if (isTeamLoggedIn && team) {
+        await logoutTeam();
+      }
       Alert.alert(getText('success'), getText('logoutSuccess'));
     } catch (error) {
       Alert.alert(getText('error'), getText('logoutError'));
@@ -214,6 +251,18 @@ const UserAccountScreen = ({ navigation }: any) => {
               </Text>
             )}
           </View>
+        ) : isTeamLoggedIn && team ? (
+          <View style={styles.playerInfo}>
+            <Text style={[styles.playerName, { color: 'white' }]}>
+              {team.name}
+            </Text>
+            <Text style={[styles.playerTeam, { color: 'rgba(255, 255, 255, 0.9)' }]}>
+              Murabbiy
+            </Text>
+            <Text style={[styles.playerPosition, { color: 'rgba(255, 255, 255, 0.7)' }]}>
+              {team.captainPhone}
+            </Text>
+          </View>
         ) : (
           <Text style={[styles.subtitle, { color: 'rgba(255, 255, 255, 0.8)' }]}>
             {getText('manageAccount')}
@@ -223,7 +272,9 @@ const UserAccountScreen = ({ navigation }: any) => {
 
       <View style={styles.menuSection}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {isLoggedIn ? getText('transferRequest') : getText('apply')}
+          {isLoggedIn ? getText('transferRequest') : 
+           isTeamLoggedIn ? getText('account') : 
+           getText('apply')}
         </Text>
         {isLoggedIn ? (
           <MenuItem
@@ -233,7 +284,7 @@ const UserAccountScreen = ({ navigation }: any) => {
             onPress={handleTransferRequest}
             colors={colors}
           />
-        ) : (
+        ) : !isTeamLoggedIn && (
         <MenuItem
           icon="add-circle-outline"
           title={getText('apply')}
@@ -242,6 +293,27 @@ const UserAccountScreen = ({ navigation }: any) => {
           colors={colors}
         />
         )}
+        {isTeamLoggedIn ? (
+          <MenuItem
+            icon="people"
+            title="Murabbiy Panel"
+            subtitle="Jamoani boshqarish"
+            onPress={() => navigation.navigate('TrainerDashboard', { 
+              trainerId: team?.id,
+              trainer: {
+                id: team?.id,
+                name: team?.name,
+                teamId: team?.id,
+                teamName: team?.name,
+                teamPhone: team?.captainPhone,
+                status: team?.status,
+                createdAt: team?.createdAt,
+                updatedAt: team?.updatedAt,
+              }
+            })}
+            colors={colors}
+          />
+        ) : (
         <MenuItem
           icon={isLoggedIn ? "person" : "person-outline"}
           title={isLoggedIn ? getText('playerPanel') : getText('playerLogin')}
@@ -249,7 +321,8 @@ const UserAccountScreen = ({ navigation }: any) => {
           onPress={handlePlayerLogin}
           colors={colors}
         />
-        {isLoggedIn && (
+        )}
+        {(isLoggedIn || isTeamLoggedIn) && (
           <MenuItem
             icon="log-out-outline"
             title={getText('logout')}

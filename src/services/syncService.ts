@@ -45,7 +45,7 @@ class SyncService {
   private initializeSync(): void {
     // Load last sync time from storage
     this.loadLastSyncTime();
-    
+
     // Start periodic sync
     this.startPeriodicSync();
   }
@@ -95,7 +95,7 @@ class SyncService {
   // Set online status
   setOnlineStatus(isOnline: boolean): void {
     this.isOnline = isOnline;
-    
+
     if (isOnline && !this.syncStatus.isSyncing) {
       // Sync immediately when coming online
       this.syncData();
@@ -132,7 +132,7 @@ class SyncService {
           action: 'sync_teams',
         });
       }
-      
+
       // Sync matches
       try {
         await this.syncMatches();
@@ -145,7 +145,7 @@ class SyncService {
           action: 'sync_matches',
         });
       }
-      
+
       // Sync players
       try {
         await this.syncPlayers();
@@ -158,7 +158,7 @@ class SyncService {
           action: 'sync_players',
         });
       }
-      
+
       // Sync standings
       try {
         await this.syncStandings();
@@ -174,11 +174,11 @@ class SyncService {
 
       // Update sync status
       this.syncStatus.lastSync = Date.now();
-      
+
       // Count successful syncs
       const successfulSyncs = Object.values(syncResults).filter(Boolean).length;
       const totalSyncs = Object.keys(syncResults).length;
-      
+
       if (successfulSyncs === totalSyncs) {
         this.syncStatus.errors = 0;
         console.log('✅ All data synced successfully');
@@ -189,13 +189,13 @@ class SyncService {
         this.syncStatus.errors = totalSyncs;
         console.log('❌ All sync operations failed');
       }
-      
+
       await this.saveLastSyncTime();
-      
+
     } catch (error) {
       console.error('❌ Data sync failed:', error);
       this.syncStatus.errors++;
-      
+
       errorService.logError(error, {
         screen: 'SyncService',
         action: 'sync_data',
@@ -209,11 +209,11 @@ class SyncService {
   private async syncTeams(): Promise<void> {
     try {
       console.log('🔄 Syncing teams...');
-      
+
       // Try local API route first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
+
       try {
         response = await fetch('/api/teams', {
           method: 'GET',
@@ -224,7 +224,7 @@ class SyncService {
       } catch (localError) {
         console.log('Local API failed, trying direct backend...');
         apiSource = 'backend';
-        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com';
         response = await fetch(`${backendUrl}/api/teams`, {
           method: 'GET',
           headers: {
@@ -247,7 +247,7 @@ class SyncService {
 
       const result = await response.json();
       console.log(`📊 Teams response from ${apiSource}:`, result);
-      
+
       if (result.success && result.data) {
         // Cache teams data
         await offlineService.cacheData('teams', result.data);
@@ -265,11 +265,11 @@ class SyncService {
   private async syncMatches(): Promise<void> {
     try {
       console.log('🔄 Syncing matches...');
-      
+
       // Try local API route first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
+
       try {
         response = await fetch('/api/matches', {
           method: 'GET',
@@ -280,7 +280,7 @@ class SyncService {
       } catch (localError) {
         console.log('Local API failed, trying direct backend...');
         apiSource = 'backend';
-        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com';
         response = await fetch(`${backendUrl}/api/matches`, {
           method: 'GET',
           headers: {
@@ -303,7 +303,7 @@ class SyncService {
 
       const result = await response.json();
       console.log(`📊 Matches response from ${apiSource}:`, result);
-      
+
       if (result.success && result.data) {
         // Cache matches data
         await offlineService.cacheData('matches', result.data);
@@ -321,11 +321,11 @@ class SyncService {
   private async syncPlayers(): Promise<void> {
     try {
       console.log('🔄 Syncing players...');
-      
+
       // Try local API route first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
+
       try {
         response = await fetch('/api/players', {
           method: 'GET',
@@ -336,7 +336,7 @@ class SyncService {
       } catch (localError) {
         console.log('Local API failed, trying direct backend...');
         apiSource = 'backend';
-        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com';
         response = await fetch(`${backendUrl}/api/players`, {
           method: 'GET',
           headers: {
@@ -359,7 +359,7 @@ class SyncService {
 
       const result = await response.json();
       console.log(`📊 Players response from ${apiSource}:`, result);
-      
+
       if (result.success && result.data) {
         // Cache players data
         await offlineService.cacheData('players', result.data);
@@ -377,11 +377,11 @@ class SyncService {
   private async syncStandings(): Promise<void> {
     try {
       console.log('🔄 Syncing standings...');
-      
+
       // Try local API route first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
+
       try {
         response = await fetch('/api/standings', {
           method: 'GET',
@@ -392,7 +392,7 @@ class SyncService {
       } catch (localError) {
         console.log('Local API failed, trying direct backend...');
         apiSource = 'backend';
-        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com';
         response = await fetch(`${backendUrl}/api/standings`, {
           method: 'GET',
           headers: {
@@ -415,7 +415,7 @@ class SyncService {
 
       const result = await response.json();
       console.log(`📊 Standings response from ${apiSource}:`, result);
-      
+
       if (result.success && result.data) {
         // Cache standings data
         await offlineService.cacheData('standings', result.data);

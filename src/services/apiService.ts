@@ -5,17 +5,17 @@ class ApiService {
   private baseUrl: string;
 
   constructor() {
-    // Use backend API directly
-    this.baseUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+    // Use production backend API
+    this.baseUrl = 'https://hfl-backend.onrender.com';
     console.log('API Base URL:', this.baseUrl);
   }
 
   private async request<T>(
-    endpoint: string, 
+    endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const defaultHeaders = {
       'Content-Type': 'application/json',
     };
@@ -30,13 +30,13 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorData: ApiError = await response.json().catch(() => ({
           success: false,
           error: `HTTP ${response.status}: ${response.statusText}`
         }));
-        
+
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
@@ -52,11 +52,11 @@ class ApiService {
       return data;
     } catch (error) {
       console.error(`API request failed for ${endpoint}:`, error);
-      
+
       if (error instanceof Error) {
         throw error;
       }
-      
+
       throw new Error('Network error occurred');
     }
   }
@@ -66,7 +66,7 @@ class ApiService {
     try {
       const response = await this.request('/api/teams');
       console.log('Raw API response:', response);
-      
+
       // Backend returns {success: true, data: [...]} format
       if (response && response.success && response.data) {
         return {
@@ -74,7 +74,7 @@ class ApiService {
           data: response.data
         };
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error in getTeams:', error);

@@ -57,7 +57,7 @@ class ErrorService {
       };
 
       this.errors.push(errorReport);
-      
+
       // Keep only recent errors
       if (this.errors.length > this.maxErrors) {
         this.errors = this.errors.slice(-this.maxErrors);
@@ -239,11 +239,11 @@ class ErrorService {
   async reportErrorsToServer(): Promise<void> {
     try {
       const unreportedErrors = this.errors.filter(e => !e.reported);
-      
+
       if (unreportedErrors.length === 0) return;
 
-      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
-      
+      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com';
+
       const response = await fetch(`${apiBaseUrl}/api/errors/report`, {
         method: 'POST',
         headers: {

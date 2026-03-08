@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
-  ScrollView, 
   TouchableOpacity, 
   StyleSheet, 
   Alert, 
@@ -10,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator
 } from 'react-native';
+import SafeScrollView from '../components/SafeScrollView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Team } from '../types';
@@ -146,7 +146,7 @@ export default function TeamsScreen() {
         </Text>
       </View>
       
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
+      <SafeScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
         {teams && teams.length > 0 ? (
           <View style={styles.teamsList}>
             {teams.map((team, index) => (
@@ -163,7 +163,7 @@ export default function TeamsScreen() {
             </Text>
           </View>
         )}
-      </ScrollView>
+      </SafeScrollView>
     </SafeAreaView>
   );
 }

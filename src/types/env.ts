@@ -7,10 +7,10 @@ export interface EnvironmentVariables {
   EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: string;
   EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: string;
   EXPO_PUBLIC_FIREBASE_APP_ID: string;
-  
+
   // API Configuration
   EXPO_PUBLIC_API_BASE_URL: string;
-  
+
   // Development Settings
   EXPO_PUBLIC_USE_MOCK_DATA: string;
 }
@@ -23,7 +23,7 @@ export const env = {
   FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
   FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
   FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
-  
-  API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com',
+
+  API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com',
   USE_MOCK_DATA: process.env.EXPO_PUBLIC_USE_MOCK_DATA === 'true',
 } as const;

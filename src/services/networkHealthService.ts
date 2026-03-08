@@ -49,7 +49,7 @@ class NetworkHealthService {
     },
   ];
 
-  private backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+  private backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com';
 
   constructor() {
     this.initializeNetworkMonitoring();
@@ -60,7 +60,7 @@ class NetworkHealthService {
     NetInfo.addEventListener(state => {
       const wasOffline = !this.healthStatus.isOnline;
       this.healthStatus.isOnline = state.isConnected ?? false;
-      
+
       if (wasOffline && this.healthStatus.isOnline) {
         console.log('🌐 Network restored - performing health check');
         this.performHealthCheck();
@@ -74,7 +74,7 @@ class NetworkHealthService {
   // Perform comprehensive health check
   async performHealthCheck(): Promise<HealthCheck> {
     console.log('🔍 Performing network health check...');
-    
+
     const startTime = Date.now();
     const errors: string[] = [];
     let healthyEndpoints = 0;
@@ -125,7 +125,7 @@ class NetworkHealthService {
     };
 
     console.log(`🏥 Health check complete: ${apiHealth} (${healthyEndpoints}/${totalEndpoints} endpoints healthy)`);
-    
+
     return this.healthStatus;
   }
 
@@ -143,7 +143,7 @@ class NetworkHealthService {
     });
 
     const response = await Promise.race([fetchPromise, timeoutPromise]);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -228,11 +228,11 @@ class NetworkHealthService {
     apiErrors: number;
     recentErrors: string[];
   } {
-    const networkErrors = this.healthStatus.errors.filter(error => 
+    const networkErrors = this.healthStatus.errors.filter(error =>
       error.includes('Failed to fetch') || error.includes('Network')
     ).length;
 
-    const apiErrors = this.healthStatus.errors.filter(error => 
+    const apiErrors = this.healthStatus.errors.filter(error =>
       error.includes('HTTP') || error.includes('API')
     ).length;
 

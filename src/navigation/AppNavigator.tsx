@@ -5,6 +5,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useTeamStore } from '../store/useTeamStore';
 
 import { RootStackParamList, MainTabParamList } from '../types';
 import SplashScreen from '../screens/SplashScreen';
@@ -27,6 +29,7 @@ import TrainerDashboard from '../screens/TrainerDashboard';
 import TeamManagement from '../screens/TeamManagement';
 import CaptainSelection from '../screens/CaptainSelection';
 import TeamTactics from '../screens/TeamTactics';
+import TeamFormationScreen from '../screens/TeamFormationScreen';
 import TeamApplicationScreen from '../screens/TeamApplicationScreen';
 import LeagueApplicationScreen from '../screens/LeagueApplicationScreen';
 import TransferRequestScreen from '../screens/TransferRequestScreen';
@@ -133,6 +136,8 @@ const MainTabNavigator = () => {
 const AppNavigator = () => {
   const { colors, isDarkMode } = useTheme();
   const { getText } = useLanguage();
+  const { isLoggedIn: isPlayerLoggedIn } = usePlayerStore();
+  const { isLoggedIn: isTeamLoggedIn } = useTeamStore();
   
   return (
     <NavigationContainer
@@ -239,6 +244,11 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="TeamTactics" 
           component={TeamTactics}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="TeamFormation" 
+          component={TeamFormationScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen 

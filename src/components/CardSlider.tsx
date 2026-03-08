@@ -79,7 +79,10 @@ const CardSlider: React.FC<CardSliderProps> = ({
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: false }
+    { useNativeDriver: false, listener: (event: any) => {
+      // Scroll event listener
+      console.log('CardSlider scroll event:', event);
+    }}
   );
 
   const handleScrollEnd = (event: any) => {
@@ -240,5 +243,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
 });
+
+export default CardSlider;
+
 
 export default CardSlider;

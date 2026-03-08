@@ -7,6 +7,8 @@ import {
   Text,
 } from 'react-native';
 import { useTheme } from '../store/useThemeStore';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useTeamStore } from '../store/useTeamStore';
 
 interface SplashScreenProps {
   navigation: any;
@@ -14,6 +16,8 @@ interface SplashScreenProps {
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
+  const { isLoggedIn: isPlayerLoggedIn, player } = usePlayerStore();
+  const { isLoggedIn: isTeamLoggedIn, team } = useTeamStore();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
@@ -34,7 +38,32 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
     // Navigate after 2 seconds
     const timer = setTimeout(() => {
-      navigation.replace('Main');
+      if (isPlayerLoggedIn && player) {
+        // Player login qilgan bo'lsa, PlayerDashboard'ga o'tish
+        navigation.replace('PlayerDashboard', { 
+          playerId: player.id,
+          player: player 
+        });
+      } else if (isTeamLoggedIn && team) {
+        // Team login qilgan bo'lsa, TrainerDashboard'ga o'tish
+        const trainerData = {
+          id: team.id,
+          name: team.name,
+          teamId: team.id,
+          teamName: team.name,
+          teamPhone: team.captainPhone,
+          status: team.status,
+          createdAt: team.createdAt,
+          updatedAt: team.updatedAt,
+        };
+        navigation.replace('TrainerDashboard', {
+          trainerId: team.id,
+          trainer: trainerData
+        });
+      } else {
+        // Hech kim login qilmagan bo'lsa, Main sahifaga o'tish
+        navigation.replace('Main');
+      }
     }, 2000);
 
     return () => clearTimeout(timer);

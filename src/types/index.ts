@@ -227,6 +227,7 @@ export type RootStackParamList = {
   TeamManagement: { teamId: string; trainer: Trainer };
   CaptainSelection: { teamId: string; players: Player[]; trainer: Trainer };
   TeamTactics: { teamId: string; team: Team; trainer: Trainer };
+  TeamFormation: { teamId: string; team: Team; trainer: Trainer };
   TeamApplication: undefined;
   LeagueApplication: undefined;
   TransferRequest: undefined;
@@ -244,4 +245,5 @@ export type MainTabParamList = {
   Standings: undefined;
   Account: undefined;
 };
+
 

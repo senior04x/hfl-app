@@ -27,7 +27,7 @@ class TransferService {
   private apiBaseUrl: string;
 
   constructor() {
-    this.apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+    this.apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com';
   }
 
   // Submit player transfer request

@@ -1,7 +1,7 @@
 import { SliderItem, ApiResponse } from '../types';
 
-// Use the Heroku backend API URL
-const API_BASE_URL = 'https://hfl-backend-360d7733bad1.herokuapp.com/api';
+// Use the production backend API URL
+const API_BASE_URL = 'https://hfl-backend.onrender.com/api';
 
 class SliderService {
   private async apiCall<T>(
@@ -10,7 +10,7 @@ class SliderService {
   ): Promise<ApiResponse<T>> {
     try {
       console.log(`Making slider API call to: ${API_BASE_URL}${endpoint}`);
-      
+
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'GET',
         headers: {
@@ -50,7 +50,7 @@ class SliderService {
   async getActiveSliderItems(): Promise<ApiResponse<SliderItem[]>> {
     try {
       const response = await this.getSliderItems();
-      
+
       if (response.success && response.data) {
         // Filter only active items
         const activeItems = response.data.filter(item => item.isActive);
@@ -59,7 +59,7 @@ class SliderService {
           data: activeItems
         };
       }
-      
+
       return response;
     } catch (error: any) {
       console.error('Error getting active slider items:', error);

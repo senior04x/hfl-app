@@ -1,11 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Platform } from 'react-native';
+import { Platform, View, Text, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { initializePlayerStore } from './src/store/usePlayerStore';
+import { initializeTeamStore } from './src/store/useTeamStore';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { initializeAppSafely } from './src/utils/storeUtils';
 import { notificationService } from './src/services/notificationService';
 import { syncService } from './src/services/syncService';
 import { offlineService } from './src/services/offlineService';
@@ -17,14 +20,25 @@ import UpdateService from './src/services/updateService';
 
 export default function App() {
   const updateModal = useUpdateModal();
+  const [isAppReady, setIsAppReady] = useState(false);
 
   useEffect(() => {
+    // Simple initialization without complex store setup
+    const initApp = async () => {
+      try {
+        console.log('🚀 Initializing app...');
+        setIsAppReady(true);
+        console.log('✅ App initialized successfully');
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        setIsAppReady(true);
+      }
+    };
+    
+    initApp();
+    
     // Set up update modal callback
     updateModal.setupUpdateCallback();
-    // Initialize player store in background
-    initializePlayerStore().catch(error => {
-      console.error('Error initializing player store:', error);
-    });
     
     // Initialize notification service
     const initNotifications = async () => {
@@ -135,6 +149,39 @@ export default function App() {
       realTimeService.disconnect();
     };
   }, []);
+
+  // Show loading screen while app is initializing
+  if (!isAppReady) {
+    return (
+      <SafeAreaProvider style={{ backgroundColor: '#0f0f23' }}>
+        <View style={{ 
+          flex: 1, 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          backgroundColor: '#0f0f23' 
+        }}>
+          <ActivityIndicator size="large" color="#ffffff" />
+          <Text style={{ 
+            color: '#ffffff', 
+            marginTop: 20, 
+            fontSize: 16 
+          }}>
+            HFL Sports yuklanmoqda...
+          </Text>
+          <Text style={{ 
+            color: '#ffffff', 
+            marginTop: 10, 
+            fontSize: 12,
+            textAlign: 'center',
+            paddingHorizontal: 20
+          }}>
+            New Architecture bilan ishlayapti
+          </Text>
+        </View>
+        <StatusBar style="light" backgroundColor="#0f0f23" translucent />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <ErrorBoundary>

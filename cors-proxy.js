@@ -10,30 +10,30 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
+
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
     res.end();
     return;
   }
-  
+
   // Parse the target URL
-  const targetUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com' + req.url;
+  const targetUrl = 'http://192.168.0.111:3001' + req.url;
   console.log('Proxying request to:', targetUrl);
-  
+
   // Make request to target server
   const targetReq = https.request(targetUrl, (targetRes) => {
     // Copy headers
     res.writeHead(targetRes.statusCode, targetRes.headers);
     targetRes.pipe(res);
   });
-  
+
   targetReq.on('error', (err) => {
     console.error('Proxy error:', err);
     res.writeHead(500);
     res.end('Proxy error: ' + err.message);
   });
-  
+
   req.pipe(targetReq);
 });
 

@@ -16,7 +16,7 @@ interface AppState {
   setupRealTimeListeners: () => () => void;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>()((set, get) => ({
   matches: [],
   teams: [],
   standings: [],

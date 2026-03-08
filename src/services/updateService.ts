@@ -17,14 +17,14 @@ interface OTAUpdateInfo {
 }
 
 class UpdateService {
-  private static readonly UPDATE_CHECK_URL = 'https://hfl-backend-360d7733bad1.herokuapp.com/api/check-update';
+  private static readonly UPDATE_CHECK_URL = 'https://hfl-backend.onrender.com/api/check-update';
   private static readonly CURRENT_VERSION = Constants.expoConfig?.version || '1.0.0';
   private static updateModalCallback: ((updateInfo: UpdateInfo) => void) | null = null;
 
   static async checkForUpdates(): Promise<void> {
     try {
       console.log('🔄 Checking for updates...');
-      
+
       // First check for OTA updates (Expo Updates)
       const otaUpdate = await this.checkForOTAUpdates();
       if (otaUpdate.isAvailable) {
@@ -44,7 +44,7 @@ class UpdateService {
       try {
         const response = await fetch(`${this.UPDATE_CHECK_URL}?version=${this.CURRENT_VERSION}`);
         const updateInfo: UpdateInfo = await response.json();
-        
+
         if (updateInfo && updateInfo.version && this.isNewVersionAvailable(updateInfo.version)) {
           console.log('📦 Manual update available:', updateInfo.version);
           updateInfo.updateType = 'manual';
@@ -89,21 +89,21 @@ class UpdateService {
   private static compareVersions(version1: string, version2: string): number {
     const v1Parts = version1.split('.').map(Number);
     const v2Parts = version2.split('.').map(Number);
-    
+
     for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
       const v1Part = v1Parts[i] || 0;
       const v2Part = v2Parts[i] || 0;
-      
+
       if (v1Part > v2Part) return 1;
       if (v1Part < v2Part) return -1;
     }
-    
+
     return 0;
   }
 
   private static showUpdateDialog(updateInfo: UpdateInfo): void {
     const title = updateInfo.updateType === 'ota' ? 'OTA Yangilanish' : 'Yangilanish mavjud';
-    const message = updateInfo.updateType === 'ota' 
+    const message = updateInfo.updateType === 'ota'
       ? `Yangi versiya ${updateInfo.version} mavjud.\n\n${updateInfo.releaseNotes}\n\nOTA yangilanish tez va xavfsiz.`
       : `Yangi versiya ${updateInfo.version} chiqarildi.\n\n${updateInfo.releaseNotes}`;
 
@@ -148,14 +148,14 @@ class UpdateService {
   private static async performOTAUpdate(): Promise<void> {
     try {
       console.log('🔄 Starting OTA update...');
-      
+
       if (!Updates.isEnabled) {
         Alert.alert('Xatolik', 'OTA yangilanish development rejimida ishlamaydi');
         return;
       }
 
       const update = await Updates.fetchUpdateAsync();
-      
+
       if (update.isNew) {
         console.log('✅ OTA update downloaded, restarting app...');
         await Updates.reloadAsync();
@@ -172,7 +172,7 @@ class UpdateService {
     const lastCheck = await AsyncStorage.getItem('lastUpdateCheck');
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
-    
+
     if (!lastCheck || (now - parseInt(lastCheck)) > oneDay) {
       await this.checkForUpdates();
       await AsyncStorage.setItem('lastUpdateCheck', now.toString());
@@ -231,7 +231,7 @@ class UpdateService {
       try {
         const response = await fetch(`${this.UPDATE_CHECK_URL}?version=${this.CURRENT_VERSION}`);
         const updateInfo: UpdateInfo = await response.json();
-        
+
         if (updateInfo && updateInfo.version && this.isNewVersionAvailable(updateInfo.version)) {
           return {
             hasUpdate: true,

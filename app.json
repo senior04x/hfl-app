@@ -13,6 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "newArchEnabled": false,
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
@@ -21,7 +22,7 @@
               "NSExceptionAllowsInsecureHTTPLoads": true,
               "NSExceptionMinimumTLSVersion": "1.0"
             },
-            "hfl-backend-360d7733bad1.herokuapp.com": {
+            "192.168.0.111": {
               "NSExceptionAllowsInsecureHTTPLoads": false,
               "NSExceptionMinimumTLSVersion": "1.2"
             }
@@ -37,6 +38,7 @@
         "backgroundColor": "#0f0f23"
       },
       "package": "com.seniorxo.hfl",
+      "newArchEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -53,7 +55,7 @@
       "eas": {
         "projectId": "55652ecc-9c9d-4966-9287-ab72bc39e448"
       },
-      "EXPO_PUBLIC_API_BASE_URL": "https://hfl-backend-360d7733bad1.herokuapp.com"
+      "EXPO_PUBLIC_API_BASE_URL": "http://192.168.0.111:3001"
     },
     "owner": "seniorxo",
     "plugins": [

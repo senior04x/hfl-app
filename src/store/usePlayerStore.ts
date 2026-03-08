@@ -10,6 +10,7 @@ interface PlayerState {
   logout: () => Promise<void>;
   updatePlayer: (player: Player) => Promise<void>;
   setLoading: (loading: boolean) => void;
+  reset: () => Promise<void>;
 }
 
 const PLAYER_STORAGE_KEY = '@hfl_player';
@@ -23,8 +24,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     try {
       set({ isLoading: true });
       
-      // Save to AsyncStorage
-      await AsyncStorage.setItem(PLAYER_STORAGE_KEY, JSON.stringify(player));
+      // Save to AsyncStorage with error handling
+      try {
+        await AsyncStorage.setItem(PLAYER_STORAGE_KEY, JSON.stringify(player));
+      } catch (storageError) {
+        console.error('Storage error, continuing without persistence:', storageError);
+      }
       
       set({ 
         player, 
@@ -36,7 +41,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     } catch (error) {
       console.error('Error saving player data:', error);
       set({ isLoading: false });
-      throw error;
     }
   },
 
@@ -57,7 +61,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     } catch (error) {
       console.error('Error removing player data:', error);
       set({ isLoading: false });
-      throw error;
     }
   },
 
@@ -77,23 +80,39 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     } catch (error) {
       console.error('Error updating player data:', error);
       set({ isLoading: false });
-      throw error;
     }
   },
 
   setLoading: (loading: boolean) => {
     set({ isLoading: loading });
   },
+
+  reset: async () => {
+    try {
+      await AsyncStorage.removeItem(PLAYER_STORAGE_KEY);
+      set({ 
+        player: null, 
+        isLoggedIn: false, 
+        isLoading: false 
+      });
+      console.log('✅ Player store reset successfully');
+    } catch (error) {
+      console.error('Error resetting player store:', error);
+      set({ 
+        player: null, 
+        isLoggedIn: false, 
+        isLoading: false 
+      });
+    }
+  },
 }));
 
 // Initialize player data from storage on app start
 export const initializePlayerStore = async () => {
   try {
-    // Check AsyncStorage for offline support
     const storedPlayer = await AsyncStorage.getItem(PLAYER_STORAGE_KEY);
     if (storedPlayer) {
       const player = JSON.parse(storedPlayer);
-      // Use the login method but don't await it to prevent blocking
       usePlayerStore.getState().login(player).catch(error => {
         console.error('Error logging in stored player:', error);
       });

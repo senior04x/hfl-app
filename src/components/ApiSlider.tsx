@@ -112,7 +112,10 @@ const ApiSlider: React.FC<ApiSliderProps> = ({
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: true }
+    { useNativeDriver: true, listener: (event: any) => {
+      // Scroll event listener
+      console.log('Scroll event:', event);
+    }}
   );
 
   const handleScrollEnd = (event: any) => {
@@ -367,5 +370,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+
+export default ApiSlider;
+
 
 export default ApiSlider;

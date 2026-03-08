@@ -52,7 +52,7 @@ class NotificationService {
       // Web platformada push notifications uchun alohida tekshirish
       if (Platform.OS === 'web') {
         console.log('🌐 Web platform detected - checking VAPID configuration');
-        
+
         // Web uchun VAPID key mavjudligini tekshirish
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
@@ -99,7 +99,7 @@ class NotificationService {
 
       const token = (await Notifications.getExpoPushTokenAsync()).data;
       console.log('📱 Mobile push token:', token);
-      
+
       return token;
     } catch (error) {
       console.error('❌ Error registering for push notifications:', error);
@@ -139,7 +139,7 @@ class NotificationService {
       console.log('🔔 Push token registration skipped for development');
       return true;
 
-      // const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+      // const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.0.111:3001';
       // const response = await fetch(`${apiBaseUrl}/api/notifications/register`, {
       //   method: 'POST',
       //   headers: {
@@ -185,7 +185,7 @@ class NotificationService {
   private handleNotificationReceived(notification: any): void {
     const { title, body, data } = notification.request.content;
     console.log('📨 Notification received:', { title, body, data });
-    
+
     // You can add custom logic here to handle different notification types
     if (data?.type) {
       switch (data.type) {
@@ -208,7 +208,7 @@ class NotificationService {
   private handleNotificationResponse(response: any): void {
     const { data } = response.notification.request.content;
     console.log('👆 Notification tapped:', data);
-    
+
     // You can add navigation logic here based on notification data
     if (data?.type) {
       switch (data.type) {

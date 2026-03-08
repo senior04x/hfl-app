@@ -101,8 +101,8 @@ const PlayerRegistrationScreen: React.FC<PlayerRegistrationScreenProps> = ({ nav
       if (result.success && result.data) {
         // Handle nested data structure
         let teamsData = result.data;
-        if (result.data.data && Array.isArray(result.data.data)) {
-          teamsData = result.data.data;
+        if (Array.isArray(result.data) && result.data.length > 0 && result.data[0].data) {
+          teamsData = result.data[0].data;
         }
         console.log('✅ Final teams data to display:', JSON.stringify(teamsData, null, 2));
         setTeams(teamsData);

@@ -13,7 +13,7 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>()((set, get) => ({
   user: {
     id: 'temp-user',
     email: 'temp@example.com',

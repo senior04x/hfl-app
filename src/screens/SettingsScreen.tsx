@@ -16,6 +16,7 @@ import SafeScrollView from '../components/SafeScrollView';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { useTeamStore } from '../store/useTeamStore';
 import { useLanguage } from '../store/useLanguageStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -71,6 +72,7 @@ interface SettingsData {
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const { colors, isDarkMode, toggleTheme } = useTheme();
   const { player, logout } = usePlayerStore();
+  const { team, logout: logoutTeam } = useTeamStore();
   const { getText, setLanguage } = useLanguage();
   
   const [settings, setSettings] = useState<SettingsData>({
@@ -135,7 +137,18 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       getText('logoutConfirm'),
       [
         { text: getText('cancel'), style: 'cancel' },
-        { text: getText('logout'), style: 'destructive', onPress: logout },
+        { 
+          text: getText('logout'), 
+          style: 'destructive', 
+          onPress: () => {
+            if (player) {
+              logout();
+            }
+            if (team) {
+              logoutTeam();
+            }
+          }
+        },
       ]
     );
   };
@@ -189,8 +202,27 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           </View>
         )}
 
+        {/* Team Info */}
+        {team && (
+          <View style={[styles.userSection, { backgroundColor: colors.card }]}>
+            <View style={styles.userInfo}>
+              <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
+                <Ionicons name="people" size={24} color="white" />
+              </View>
+              <View style={styles.userDetails}>
+                <Text style={[styles.userName, { color: colors.text }]}>
+                  {team.name}
+                </Text>
+                       <Text style={[styles.userRole, { color: colors.textSecondary }]}>
+                         Murabbiy • {team.captainPhone}
+                       </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Login Section */}
-        {!player && (
+        {!player && !team && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Kirish</Text>
             
@@ -253,7 +285,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
                </View>
 
         {/* Logout */}
-        {player && (
+        {(player || team) && (
           <View style={styles.section}>
             <SettingItem
               icon="log-out-outline"

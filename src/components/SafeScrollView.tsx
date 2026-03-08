@@ -12,8 +12,20 @@ const SafeScrollView: React.FC<SafeScrollViewProps> = ({
 }) => {
   // onScroll prop'ini to'g'ri formatda qaytarish
   const handleScroll = (event: any) => {
-    if (onScroll && typeof onScroll === 'function') {
-      onScroll(event);
+    if (onScroll) {
+      if (typeof onScroll === 'function') {
+        onScroll(event);
+      } else if (onScroll && typeof onScroll === 'object') {
+        // onScroll object bo'lsa (Animated.event dan kelgan), uni to'g'ri handle qilish
+        const scrollObj = onScroll as any;
+        if (scrollObj._listener && typeof scrollObj._listener === 'function') {
+          scrollObj._listener(event);
+        } else if (scrollObj.listener && typeof scrollObj.listener === 'function') {
+          scrollObj.listener(event);
+        } else {
+          console.log('onScroll object detected but no valid listener:', onScroll);
+        }
+      }
     }
   };
 

@@ -30,9 +30,9 @@ class MongoDBService {
         applications: 'leagueApplications'
       }
     };
-    
+
     // Use hardcoded URL as fallback for network requests
-    this.baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend-360d7733bad1.herokuapp.com';
+    this.baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hfl-backend.onrender.com';
     console.log('MongoDBService initialized with base URL:', this.baseUrl);
   }
 
@@ -58,7 +58,7 @@ class MongoDBService {
 
       const result = await response.json();
       console.log('📋 Raw teams response from backend:', JSON.stringify(result, null, 2));
-      
+
       if (result.success && result.data) {
         console.log('✅ Teams data extracted:', result.data);
         return result.data;
@@ -86,7 +86,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -113,7 +113,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -139,7 +139,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -154,10 +154,10 @@ class MongoDBService {
   // Matches operations
   async getMatches(status?: string): Promise<any[]> {
     try {
-      const url = status 
+      const url = status
         ? `${this.baseUrl}/api/matches?status=${status}`
         : `${this.baseUrl}/api/matches`;
-        
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -170,7 +170,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -196,7 +196,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -223,7 +223,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -240,10 +240,10 @@ class MongoDBService {
     try {
       console.log('Creating application with data:', applicationData);
       console.log('Using base URL:', this.baseUrl);
-      
+
       const apiUrl = `${this.baseUrl}/api/applications`;
       console.log('Full API URL:', apiUrl);
-      
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -264,7 +264,7 @@ class MongoDBService {
 
       const result = await response.json();
       console.log('Response result:', result);
-      
+
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -292,7 +292,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -320,7 +320,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success) {
         return result.data;
       } else {
@@ -347,7 +347,7 @@ class MongoDBService {
       }
 
       const result = await response.json();
-      
+
       if (result.success) {
         return result.data;
       } else {
@@ -461,7 +461,7 @@ class MongoDBService {
   async getActiveSliderItems(): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
       const response = await this.getSliderItems();
-      
+
       if (response.success && response.data) {
         // Filter only active items
         const activeItems = response.data.filter((item: any) => item.isActive);
@@ -470,7 +470,7 @@ class MongoDBService {
           data: activeItems
         };
       }
-      
+
       return response;
     } catch (error) {
       console.error('Error getting active slider items:', error);
@@ -519,9 +519,9 @@ class MongoDBService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('All tournaments API error:', response.status, errorText);
-        return { 
-          success: false, 
-          error: `HTTP ${response.status}: ${response.statusText}` 
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
         };
       }
 
@@ -530,9 +530,9 @@ class MongoDBService {
       return result;
     } catch (error) {
       console.error('Error fetching all tournaments:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -554,7 +554,7 @@ class MongoDBService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Tournaments API error:', response.status, errorText);
-        
+
         // If 404 error, try to get all tournaments and filter client-side
         if (response.status === 404) {
           console.log('🔄 404 error - trying to get all tournaments and filter client-side...');
@@ -566,7 +566,7 @@ class MongoDBService {
                 const belongsToLeague = tournament.leagueId === leagueId || tournament.league === leagueId;
                 return belongsToLeague;
               });
-              
+
               console.log('✅ Fallback: Found', filteredTournaments.length, 'tournaments for league', leagueId, 'from all tournaments');
               return { success: true, data: filteredTournaments };
             }
@@ -574,22 +574,22 @@ class MongoDBService {
             console.error('Fallback also failed:', fallbackError);
           }
         }
-        
-        return { 
-          success: false, 
-          error: `HTTP ${response.status}: ${response.statusText}` 
+
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
         };
       }
 
       const result = await response.json();
       console.log('Tournaments API response:', result);
-      console.log('🔍 Raw tournaments data:', result.data?.map((t: any) => ({ 
-        name: t.name, 
-        leagueId: t.leagueId, 
+      console.log('🔍 Raw tournaments data:', result.data?.map((t: any) => ({
+        name: t.name,
+        leagueId: t.leagueId,
         league: t.league,
-        _id: t._id 
+        _id: t._id
       })));
-      
+
       if (result.success && result.data) {
         // Filter tournaments by league ID to ensure they belong to the correct league
         const filteredTournaments = result.data.filter((tournament: any) => {
@@ -599,7 +599,7 @@ class MongoDBService {
           }
           return belongsToLeague;
         });
-        
+
         console.log('✅ Tournaments fetched successfully for league', leagueId, ':', filteredTournaments.length, 'tournaments (filtered from', result.data.length, 'total)');
         return { success: true, data: filteredTournaments };
       } else {
@@ -608,9 +608,9 @@ class MongoDBService {
       }
     } catch (error) {
       console.error('Error fetching tournaments for league', leagueId, ':', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -622,9 +622,9 @@ class MongoDBService {
       console.log('🔍 Fetching all teams and filtering by tournamentId:', tournamentId);
       const allTeams = await this.getTeams();
       console.log('📋 All teams from backend:', allTeams);
-      
+
       if (Array.isArray(allTeams) && allTeams.length > 0) {
-        const filteredTeams = allTeams.filter(team => 
+        const filteredTeams = allTeams.filter(team =>
           team.tournamentId === tournamentId
         );
         console.log('✅ Filtered teams for tournament:', filteredTeams);
@@ -797,10 +797,10 @@ class MongoDBService {
   // Standings operations
   async getStandings(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      const url = round 
+      const url = round
         ? `${this.baseUrl}/api/tournaments/${tournamentId}/standings?round=${round}`
         : `${this.baseUrl}/api/tournaments/${tournamentId}/standings`;
-      
+
       console.log('Fetching standings for tournament:', tournamentId, round ? `round: ${round}` : '');
       const response = await fetch(url, {
         method: 'GET',
@@ -825,10 +825,10 @@ class MongoDBService {
   // Top scorers operations
   async getTopScorers(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      const url = round 
+      const url = round
         ? `${this.baseUrl}/api/tournaments/${tournamentId}/top-scorers?round=${round}`
         : `${this.baseUrl}/api/tournaments/${tournamentId}/top-scorers`;
-      
+
       console.log('Fetching top scorers for tournament:', tournamentId, round ? `round: ${round}` : '');
       const response = await fetch(url, {
         method: 'GET',
@@ -853,10 +853,10 @@ class MongoDBService {
   // Top assists operations
   async getTopAssists(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      const url = round 
+      const url = round
         ? `${this.baseUrl}/api/tournaments/${tournamentId}/top-assists?round=${round}`
         : `${this.baseUrl}/api/tournaments/${tournamentId}/top-assists`;
-      
+
       console.log('Fetching top assists for tournament:', tournamentId, round ? `round: ${round}` : '');
       const response = await fetch(url, {
         method: 'GET',
@@ -881,10 +881,10 @@ class MongoDBService {
   // Matches operations
   async getMatchesByTournament(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      const url = round 
+      const url = round
         ? `${this.baseUrl}/api/tournaments/${tournamentId}/matches?round=${round}`
         : `${this.baseUrl}/api/tournaments/${tournamentId}/matches`;
-      
+
       console.log('Fetching matches for tournament:', tournamentId, round ? `round: ${round}` : '');
       const response = await fetch(url, {
         method: 'GET',
@@ -923,7 +923,7 @@ class MongoDBService {
 
       const result = await response.json();
       console.log('Leagues fetched successfully:', result);
-      
+
       if (result.success && result.data) {
         return { success: true, data: result.data };
       } else {
@@ -938,10 +938,10 @@ class MongoDBService {
   // Get tournament standings (real data)
   async getTournamentStandings(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      const url = round 
+      const url = round
         ? `${this.baseUrl}/api/tournaments/${tournamentId}/standings?round=${round}`
         : `${this.baseUrl}/api/tournaments/${tournamentId}/standings`;
-      
+
       console.log('🏆 Fetching tournament standings for:', tournamentId, round ? `round: ${round}` : '');
       console.log('🌐 API URL:', url);
       const response = await fetch(url, {
@@ -957,15 +957,15 @@ class MongoDBService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Tournament standings API error:', response.status, errorText);
-        return { 
-          success: false, 
-          error: `HTTP ${response.status}: ${response.statusText}` 
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
         };
       }
 
       const result = await response.json();
       console.log('✅ Tournament standings fetched successfully:', result);
-      
+
       if (result.success && result.data) {
         return { success: true, data: result.data };
       } else {
@@ -974,9 +974,9 @@ class MongoDBService {
       }
     } catch (error) {
       console.error('Error fetching tournament standings:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -984,10 +984,10 @@ class MongoDBService {
   // Get tournament top scorers (real data)
   async getTournamentTopScorers(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      const url = round 
+      const url = round
         ? `${this.baseUrl}/api/tournaments/${tournamentId}/top-scorers?round=${round}`
         : `${this.baseUrl}/api/tournaments/${tournamentId}/top-scorers`;
-      
+
       console.log('🥅 Fetching tournament top scorers for:', tournamentId, round ? `round: ${round}` : '');
       console.log('🌐 API URL:', url);
       const response = await fetch(url, {
@@ -1003,15 +1003,15 @@ class MongoDBService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Tournament top scorers API error:', response.status, errorText);
-        return { 
-          success: false, 
-          error: `HTTP ${response.status}: ${response.statusText}` 
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
         };
       }
 
       const result = await response.json();
       console.log('✅ Tournament top scorers fetched successfully:', result);
-      
+
       if (result.success && result.data) {
         return { success: true, data: result.data };
       } else {
@@ -1020,9 +1020,9 @@ class MongoDBService {
       }
     } catch (error) {
       console.error('Error fetching tournament top scorers:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -1030,10 +1030,10 @@ class MongoDBService {
   // Get tournament top assists (real data)
   async getTournamentTopAssists(tournamentId: string, round?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      const url = round 
+      const url = round
         ? `${this.baseUrl}/api/tournaments/${tournamentId}/top-assists?round=${round}`
         : `${this.baseUrl}/api/tournaments/${tournamentId}/top-assists`;
-      
+
       console.log('🎯 Fetching tournament top assists for:', tournamentId, round ? `round: ${round}` : '');
       console.log('🌐 API URL:', url);
       const response = await fetch(url, {
@@ -1049,15 +1049,15 @@ class MongoDBService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Tournament top assists API error:', response.status, errorText);
-        return { 
-          success: false, 
-          error: `HTTP ${response.status}: ${response.statusText}` 
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
         };
       }
 
       const result = await response.json();
       console.log('✅ Tournament top assists fetched successfully:', result);
-      
+
       if (result.success && result.data) {
         return { success: true, data: result.data };
       } else {
@@ -1066,9 +1066,9 @@ class MongoDBService {
       }
     } catch (error) {
       console.error('Error fetching tournament top assists:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -1077,7 +1077,7 @@ class MongoDBService {
   async healthCheck(): Promise<boolean> {
     try {
       console.log('Checking health for URL:', this.baseUrl);
-      
+
       const response = await fetch(`${this.baseUrl}/health`, {
         method: 'GET',
         headers: {

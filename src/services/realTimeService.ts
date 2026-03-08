@@ -35,7 +35,7 @@ class RealTimeService {
       try {
         console.log('🔌 Attempting WebSocket connection to:', this.config.serverUrl);
         this.ws = new WebSocket(this.config.serverUrl);
-        
+
         // Set connection timeout
         const connectionTimeout = setTimeout(() => {
           if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
@@ -44,7 +44,7 @@ class RealTimeService {
             reject(new Error('WebSocket connection timeout'));
           }
         }, 10000); // 10 second timeout
-        
+
         this.ws.onopen = () => {
           clearTimeout(connectionTimeout);
           console.log('🔌 WebSocket connected successfully');
@@ -67,7 +67,7 @@ class RealTimeService {
           clearTimeout(connectionTimeout);
           console.log('🔌 WebSocket disconnected:', event.code, event.reason);
           this.isConnected = false;
-          
+
           // Only schedule reconnect if it wasn't a manual disconnect
           if (event.code !== 1000) {
             this.scheduleReconnect();
@@ -94,12 +94,12 @@ class RealTimeService {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    
+
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
-    
+
     this.isConnected = false;
   }
 
@@ -115,9 +115,9 @@ class RealTimeService {
     const baseDelay = this.config.reconnectInterval;
     const jitter = Math.random() * 1000; // Add up to 1 second of jitter
     const delay = Math.min(baseDelay * Math.pow(2, this.reconnectAttempts - 1) + jitter, 30000); // Max 30 seconds
-    
+
     console.log(`🔌 Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
-    
+
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(error => {
         console.error('Reconnection failed:', error);
@@ -129,7 +129,7 @@ class RealTimeService {
   // Handle incoming messages
   private handleMessage(message: RealTimeMessage): void {
     console.log('📨 Real-time message received:', message.type);
-    
+
     // Notify all listeners for this message type
     const listeners = this.listeners.get(message.type);
     if (listeners) {
@@ -146,7 +146,7 @@ class RealTimeService {
   // Subscribe to specific message types
   subscribe(messageType: string, callback: (data: any) => void): () => void {
     this.listeners.set(messageType, callback);
-    
+
     // Return unsubscribe function
     return () => {
       this.listeners.delete(messageType);
@@ -180,7 +180,7 @@ class RealTimeService {
 
 // Export singleton instance
 export const realTimeService = new RealTimeService({
-  serverUrl: process.env.EXPO_PUBLIC_WEBSOCKET_URL || 'wss://hfl-backend-360d7733bad1.herokuapp.com',
+  serverUrl: process.env.EXPO_PUBLIC_WEBSOCKET_URL || 'wss://hfl-backend.onrender.com',
   reconnectInterval: 5000, // 5 seconds
   maxReconnectAttempts: 5,
 });

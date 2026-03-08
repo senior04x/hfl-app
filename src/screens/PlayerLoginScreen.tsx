@@ -8,10 +8,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
 } from 'react-native';
+import SafeScrollView from '../components/SafeScrollView';
 import { useTheme } from '../store/useThemeStore';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { useTeamStore } from '../store/useTeamStore';
 import { useLanguage } from '../store/useLanguageStore';
 import { Player } from '../types';
 import { formatPhoneNumber, parsePhoneNumberForAPI, validatePhoneNumber } from '../utils/phoneUtils';
@@ -24,6 +25,7 @@ interface PlayerLoginScreenProps {
 const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => {
   const { colors } = useTheme();
   const { login } = usePlayerStore();
+  const { login: loginTeam } = useTeamStore();
   const { getText } = useLanguage();
   const [phoneNumber, setPhoneNumber] = useState('+998 93 378 68 86');
   const [loading, setLoading] = useState(false);
@@ -79,6 +81,8 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
         result = await apiService.simpleLogin(cleanPhone);
       }
 
+      console.log('Full API result:', result);
+      
       if (result.success) {
         if (selectedRole === 'player') {
           // Get player data and map to Player type
@@ -113,11 +117,63 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
             player: playerData 
           });
         } else if (selectedRole === 'trainer') {
-          // Navigate to trainer dashboard
-          navigation.navigate('TrainerDashboard', {
-            trainerId: result.trainer.id,
-            trainer: result.trainer
-          });
+          // Navigate to team dashboard (jamoa sifatida)
+          console.log('=== TEAM LOGIN DEBUG ===');
+          console.log('Full result:', JSON.stringify(result, null, 2));
+          console.log('Result.success:', result.success);
+          console.log('Result.team:', result.team);
+          console.log('Result.team type:', typeof result.team);
+          
+          if (result.team) {
+            console.log('Team._id:', result.team._id);
+            console.log('Team.id:', result.team.id);
+            console.log('Team.name:', result.team.name);
+            console.log('Team.contactPhone:', result.team.contactPhone);
+          }
+          
+          if (result.team && (result.team._id || result.team.id)) {
+            const teamId = result.team._id || result.team.id;
+            console.log('Navigating to TrainerDashboard with Team ID:', teamId);
+            
+            // Team ma'lumotlarini to'g'ri formatda yaratish
+            const teamData: Team = {
+              id: teamId,
+              name: result.team.name || 'Jamoa',
+              description: result.team.description || '',
+              color: result.team.color || '#3B82F6',
+              captainPhone: result.team.captainPhone || '',
+              status: result.team.status || 'active',
+              createdAt: new Date(result.team.createdAt || Date.now()),
+              updatedAt: new Date(result.team.updatedAt || Date.now()),
+            };
+            
+            // Team ma'lumotlarini store'ga saqlash
+            loginTeam(teamData);
+            
+            // Trainer formatida trainer data yaratish
+            const trainerData = {
+              id: teamId,
+              name: result.team.name || 'Jamoa',
+              teamId: teamId,
+              teamName: result.team.name || 'Jamoa',
+              teamPhone: result.team.captainPhone || '',
+              status: result.team.status || 'active',
+              createdAt: new Date(result.team.createdAt || Date.now()),
+              updatedAt: new Date(result.team.updatedAt || Date.now()),
+            };
+            
+            // Bosh sahifaga o'tish
+            navigation.reset({
+              index: 0,
+              routes: [
+                { name: 'Main' },
+                { name: 'TrainerDashboard', params: { trainerId: teamId, trainer: trainerData } }
+              ],
+            });
+          } else {
+            console.log('❌ Team data validation failed');
+            Alert.alert('Xatolik', 'Jamoa ma\'lumotlari to\'g\'ri kelmadi. Console log\'larni tekshiring.');
+          }
         } else if (selectedRole === 'admin') {
           // Admin uchun alohida navigation
           // Hozircha player dashboard'ga o'tamiz, keyin admin panel qo'shamiz
@@ -186,7 +242,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
         </Text>
       </View>
 
-      <ScrollView 
+      <SafeScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -300,7 +356,7 @@ const PlayerLoginScreen: React.FC<PlayerLoginScreenProps> = ({ navigation }) => 
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </SafeScrollView>
       
     </KeyboardAvoidingView>
   );

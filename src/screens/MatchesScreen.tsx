@@ -7,8 +7,8 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
+import SafeScrollView from '../components/SafeScrollView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -372,7 +372,7 @@ const MatchesScreen = () => {
         )}
 
         {/* Calendar Events */}
-        <ScrollView
+        <SafeScrollView
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -381,7 +381,7 @@ const MatchesScreen = () => {
           bounces={false}
         >
           {sortedDates.map(renderDateGroup)}
-        </ScrollView>
+        </SafeScrollView>
       </SafeAreaView>
     </>
   );

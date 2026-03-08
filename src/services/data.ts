@@ -10,46 +10,46 @@ export class DataService {
       'teams',
       async () => {
         console.log('Fetching teams from MongoDB API...');
-        
+
         // Use timeout for faster response
         let timeoutId: NodeJS.Timeout | undefined;
         const timeoutPromise = new Promise<Team[]>((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error('Teams fetch timeout')), 5000);
         });
-        
+
         const fetchPromise = retryService.retryOnNetworkError(async () => {
           // Try local API first, then fallback to direct backend
           let response: Response;
           let apiSource = 'local';
-          
-          // Use Heroku backend directly
-          console.log('DataService: Using Heroku backend...');
-          apiSource = 'heroku';
-          const localBackendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
-          console.log('DataService: Fetching from Heroku backend:', localBackendUrl);
-          
+
+          // Use production Render.com backend
+          console.log('DataService: Using Render.com backend...');
+          apiSource = 'render';
+          const localBackendUrl = 'https://hfl-backend.onrender.com';
+          console.log('DataService: Fetching from backend:', localBackendUrl);
+
           response = await fetch(`${localBackendUrl}/api/teams`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
             },
           });
-          
+
           if (!response.ok) {
             throw new Error(`API Error: ${response.status} - ${response.statusText}`);
           }
-          
+
           const result = await response.json();
           console.log(`MongoDB API response from ${apiSource}:`, result);
-          
+
           if (!result.success) {
             throw new Error(result.error || 'API returned error');
           }
-          
+
           const teams = result.data || [];
           console.log('Teams from MongoDB API:', teams.length, 'teams found');
           console.log('Teams data:', teams);
-          
+
           // Map _id to id for frontend compatibility
           const mappedTeams = teams.map((team: any) => {
             const { _id, ...teamWithoutId } = team;
@@ -59,7 +59,7 @@ export class DataService {
               id: _id ? _id.toString() : (team.id ? team.id.toString() : Math.random().toString(36).substr(2, 9)),
             };
           });
-          
+
           console.log('Mapped teams:', mappedTeams.length, 'teams');
           console.log('First mapped team:', mappedTeams[0]);
           return mappedTeams;
@@ -73,7 +73,7 @@ export class DataService {
             console.log(`🔄 Teams fetch retry ${attempt}: ${error.message}`);
           },
         });
-        
+
         // Race between fetch and timeout
         try {
           const result = await Promise.race([fetchPromise, timeoutPromise]);
@@ -91,7 +91,7 @@ export class DataService {
   static async getTeam(teamId: string): Promise<Team | null> {
     try {
       console.log('🔍 Getting team with ID:', teamId);
-      
+
       // Validate teamId
       if (!teamId || typeof teamId !== 'string') {
         console.error('❌ Invalid teamId:', teamId);
@@ -101,33 +101,33 @@ export class DataService {
       // Try local API first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
-      // Use Heroku backend directly
-      console.log('DataService: Using Heroku backend...');
-      apiSource = 'heroku';
-      const localBackendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
-      console.log('DataService: Fetching from Heroku backend:', localBackendUrl);
-      
+
+      // Use production Render.com backend
+      console.log('DataService: Using Render.com backend...');
+      apiSource = 'render';
+      const localBackendUrl = 'https://hfl-backend.onrender.com';
+      console.log('DataService: Fetching from backend:', localBackendUrl);
+
       response = await fetch(`${localBackendUrl}/api/teams/${teamId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!response.ok) {
         console.log('❌ Team not found in MongoDB API:', teamId);
         return null;
       }
-      
+
       const result = await response.json();
       console.log(`📋 Team data from ${apiSource}:`, result);
-      
+
       if (!result.success) {
         console.log('❌ API returned error');
         return null;
       }
-      
+
       const team = result.data;
       console.log('✅ Team loaded successfully:', team);
       return team;
@@ -145,18 +145,18 @@ export class DataService {
       'matches',
       async () => {
         console.log('Fetching matches from MongoDB API...');
-        
+
         // Use timeout for faster response
         let timeoutId: NodeJS.Timeout | undefined;
         const timeoutPromise = new Promise<Match[]>((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error('Matches fetch timeout')), 5000);
         });
-        
+
         const fetchPromise = retryService.retryOnNetworkError(async () => {
           // Try local API first, then fallback to direct backend
           let response: Response;
           let apiSource = 'local';
-          
+
           try {
             console.log('DataService: Trying local API first...');
             response = await fetch('/api/matches', {
@@ -168,9 +168,9 @@ export class DataService {
           } catch (localError) {
             console.log('DataService: Local API failed, trying direct backend...');
             apiSource = 'backend';
-            const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+            const backendUrl = 'https://hfl-backend.onrender.com';
             console.log('DataService: Fetching from backend API:', backendUrl);
-            
+
             response = await fetch(`${backendUrl}/api/matches`, {
               method: 'GET',
               headers: {
@@ -178,18 +178,18 @@ export class DataService {
               },
             });
           }
-          
+
           if (!response.ok) {
             throw new Error(`API Error: ${response.status} - ${response.statusText}`);
           }
-          
+
           const result = await response.json();
           console.log(`MongoDB API response from ${apiSource}:`, result);
-          
+
           if (!result.success) {
             throw new Error(result.error || 'API returned error');
           }
-          
+
           const matches = result.data || [];
           console.log('Matches from MongoDB API:', matches.length, 'matches found');
           console.log('Matches data:', matches);
@@ -204,7 +204,7 @@ export class DataService {
             console.log(`🔄 Matches fetch retry ${attempt}: ${error.message}`);
           },
         });
-        
+
         // Race between fetch and timeout
         try {
           const result = await Promise.race([fetchPromise, timeoutPromise]);
@@ -224,7 +224,7 @@ export class DataService {
       // Try local API first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
+
       try {
         console.log('DataService: Trying local API first...');
         response = await fetch(`/api/matches/${matchId}`, {
@@ -236,9 +236,9 @@ export class DataService {
       } catch (localError) {
         console.log('DataService: Local API failed, trying direct backend...');
         apiSource = 'backend';
-        const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        const backendUrl = 'https://hfl-backend.onrender.com';
         console.log('DataService: Fetching from backend API:', backendUrl);
-        
+
         response = await fetch(`${backendUrl}/api/matches/${matchId}`, {
           method: 'GET',
           headers: {
@@ -246,20 +246,20 @@ export class DataService {
           },
         });
       }
-      
+
       if (!response.ok) {
         console.log('❌ Match not found in MongoDB API:', matchId);
         return null;
       }
-      
+
       const result = await response.json();
       console.log(`📋 Match data from ${apiSource}:`, result);
-      
+
       if (!result.success) {
         console.log('❌ API returned error');
         return null;
       }
-      
+
       return result.data;
     } catch (error) {
       console.error('Error getting match:', error);
@@ -290,7 +290,7 @@ export class DataService {
       // Try local API first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
+
       try {
         console.log('DataService: Trying local API first...');
         response = await fetch('/api/matches', {
@@ -303,9 +303,9 @@ export class DataService {
       } catch (localError) {
         console.log('DataService: Local API failed, trying direct backend...');
         apiSource = 'backend';
-        const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        const backendUrl = 'https://hfl-backend.onrender.com';
         console.log('DataService: Fetching from backend API:', backendUrl);
-        
+
         response = await fetch(`${backendUrl}/api/matches`, {
           method: 'POST',
           headers: {
@@ -314,11 +314,11 @@ export class DataService {
           body: JSON.stringify(matchData),
         });
       }
-      
+
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log(`📋 Create match response from ${apiSource}:`, result);
       return result.data.id;
@@ -333,7 +333,7 @@ export class DataService {
       // Try local API first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
+
       try {
         console.log('DataService: Trying local API first...');
         response = await fetch(`/api/matches/${matchId}/score`, {
@@ -346,9 +346,9 @@ export class DataService {
       } catch (localError) {
         console.log('DataService: Local API failed, trying direct backend...');
         apiSource = 'backend';
-        const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        const backendUrl = 'https://hfl-backend.onrender.com';
         console.log('DataService: Fetching from backend API:', backendUrl);
-        
+
         response = await fetch(`${backendUrl}/api/matches/${matchId}/score`, {
           method: 'PUT',
           headers: {
@@ -357,11 +357,11 @@ export class DataService {
           body: JSON.stringify(score),
         });
       }
-      
+
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
       }
-      
+
       console.log(`📋 Update match score response from ${apiSource}:`, 'Success');
     } catch (error) {
       console.error('Error updating match score:', error);
@@ -374,7 +374,7 @@ export class DataService {
       // Try local API first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
+
       try {
         console.log('DataService: Trying local API first...');
         response = await fetch(`/api/matches/${matchId}/status`, {
@@ -387,9 +387,9 @@ export class DataService {
       } catch (localError) {
         console.log('DataService: Local API failed, trying direct backend...');
         apiSource = 'backend';
-        const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+        const backendUrl = 'https://hfl-backend.onrender.com';
         console.log('DataService: Fetching from backend API:', backendUrl);
-        
+
         response = await fetch(`${backendUrl}/api/matches/${matchId}/status`, {
           method: 'PUT',
           headers: {
@@ -398,11 +398,11 @@ export class DataService {
           body: JSON.stringify({ status }),
         });
       }
-      
+
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
       }
-      
+
       console.log(`📋 Update match status response from ${apiSource}:`, 'Success');
     } catch (error) {
       console.error('Error updating match status:', error);
@@ -414,37 +414,37 @@ export class DataService {
   static async getPlayer(playerId: string): Promise<Player | null> {
     try {
       console.log('Fetching player with ID:', playerId);
-      
+
       // Try local API first, then fallback to direct backend
       let response: Response;
       let apiSource = 'local';
-      
-      // Use Heroku backend directly
-      console.log('DataService: Using Heroku backend...');
-      apiSource = 'heroku';
-      const localBackendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
-      console.log('DataService: Fetching from Heroku backend:', localBackendUrl);
-      
+
+      // Use production Render.com backend
+      console.log('DataService: Using Render.com backend...');
+      apiSource = 'render';
+      const localBackendUrl = 'https://hfl-backend.onrender.com';
+      console.log('DataService: Fetching from backend:', localBackendUrl);
+
       response = await fetch(`${localBackendUrl}/api/players/${playerId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!response.ok) {
         console.log('❌ Player not found in MongoDB API:', playerId);
         return null;
       }
-      
+
       const result = await response.json();
       console.log(`MongoDB API response from ${apiSource}:`, result);
-      
+
       if (!result.success) {
         console.log('❌ API returned error');
         return null;
       }
-      
+
       console.log('Processed player data:', result.data);
       return result.data;
     } catch (error) {
@@ -459,18 +459,18 @@ export class DataService {
       'standings',
       async () => {
         console.log('Fetching standings from MongoDB API...');
-        
+
         // Use timeout for faster response
         let timeoutId: NodeJS.Timeout | undefined;
         const timeoutPromise = new Promise<TeamStanding[]>((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error('Standings fetch timeout')), 5000);
         });
-        
+
         const fetchPromise = retryService.retryOnNetworkError(async () => {
           // Try local API first, then fallback to direct backend
           let response: Response;
           let apiSource = 'local';
-          
+
           try {
             console.log('DataService: Trying local API first...');
             response = await fetch('/api/standings', {
@@ -482,9 +482,9 @@ export class DataService {
           } catch (localError) {
             console.log('DataService: Local API failed, trying direct backend...');
             apiSource = 'backend';
-            const backendUrl = 'https://hfl-backend-360d7733bad1.herokuapp.com';
+            const backendUrl = 'https://hfl-backend.onrender.com';
             console.log('DataService: Fetching from backend API:', backendUrl);
-            
+
             response = await fetch(`${backendUrl}/api/standings`, {
               method: 'GET',
               headers: {
@@ -492,18 +492,18 @@ export class DataService {
               },
             });
           }
-          
+
           if (!response.ok) {
             throw new Error(`API Error: ${response.status} - ${response.statusText}`);
           }
-          
+
           const result = await response.json();
           console.log(`MongoDB API response from ${apiSource}:`, result);
-          
+
           if (!result.success) {
             throw new Error(result.error || 'API returned error');
           }
-          
+
           const standings = result.data || [];
           console.log('Standings from MongoDB API:', standings.length, 'standings found');
           console.log('Standings data:', standings);
@@ -518,7 +518,7 @@ export class DataService {
             console.log(`🔄 Standings fetch retry ${attempt}: ${error.message}`);
           },
         });
-        
+
         // Race between fetch and timeout
         try {
           const result = await Promise.race([fetchPromise, timeoutPromise]);
