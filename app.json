@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Amatora",
+    "name": "amatora",
     "slug": "amatora",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hflsoccerapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.amatora.app"
