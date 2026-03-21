@@ -8,16 +8,45 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
-    KeyboardAvoidingView,
     Platform,
     Image,
+    Dimensions,
+    SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 
-type ApplicationType = 'player' | 'team' | 'league';
+const { width } = Dimensions.get('window');
+
+type ApplicationType = 'player' | 'team';
+
+const PLAYER_POSITIONS = [
+    { id: 'GK', label: 'GK' },
+    { id: 'CB', label: 'CB' },
+    { id: 'LB', label: 'LB' },
+    { id: 'RB', label: 'RB' },
+    { id: 'LWB', label: 'LWB' },
+    { id: 'RWB', label: 'RWB' },
+    { id: 'CDM', label: 'CDM' },
+    { id: 'CM', label: 'CM' },
+    { id: 'CAM', label: 'CAM' },
+    { id: 'LM', label: 'LM' },
+    { id: 'RM', label: 'RM' },
+    { id: 'LW', label: 'LW' },
+    { id: 'RW', label: 'RW' },
+    { id: 'ST', label: 'ST' },
+    { id: 'CF', label: 'CF' },
+];
+
+const TEAM_ROLES = [
+    { id: 'Owner', label: 'Rahbar' },
+    { id: 'Manager', label: 'Manager' },
+    { id: 'Coach', label: 'Murabbiy' },
+    { id: 'Admin', label: 'Admin' },
+    { id: 'Captain', label: 'Sardor' },
+];
 
 const JoinApplicationScreen = ({ navigation }: any) => {
     const [loading, setLoading] = useState(false);
@@ -28,30 +57,17 @@ const JoinApplicationScreen = ({ navigation }: any) => {
     const [applicationType, setApplicationType] = useState<ApplicationType>('player');
 
     const [formData, setFormData] = useState({
-        // General
         phone: '',
-        email: '',
-
-        // Player specific
         firstName: '',
         lastName: '',
-        middleName: '',
         number: '',
         position: '',
         experience: '',
         photo: null as string | null,
-
-        // Team specific
         teamName: '',
         teamLogo: null as string | null,
-        teamFoundedDate: '',
-
-        // League specific
-        leagueName: '',
-        leagueLogo: null as string | null,
-        leagueFoundedDate: '',
-
-        // Selections
+        staffName: '',
+        staffRole: '',
         selectedLeague: '',
         selectedTournament: '',
         selectedTeam: '',
@@ -64,10 +80,8 @@ const JoinApplicationScreen = ({ navigation }: any) => {
     const loadLeagues = async () => {
         try {
             setLoadingData(true);
-            const response = await apiService.getTournaments();
-            if (response.data.success && response.data.data) {
-                setLeagues(response.data.data);
-            }
+            const data = await apiService.getLeagues();
+            setLeagues(data || []);
         } catch (error) {
             console.error('Error loading leagues:', error);
         } finally {
@@ -75,38 +89,45 @@ const JoinApplicationScreen = ({ navigation }: any) => {
         }
     };
 
-    const handleLeagueSelect = (leagueId: string) => {
+    const handleLeagueSelect = async (leagueId: string) => {
         setFormData({
             ...formData,
             selectedLeague: leagueId,
             selectedTournament: '',
             selectedTeam: ''
         });
-        const league = leagues.find(l => l._id === leagueId);
-        if (league && league.tournaments) {
-            setTournaments(league.tournaments);
-        } else {
-            setTournaments([]);
-        }
+        setTournaments([]);
         setTeams([]);
-    };
-
-    const handleTournamentSelect = async (tournamentId: string) => {
-        setFormData({ ...formData, selectedTournament: tournamentId, selectedTeam: '' });
+        
         try {
             setLoadingData(true);
-            const response = await apiService.getTeams(1, 100, tournamentId);
-            if (response.data.success) {
-                setTeams(response.data.data);
-            }
+            const data = await apiService.getTournaments(1, 50, leagueId);
+            setTournaments(data || []);
         } catch (error) {
-            console.error('Error loading teams:', error);
+            console.error('Error loading tournaments:', error);
         } finally {
             setLoadingData(false);
         }
     };
 
-    const pickImage = async (field: 'photo' | 'teamLogo' | 'leagueLogo') => {
+    const handleTournamentSelect = async (tournamentId: string) => {
+        setFormData({ ...formData, selectedTournament: tournamentId, selectedTeam: '' });
+        setTeams([]);
+
+        if (applicationType === 'player') {
+            try {
+                setLoadingData(true);
+                const data = await apiService.getTeams(1, 100, tournamentId);
+                setTeams(data || []);
+            } catch (error) {
+                console.error('Error loading teams:', error);
+            } finally {
+                setLoadingData(false);
+            }
+        }
+    };
+
+    const pickImage = async (field: 'photo' | 'teamLogo') => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Xato', 'Galereyaga ruxsat berilmadi');
@@ -128,19 +149,19 @@ const JoinApplicationScreen = ({ navigation }: any) => {
     };
 
     const handleSubmit = async () => {
-        // Validation logic
+        // Validation
+        if (!formData.phone || formData.phone.length < 9) {
+            Alert.alert('Xato', 'Telefon raqamini to\'g\'ri kiriting');
+            return;
+        }
+
         if (applicationType === 'player') {
-            if (!formData.firstName || !formData.lastName || !formData.phone || !formData.selectedLeague || !formData.selectedTeam) {
+            if (!formData.firstName || !formData.lastName || !formData.position || !formData.selectedTeam) {
                 Alert.alert('Xato', 'Iltimos, barcha majburiy maydonlarni to\'ldiring');
                 return;
             }
-        } else if (applicationType === 'team') {
-            if (!formData.teamName || !formData.phone || !formData.selectedLeague || !formData.selectedTournament) {
-                Alert.alert('Xato', 'Iltimos, barcha majburiy maydonlarni to\'ldiring');
-                return;
-            }
-        } else if (applicationType === 'league') {
-            if (!formData.leagueName || !formData.phone) {
+        } else {
+            if (!formData.teamName || !formData.selectedLeague || !formData.selectedTournament || !formData.staffName || !formData.staffRole) {
                 Alert.alert('Xato', 'Iltimos, barcha majburiy maydonlarni to\'ldiring');
                 return;
             }
@@ -148,372 +169,287 @@ const JoinApplicationScreen = ({ navigation }: any) => {
 
         try {
             setLoading(true);
-            const response = await apiService.createApplication({
+            const applicationData = {
                 ...formData,
                 type: applicationType,
                 status: 'pending',
                 createdAt: new Date(),
-            });
+            };
 
-            if (response.data.success) {
+            const response = await apiService.createApplication(applicationData);
+
+            if (response && response.success) {
                 Alert.alert(
                     'Muvaffaqiyatli',
-                    'Sizning arizangiz qabul qilindi. Tez orada administratorlarimiz siz bilan bog\'lanishadi.',
+                    'Arizangiz qabul qilindi! Admin ko\'rib chiqqach sizga xabar beriladi.',
                     [{ text: 'OK', onPress: () => navigation.goBack() }]
                 );
+            } else {
+                throw new Error('Server error');
             }
         } catch (error: any) {
-            console.error('Error submitting application:', error);
             Alert.alert('Xato', 'Ariza yuborishda xatolik yuz berdi');
         } finally {
             setLoading(false);
         }
     };
 
+    const renderHeader = () => (
+        <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                <Ionicons name="chevron-back" size={28} color={Colors.text} />
+            </TouchableOpacity>
+            <View>
+                <Text style={styles.headerTitle}>ARIZA TOPSHIRISH</Text>
+                <Text style={styles.headerSubtitle}>Amatora Sports oilasiga qo'shiling</Text>
+            </View>
+            <View style={{ width: 40 }} />
+        </View>
+    );
+
     const renderTypeSelector = () => (
-        <View style={styles.typeContainer}>
+        <View style={styles.typeSelectorWrapper}>
             <TouchableOpacity
-                style={[styles.typeButton, applicationType === 'player' && styles.typeButtonActive]}
+                style={[styles.typeOption, applicationType === 'player' && styles.typeOptionActive]}
                 onPress={() => setApplicationType('player')}
             >
-                <Ionicons name="person" size={18} color={applicationType === 'player' ? '#000' : Colors.textMuted} />
-                <Text style={[styles.typeButtonText, applicationType === 'player' && styles.typeButtonTextActive]}>O'yinchi</Text>
+                <Ionicons name="person" size={20} color={applicationType === 'player' ? '#000' : Colors.textMuted} />
+                <Text style={[styles.typeOptionText, applicationType === 'player' && styles.typeOptionTextActive]}>O'YINCHI</Text>
             </TouchableOpacity>
             <TouchableOpacity
-                style={[styles.typeButton, applicationType === 'team' && styles.typeButtonActive]}
+                style={[styles.typeOption, applicationType === 'team' && styles.typeOptionActive]}
                 onPress={() => setApplicationType('team')}
             >
-                <Ionicons name="shield" size={18} color={applicationType === 'team' ? '#000' : Colors.textMuted} />
-                <Text style={[styles.typeButtonText, applicationType === 'team' && styles.typeButtonTextActive]}>Jamoa</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[styles.typeButton, applicationType === 'league' && styles.typeButtonActive]}
-                onPress={() => setApplicationType('league')}
-            >
-                <Ionicons name="trophy" size={18} color={applicationType === 'league' ? '#000' : Colors.textMuted} />
-                <Text style={[styles.typeButtonText, applicationType === 'league' && styles.typeButtonTextActive]}>Liga</Text>
+                <Ionicons name="shield" size={20} color={applicationType === 'team' ? '#000' : Colors.textMuted} />
+                <Text style={[styles.typeOptionText, applicationType === 'team' && styles.typeOptionTextActive]}>JAMOA</Text>
             </TouchableOpacity>
         </View>
     );
 
-    const renderPlayerForm = () => (
-        <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Shaxsiy ma'lumotlar</Text>
-
-            <TouchableOpacity style={styles.imagePicker} onPress={() => pickImage('photo')}>
-                {formData.photo ? (
-                    <Image source={{ uri: formData.photo }} style={styles.pickedImage} />
-                ) : (
-                    <View style={styles.imagePlaceholder}>
-                        <Ionicons name="camera" size={30} color={Colors.textMuted} />
-                        <Text style={styles.imagePlaceholderText}>Rasm yuklash</Text>
-                    </View>
-                )}
-            </TouchableOpacity>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Familiya *</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.lastName}
-                    onChangeText={(text) => setFormData({ ...formData, lastName: text })}
-                    placeholder="Familiyangizni kiriting"
-                    placeholderTextColor={Colors.textMuted}
-                />
-            </View>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Ism *</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.firstName}
-                    onChangeText={(text) => setFormData({ ...formData, firstName: text })}
-                    placeholder="Ismingizni kiriting"
-                    placeholderTextColor={Colors.textMuted}
-                />
-            </View>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Otasining ismi</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.middleName}
-                    onChangeText={(text) => setFormData({ ...formData, middleName: text })}
-                    placeholder="Sharifingizni kiriting"
-                    placeholderTextColor={Colors.textMuted}
-                />
-            </View>
-
-            <View style={styles.row}>
-                <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                    <Text style={styles.label}>Raqam</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={formData.number}
-                        onChangeText={(text) => setFormData({ ...formData, number: text })}
-                        placeholder="7"
-                        keyboardType="number-pad"
-                        placeholderTextColor={Colors.textMuted}
-                    />
-                </View>
-                <View style={[styles.inputGroup, { flex: 2 }]}>
-                    <Text style={styles.label}>Ampluasi (Rol)</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={formData.position}
-                        onChangeText={(text) => setFormData({ ...formData, position: text })}
-                        placeholder="Hujumchi"
-                        placeholderTextColor={Colors.textMuted}
-                    />
-                </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Tajriba (Qayerda o'ynagan)</Text>
-                <TextInput
-                    style={[styles.input, styles.textArea]}
-                    value={formData.experience}
-                    onChangeText={(text) => setFormData({ ...formData, experience: text })}
-                    placeholder="Oldingi jamoalaringiz va tajribangiz haqida..."
-                    multiline
-                    numberOfLines={3}
-                    placeholderTextColor={Colors.textMuted}
-                />
-            </View>
-
-            <Text style={styles.sectionTitle}>Jamoa tanlash</Text>
-
-            <Text style={styles.label}>Ligani tanlang *</Text>
-            <View style={styles.pickerContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {leagues.map((league) => (
-                        <TouchableOpacity
-                            key={league._id}
-                            style={[styles.pickerItem, formData.selectedLeague === league._id && styles.pickerItemActive]}
-                            onPress={() => handleLeagueSelect(league._id)}
-                        >
-                            <Text style={[styles.pickerItemText, formData.selectedLeague === league._id && styles.pickerItemTextActive]}>{league.name}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            {formData.selectedLeague !== '' && (
-                <>
-                    <Text style={styles.label}>Turnirni tanlang *</Text>
-                    <View style={styles.pickerContainer}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {tournaments.map((tournament) => (
-                                <TouchableOpacity
-                                    key={tournament._id}
-                                    style={[styles.pickerItem, formData.selectedTournament === tournament._id && styles.pickerItemActive]}
-                                    onPress={() => handleTournamentSelect(tournament._id)}
-                                >
-                                    <Text style={[styles.pickerItemText, formData.selectedTournament === tournament._id && styles.pickerItemTextActive]}>{tournament.name}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </>
-            )}
-
-            {formData.selectedTournament !== '' && (
-                <>
-                    <Text style={styles.label}>Jamoani tanlang *</Text>
-                    <View style={styles.pickerContainer}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {teams.map((team) => (
-                                <TouchableOpacity
-                                    key={team._id}
-                                    style={[styles.pickerItem, formData.selectedTeam === team._id && styles.pickerItemActive]}
-                                    onPress={() => setFormData({ ...formData, selectedTeam: team._id })}
-                                >
-                                    <Text style={[styles.pickerItemText, formData.selectedTeam === team._id && styles.pickerItemTextActive]}>{team.name}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </>
-            )}
-        </View>
-    );
-
-    const renderTeamForm = () => (
-        <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Jamoa ma'lumotlari</Text>
-
-            <TouchableOpacity style={styles.imagePicker} onPress={() => pickImage('teamLogo')}>
-                {formData.teamLogo ? (
-                    <Image source={{ uri: formData.teamLogo }} style={styles.pickedImage} />
-                ) : (
-                    <View style={styles.imagePlaceholder}>
-                        <Ionicons name="shield" size={30} color={Colors.textMuted} />
-                        <Text style={styles.imagePlaceholderText}>Logo yuklash</Text>
-                    </View>
-                )}
-            </TouchableOpacity>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Jamoa nomi *</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.teamName}
-                    onChangeText={(text) => setFormData({ ...formData, teamName: text })}
-                    placeholder="Jamoangiz nomini kiriting"
-                    placeholderTextColor={Colors.textMuted}
-                />
-            </View>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Tashkil topgan sana</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.teamFoundedDate}
-                    onChangeText={(text) => setFormData({ ...formData, teamFoundedDate: text })}
-                    placeholder="Masalan: 2023-yil"
-                    placeholderTextColor={Colors.textMuted}
-                />
-            </View>
-
-            <Text style={styles.sectionTitle}>Musobaqa tanlash</Text>
-            <Text style={styles.label}>Ligani tanlang *</Text>
-            <View style={styles.pickerContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {leagues.map((league) => (
-                        <TouchableOpacity
-                            key={league._id}
-                            style={[styles.pickerItem, formData.selectedLeague === league._id && styles.pickerItemActive]}
-                            onPress={() => handleLeagueSelect(league._id)}
-                        >
-                            <Text style={[styles.pickerItemText, formData.selectedLeague === league._id && styles.pickerItemTextActive]}>{league.name}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            {formData.selectedLeague !== '' && (
-                <>
-                    <Text style={styles.label}>Turnirni tanlang *</Text>
-                    <View style={styles.pickerContainer}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {tournaments.map((tournament) => (
-                                <TouchableOpacity
-                                    key={tournament._id}
-                                    style={[styles.pickerItem, formData.selectedTournament === tournament._id && styles.pickerItemActive]}
-                                    onPress={() => setFormData({ ...formData, selectedTournament: tournament._id })}
-                                >
-                                    <Text style={[styles.pickerItemText, formData.selectedTournament === tournament._id && styles.pickerItemTextActive]}>{tournament.name}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </>
-            )}
-        </View>
-    );
-
-    const renderLeagueForm = () => (
-        <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Liga ma'lumotlari</Text>
-
-            <TouchableOpacity style={styles.imagePicker} onPress={() => pickImage('leagueLogo')}>
-                {formData.leagueLogo ? (
-                    <Image source={{ uri: formData.leagueLogo }} style={styles.pickedImage} />
-                ) : (
-                    <View style={styles.imagePlaceholder}>
-                        <Ionicons name="trophy" size={30} color={Colors.textMuted} />
-                        <Text style={styles.imagePlaceholderText}>Logo yuklash</Text>
-                    </View>
-                )}
-            </TouchableOpacity>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Liga nomi *</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.leagueName}
-                    onChangeText={(text) => setFormData({ ...formData, leagueName: text })}
-                    placeholder="Liga nomini kiriting"
-                    placeholderTextColor={Colors.textMuted}
-                />
-            </View>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Tashkil topgan sana</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.leagueFoundedDate}
-                    onChangeText={(text) => setFormData({ ...formData, leagueFoundedDate: text })}
-                    placeholder="Masalan: 2024-yil"
-                    placeholderTextColor={Colors.textMuted}
-                />
-            </View>
-        </View>
-    );
+    const playerPhoto = formData.photo || undefined;
+    const teamLogo = formData.teamLogo || undefined;
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1 }}
-        >
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Ariza topshirish</Text>
-                <View style={{ width: 24 }} />
-            </View>
-
-            <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-                <Text style={styles.subtitle}>HFL oilasiga qo'shilish uchun quyidagi shaklni to'ldiring</Text>
-
-                {renderTypeSelector()}
-
-                <View style={styles.contactSection}>
-                    <Text style={styles.sectionTitle}>Aloqa ma'lumotlari</Text>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Telefon raqami *</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={formData.phone}
-                            onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                            placeholder="+998 90 123 45 67"
-                            keyboardType="phone-pad"
-                            placeholderTextColor={Colors.textMuted}
-                        />
-                    </View>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Telegram yoki Email</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={formData.email}
-                            onChangeText={(text) => setFormData({ ...formData, email: text })}
-                            placeholder="@user yoki email"
-                            autoCapitalize="none"
-                            placeholderTextColor={Colors.textMuted}
-                        />
-                    </View>
-                </View>
-
-                {applicationType === 'player' && renderPlayerForm()}
-                {applicationType === 'team' && renderTeamForm()}
-                {applicationType === 'league' && renderLeagueForm()}
-
-                <TouchableOpacity
-                    style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                    onPress={handleSubmit}
-                    disabled={loading}
+        <View style={styles.container}>
+            <SafeAreaView style={{ flex: 1 }}>
+                {renderHeader()}
+                
+                <ScrollView 
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.scrollContent}
                 >
-                    {loading ? (
-                        <ActivityIndicator color="#000" />
-                    ) : (
-                        <Text style={styles.submitButtonText}>Arzani Jo'natish</Text>
-                    )}
-                </TouchableOpacity>
+                    {renderTypeSelector()}
 
-                <View style={{ height: 40 }} />
-            </ScrollView>
-        </KeyboardAvoidingView>
+                    {/* Step 1: Basic Info */}
+                    <View style={styles.card}>
+                        <Text style={styles.cardLabel}>{applicationType === 'player' ? 'SHAXSIY MA\'LUMOTLAR' : 'JAMOA MA\'LUMOTLARI'}</Text>
+                        
+                        <TouchableOpacity 
+                            style={styles.photoUpload} 
+                            onPress={() => pickImage(applicationType === 'player' ? 'photo' : 'teamLogo')}
+                        >
+                            {(applicationType === 'player' ? playerPhoto : teamLogo) ? (
+                                <Image 
+                                    source={{ uri: (applicationType === 'player' ? playerPhoto : teamLogo) as string }} 
+                                    style={styles.uploadedImage} 
+                                />
+                            ) : (
+                                <View style={styles.photoPlaceholder}>
+                                    <Ionicons 
+                                        name={applicationType === 'player' ? "camera-outline" : "shield-outline"} 
+                                        size={32} 
+                                        color={Colors.primary} 
+                                    />
+                                    <Text style={styles.photoText}>RASM YUKLASH</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+
+                        <View style={styles.inputStack}>
+                            {applicationType === 'player' ? (
+                                <>
+                                    <View style={styles.inputBox}>
+                                        <Text style={styles.boxLabel}>FAMILIYA</Text>
+                                        <TextInput
+                                            style={styles.textInput}
+                                            value={formData.lastName}
+                                            onChangeText={(t) => setFormData({...formData, lastName: t})}
+                                            placeholder="Masalan: Karimov"
+                                            placeholderTextColor="rgba(255,255,255,0.2)"
+                                        />
+                                    </View>
+                                    <View style={styles.inputBox}>
+                                        <Text style={styles.boxLabel}>ISM</Text>
+                                        <TextInput
+                                            style={styles.textInput}
+                                            value={formData.firstName}
+                                            onChangeText={(t) => setFormData({...formData, firstName: t})}
+                                            placeholder="Masalan: Aziz"
+                                            placeholderTextColor="rgba(255,255,255,0.2)"
+                                        />
+                                    </View>
+                                </>
+                            ) : (
+                                <>
+                                    <View style={styles.inputBox}>
+                                        <Text style={styles.boxLabel}>JAMOA NOMI *</Text>
+                                        <TextInput
+                                            style={styles.textInput}
+                                            value={formData.teamName}
+                                            onChangeText={(t) => setFormData({ ...formData, teamName: t })}
+                                            placeholder="Masalan: Zarba FC"
+                                            placeholderTextColor="rgba(255,255,255,0.2)"
+                                        />
+                                    </View>
+
+                                    <View style={styles.inputBox}>
+                                        <Text style={styles.boxLabel}>XODIM ISMI VA FAMILYASI *</Text>
+                                        <TextInput
+                                            style={styles.textInput}
+                                            value={formData.staffName}
+                                            onChangeText={(t) => setFormData({ ...formData, staffName: t })}
+                                            placeholder="Ism sharifingizni kiriting"
+                                            placeholderTextColor="rgba(255,255,255,0.2)"
+                                        />
+                                    </View>
+
+                                    <View style={styles.inputBox}>
+                                        <Text style={styles.boxLabel}>ROLINGIZ *</Text>
+                                        <View style={styles.positionCloud}>
+                                            {TEAM_ROLES.map((role) => (
+                                                <TouchableOpacity
+                                                    key={role.id}
+                                                    style={[
+                                                        styles.positionCloudItem,
+                                                        formData.staffRole === role.id && styles.positionCloudItemActive
+                                                    ]}
+                                                    onPress={() => setFormData({ ...formData, staffRole: role.id })}
+                                                >
+                                                    <Text style={[
+                                                        styles.positionCloudText,
+                                                        formData.staffRole === role.id && styles.positionCloudTextActive
+                                                    ]}>
+                                                        {role.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+                                </>
+                            )}
+
+                            <View style={styles.inputBox}>
+                                <Text style={styles.boxLabel}>TELEFON RAQAM (+998)</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={formData.phone}
+                                    onChangeText={(t) => setFormData({...formData, phone: t})}
+                                    placeholder="90 123 45 67"
+                                    keyboardType="phone-pad"
+                                    maxLength={9}
+                                    placeholderTextColor="rgba(255,255,255,0.2)"
+                                />
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Step 2: Player Position (Only for players) */}
+                    {applicationType === 'player' && (
+                        <View style={styles.card}>
+                            <Text style={styles.cardLabel}>AMPLUA (ROL)</Text>
+                        <View style={styles.positionCloud}>
+                            {PLAYER_POSITIONS.map((pos) => (
+                                <TouchableOpacity
+                                    key={pos.id}
+                                    style={[
+                                        styles.positionCloudItem,
+                                        formData.position === pos.id && styles.positionCloudItemActive
+                                    ]}
+                                    onPress={() => setFormData({...formData, position: pos.id})}
+                                >
+                                    <Text style={[
+                                        styles.positionCloudText,
+                                        formData.position === pos.id && styles.positionCloudTextActive
+                                    ]}>{pos.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        </View>
+                    )}
+
+                    {/* Step 3: Selection Hierarchy */}
+                    <View style={styles.card}>
+                        <Text style={styles.cardLabel}>MUSOBAQA TANLASH</Text>
+                        
+                        {/* League */}
+                        <Text style={styles.subLabel}>LIGA</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalSelect}>
+                            {leagues.map(l => (
+                                <TouchableOpacity 
+                                    key={l._id} 
+                                    style={[styles.selectBtn, formData.selectedLeague === l._id && styles.selectBtnActive]}
+                                    onPress={() => handleLeagueSelect(l._id)}
+                                >
+                                    <Text style={[styles.selectBtnText, formData.selectedLeague === l._id && styles.selectBtnTextActive]}>{l.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        {/* Tournament */}
+                        {formData.selectedLeague !== '' && (
+                            <>
+                                <Text style={styles.subLabel}>TURNIR</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalSelect}>
+                                    {tournaments.map(t => (
+                                        <TouchableOpacity 
+                                            key={t._id} 
+                                            style={[styles.selectBtn, formData.selectedTournament === t._id && styles.selectBtnActive]}
+                                            onPress={() => handleTournamentSelect(t._id)}
+                                        >
+                                            <Text style={[styles.selectBtnText, formData.selectedTournament === t._id && styles.selectBtnTextActive]}>{t.name}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </>
+                        )}
+
+                        {/* Team (Only for players) */}
+                        {applicationType === 'player' && formData.selectedTournament !== '' && (
+                            <>
+                                <Text style={styles.subLabel}>JAMOA</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalSelect}>
+                                    {teams.map(tm => (
+                                        <TouchableOpacity 
+                                            key={tm._id} 
+                                            style={[styles.selectBtn, formData.selectedTeam === tm._id && styles.selectBtnActive]}
+                                            onPress={() => setFormData({...formData, selectedTeam: tm._id})}
+                                        >
+                                            <Text style={[styles.selectBtnText, formData.selectedTeam === tm._id && styles.selectBtnTextActive]}>{tm.name}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </>
+                        )}
+
+                        {loadingData && <ActivityIndicator color={Colors.primary} style={{ marginTop: 10 }} />}
+                    </View>
+
+                    <TouchableOpacity 
+                        style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+                        onPress={handleSubmit}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#000" />
+                        ) : (
+                            <Text style={styles.submitBtnText}>ARIZANI YUBORISH</Text>
+                        )}
+                    </TouchableOpacity>
+
+                    <View style={{ height: 100 }} />
+                </ScrollView>
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -526,168 +462,211 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'ios' ? 60 : 40,
-        paddingBottom: 20,
-        backgroundColor: Colors.background,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        marginTop: Platform.OS === 'ios' ? 0 : 30,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     headerTitle: {
         color: Colors.text,
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 2,
+        textAlign: 'center',
     },
-    backButton: {
-        padding: 5,
+    headerSubtitle: {
+        color: Colors.textMuted,
+        fontSize: 10,
+        textAlign: 'center',
+        opacity: 0.6,
     },
-    content: {
+    scrollContent: {
         padding: 20,
     },
-    subtitle: {
-        color: Colors.textMuted,
-        fontSize: 14,
-        marginBottom: 25,
-        lineHeight: 20,
-    },
-    typeContainer: {
+    typeSelectorWrapper: {
         flexDirection: 'row',
-        backgroundColor: Colors.surface,
+        backgroundColor: 'rgba(255,255,255,0.03)',
         borderRadius: 16,
-        padding: 5,
-        marginBottom: 25,
+        padding: 6,
+        marginBottom: 24,
         borderWidth: 1,
-        borderColor: Colors.border,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
-    typeButton: {
+    typeOption: {
         flex: 1,
         flexDirection: 'row',
+        height: 48,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
         borderRadius: 12,
     },
-    typeButtonActive: {
+    typeOptionActive: {
         backgroundColor: Colors.primary,
     },
-    typeButtonText: {
+    typeOptionText: {
         color: Colors.textMuted,
         fontSize: 12,
-        fontWeight: 'bold',
-        marginLeft: 6,
+        fontWeight: '800',
+        marginLeft: 8,
     },
-    typeButtonTextActive: {
+    typeOptionTextActive: {
         color: '#000',
     },
-    formSection: {
-        marginTop: 10,
-    },
-    contactSection: {
+    card: {
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 24,
+        padding: 20,
         marginBottom: 20,
-    },
-    sectionTitle: {
-        color: Colors.text,
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 15,
-        marginTop: 10,
-    },
-    inputGroup: {
-        marginBottom: 15,
-    },
-    label: {
-        color: Colors.text,
-        fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    input: {
-        backgroundColor: Colors.surface,
-        borderRadius: 12,
-        padding: 15,
-        color: Colors.text,
         borderWidth: 1,
-        borderColor: Colors.border,
-        fontSize: 15,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
-    row: {
-        flexDirection: 'row',
-        marginBottom: 15,
+    cardLabel: {
+        color: Colors.primary,
+        fontSize: 11,
+        fontWeight: '900',
+        letterSpacing: 1,
+        marginBottom: 20,
+        opacity: 0.8,
     },
-    textArea: {
-        height: 80,
-        textAlignVertical: 'top',
-    },
-    imagePicker: {
+    photoUpload: {
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: Colors.surface,
+        backgroundColor: 'rgba(255,255,255,0.02)',
         borderWidth: 1,
-        borderColor: Colors.border,
+        borderColor: 'rgba(255,255,255,0.05)',
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
         alignSelf: 'center',
-        marginBottom: 20,
+        marginBottom: 24,
         overflow: 'hidden',
     },
-    pickedImage: {
+    uploadedImage: {
         width: '100%',
         height: '100%',
     },
-    imagePlaceholder: {
+    photoPlaceholder: {
         alignItems: 'center',
     },
-    imagePlaceholderText: {
+    photoText: {
+        color: Colors.textMuted,
+        fontSize: 8,
+        fontWeight: '800',
+        marginTop: 4,
+    },
+    inputStack: {
+        // Gap is handled via margin for compatibility if needed, but modern RN supports gap
+    },
+    inputBox: {
+        marginBottom: 16,
+    },
+    boxLabel: {
         color: Colors.textMuted,
         fontSize: 10,
-        marginTop: 5,
-        fontWeight: 'bold',
+        fontWeight: '700',
+        marginLeft: 4,
+        marginBottom: 8,
     },
-    pickerContainer: {
-        marginBottom: 20,
-    },
-    pickerItem: {
+    textInput: {
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 12,
+        height: 52,
         paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 25,
-        backgroundColor: Colors.surface,
-        marginRight: 10,
+        color: Colors.text,
+        fontSize: 15,
+        fontWeight: '600',
         borderWidth: 1,
-        borderColor: Colors.border,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
-    pickerItemActive: {
+    positionCloud: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -4,
+    },
+    positionCloudItem: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        borderRadius: 10,
+        margin: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.05)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    positionCloudItemActive: {
         backgroundColor: Colors.primary,
         borderColor: Colors.primary,
     },
-    pickerItemText: {
+    positionCloudText: {
+        color: Colors.textMuted,
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 1,
+    },
+    positionCloudTextActive: {
+        color: '#000',
+    },
+    subLabel: {
+        color: Colors.textMuted,
+        fontSize: 10,
+        fontWeight: '800',
+        marginBottom: 10,
+        opacity: 0.5,
+    },
+    horizontalSelect: {
+        marginBottom: 20,
+    },
+    selectBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    selectBtnActive: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primary,
+    },
+    selectBtnText: {
         color: Colors.text,
         fontSize: 13,
+        fontWeight: '600',
     },
-    pickerItemTextActive: {
+    selectBtnTextActive: {
         color: '#000',
-        fontWeight: 'bold',
+        fontWeight: '800',
     },
-    submitButton: {
+    submitBtn: {
         backgroundColor: Colors.primary,
+        height: 60,
         borderRadius: 16,
-        padding: 18,
+        justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 30,
         shadowColor: Colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 10,
+        shadowRadius: 8,
         elevation: 5,
     },
-    submitButtonDisabled: {
-        opacity: 0.7,
+    submitBtnDisabled: {
+        opacity: 0.5,
     },
-    submitButtonText: {
+    submitBtnText: {
         color: '#000',
-        fontSize: 17,
-        fontWeight: '800',
-        textTransform: 'uppercase',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 1,
     },
 });
 

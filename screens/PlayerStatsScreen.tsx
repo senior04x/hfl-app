@@ -9,23 +9,22 @@ import {
     Linking,
     Dimensions,
     Image,
-    Animated,
-    SafeAreaView,
-    StatusBar
+    Animated
 } from 'react-native';
 import { apiService } from '../services/apiService';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
-import { useAuthStore } from '../store/useAuthStore';
+import { Player } from '../types';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
+import Translations from '../constants/Translations';
 
 const { width } = Dimensions.get('window');
 
-const MyStatsScreen = ({ navigation }: any) => {
-    const user = useAuthStore((state) => state.user);
+const PlayerStatsScreen = ({ route, navigation }: any) => {
+    const { playerId, player: initialPlayer } = route.params || {};
     const [loading, setLoading] = useState(true);
-    const [player, setPlayer] = useState<any>(null);
+    const [player, setPlayer] = useState<Player | null>(initialPlayer || null);
     const [activeTab, setActiveTab] = useState('profil');
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
@@ -34,7 +33,7 @@ const MyStatsScreen = ({ navigation }: any) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
 
     const tabs = ['profil', 'karyerasi', 'oyinlari'];
-    const tabLabels: any = {
+    const tabLabels = {
         profil: 'PROFIL',
         karyerasi: 'KARYERASI',
         oyinlari: "O'YINLARI"
@@ -62,17 +61,17 @@ const MyStatsScreen = ({ navigation }: any) => {
     };
 
     useEffect(() => {
-        if (user && user.id && user.role === 'player') {
+        if (playerId) {
             fetchPlayer();
         } else {
             setLoading(false);
         }
-    }, [user]);
+    }, [playerId]);
 
     const fetchPlayer = async () => {
         try {
             setLoading(true);
-            const data = await apiService.getPlayerById(user.id);
+            const data = await apiService.getPlayerById(playerId);
             if (data) {
                 setPlayer(data);
                 if (activeTab === 'oyinlari') {
@@ -80,17 +79,16 @@ const MyStatsScreen = ({ navigation }: any) => {
                 }
             }
         } catch (error) {
-            console.error('Error fetching my stats:', error);
+            console.error('Error fetching player stats:', error);
         } finally {
             setLoading(false);
         }
     };
 
     const fetchPlayerMatches = async () => {
-        if (!user?.id) return;
         try {
             setMatchesLoading(true);
-            const data = await apiService.getPlayerMatches(user.id);
+            const data = await apiService.getPlayerMatches(playerId);
             setMatches(data || []);
         } catch (error) {
             console.error('Error fetching player matches:', error);
@@ -105,64 +103,11 @@ const MyStatsScreen = ({ navigation }: any) => {
         }
     }, [activeTab]);
 
-    if (!user) {
-        return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.centeredContent}>
-                    <Ionicons name="lock-closed" size={64} color={Colors.textMuted} />
-                    <Text style={styles.noUserText}>Iltimos, tizimga kiring</Text>
-                    <TouchableOpacity 
-                        style={styles.loginBtn}
-                        onPress={() => navigation.navigate('Welcome')}
-                    >
-                        <Text style={styles.loginBtnText}>KIRISH</Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
     if (loading && !player) {
         return <PlayerProfileSkeleton />;
     }
 
-    if (!player && user.role === 'player') {
-         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.centeredContent}>
-                    <Text style={styles.noUserText}>Ma'lumotlar topilmadi</Text>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
-    // manager view placeholder (since request focused on player stats imitation)
-    if (user.role === 'manager') {
-        return (
-            <SafeAreaView style={styles.container}>
-                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
-                    </TouchableOpacity>
-                    <Text style={styles.brandText}>AMATORA</Text>
-                    <View style={{ width: 24 }} />
-                </View>
-                <View style={styles.centeredContent}>
-                    <SmartImage uri={user.logo} style={{ width: 120, height: 120, borderRadius: 60, marginBottom: 20 }} />
-                    <Text style={styles.playerName}>{user.name}</Text>
-                    <View style={styles.managerBadge}>
-                        <Text style={styles.managerBadgeText}>JAMOA SARDORI</Text>
-                    </View>
-                    <TouchableOpacity 
-                        style={styles.actionBtn}
-                        onPress={() => navigation.navigate('TeamProfile', { teamId: user.id })}
-                    >
-                        <Text style={styles.actionBtnText}>JAMOA PROFILI</Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        );
-    }
+    if (!player) return null;
 
     const stats = player.stats || { goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0 };
 
@@ -202,8 +147,8 @@ const MyStatsScreen = ({ navigation }: any) => {
                             <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
                         </View>
                         <View>
-                            <Text style={styles.statLabelSmall}>YOSHI</Text>
-                            <Text style={styles.statValueSmall}>{player?.age || '—'}</Text>
+                            <Text style={styles.statLabel}>YOSHI</Text>
+                            <Text style={styles.statValue}>{player?.age || '—'}</Text>
                         </View>
                     </View>
                     <View style={styles.statItem}>
@@ -211,8 +156,8 @@ const MyStatsScreen = ({ navigation }: any) => {
                             <Ionicons name="resize-outline" size={18} color={Colors.primary} />
                         </View>
                         <View>
-                            <Text style={styles.statLabelSmall}>BO'YI</Text>
-                            <Text style={styles.statValueSmall}>{player?.height ? `${player.height} SM` : '—'}</Text>
+                            <Text style={styles.statLabel}>BO'YI</Text>
+                            <Text style={styles.statValue}>{player?.height ? `${player.height} SM` : '—'}</Text>
                         </View>
                     </View>
                     <View style={styles.statItem}>
@@ -220,8 +165,8 @@ const MyStatsScreen = ({ navigation }: any) => {
                             <Ionicons name="fitness-outline" size={18} color={Colors.primary} />
                         </View>
                         <View>
-                            <Text style={styles.statLabelSmall}>VAZNI</Text>
-                            <Text style={styles.statValueSmall}>{player?.weight ? `${player.weight} KG` : '—'}</Text>
+                            <Text style={styles.statLabel}>VAZNI</Text>
+                            <Text style={styles.statValue}>{player?.weight ? `${player.weight} KG` : '—'}</Text>
                         </View>
                     </View>
                 </View>
@@ -236,17 +181,8 @@ const MyStatsScreen = ({ navigation }: any) => {
                     <InfoRow label="OTASINING ISMI" value={player.fatherName || '---'} icon="person" />
                     <InfoRow label="MILLATI" value={player.citizenship || '---'} icon="planet" />
                     <InfoRow label="POZITSIYA" value={player.positionUz || player.position || '---'} icon="shield" />
-                    <InfoRow label="TELEFON" value={player.phone || '---'} icon="call" />
                 </View>
             </View>
-            
-            <TouchableOpacity 
-                style={styles.editProfileBtn}
-                onPress={() => Linking.openURL('https://t.me/amatora_support')}
-            >
-                <Ionicons name="create-outline" size={20} color="#000" />
-                <Text style={styles.editProfileBtnText}>MA'LUMOTLARNI TAHRIRLASH</Text>
-            </TouchableOpacity>
         </ScrollView>
     );
 
@@ -262,7 +198,7 @@ const MyStatsScreen = ({ navigation }: any) => {
 
                 <View style={styles.careerTimelineContainer}>
                     {history.length > 0 ? (
-                        history.map((yearGroup: any, yIdx: number) => (
+                        history.map((yearGroup, yIdx) => (
                             <View key={yearGroup.year} style={styles.yearBlock}>
                                 <View style={styles.yearHeaderBadge}>
                                     <Text style={styles.yearHeaderText}>{yearGroup.year}</Text>
@@ -273,7 +209,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                     </View>
                                 </View>
 
-                                {yearGroup.teams.map((team: any, tIdx: number) => (
+                                {yearGroup.teams.map((team, tIdx) => (
                                     <View key={team.teamId} style={styles.teamCareerWrapper}>
                                         <View style={styles.teamMainRow}>
                                             <View style={styles.teamIconBox}>
@@ -292,7 +228,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                             </View>
                                         </View>
 
-                                        {team.tournaments.map((tour: any, tourIdx: number) => (
+                                        {team.tournaments.map((tour, tourIdx) => (
                                             <View key={tourIdx} style={styles.tournamentRow}>
                                                 <View style={styles.tourIconWrap}>
                                                     <Ionicons name="football" size={12} color="rgba(255,255,255,0.4)" />
@@ -344,7 +280,6 @@ const MyStatsScreen = ({ navigation }: any) => {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.heroSection}>
                     <View style={styles.heroBackgroundContainer}>
@@ -356,13 +291,12 @@ const MyStatsScreen = ({ navigation }: any) => {
                         <View style={styles.heroOverlay} />
                     </View>
 
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()}>
-                            <Ionicons name="arrow-back" size={24} color="#FFF" />
-                        </TouchableOpacity>
-                        <Text style={styles.brandText}>AMATORA</Text>
-                        <View style={{ width: 24 }} />
-                    </View>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <Ionicons name="arrow-back" size={24} color="#FFF" />
+                    </TouchableOpacity>
 
                     <View style={styles.profileHeader}>
                         <View style={styles.photoContainer}>
@@ -384,26 +318,56 @@ const MyStatsScreen = ({ navigation }: any) => {
                             <View style={styles.badgeRow}>
                                 <View style={[
                                     styles.statusBadge,
-                                    player.status === 'inactive' && { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' }
+                                    player.status === 'inactive' && { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' },
+                                    player.status === 'suspended' && { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.2)' }
                                 ]}>
                                     <Text style={[
                                         styles.statusText,
-                                        player.status === 'inactive' && { color: '#EF4444' }
+                                        player.status === 'inactive' && { color: '#EF4444' },
+                                        player.status === 'suspended' && { color: '#F59E0B' }
                                     ]}>
-                                        {player.status === 'inactive' ? 'NOFAOL' : 'FAOL'} O'YINCHI
+                                        {player.status === 'inactive' ? 'NOFAOL' : (player.status === 'suspended' ? 'SUSPENSIYA' : 'FAOL')} O'YINCHI
                                     </Text>
                                 </View>
                                 <View style={styles.ratingBadge}>
                                     <Text style={styles.ratingText}>★ {player?.rating || 0}</Text>
                                 </View>
+                                <View style={styles.posBadge}>
+                                    <Text style={styles.posText}>{player?.positionUz || player?.position || 'O\'YINCHI'}</Text>
+                                </View>
                             </View>
 
                             <Text style={styles.firstName}>{player.firstName}</Text>
                             <Text style={styles.lastName}>{player.lastName}</Text>
-                            
-                            <View style={styles.posBadge}>
-                                <Text style={styles.posText}>{player?.positionUz || player?.position || 'O\'YINCHI'}</Text>
-                            </View>
+
+                            {(player.instagram || player.facebook || player.youtube) && (
+                                <View style={styles.socialRow}>
+                                    {player.instagram && (
+                                        <TouchableOpacity
+                                            style={styles.socialBtn}
+                                            onPress={() => Linking.openURL(player.instagram!)}
+                                        >
+                                            <Ionicons name="logo-instagram" size={18} color="#FFF" />
+                                        </TouchableOpacity>
+                                    )}
+                                    {player.facebook && (
+                                        <TouchableOpacity
+                                            style={styles.socialBtn}
+                                            onPress={() => Linking.openURL(player.facebook!)}
+                                        >
+                                            <Ionicons name="logo-facebook" size={18} color="#FFF" />
+                                        </TouchableOpacity>
+                                    )}
+                                    {player.youtube && (
+                                        <TouchableOpacity
+                                            style={styles.socialBtn}
+                                            onPress={() => Linking.openURL(player.youtube!)}
+                                        >
+                                            <Ionicons name="logo-youtube" size={18} color="#FFF" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -429,7 +393,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                     </View>
                                     <View style={{ flex: 1, marginLeft: 12 }}>
                                         <Text style={styles.miniTabType}>BO'LIM</Text>
-                                        <Text style={styles.miniTabName}>{tabLabels[activeTab]}</Text>
+                                        <Text style={styles.miniTabName}>{tabLabels[activeTab as keyof typeof tabLabels]}</Text>
                                     </View>
                                 </View>
                             </Animated.View>
@@ -458,7 +422,7 @@ const StatBox = ({ label, value, icon, color }: any) => (
         <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
             <Ionicons name={icon} size={20} color={color} />
         </View>
-        <Text style={styles.statLabelSmall}>{label}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
         <Text style={styles.statValue}>{value}</Text>
     </View>
 );
@@ -508,52 +472,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#0A0E1A',
     },
-    centeredContent: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    noUserText: {
-        color: Colors.text,
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginTop: 20,
-        marginBottom: 30,
-    },
-    loginBtn: {
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 40,
-        paddingVertical: 15,
-        borderRadius: 12,
-    },
-    loginBtnText: {
-        color: '#000',
-        fontWeight: '900',
-        letterSpacing: 2,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 40,
-        marginBottom: 20,
-    },
-    brandText: {
-        color: '#FFF',
-        fontSize: 18,
-        fontWeight: '900',
-        letterSpacing: 4,
-        opacity: 0.8,
-    },
     scrollContent: {
         paddingBottom: 40,
     },
     heroSection: {
         backgroundColor: '#050A18',
-        paddingTop: 10,
-        paddingBottom: 20,
+        paddingTop: 60,
+        paddingBottom: 0,
         paddingHorizontal: 24,
         borderBottomLeftRadius: 50,
         borderBottomRightRadius: 50,
@@ -575,10 +500,19 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(5, 10, 24, 0.7)',
     },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
     profileHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 10,
+        paddingBottom: 30,
     },
     photoContainer: {
         position: 'relative',
@@ -589,8 +523,6 @@ const styles = StyleSheet.create({
         borderRadius: 40,
         backgroundColor: '#000',
         overflow: 'hidden',
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.1)',
     },
     profilePhoto: {
         width: '100%',
@@ -605,8 +537,8 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: Colors.primary,
-        shadowColor: Colors.primary,
+        borderColor: '#00FF66',
+        shadowColor: '#00FF66',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.8,
         shadowRadius: 8,
@@ -617,7 +549,7 @@ const styles = StyleSheet.create({
         transform: [{ rotate: '15deg' }],
     },
     numberText: {
-        color: Colors.primary,
+        color: '#00FF66',
         fontSize: 18,
         fontWeight: 'bold',
         fontStyle: 'italic',
@@ -659,6 +591,19 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '900',
     },
+    posBadge: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    posText: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 8,
+        fontWeight: '900',
+    },
     firstName: {
         color: '#FFF',
         fontSize: 28,
@@ -676,19 +621,20 @@ const styles = StyleSheet.create({
         letterSpacing: -1,
         marginTop: -5,
     },
-    posBadge: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-        marginTop: 10,
-        alignSelf: 'flex-start',
+    socialRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 15,
     },
-    posText: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 10,
-        fontWeight: '900',
-        letterSpacing: 1,
+    socialBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     mainContent: {
         paddingHorizontal: 20,
@@ -717,7 +663,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 12,
     },
-    statLabelSmall: {
+    statLabel: {
         color: 'rgba(255,255,255,0.3)',
         fontSize: 9,
         fontWeight: '900',
@@ -755,13 +701,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
-    },
-    statValueSmall: {
-        color: '#FFF',
-        fontSize: 14,
-        fontWeight: '900',
-        fontStyle: 'italic',
-        textAlign: 'center',
     },
     infoSection: {
         marginBottom: 30,
@@ -878,6 +817,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.05)',
         marginLeft: 12,
+    },
+    careerTimelineContainer: {
+        paddingVertical: 10,
     },
     yearBlock: {
         marginBottom: 20,
@@ -1007,7 +949,7 @@ const styles = StyleSheet.create({
     matchLeague: {
         color: 'rgba(255,255,255,0.3)',
         fontSize: 8,
-        fontWeight: 'bold',
+        fontWeight: 'black',
         textTransform: 'uppercase',
     },
     matchDate: {
@@ -1062,6 +1004,15 @@ const styles = StyleSheet.create({
         fontSize: 9,
         fontWeight: 'bold',
     },
+    noDataBox: {
+        padding: 40,
+        alignItems: 'center',
+    },
+    noDataText: {
+        color: 'rgba(255,255,255,0.2)',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
     tabContent: {
         flex: 1,
     },
@@ -1069,47 +1020,6 @@ const styles = StyleSheet.create({
         padding: 40,
         alignItems: 'center',
     },
-    managerBadge: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: Colors.primary,
-        marginBottom: 30,
-    },
-    managerBadgeText: {
-        color: Colors.primary,
-        fontWeight: '900',
-        fontSize: 12,
-        letterSpacing: 1,
-    },
-    actionBtn: {
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 30,
-        paddingVertical: 15,
-        borderRadius: 12,
-    },
-    actionBtnText: {
-        color: '#000',
-        fontWeight: '900',
-    },
-    editProfileBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: Colors.primary,
-        padding: 15,
-        borderRadius: 15,
-        marginTop: 10,
-        marginBottom: 30,
-        gap: 10,
-    },
-    editProfileBtnText: {
-        color: '#000',
-        fontWeight: '900',
-        fontSize: 12,
-    },
 });
 
-export default MyStatsScreen;
+export default PlayerStatsScreen;

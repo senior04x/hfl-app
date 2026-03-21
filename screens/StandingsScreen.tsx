@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -6,27 +6,84 @@ import {
     FlatList,
     Image,
     ActivityIndicator,
-    SafeAreaView
+    SafeAreaView,
+    ScrollView,
+    TouchableOpacity,
+    RefreshControl
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
+import TableSkeleton from '../components/TableSkeleton';
 import { useSocket } from '../context/SocketContext';
 
-const StandingsScreen = ({ route }: any) => {
-    const { tournamentId, tournamentName } = route.params || {};
+const StandingsScreen = ({ route, navigation }: any) => {
+    const { tournamentId: initialTournamentId, tournamentName: initialTournamentName } = route.params || {};
+    
     const [standings, setStandings] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [tournaments, setTournaments] = useState<any[]>([]);
+    const [currentTournament, setCurrentTournament] = useState<any>(null);
     const { socket, isConnected } = useSocket();
 
-    useEffect(() => {
-        loadStandings();
-    }, [tournamentId]);
+    const loadData = useCallback(async (tId?: string) => {
+        try {
+            setLoading(true);
+            
+            // 1. Fetch available tournaments if not already loaded or if we need to find one
+            let availableTournaments = tournaments;
+            if (availableTournaments.length === 0) {
+                const data = await apiService.getTournaments();
+                availableTournaments = data || [];
+                setTournaments(availableTournaments);
+            }
+
+            // 2. Identify target tournament ID
+            const targetId = tId || initialTournamentId || (availableTournaments.length > 0 ? availableTournaments[0]._id : null);
+            
+            if (!targetId) {
+                setLoading(false);
+                return;
+            }
+
+            // 3. Fetch Tournament and Standings
+            const tournament = await apiService.getTournamentById(targetId);
+            if (tournament) {
+                setCurrentTournament(tournament);
+                if (tournament.standings && tournament.standings.length > 0) {
+                    setStandings(tournament.standings);
+                } else {
+                    // Fallback to fetching teams directly and sorting if standings field is missing
+                    const teamsData = await apiService.getTeams(1, 100, targetId);
+                    const sorted = (teamsData || []).sort((a: any, b: any) => {
+                        const statsA = a.stats || {};
+                        const statsB = b.stats || {};
+                        if ((statsB.points || 0) !== (statsA.points || 0)) return (statsB.points || 0) - (statsA.points || 0);
+                        const gdA = (statsA.goalsFor || 0) - (statsA.goalsAgainst || 0);
+                        const gdB = (statsB.goalsFor || 0) - (statsB.goalsAgainst || 0);
+                        if (gdB !== gdA) return gdB - gdA;
+                        return (statsB.goalsFor || 0) - (statsA.goalsFor || 0);
+                    });
+                    setStandings(sorted);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading data:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [initialTournamentId, tournaments]);
 
     useEffect(() => {
-        if (socket && isConnected) {
+        loadData();
+    }, [initialTournamentId]);
+
+    useEffect(() => {
+        if (socket && isConnected && currentTournament?._id) {
             socket.on('standings-update', (data: any) => {
-                if (data.tournamentId === tournamentId) {
-                    console.log('📊 Standings Update Received:', data.standings);
+                if (data.tournamentId === currentTournament._id) {
                     setStandings(data.standings);
                 }
             });
@@ -35,76 +92,106 @@ const StandingsScreen = ({ route }: any) => {
                 socket.off('standings-update');
             };
         }
-    }, [socket, isConnected, tournamentId]);
+    }, [socket, isConnected, currentTournament?._id]);
 
-    const loadStandings = async () => {
-        try {
-            setLoading(true);
-            // We'll use a generic teams endpoint filtered by tournament if specific standings endpoint is not yet ready
-            const response = await apiService.getTeams(1, 50, tournamentId);
-            if (response.data) {
-                // Sort by points, then GD, then GF
-                const sorted = response.data.sort((a: any, b: any) => {
-                    const statsA = a.stats || {};
-                    const statsB = b.stats || {};
-                    if ((statsB.points || 0) !== (statsA.points || 0)) return (statsB.points || 0) - (statsA.points || 0);
-                    const gdA = (statsA.goalsFor || 0) - (statsA.goalsAgainst || 0);
-                    const gdB = (statsB.goalsFor || 0) - (statsB.goalsAgainst || 0);
-                    if (gdB !== gdA) return gdB - gdA;
-                    return (statsB.goalsFor || 0) - (statsA.goalsFor || 0);
-                });
-                setStandings(sorted);
-            }
-        } catch (error) {
-            console.error('Error loading standings:', error);
-        } finally {
-            setLoading(false);
-        }
+    const onRefresh = () => {
+        setRefreshing(true);
+        loadData(currentTournament?._id);
     };
 
     const renderHeader = () => (
         <View style={styles.tableHeader}>
             <Text style={[styles.headerText, { width: 30 }]}>#</Text>
-            <Text style={[styles.headerText, { flex: 1 }]}>JAMOA</Text>
+            <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>JAMOA</Text>
             <Text style={[styles.headerText, { width: 30 }]}>O'</Text>
-            <Text style={[styles.headerText, { width: 30 }]}>G/N</Text>
-            <Text style={[styles.headerText, { width: 40, fontWeight: '900' }]}>OCH</Text>
+            <Text style={[styles.headerText, { width: 45 }]}>G/N</Text>
+            <Text style={[styles.headerText, { width: 35, fontWeight: '900' }]}>OCH</Text>
         </View>
     );
 
     const renderTeam = ({ item, index }: any) => {
         const stats = item.stats || {};
-        const gd = (stats.goalsFor || 0) - (stats.goalsAgainst || 0);
+        const goalsFor = stats.goalsFor || 0;
+        const goalsAgainst = stats.goalsAgainst || 0;
+        
+        // Compact display: team names in lowercase as requested for long names
+        const displayName = (item.name || '').toLowerCase();
 
         return (
-            <View style={[styles.row, index % 2 === 0 ? styles.evenRow : styles.oddRow]}>
-                <Text style={[styles.cell, { width: 30, color: index < 3 ? Colors.primary : Colors.text }]}>{index + 1}</Text>
+            <TouchableOpacity
+                style={[styles.row, index % 2 === 0 ? styles.evenRow : styles.oddRow]}
+                onPress={() => navigation.navigate('TeamProfile', { teamId: item.teamId || item._id || item.id })}
+            >
+                <Text style={[styles.posCell, index < 3 && styles.topPos]}>{index + 1}</Text>
+                
                 <View style={[styles.teamCell, { flex: 1 }]}>
-                    {item.logo ? <Image source={{ uri: item.logo }} style={styles.miniLogo} /> : <View style={[styles.miniPlaceholder, { backgroundColor: item.color || Colors.primary }]} />}
-                    <Text style={styles.teamName} numberOfLines={1}>{item.name}</Text>
+                    <View style={styles.logoWrapper}>
+                        {item.logo ? (
+                            <Image source={{ uri: item.logo }} style={styles.miniLogo} />
+                        ) : (
+                            <View style={[styles.miniPlaceholder, { backgroundColor: item.color || Colors.surfaceLight }]} />
+                        )}
+                    </View>
+                    <Text style={styles.teamName} numberOfLines={1}>{displayName}</Text>
                 </View>
-                <Text style={[styles.cell, { width: 30 }]}>{stats.played || 0}</Text>
-                <Text style={[styles.cell, { width: 30, fontSize: 10 }]}>{gd > 0 ? `+${gd}` : gd}</Text>
-                <Text style={[styles.cell, { width: 40, fontWeight: 'bold', color: Colors.primary }]}>{stats.points || 0}</Text>
-            </View>
+
+                <Text style={styles.statCell}>{stats.played || 0}</Text>
+                <Text style={[styles.statCell, { width: 45, fontSize: 11, color: Colors.textMuted }]}>
+                    {goalsFor}-{goalsAgainst}
+                </Text>
+                <Text style={[styles.statCell, styles.ptsCell]}>{stats.points || 0}</Text>
+            </TouchableOpacity>
         );
     };
 
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.screenHeader}>
-                <Text style={styles.title}>{tournamentName || 'Turnir Jadvali'}</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <Ionicons name="chevron-back" size={24} color={Colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.title} numberOfLines={1}>
+                    {currentTournament?.name || initialTournamentName || 'Turnir Jadvali'}
+                </Text>
             </View>
 
-            {loading ? (
-                <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+            {/* Tournament Selector (Horizontal) */}
+            <View style={styles.selectorContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorScroll}>
+                    {tournaments.map((t) => (
+                        <TouchableOpacity
+                            key={t._id}
+                            style={[styles.filterChip, currentTournament?._id === t._id && styles.activeChip]}
+                            onPress={() => loadData(t._id)}
+                        >
+                            <Text style={[styles.filterText, currentTournament?._id === t._id && styles.activeFilterText]}>
+                                {t.name}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
+
+            {loading && !refreshing ? (
+                <View style={{ padding: 15 }}>
+                    <TableSkeleton />
+                </View>
             ) : (
                 <FlatList
                     data={standings}
                     ListHeaderComponent={renderHeader}
                     renderItem={renderTeam}
-                    keyExtractor={(item) => item._id || item.id}
+                    keyExtractor={(item, idx) => (item.teamId || item._id || item.id || idx).toString()}
                     contentContainerStyle={styles.list}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+                    }
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Ionicons name="stats-chart-outline" size={48} color={Colors.surfaceLight} />
+                            <Text style={styles.emptyText}>Ma'lumotlar mavjud emas</Text>
+                        </View>
+                    }
                 />
             )}
         </SafeAreaView>
@@ -114,78 +201,144 @@ const StandingsScreen = ({ route }: any) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor:Colors.background,
     },
     screenHeader: {
-        padding: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
         backgroundColor: Colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
     },
+    backBtn: {
+        marginRight: 15,
+    },
     title: {
+        flex: 1,
         color: Colors.text,
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
     },
+    selectorContainer: {
+        backgroundColor: Colors.surface,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+    },
+    selectorScroll: {
+        paddingHorizontal: 15,
+    },
+    filterChip: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginHorizontal: 5,
+    },
+    activeChip: {
+        backgroundColor: Colors.primary,
+    },
+    filterText: {
+        color: Colors.textMuted,
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    activeFilterText: {
+        color: '#000',
+    },
     list: {
-        padding: 10,
+        padding: 8,
     },
     tableHeader: {
         flexDirection: 'row',
         paddingVertical: 12,
-        paddingHorizontal: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-        backgroundColor: Colors.surface,
-        borderRadius: 8,
-        marginBottom: 5,
+        paddingHorizontal: 12,
+        backgroundColor: 'rgba(255,255,255,0.02)',
+        borderRadius: 10,
+        marginBottom: 8,
     },
     headerText: {
         color: Colors.textMuted,
         fontSize: 10,
         fontWeight: 'bold',
         textAlign: 'center',
+        textTransform: 'uppercase',
     },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 15,
-        paddingHorizontal: 10,
-        borderRadius: 8,
-        marginVertical: 2,
+        paddingVertical: 10, // Tighter vertical padding
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        marginBottom: 4,
     },
     evenRow: {
-        backgroundColor: Colors.surface,
+        backgroundColor: 'rgba(255,255,255,0.03)',
     },
     oddRow: {
         backgroundColor: 'transparent',
     },
-    cell: {
-        color: Colors.text,
+    posCell: {
+        width: 30,
+        color: Colors.textMuted,
         fontSize: 14,
+        fontWeight: 'bold',
         textAlign: 'center',
+    },
+    topPos: {
+        color: Colors.primary,
     },
     teamCell: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingLeft: 10,
+        paddingLeft: 8,
+    },
+    logoWrapper: {
+        width: 24, // Smaller logos as requested
+        height: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
     },
     miniLogo: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        marginRight: 10,
+        width: 22,
+        height: 22,
+        resizeMode: 'contain',
     },
     miniPlaceholder: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        marginRight: 10,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        opacity: 0.5,
     },
     teamName: {
         color: Colors.text,
-        fontSize: 14,
+        fontSize: 13, // Slightly smaller font
         fontWeight: '600',
+    },
+    statCell: {
+        width: 30,
+        color: Colors.text,
+        fontSize: 13,
+        textAlign: 'center',
+    },
+    ptsCell: {
+        width: 35,
+        fontWeight: '900',
+        color: Colors.primary,
+        fontSize: 15,
+    },
+    emptyContainer: {
+        marginTop: 100,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyText: {
+        color: Colors.textMuted,
+        marginTop: 15,
+        fontSize: 14,
     }
 });
 

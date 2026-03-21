@@ -5,8 +5,8 @@ import Colors from '../constants/Colors';
 
 import HomeScreen from '../screens/HomeScreen';
 import TournamentsScreen from '../screens/TournamentsScreen';
-import TeamsScreen from '../screens/TeamsScreen';
-import PlayersScreen from '../screens/PlayersScreen';
+import CalendarScreen from '../screens/CalendarScreen';
+import NewsScreen from '../screens/NewsScreen';
 import AccountScreen from '../screens/AccountScreen';
 
 const Tab = createBottomTabNavigator();
@@ -15,6 +15,7 @@ export default function AppNavigator() {
     return (
         <Tab.Navigator
             screenOptions={{
+                headerShown: false,
                 headerStyle: {
                     backgroundColor: Colors.surface,
                     borderBottomWidth: 1,
@@ -55,20 +56,20 @@ export default function AppNavigator() {
                 }}
             />
             <Tab.Screen
-                name="Jamoalar"
-                component={TeamsScreen}
+                name="Taqvim"
+                component={CalendarScreen}
                 options={{
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="shield-half" size={size} color={color} />
+                        <Ionicons name="calendar" size={size} color={color} />
                     ),
                 }}
             />
             <Tab.Screen
-                name="O'yinchilar"
-                component={PlayersScreen}
+                name="Yangiliklar"
+                component={NewsScreen}
                 options={{
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="people" size={size} color={color} />
+                        <Ionicons name="newspaper-outline" size={size} color={color} />
                     ),
                 }}
             />

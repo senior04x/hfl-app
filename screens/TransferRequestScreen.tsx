@@ -27,9 +27,9 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
 
     const fetchTeams = async () => {
         try {
-            const response = await apiService.getTeams(1, 100);
-            if (response.data.success) {
-                setTeams(response.data.data);
+            const data = await apiService.getTeams(1, 100);
+            if (data && Array.isArray(data)) {
+                setTeams(data);
             }
         } catch (error) {
             console.error('Error fetching teams:', error);
@@ -52,11 +52,11 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
             };
 
             const response = await apiService.createTransferRequest(transferData);
-            if (response.data.success) {
+            if (response.success) {
                 Alert.alert('Muvaffaqiyat', 'Transfer so\'rovi yuborildi. Admin javobini kuting.');
                 navigation.goBack();
             } else {
-                Alert.alert('Xatolik', response.data.error || 'So\'rov yuborib bo\'lmadi');
+                Alert.alert('Xatolik', response.error || 'So\'rov yuborib bo\'lmadi');
             }
         } catch (error) {
             console.error('Error submitting transfer request:', error);
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'between',
+        justifyContent: 'space-between',
         padding: 20,
         borderBottomWidth: 1,
         borderBottomColor: '#1A1A1A',

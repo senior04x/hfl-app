@@ -5,13 +5,13 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    Image,
     Dimensions,
     Animated,
     ActivityIndicator,
 } from 'react-native';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
+import SmartImage from './SmartImage';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth * 0.9;
@@ -41,13 +41,27 @@ const ApiSlider: React.FC = () => {
     const loadSliderItems = async () => {
         try {
             setLoading(true);
-            const response = await apiService.getSliderItems();
-            if (response.data.success && response.data.data) {
-                const activeItems = response.data.data.filter((item: SliderItem) => item.isActive);
-                setItems(activeItems);
+            const data = await apiService.getSliderItems();
+            if (data && Array.isArray(data) && data.length > 0) {
+                const activeItems = data.filter((item: SliderItem) => item.isActive);
+                if (activeItems.length > 0) {
+                    setItems(activeItems);
+                    return;
+                }
             }
+            // Fallback to mock data if no items exist
+            setItems([
+                { id: 'm1', title: 'Amatora Superliga Yangi Mavsumi Boshlandi!', imageUrl: 'https://images.unsplash.com/photo-1518605368461-1ee0684f88e1?q=80&w=2074&auto=format&fit=crop', isActive: true },
+                { id: 'm2', title: 'Chempionlar Ligasi finali yondiradi', imageUrl: 'https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=2070&auto=format&fit=crop', isActive: true },
+                { id: 'm3', title: "Eng yaxshi to'purar aniqlandi", imageUrl: 'https://images.unsplash.com/photo-1551280857-2b9bbe5204ce?q=80&w=2070&auto=format&fit=crop', isActive: true }
+            ]);
         } catch (error) {
             console.error('Error loading slider items:', error);
+            // Fallback to mock data on error
+            setItems([
+                { id: 'm1', title: 'Amatora Superliga Yangi Mavsumi Boshlandi!', imageUrl: 'https://images.unsplash.com/photo-1518605368461-1ee0684f88e1?q=80&w=2074&auto=format&fit=crop', isActive: true },
+                { id: 'm2', title: 'Chempionlar Ligasi finali yondiradi', imageUrl: 'https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=2070&auto=format&fit=crop', isActive: true }
+            ]);
         } finally {
             setLoading(false);
         }
@@ -101,10 +115,12 @@ const ApiSlider: React.FC = () => {
                         activeOpacity={0.9}
                         style={[styles.card, { marginRight: index === items.length - 1 ? 0 : CARD_SPACING }]}
                     >
-                        <Image
-                            source={{ uri: item.imageUrl }}
+                        <SmartImage
+                            uri={item.imageUrl}
                             style={styles.image}
-                            resizeMode="cover"
+                            contentFit="cover"
+                            fallbackIcon="image-outline"
+                            fallbackIconSize={48}
                         />
                         <View style={styles.overlay}>
                             <Text style={styles.title} numberOfLines={2}>

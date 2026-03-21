@@ -44,9 +44,8 @@ const FormationBoard = ({ route, navigation }: any) => {
     const fetchTeamData = async () => {
         try {
             setLoading(true);
-            const response = await apiService.getTeamById(teamId);
-            if (response.data) {
-                const team = response.data;
+            const team = await apiService.getTeamById(teamId);
+            if (team) {
                 if (team.formation && team.formation.players) {
                     setPlayers(team.formation.players);
                 } else if (team.players) {
@@ -71,7 +70,7 @@ const FormationBoard = ({ route, navigation }: any) => {
         try {
             setSaving(true);
             const response = await apiService.updateFormation(teamId, { players });
-            if (response.data.success) {
+            if (response.success) {
                 Alert.alert('Muvaffaqiyat', 'Sostav muvaffaqiyatli saqlandi');
             }
         } catch (error) {

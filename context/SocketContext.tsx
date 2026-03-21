@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 
-const SOCKET_URL = 'https://hfl-backend.onrender.com';
+const SOCKET_URL = 'http://192.168.0.111:3002';
 
 interface SocketContextType {
     socket: Socket | null;
@@ -20,10 +20,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
-        // Initialize socket
+        // Initialize socket with multiple transports for better reliability on Render
         const socket = io(SOCKET_URL, {
-            transports: ['websocket'],
+            transports: ['polling', 'websocket'],
             autoConnect: true,
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000,
         });
 
         socketRef.current = socket;

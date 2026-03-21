@@ -6,21 +6,26 @@ import {
     FlatList,
     TouchableOpacity,
     ActivityIndicator,
-    Image
+    Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useTeamStore } from '../store/useTeamStore';
 import { apiService } from '../services/apiService';
 import { Team } from '../types';
+import SmartImage from '../components/SmartImage';
+import TeamsSkeleton from '../components/TeamsSkeleton';
 
-export default function TeamsScreen() {
+export default function TeamsScreen({ route, navigation }: any) {
+    const { tournamentId } = route?.params || {};
     const { teams, setTeams, isLoading, setLoading } = useTeamStore();
 
     const fetchTeams = async () => {
         try {
             setLoading(true);
-            const response = await apiService.getTeams(1, 100);
-            setTeams(response.data);
+            const data = await apiService.getTeams(1, 100, tournamentId);
+            setTeams(data || []);
         } catch (error) {
             console.error('Error fetching teams:', error);
         } finally {
@@ -33,35 +38,72 @@ export default function TeamsScreen() {
     }, []);
 
     const renderTeamItem = ({ item }: { item: Team }) => (
-        <TouchableOpacity style={styles.teamCard}>
+        <TouchableOpacity
+            style={styles.teamCard}
+            onPress={() => navigation.navigate('TeamProfile', { teamId: item._id, tournamentId: tournamentId })}
+        >
             <View style={styles.logoContainer}>
-                {item.logo ? (
-                    <Image source={{ uri: item.logo }} style={styles.logo} />
-                ) : (
-                    <View style={styles.logoPlaceholder}>
-                        <Text style={styles.logoInitial}>{item.name.charAt(0)}</Text>
-                    </View>
-                )}
+                <SmartImage
+                    uri={item.logo}
+                    style={styles.logo}
+                    contentFit="cover"
+                    fallbackIcon="shield-outline"
+                    fallbackIconSize={24}
+                    borderRadius={25}
+                />
             </View>
             <View style={styles.infoContainer}>
-                <Text style={styles.teamName}>{item.name}</Text>
+                <Text style={styles.teamName}>{item.name || 'Noma\'lum jamoa'}</Text>
                 <Text style={styles.teamStats}>
                     {item.stats?.played || 0} O'yin • {item.stats?.points || 0} Ochko
                 </Text>
+                {(item.instagram || item.facebook || item.youtube) && (
+                    <View style={styles.socialRow}>
+                        {item.instagram && (
+                            <TouchableOpacity
+                                style={styles.socialIcon}
+                                onPress={() => Linking.openURL(item.instagram!)}
+                            >
+                                <Ionicons name="logo-instagram" size={14} color="#E1306C" />
+                            </TouchableOpacity>
+                        )}
+                        {item.facebook && (
+                            <TouchableOpacity
+                                style={styles.socialIcon}
+                                onPress={() => Linking.openURL(item.facebook!)}
+                            >
+                                <Ionicons name="logo-facebook" size={14} color="#1877F2" />
+                            </TouchableOpacity>
+                        )}
+                        {item.youtube && (
+                            <TouchableOpacity
+                                style={styles.socialIcon}
+                                onPress={() => Linking.openURL(item.youtube!)}
+                            >
+                                <Ionicons name="logo-youtube" size={14} color="#FF0000" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
             </View>
             <View style={styles.arrowContainer}>
-                <Text style={styles.arrow}>›</Text>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
             </View>
         </TouchableOpacity>
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>{route?.params?.tournamentName || 'Jamoalar'}</Text>
+                <View style={styles.placeholder} />
+            </View>
+
             {isLoading && teams.length === 0 ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>Jamoalar yuklanmoqda...</Text>
-                </View>
+                <TeamsSkeleton />
             ) : (
                 <FlatList
                     data={teams}
@@ -77,7 +119,7 @@ export default function TeamsScreen() {
                     }
                 />
             )}
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -85,6 +127,26 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+    },
+    backButton: {
+        padding: 4,
+    },
+    headerTitle: {
+        color: Colors.text,
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    placeholder: {
+        width: 32, // to balance the header center alignment
     },
     listContent: {
         padding: 16,
@@ -136,9 +198,17 @@ const styles = StyleSheet.create({
     arrowContainer: {
         paddingLeft: 8,
     },
-    arrow: {
-        color: Colors.textMuted,
-        fontSize: 24,
+    socialRow: {
+        flexDirection: 'row',
+        marginTop: 6,
+        gap: 8,
+    },
+    socialIcon: {
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        padding: 4,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.05)',
     },
     loadingContainer: {
         flex: 1,

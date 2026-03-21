@@ -8,19 +8,28 @@ import {
     ActivityIndicator,
     Image
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { apiService } from '../services/apiService';
 import { Player } from '../types';
+import PlayerListSkeleton from '../components/PlayerListSkeleton';
 
-export default function PlayersScreen() {
+export default function PlayersScreen({ route, navigation }: any) {
+    const { teamId, tournamentId, tournamentName } = route?.params || {};
     const { players, setPlayers, isLoading, setLoading } = usePlayerStore();
 
     const fetchPlayers = async () => {
         try {
             setLoading(true);
-            const response = await apiService.getPlayers(1, 100);
-            setPlayers(response.data);
+            let data;
+            if (teamId) {
+                data = await apiService.getPlayersByTeam(teamId);
+            } else {
+                data = await apiService.getPlayers(1, 100, undefined, tournamentId);
+            }
+            setPlayers(data || []);
         } catch (error) {
             console.error('Error fetching players:', error);
         } finally {
@@ -33,18 +42,21 @@ export default function PlayersScreen() {
     }, []);
 
     const renderPlayerItem = ({ item }: { item: Player }) => (
-        <TouchableOpacity style={styles.playerCard}>
+        <TouchableOpacity
+            style={styles.playerCard}
+            onPress={() => navigation.navigate('PlayerStats', { playerId: item._id, player: item })}
+        >
             <View style={styles.avatarContainer}>
                 {item.avatar ? (
                     <Image source={{ uri: item.avatar }} style={styles.avatar} />
                 ) : (
                     <View style={styles.avatarPlaceholder}>
-                        <Text style={styles.avatarInitial}>{item.firstName.charAt(0)}</Text>
+                        <Text style={styles.avatarInitial}>{String(item.firstName || 'O').charAt(0).toUpperCase()}</Text>
                     </View>
                 )}
             </View>
             <View style={styles.infoContainer}>
-                <Text style={styles.playerName}>{item.firstName} {item.lastName}</Text>
+                <Text style={styles.playerName}>{item.firstName || 'O\'yinchi'} {item.lastName || ''}</Text>
                 <Text style={styles.playerPosition}>
                     {item.position || "Noma'lum position"} • #{item.number || '--'}
                 </Text>
@@ -56,12 +68,17 @@ export default function PlayersScreen() {
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>{tournamentName ? `${tournamentName} Top Scorerlar` : "O'yinchilar"}</Text>
+                <View style={styles.placeholder} />
+            </View>
+
             {isLoading && players.length === 0 ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>O'yinchilar yuklanmoqda...</Text>
-                </View>
+                <PlayerListSkeleton />
             ) : (
                 <FlatList
                     data={players}
@@ -77,7 +94,7 @@ export default function PlayersScreen() {
                     }
                 />
             )}
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -85,6 +102,26 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+    },
+    backButton: {
+        padding: 4,
+    },
+    headerTitle: {
+        color: Colors.text,
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    placeholder: {
+        width: 32,
     },
     listContent: {
         padding: 16,

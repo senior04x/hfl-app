@@ -8,6 +8,7 @@ import {
     Switch,
     Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
@@ -57,141 +58,147 @@ export default function AccountScreen({ navigation }: any) {
     );
 
     return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            {/* Profile Header */}
-            <View style={styles.profileHeader}>
-                <View style={styles.avatarContainer}>
-                    <Ionicons name="person" size={60} color={Colors.text} />
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+                {/* Profile Header */}
+                <View style={styles.profileHeader}>
+                    <View style={styles.avatarContainer}>
+                        <Ionicons name="person" size={60} color={Colors.text} />
+                    </View>
+                    <Text style={styles.userName}>{isGuest ? 'Mehmon' : 'Futbolchi'}</Text>
+                    <Text style={styles.userRole}>{isGuest ? 'Cheklangan imkoniyat' : "Amatora A'zosi"}</Text>
                 </View>
-                <Text style={styles.userName}>{isGuest ? 'Mehmon' : 'Futbolchi'}</Text>
-                <Text style={styles.userRole}>{isGuest ? 'Cheklangan imkoniyat' : "HFL A'zosi"}</Text>
-            </View>
 
-            {/* Account Settings */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Hisob</Text>
-                {isGuest ? (
-                    <TouchableOpacity style={styles.loginBanner} onPress={() => logout()}>
-                        <View style={styles.bannerInfo}>
-                            <Ionicons name="log-in-outline" size={24} color={Colors.primary} />
-                            <View style={styles.bannerTextContainer}>
-                                <Text style={styles.bannerTitle}>Tizimga kiring</Text>
-                                <Text style={styles.bannerSubtitle}>Barcha imkoniyatlardan foydalanish uchun</Text>
+                {/* Account Settings */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Hisob</Text>
+                    {isGuest ? (
+                        <TouchableOpacity style={styles.loginBanner} onPress={() => logout()}>
+                            <View style={styles.bannerInfo}>
+                                <Ionicons name="log-in-outline" size={24} color={Colors.primary} />
+                                <View style={styles.bannerTextContainer}>
+                                    <Text style={styles.bannerTitle}>Tizimga kiring</Text>
+                                    <Text style={styles.bannerSubtitle}>Barcha imkoniyatlardan foydalanish uchun</Text>
+                                </View>
                             </View>
-                        </View>
-                        <Ionicons name="arrow-forward" size={20} color={Colors.primary} />
-                    </TouchableOpacity>
-                ) : (
+                            <Ionicons name="arrow-forward" size={20} color={Colors.primary} />
+                        </TouchableOpacity>
+                    ) : (
+                        <SettingItem
+                            icon="person-outline"
+                            title="Profilni tahrirlash"
+                            onPress={() => { }}
+                        />
+                    )}
                     <SettingItem
-                        icon="person-outline"
-                        title="Profilni tahrirlash"
+                        icon="shield-checkmark-outline"
+                        title="Xavfsizlik"
                         onPress={() => { }}
                     />
-                )}
-                <SettingItem
-                    icon="shield-checkmark-outline"
-                    title="Xavfsizlik"
-                    onPress={() => { }}
-                />
-            </View>
-
-            {/* Role-Specific Features */}
-            {!isGuest && (
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Jamoa va O'yinchi</Text>
-
-                    {/* Player Only Features */}
-                    {user?.role === 'player' && (
-                        <>
-                            <SettingItem
-                                icon="stats-chart-outline"
-                                title="Mening statistika"
-                                onPress={() => navigation.navigate('MyStats', { playerId: user?.id })}
-                            />
-                            <SettingItem
-                                icon="swap-horizontal-outline"
-                                title="Transfer so'rovi"
-                                onPress={() => navigation.navigate('TransferRequest', { playerId: user?.id })}
-                            />
-                        </>
-                    )}
-
-                    {/* Coach/Team Manager Features */}
-                    {(user?.role === 'coach' || user?.role === 'team_admin') && (
-                        <>
-                            <SettingItem
-                                icon="grid-outline"
-                                title="Sostav (Tactic)"
-                                onPress={() => navigation.navigate('FormationBoard', { teamId: user?.teamId })}
-                            />
-                            <SettingItem
-                                icon="chatbubbles-outline"
-                                title="Jamoa chati"
-                                onPress={() => navigation.navigate('TeamChat', { teamId: user?.teamId, userId: user?.id, userName: user?.name })}
-                            />
-                        </>
-                    )}
-
-                    {/* General League/Admin placeholders if needed */}
-                    {user?.role === 'league' && (
-                        <Text style={{ color: Colors.textMuted, padding: 12, fontSize: 14 }}>
-                            Liga boshqaruvi saytimiz orqali amalga oshiriladi.
-                        </Text>
-                    )}
                 </View>
-            )}
 
-            {/* App Settings */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Ilova sozlamalari</Text>
-                <SettingItem
-                    icon="moon-outline"
-                    title="Tungi rejim"
-                    type="switch"
-                    value={isDarkMode}
-                    onPress={() => setIsDarkMode(!isDarkMode)}
-                />
-                <SettingItem
-                    icon="language-outline"
-                    title="Til"
-                    value={language === 'uz' ? 'O\'zbekcha' : 'Russian'}
-                    onPress={() => Alert.alert('Tilni tanlang', 'Hozircha faqat O\'zbek tili mavjud')}
-                />
-                <SettingItem
-                    icon="notifications-outline"
-                    title="Bildirishnomalar"
-                    onPress={() => { }}
-                />
-            </View>
+                {/* Role-Specific Features */}
+                {!isGuest && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Jamoa va O'yinchi</Text>
 
-            {/* Application Section - Only for Guests */}
-            {isGuest && (
-                <View style={styles.section}>
-                    <View style={styles.applyBanner}>
-                        <Text style={styles.applyTitle}>Ligaga ariza topshiring</Text>
-                        <Text style={styles.applySubtitle}>O'z jamoangiz bilan HFL da qatnashing!</Text>
-                        <TouchableOpacity
-                            style={styles.applyButton}
-                            onPress={() => (navigation as any).navigate('JoinApplication')}
-                        >
-                            <Text style={styles.applyButtonText}>Ariza topshirish</Text>
-                        </TouchableOpacity>
+                        {/* Player Only Features */}
+                        {user?.role === 'player' && (
+                            <>
+                                <SettingItem
+                                    icon="stats-chart-outline"
+                                    title="Mening statistika"
+                                    onPress={() => navigation.navigate('MyStats', { playerId: user?.id })}
+                                />
+                                <SettingItem
+                                    icon="swap-horizontal-outline"
+                                    title="Transfer so'rovi"
+                                    onPress={() => navigation.navigate('TransferRequest', { playerId: user?.id })}
+                                />
+                            </>
+                        )}
+
+                        {/* Coach/Team Manager Features */}
+                        {(user?.role === 'coach' || user?.role === 'team_admin') && (
+                            <>
+                                <SettingItem
+                                    icon="grid-outline"
+                                    title="Sostav (Tactic)"
+                                    onPress={() => navigation.navigate('FormationBoard', { teamId: user?.teamId })}
+                                />
+                                <SettingItem
+                                    icon="chatbubbles-outline"
+                                    title="Jamoa chati"
+                                    onPress={() => navigation.navigate('TeamChat', { teamId: user?.teamId, userId: user?.id, userName: user?.name })}
+                                />
+                            </>
+                        )}
+
+                        {/* General League/Admin placeholders if needed */}
+                        {user?.role === 'league' && (
+                            <Text style={{ color: Colors.textMuted, padding: 12, fontSize: 14 }}>
+                                Liga boshqaruvi saytimiz orqali amalga oshiriladi.
+                            </Text>
+                        )}
                     </View>
+                )}
+
+                {/* App Settings */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Ilova sozlamalari</Text>
+                    <SettingItem
+                        icon="moon-outline"
+                        title="Tungi rejim"
+                        type="switch"
+                        value={isDarkMode}
+                        onPress={() => setIsDarkMode(!isDarkMode)}
+                    />
+                    <SettingItem
+                        icon="language-outline"
+                        title="Til"
+                        value={language === 'uz' ? 'O\'zbekcha' : 'Russian'}
+                        onPress={() => Alert.alert('Tilni tanlang', 'Hozircha faqat O\'zbek tili mavjud')}
+                    />
+                    <SettingItem
+                        icon="notifications-outline"
+                        title="Bildirishnomalar"
+                        onPress={() => { }}
+                    />
                 </View>
-            )}
 
-            {/* Logout Button */}
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Ionicons name="log-out-outline" size={22} color={Colors.danger} />
-                <Text style={styles.logoutText}>Chiqish</Text>
-            </TouchableOpacity>
+                {/* Application Section - Only for Guests */}
+                {isGuest && (
+                    <View style={styles.section}>
+                        <View style={styles.applyBanner}>
+                            <Text style={styles.applyTitle}>Ligaga ariza topshiring</Text>
+                            <Text style={styles.applySubtitle}>O'z jamoangiz bilan Amatora da qatnashing!</Text>
+                            <TouchableOpacity
+                                style={styles.applyButton}
+                                onPress={() => (navigation as any).navigate('JoinApplication')}
+                            >
+                                <Text style={styles.applyButtonText}>Ariza topshirish</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
 
-            <View style={{ height: 40 }} />
-        </ScrollView>
+                {/* Logout Button */}
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                    <Ionicons name="log-out-outline" size={22} color={Colors.danger} />
+                    <Text style={styles.logoutText}>Chiqish</Text>
+                </TouchableOpacity>
+
+                <View style={{ height: 40 }} />
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
     container: {
         flex: 1,
         backgroundColor: Colors.background,
