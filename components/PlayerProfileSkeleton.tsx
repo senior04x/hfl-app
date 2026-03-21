@@ -14,7 +14,7 @@ const PlayerProfileSkeleton = () => {
                     <View style={styles.profileHeader}>
                         {/* Photo Placeholder */}
                         <View style={styles.photoContainer}>
-                            <Skeleton width={160} height={240} borderRadius={24} />
+                            <Skeleton width={160} height={160} borderRadius={24} />
                         </View>
 
                         {/* Name & Badges Placeholder */}
@@ -25,7 +25,7 @@ const PlayerProfileSkeleton = () => {
                             </View>
                             <Skeleton width={150} height={32} borderRadius={8} style={{ marginTop: 12 }} />
                             <Skeleton width={120} height={32} borderRadius={8} style={{ marginTop: 8 }} />
-                            
+
                             <View style={[styles.socialRow, { marginTop: 20 }]}>
                                 <Skeleton width={36} height={36} borderRadius={18} />
                                 <Skeleton width={36} height={36} borderRadius={18} style={{ marginLeft: 12 }} />
@@ -85,8 +85,8 @@ const styles = StyleSheet.create({
     },
     heroSection: {
         backgroundColor: '#050A18',
-        paddingTop: 60,
-        paddingBottom: 0,
+        paddingTop: 30,
+        paddingBottom: 30,
         paddingHorizontal: 24,
         borderBottomLeftRadius: 50,
         borderBottomRightRadius: 50,
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     profileHeader: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        marginTop: 40,
+        marginTop: 80,
         gap: 24,
         paddingBottom: 0,
     },
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     },
     nameContainer: {
         flex: 1,
-        marginBottom: 80,
+        marginBottom: 0,
     },
     badgeRow: {
         flexDirection: 'row',

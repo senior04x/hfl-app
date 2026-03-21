@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
+import SmartImage from '../components/SmartImage';
 
 export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout } = useAuthStore();
@@ -63,16 +64,28 @@ export default function AccountScreen({ navigation }: any) {
                 {/* Profile Header */}
                 <View style={styles.profileHeader}>
                     <View style={styles.avatarContainer}>
-                        <Ionicons name="person" size={60} color={Colors.text} />
+                        {!isGuest && (user?.photo || user?.logo || user?.avatar) ? (
+                            <SmartImage 
+                                uri={user.photo || user.logo || user.avatar}
+                                style={{ width: 100, height: 100, borderRadius: 50 }}
+                                fallbackIcon={user.role === 'manager' ? 'people' : 'person'}
+                            />
+                        ) : (
+                            <Ionicons name="person" size={60} color={Colors.text} />
+                        )}
                     </View>
-                    <Text style={styles.userName}>{isGuest ? 'Mehmon' : 'Futbolchi'}</Text>
-                    <Text style={styles.userRole}>{isGuest ? 'Cheklangan imkoniyat' : "Amatora A'zosi"}</Text>
+                    <Text style={styles.userName}>{isGuest ? 'Mehmon' : (user?.name || user?.firstName || 'Foydalanuvchi')}</Text>
+                    <Text style={styles.userRole}>
+                        {isGuest ? 'Cheklangan imkoniyat' : 
+                         user?.role === 'manager' ? 'Jamoa Menejeri' : 
+                         user?.role === 'player' ? 'Futbolchi' : "Amatora Az'osi"}
+                    </Text>
                 </View>
 
-                {/* Account Settings */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Hisob</Text>
-                    {isGuest ? (
+                {/* Account Settings (Guest Only) */}
+                {isGuest && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Hisob</Text>
                         <TouchableOpacity style={styles.loginBanner} onPress={() => logout()}>
                             <View style={styles.bannerInfo}>
                                 <Ionicons name="log-in-outline" size={24} color={Colors.primary} />
@@ -83,19 +96,8 @@ export default function AccountScreen({ navigation }: any) {
                             </View>
                             <Ionicons name="arrow-forward" size={20} color={Colors.primary} />
                         </TouchableOpacity>
-                    ) : (
-                        <SettingItem
-                            icon="person-outline"
-                            title="Profilni tahrirlash"
-                            onPress={() => { }}
-                        />
-                    )}
-                    <SettingItem
-                        icon="shield-checkmark-outline"
-                        title="Xavfsizlik"
-                        onPress={() => { }}
-                    />
-                </View>
+                    </View>
+                )}
 
                 {/* Role-Specific Features */}
                 {!isGuest && (
@@ -118,19 +120,30 @@ export default function AccountScreen({ navigation }: any) {
                             </>
                         )}
 
-                        {/* Coach/Team Manager Features */}
-                        {(user?.role === 'coach' || user?.role === 'team_admin') && (
+                        {/* Team Related Features for both Players and Managers */}
+                        {(user?.role === 'player' || user?.role === 'manager' || user?.role === 'coach' || user?.role === 'team_admin') && user?.teamId && (
                             <>
                                 <SettingItem
-                                    icon="grid-outline"
-                                    title="Sostav (Tactic)"
-                                    onPress={() => navigation.navigate('FormationBoard', { teamId: user?.teamId })}
+                                    icon="shield-outline"
+                                    title="Mening jamoam"
+                                    onPress={() => navigation.navigate('TeamProfile', { teamId: user?.teamId })}
                                 />
                                 <SettingItem
                                     icon="chatbubbles-outline"
                                     title="Jamoa chati"
-                                    onPress={() => navigation.navigate('TeamChat', { teamId: user?.teamId, userId: user?.id, userName: user?.name })}
+                                    onPress={() => navigation.navigate('TeamChat', { 
+                                        teamId: user?.teamId, 
+                                        userId: user?._id || user?.id, 
+                                        userName: user?.firstName || user?.name || 'Foydalanuvchi' 
+                                    })}
                                 />
+                                {(user?.role === 'manager' || user?.role === 'coach' || user?.role === 'team_admin') && (
+                                    <SettingItem
+                                        icon="grid-outline"
+                                        title="Sostavni tahrirlash"
+                                        onPress={() => navigation.navigate('FormationBoard', { teamId: user?.teamId })}
+                                    />
+                                )}
                             </>
                         )}
 
@@ -143,28 +156,7 @@ export default function AccountScreen({ navigation }: any) {
                     </View>
                 )}
 
-                {/* App Settings */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Ilova sozlamalari</Text>
-                    <SettingItem
-                        icon="moon-outline"
-                        title="Tungi rejim"
-                        type="switch"
-                        value={isDarkMode}
-                        onPress={() => setIsDarkMode(!isDarkMode)}
-                    />
-                    <SettingItem
-                        icon="language-outline"
-                        title="Til"
-                        value={language === 'uz' ? 'O\'zbekcha' : 'Russian'}
-                        onPress={() => Alert.alert('Tilni tanlang', 'Hozircha faqat O\'zbek tili mavjud')}
-                    />
-                    <SettingItem
-                        icon="notifications-outline"
-                        title="Bildirishnomalar"
-                        onPress={() => { }}
-                    />
-                </View>
+
 
                 {/* Application Section - Only for Guests */}
                 {isGuest && (

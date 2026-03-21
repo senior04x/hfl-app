@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 
-const SOCKET_URL = 'http://192.168.0.111:3002';
+const SOCKET_URL = 'https://hfl-backend.onrender.com';
 
 interface SocketContextType {
     socket: Socket | null;

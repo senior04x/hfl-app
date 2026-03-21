@@ -8,6 +8,8 @@ import { apiService } from '../services/apiService';
 import { useSocket } from '../context/SocketContext';
 import HomeSkeleton from '../components/HomeSkeleton';
 import Skeleton from '../components/Skeleton';
+import { useAuthStore } from '../store/useAuthStore';
+import SmartImage from '../components/SmartImage';
 
 const { width } = Dimensions.get('window');
 
@@ -15,6 +17,7 @@ export default function HomeScreen({ navigation }: any) {
     const [matches, setMatches] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const { socket, isConnected } = useSocket();
+    const { user } = useAuthStore();
 
     useEffect(() => {
         loadMatches();
@@ -143,14 +146,35 @@ export default function HomeScreen({ navigation }: any) {
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 {/* Header Section */}
                 <View style={styles.header}>
-                    <View>
-                        <Text style={styles.welcomeText}>Xush kelibsiz!</Text>
-                        <Text style={styles.brandText}>AMATORA SPORTS</Text>
-                    </View>
-                    <TouchableOpacity style={styles.profileButton}>
-                        <Ionicons name="person-circle-outline" size={32} color={Colors.primary} />
+                    <TouchableOpacity 
+                        onPress={() => {
+                            if (!user) return navigation.navigate('Welcome');
+                            if (user.role === 'manager') {
+                                navigation.navigate('TeamProfile', { teamId: user.id });
+                            } else {
+                                navigation.navigate('MyStats', { playerId: user.id });
+                            }
+                        }}
+                    >
+                        {user && (user.photo || user.logo || user.avatar) ? (
+                            <SmartImage 
+                                uri={user.photo || user.logo || user.avatar} 
+                                style={{ width: 44, height: 44, borderRadius: 22, marginRight: 15 }}
+                                fallbackIcon={user.role === 'manager' ? 'people' : 'person'}
+                                contentFit="cover"
+                            />
+                        ) : (
+                            <Ionicons name="person-circle-outline" size={44} color={Colors.primary} style={{ marginRight: 15 }} />
+                        )}
                     </TouchableOpacity>
+
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.welcomeText}>Xush kelibsiz!</Text>
+                        <Text style={styles.brandText} numberOfLines={1}>{user ? (user.name || user.firstName)?.toUpperCase() : 'AMATORA SPORTS'}</Text>
+                    </View>
                 </View>
+
+
 
                 {/* Slider / Stories Area */}
                 <View style={styles.sliderContainer}>
@@ -285,6 +309,41 @@ const styles = StyleSheet.create({
     },
     profileButton: {
         padding: 4,
+    },
+    myTeamBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(0, 255, 102, 0.08)',
+        marginHorizontal: 20,
+        marginBottom: 20,
+        padding: 15,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.2)',
+    },
+    myTeamInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    myTeamIconBg: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0, 255, 102, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    myTeamTitle: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    myTeamSubtitle: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 11,
+        marginTop: 2,
     },
     sliderContainer: {
         marginBottom: 20,

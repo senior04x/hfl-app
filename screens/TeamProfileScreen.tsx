@@ -8,7 +8,9 @@ import {
     Image,
     Linking,
     Dimensions,
-    ActivityIndicator
+    ActivityIndicator,
+    TextInput,
+    Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,8 +19,11 @@ import { apiService } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 import Skeleton from '../components/Skeleton';
 import TeamProfileSkeleton from '../components/TeamProfileSkeleton';
+import TacticsBoard from '../components/TacticsBoard';
 import { Player, Team } from '../types';
 import Translations from '../constants/Translations';
+import { useAuthStore } from '../store/useAuthStore';
+import { useSocket } from '../context/SocketContext';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +33,23 @@ export default function TeamProfileScreen({ route, navigation }: any) {
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState<any>({});
+    const [isUpdating, setIsUpdating] = useState(false);
+    const { user } = useAuthStore();
+    const { socket } = useSocket();
+    
+    // Improved access control
+    const isOwner = user && team && (
+        (user.teamId?.toString() === teamId?.toString()) || 
+        (user.id?.toString() === teamId?.toString()) ||
+        (user.teamId?.toString() === team?._id?.toString())
+    );
+    const isAdmin = user && (user.role === 'admin' || user.role === 'trainer');
+    const canEdit = isAdmin || (isOwner && user?.role === 'manager');
+    const isMember = isOwner || isAdmin || (user && team && user.teamId?.toString() === teamId?.toString());
+    const canChat = isMember;
+    const canViewBoard = isMember || true; // Everyone can view the board? Or only members? Let's say everyone.
 
     const fetchData = async () => {
         try {
@@ -39,6 +61,12 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             ]);
 
             setTeam(teamData);
+            setEditData({
+                name: teamData?.name,
+                instagram: teamData?.instagram,
+                facebook: teamData?.facebook,
+                youtube: teamData?.youtube
+            });
             setPlayers(playersData || []);
             setMatches(matchesData?.slice(0, 5) || []);
         } catch (error) {
@@ -50,7 +78,38 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
     useEffect(() => {
         fetchData();
-    }, [teamId]);
+
+        if (socket && teamId) {
+            socket.emit('join-team', teamId);
+            
+            socket.on('formation-updated', (data: any) => {
+                if (data.teamId === teamId) {
+                    setTeam(prev => prev ? { ...prev, formation: data.formation } : null);
+                }
+            });
+
+            return () => {
+                socket.off('formation-updated');
+            };
+        }
+    }, [teamId, socket]);
+
+    const handleUpdateTeam = async () => {
+        try {
+            setIsUpdating(true);
+            const res = await apiService.updateTeam(teamId, editData);
+            if (res.success) {
+                setTeam({ ...team, ...editData } as Team);
+                setIsEditing(false);
+                Alert.alert('Muvaffaqiyat', 'Jamoa ma\'lumotlari yangilandi');
+            }
+        } catch (error) {
+            console.error('Error updating team:', error);
+            Alert.alert('Xatolik', 'Ma\'lumotlarni saqlab bo\'lmadi');
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     const renderHeader = () => (
         <View style={styles.heroSection}>
@@ -70,6 +129,40 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             >
                 <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
+
+            <View style={styles.adminActionRow}>
+                {canEdit && (
+                    <TouchableOpacity
+                        style={[styles.adminBtn, isEditing && styles.adminBtnActive]}
+                        onPress={() => setIsEditing(!isEditing)}
+                    >
+                        <Ionicons name={isEditing ? "close" : "create-outline"} size={20} color="#FFF" />
+                        <Text style={styles.adminBtnText}>{isEditing ? "BEKOR QILISH" : "TAHRIRLASH"}</Text>
+                    </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                    style={styles.adminBtn}
+                    onPress={() => navigation.navigate('FormationBoard', { teamId, isReadOnly: !canEdit })}
+                >
+                    <Ionicons name="grid-outline" size={20} color="#FFF" />
+                    <Text style={styles.adminBtnText}>{canEdit ? "SOSTAV" : "TAKTIKA"}</Text>
+                </TouchableOpacity>
+                
+                {canChat && (
+                    <TouchableOpacity
+                        style={styles.adminBtn}
+                        onPress={() => navigation.navigate('TeamChat', { 
+                            teamId, 
+                            userId: user?._id || user?.id || 'guest_' + Math.random().toString(36).substr(2, 5), 
+                            userName: user?.firstName || 'Mehmon' 
+                        })}
+                    >
+                        <Ionicons name="chatbubbles-outline" size={20} color="#FFF" />
+                        <Text style={styles.adminBtnText}>CHAT</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
 
             <View style={styles.heroContent}>
                 <View style={[styles.mainLogoWrapper, { shadowColor: team?.color || Colors.primary }]}>
@@ -92,7 +185,30 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                         </View>
                     </View>
 
-                    <Text style={styles.teamNameHero}>{team?.name}</Text>
+                    {isEditing ? (
+                        <View style={styles.editForm}>
+                            <TextInput
+                                style={styles.editInput}
+                                value={editData.name}
+                                onChangeText={(text) => setEditData({ ...editData, name: text })}
+                                placeholder="Jamoa nomi"
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                            />
+                            <TouchableOpacity 
+                                style={styles.saveBtn} 
+                                onPress={handleUpdateTeam}
+                                disabled={isUpdating}
+                            >
+                                {isUpdating ? (
+                                    <ActivityIndicator size="small" color="#000" />
+                                ) : (
+                                    <Text style={styles.saveBtnText}>SAQLASH</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <Text style={styles.teamNameHero}>{team?.name}</Text>
+                    )}
 
                     <View style={styles.heroStatsRow}>
                         <Ionicons name="people" size={14} color={Colors.primary} />
@@ -104,31 +220,100 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                 </View>
             </View>
 
-            {/* Social Media */}
-            {(team?.instagram || team?.facebook || team?.youtube) && (
-                <View style={styles.socialRowHero}>
-                    {team.instagram && (
-                        <TouchableOpacity
-                            style={styles.socialBtn}
-                            onPress={() => Linking.openURL(team.instagram!)}
+            {/* Social Media Edit or Display */}
+            {isEditing ? (
+                <View style={styles.socialEditRow}>
+                    <View style={styles.socialInputContainer}>
+                        <Ionicons name="logo-instagram" size={16} color="#FFF" />
+                        <TextInput
+                            style={styles.socialInput}
+                            value={editData.instagram}
+                            onChangeText={(text) => setEditData({ ...editData, instagram: text })}
+                            placeholder="Instagram URL"
+                            placeholderTextColor="rgba(255,255,255,0.2)"
+                        />
+                    </View>
+                    <View style={styles.socialInputContainer}>
+                        <Ionicons name="logo-facebook" size={16} color="#FFF" />
+                        <TextInput
+                            style={styles.socialInput}
+                            value={editData.facebook}
+                            onChangeText={(text) => setEditData({ ...editData, facebook: text })}
+                            placeholder="Facebook URL"
+                            placeholderTextColor="rgba(255,255,255,0.2)"
+                        />
+                    </View>
+                </View>
+            ) : (
+                (team?.instagram || team?.facebook || team?.youtube) && (
+                    <View style={styles.socialRowHero}>
+                        {team.instagram && (
+                            <TouchableOpacity
+                                style={styles.socialBtn}
+                                onPress={() => Linking.openURL(team.instagram!)}
+                            >
+                                <Ionicons name="logo-instagram" size={18} color="#FFF" />
+                            </TouchableOpacity>
+                        )}
+                        {team.facebook && (
+                            <TouchableOpacity
+                                style={styles.socialBtn}
+                                onPress={() => Linking.openURL(team.facebook!)}
+                            >
+                                <Ionicons name="logo-facebook" size={18} color="#FFF" />
+                            </TouchableOpacity>
+                        )}
+                        {team.youtube && (
+                            <TouchableOpacity
+                                style={styles.socialBtn}
+                                onPress={() => Linking.openURL(team.youtube!)}
+                            >
+                                <Ionicons name="logo-youtube" size={18} color="#FFF" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )
+            )}
+        </View>
+    );
+
+    const renderTactics = () => (
+        <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleRow}>
+                    <Ionicons name="grid" size={20} color={Colors.primary} />
+                    <Text style={styles.sectionTitle}>JAMOA <Text style={styles.sectionTitleHighlight}>TAKTIKASI</Text></Text>
+                </View>
+                {canEdit && (
+                    <TouchableOpacity 
+                        style={styles.editTacticsBtn}
+                        onPress={() => navigation.navigate('FormationBoard', { teamId })}
+                    >
+                        <Text style={styles.editTacticsBtnText}>TAHRIRLASH</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {team?.formation?.players && team.formation.players.length > 0 ? (
+                <TouchableOpacity 
+                    activeOpacity={canEdit ? 0.9 : 1}
+                    onPress={() => canViewBoard && navigation.navigate('FormationBoard', { teamId, isReadOnly: !canEdit })}
+                >
+                    <TacticsBoard 
+                        players={team.formation.players} 
+                        teamColor={team.color || Colors.primary} 
+                    />
+                </TouchableOpacity>
+            ) : (
+                <View style={styles.emptyTacticsBox}>
+                    <Ionicons name="construct-outline" size={40} color="rgba(255,255,255,0.1)" />
+                    <Text style={styles.emptyText}>Taktika hali belgilanmagan</Text>
+                    {canEdit && (
+                        <TouchableOpacity 
+                            style={styles.createTacticsBtn}
+                            onPress={() => navigation.navigate('FormationBoard', { teamId })}
                         >
-                            <Ionicons name="logo-instagram" size={18} color="#FFF" />
-                        </TouchableOpacity>
-                    )}
-                    {team.facebook && (
-                        <TouchableOpacity
-                            style={styles.socialBtn}
-                            onPress={() => Linking.openURL(team.facebook!)}
-                        >
-                            <Ionicons name="logo-facebook" size={18} color="#FFF" />
-                        </TouchableOpacity>
-                    )}
-                    {team.youtube && (
-                        <TouchableOpacity
-                            style={styles.socialBtn}
-                            onPress={() => Linking.openURL(team.youtube!)}
-                        >
-                            <Ionicons name="logo-youtube" size={18} color="#FFF" />
+                            <Text style={styles.createTacticsBtnText}>YARATISH</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -266,6 +451,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             >
                 {renderHeader()}
                 <View style={styles.mainContent}>
+                    {renderTactics()}
                     {renderSquad()}
                     {renderMatches()}
                 </View>
@@ -428,6 +614,118 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
+    },
+    adminActionRow: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        flexDirection: 'row',
+        gap: 8,
+        zIndex: 10,
+    },
+    adminBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    adminBtnActive: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primary,
+    },
+    adminBtnText: {
+        color: '#FFF',
+        fontSize: 9,
+        fontWeight: '900',
+    },
+    editTacticsBtn: {
+        backgroundColor: 'rgba(0,255,102,0.1)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(0,255,102,0.2)',
+    },
+    editTacticsBtnText: {
+        color: Colors.primary,
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    emptyTacticsBox: {
+        backgroundColor: '#1A2138',
+        borderRadius: 24,
+        padding: 30,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    createTacticsBtn: {
+        marginTop: 15,
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        borderRadius: 10,
+    },
+    createTacticsBtnText: {
+        color: '#000',
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    editForm: {
+        width: '100%',
+        alignItems: 'center',
+        gap: 10,
+    },
+    editInput: {
+        width: '100%',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        color: '#FFF',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    saveBtn: {
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 30,
+        paddingVertical: 12,
+        borderRadius: 15,
+        marginTop: 5,
+    },
+    saveBtnText: {
+        color: '#000',
+        fontWeight: '900',
+        fontSize: 12,
+    },
+    socialEditRow: {
+        marginTop: 20,
+        gap: 10,
+        paddingHorizontal: 20,
+    },
+    socialInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    socialInput: {
+        flex: 1,
+        color: '#FFF',
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        fontSize: 12,
     },
     mainContent: {
         paddingHorizontal: 20,

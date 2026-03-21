@@ -13,7 +13,9 @@ import {
     Dimensions,
     Keyboard,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Modal,
+    ImageBackground,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -110,6 +112,8 @@ export default function WelcomeScreen({ navigation }: any) {
     const [phone, setPhone] = useState('');
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [profiles, setProfiles] = useState<any[]>([]);
+    const [showProfileModal, setShowProfileModal] = useState(false);
 
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
@@ -136,17 +140,23 @@ export default function WelcomeScreen({ navigation }: any) {
     };
 
     const handleConfirm = async () => {
-        if (!selectedRole || phone.length < 9) {
-            Alert.alert('Xato', 'Iltimos, rol va telefon raqamini to\'liq kiriting.');
+        if (phone.length < 9) {
+            Alert.alert('Xato', 'Iltimos, telefon raqamini to\'liq kiriting.');
             return;
         }
 
         try {
             setLoading(true);
-            const response = await apiService.simpleLogin(phone);
+            const fullPhone = `998${phone}`;
+            const response = await apiService.simpleLogin(fullPhone);
 
             if (response.success) {
-                setAuth(response.user);
+                if (response.multipleProfiles) {
+                    setProfiles(response.profiles);
+                    setShowProfileModal(true);
+                } else {
+                    setAuth(response.user);
+                }
             } else {
                 Alert.alert('Xato', response.reason || 'Kirishda xatolik yuz berdi.');
             }
@@ -154,6 +164,26 @@ export default function WelcomeScreen({ navigation }: any) {
             console.error('Login error:', error);
             const message = error.response?.data?.reason || 'Server bilan bog\'lanishda xatolik yuz berdi.';
             Alert.alert('Xato', message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleProfileSelect = async (profileId: string) => {
+        try {
+            setLoading(true);
+            const fullPhone = `998${phone}`;
+            const response = await apiService.simpleLogin(fullPhone, undefined, profileId);
+
+            if (response.success) {
+                setShowProfileModal(false);
+                setAuth(response.user);
+            } else {
+                Alert.alert('Xato', response.reason || 'Kirishda xatolik yuz berdi.');
+            }
+        } catch (error: any) {
+            console.error('Selection error:', error);
+            Alert.alert('Xato', 'Profilni tanlashda xatolik yuz berdi.');
         } finally {
             setLoading(false);
         }
@@ -182,37 +212,8 @@ export default function WelcomeScreen({ navigation }: any) {
                             <View style={styles.loginCard}>
                                 <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={{ padding: 24 }}>
-                                    <Text style={styles.cardTitle}>KIM SIFATIDA KIRYAPSIZ?</Text>
+                                    <Text style={styles.cardTitle}>TIZIMGA KIRISH</Text>
 
-                                    <View style={styles.roleSelectionContainer}>
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.roleButton,
-                                                selectedRole === 'player' && styles.roleButtonActive
-                                            ]}
-                                            onPress={() => handleRoleSelect('player')}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={[styles.roleIconBox, selectedRole === 'player' && styles.roleIconBoxActive]}>
-                                                <Ionicons name="football" size={24} color={selectedRole === 'player' ? '#000' : Colors.primary} />
-                                            </View>
-                                            <Text style={[styles.roleLabel, selectedRole === 'player' && styles.roleLabelActive]}>O'YINCHI</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.roleButton,
-                                                selectedRole === 'manager' && styles.roleButtonActive
-                                            ]}
-                                            onPress={() => handleRoleSelect('manager')}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={[styles.roleIconBox, selectedRole === 'manager' && styles.roleIconBoxActive]}>
-                                                <Ionicons name="people" size={24} color={selectedRole === 'manager' ? '#000' : Colors.primary} />
-                                            </View>
-                                            <Text style={[styles.roleLabel, selectedRole === 'manager' && styles.roleLabelActive]}>JAMOA</Text>
-                                        </TouchableOpacity>
-                                    </View>
 
                                     <View style={styles.inputWrapper}>
                                         <Text style={styles.inputLabel}>TEL RAQAMINGIZ</Text>
@@ -241,10 +242,10 @@ export default function WelcomeScreen({ navigation }: any) {
                                         <TouchableOpacity
                                             style={[
                                                 styles.confirmButton,
-                                                (!selectedRole || phone.length < 9 || loading) && styles.confirmButtonDisabled
+                                                (phone.length < 9 || loading) && styles.confirmButtonDisabled
                                             ]}
                                             onPress={handleConfirm}
-                                            disabled={!selectedRole || phone.length < 9 || loading}
+                                            disabled={phone.length < 9 || loading}
                                         >
                                             {loading ? (
                                                 <ActivityIndicator color="#000" />
@@ -283,6 +284,66 @@ export default function WelcomeScreen({ navigation }: any) {
                     </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
+
+            <Modal
+                visible={showProfileModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowProfileModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>QAYSI HISOBGA KIRASIZ?</Text>
+                        <Text style={styles.modalSubtitle}>Ushbu raqamda bir nechta profil topildi</Text>
+
+                        {profiles.map((profile) => (
+                            <TouchableOpacity
+                                key={profile.id}
+                                style={styles.profileItem}
+                                onPress={() => handleProfileSelect(profile.id)}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.profileIconContainer}>
+                                    {profile.logo || profile.photo ? (
+                                        <Image 
+                                            source={{ uri: profile.logo || profile.photo }} 
+                                            style={styles.profileAvatar} 
+                                        />
+                                    ) : (
+                                        <View style={[styles.profileAvatar, styles.profileAvatarPlaceholder]}>
+                                            <Ionicons 
+                                                name={profile.role === 'manager' ? 'people' : 'football'} 
+                                                size={24} 
+                                                color={Colors.primary} 
+                                            />
+                                        </View>
+                                    )}
+                                    <View style={styles.roleBadge}>
+                                        <Text style={styles.roleBadgeText}>
+                                            {profile.role === 'manager' ? 'JAMOA' : 'O\'YINCHI'}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.profileInfo}>
+                                    <Text style={styles.profileName}>{profile.name}</Text>
+                                    <Text style={styles.profileRoleName}>
+                                        {profile.role === 'manager' ? 'Jamoa Sardori' : 'Futbolchi'}
+                                    </Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+                            </TouchableOpacity>
+                        ))}
+
+                        <TouchableOpacity
+                            style={styles.modalCloseButton}
+                            onPress={() => setShowProfileModal(false)}
+                        >
+                            <Text style={styles.modalCloseText}>BEKOR QILISH</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -491,5 +552,102 @@ const styles = StyleSheet.create({
     },
     confirmButtonDisabled: {
         opacity: 0.3,
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    modalContent: {
+        width: width - 40,
+        backgroundColor: '#1A1A1A',
+        borderRadius: 32,
+        padding: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        alignItems: 'center',
+    },
+    modalTitle: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 2,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    modalSubtitle: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginBottom: 24,
+    },
+    profileItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        width: '100%',
+        padding: 16,
+        borderRadius: 20,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    profileIconContainer: {
+        position: 'relative',
+        marginRight: 16,
+    },
+    profileAvatar: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#333',
+    },
+    profileAvatarPlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'rgba(0, 255, 102, 0.2)',
+    },
+    roleBadge: {
+        position: 'absolute',
+        bottom: -4,
+        right: -4,
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#1A1A1A',
+    },
+    roleBadgeText: {
+        color: '#000',
+        fontSize: 8,
+        fontWeight: '900',
+    },
+    profileInfo: {
+        flex: 1,
+    },
+    profileName: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '800',
+        marginBottom: 2,
+    },
+    profileRoleName: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    modalCloseButton: {
+        marginTop: 12,
+        padding: 12,
+    },
+    modalCloseText: {
+        color: Colors.textMuted,
+        fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 1,
     },
 });

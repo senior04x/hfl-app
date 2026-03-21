@@ -100,6 +100,18 @@ export interface Team {
         goalsAgainst: number;
         points: number;
     };
+    formation?: {
+        layout?: string;
+        players: {
+            id: string;
+            name: string;
+            number?: string | number;
+            x: number;
+            y: number;
+            goals?: number;
+            assists?: number;
+        }[];
+    };
 }
 
 export interface Tournament {

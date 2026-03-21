@@ -9,44 +9,166 @@ import {
     ActivityIndicator,
     Alert,
     SafeAreaView,
+    Platform,
+    Modal,
+    FlatList,
+    Pressable,
 } from 'react-native';
 import { apiService } from '../services/apiService';
 import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
+import { useAuthStore } from '../store/useAuthStore';
 
 const TransferRequestScreen = ({ route, navigation }: any) => {
+    const { user } = useAuthStore();
     const { playerId } = route.params || {};
-    const [loading, setLoading] = useState(false);
+    const [leagues, setLeagues] = useState<any[]>([]);
+    const [selectedLeague, setSelectedLeague] = useState('');
+    const [loadingLeagues, setLoadingLeagues] = useState(false);
+
+    const [tournaments, setTournaments] = useState<any[]>([]);
+    const [selectedTournament, setSelectedTournament] = useState('');
+    const [loadingTournaments, setLoadingTournaments] = useState(false);
+
     const [teams, setTeams] = useState<any[]>([]);
     const [selectedTeam, setSelectedTeam] = useState('');
+    const [loadingTeams, setLoadingTeams] = useState(false);
+
     const [reason, setReason] = useState('');
+    const [loadingSubmit, setLoadingSubmit] = useState(false);
+
+    // Modal state
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalType, setModalType] = useState<'league' | 'tournament' | 'team'>('league');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const openModal = (type: 'league' | 'tournament' | 'team') => {
+        setModalType(type);
+        setSearchQuery('');
+        setModalVisible(true);
+    };
+
+    const getModalData = () => {
+        let data: any[] = [];
+        if (modalType === 'league') data = leagues;
+        if (modalType === 'tournament') data = tournaments;
+        if (modalType === 'team') data = teams;
+        
+        if (searchQuery) {
+            return data.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        }
+        return data;
+    };
+
+    const handleSelect = (item: any) => {
+        if (modalType === 'league') {
+            setSelectedLeague(item._id || item.id);
+        } else if (modalType === 'tournament') {
+            setSelectedTournament(item._id || item.id);
+        } else if (modalType === 'team') {
+            setSelectedTeam(item._id || item.id);
+        }
+        setModalVisible(false);
+    };
+
+    const getSelectedName = (type: 'league' | 'tournament' | 'team') => {
+        if (type === 'league') {
+            return leagues.find(l => (l._id || l.id) === selectedLeague)?.name || 'Ligani tanlang...';
+        }
+        if (type === 'tournament') {
+            return tournaments.find(t => (t._id || t.id) === selectedTournament)?.name || 'Turnirni tanlang...';
+        }
+        if (type === 'team') {
+            return teams.find(t => (t._id || t.id) === selectedTeam)?.name || 'Jamoani tanlang...';
+        }
+        return '';
+    };
 
     useEffect(() => {
-        fetchTeams();
+        fetchLeagues();
     }, []);
 
-    const fetchTeams = async () => {
+    const fetchLeagues = async () => {
         try {
-            const data = await apiService.getTeams(1, 100);
+            setLoadingLeagues(true);
+            const data = await apiService.getLeagues();
+            if (data && Array.isArray(data)) {
+                setLeagues(data);
+            }
+        } catch (error) {
+            console.error('Error fetching leagues:', error);
+        } finally {
+            setLoadingLeagues(false);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedLeague) {
+            fetchTournaments(selectedLeague);
+        } else {
+            setTournaments([]);
+            setSelectedTournament('');
+            setTeams([]);
+            setSelectedTeam('');
+        }
+    }, [selectedLeague]);
+
+    const fetchTournaments = async (leagueId: string) => {
+        try {
+            setLoadingTournaments(true);
+            const data = await apiService.getTournaments(1, 100, leagueId);
+            if (data && Array.isArray(data)) {
+                setTournaments(data);
+            }
+            setSelectedTournament('');
+            setTeams([]);
+            setSelectedTeam('');
+        } catch (error) {
+            console.error('Error fetching tournaments:', error);
+        } finally {
+            setLoadingTournaments(false);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedTournament) {
+            fetchTeamsForTournament(selectedTournament);
+        } else {
+            setTeams([]);
+            setSelectedTeam('');
+        }
+    }, [selectedTournament]);
+
+    const fetchTeamsForTournament = async (tournamentId: string) => {
+        try {
+            setLoadingTeams(true);
+            const data = await apiService.getTeams(1, 100, tournamentId);
             if (data && Array.isArray(data)) {
                 setTeams(data);
             }
+            setSelectedTeam('');
         } catch (error) {
             console.error('Error fetching teams:', error);
+        } finally {
+            setLoadingTeams(false);
         }
     };
 
     const handleSubmit = async () => {
         if (!selectedTeam || !reason.trim()) {
-            Alert.alert('Xatolik', 'Iltimos, jamoa tanlang va sababni yozing');
+            Alert.alert('Xatolik', 'Iltimos, barcha tanlovlarni bajaring va sababni yozing');
+            return;
+        }
+
+        if (reason.trim().length < 10) {
+            Alert.alert('Xatolik', "O'tish sababi eng kamida 10 ta belgidan iborat bo'lishi shart.");
             return;
         }
 
         try {
-            setLoading(true);
+            setLoadingSubmit(true);
             const transferData = {
                 playerId,
-                currentTeamId: 'old_team_id', // This should come from user session
+                currentTeamId: user?.teamId || 'unknown_old_team',
                 newTeamId: selectedTeam,
                 reason: reason.trim(),
             };
@@ -60,9 +182,9 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
             }
         } catch (error) {
             console.error('Error submitting transfer request:', error);
-            Alert.alert('Xatolik', 'Server bilan bog\'lanishda xatolik');
+            Alert.alert('Xatolik', 'Server bilan bog\'lanishda xatolik yuz berdi');
         } finally {
-            setLoading(false);
+            setLoadingSubmit(false);
         }
     };
 
@@ -84,24 +206,48 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                     </Text>
                 </View>
 
-                <Text style={styles.label}>Yangi Jamoani Tanlang</Text>
-                <View style={styles.pickerContainer}>
-                    <Picker
-                        selectedValue={selectedTeam}
-                        onValueChange={(itemValue) => setSelectedTeam(itemValue)}
-                        style={styles.picker}
-                        dropdownIconColor="#00FF66"
-                    >
-                        <Picker.Item label="Jamoani tanlang..." value="" />
-                        {teams.map((team) => (
-                            <Picker.Item
-                                key={team._id || team.id}
-                                label={team.name}
-                                value={team._id || team.id}
-                            />
-                        ))}
-                    </Picker>
-                </View>
+                <Text style={styles.label}>Ligani Tanlang</Text>
+                <TouchableOpacity 
+                    style={styles.selectButton} 
+                    onPress={() => openModal('league')}
+                >
+                    <Text style={[styles.selectButtonText, !selectedLeague && styles.placeholderText]}>
+                        {loadingLeagues ? "Yuklanmoqda..." : getSelectedName('league')}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#00FF66" />
+                </TouchableOpacity>
+
+                {selectedLeague ? (
+                    <>
+                        <Text style={styles.label}>Turnirni Tanlang</Text>
+                        <TouchableOpacity 
+                            style={styles.selectButton} 
+                            onPress={() => openModal('tournament')}
+                            disabled={loadingTournaments || tournaments.length === 0}
+                        >
+                            <Text style={[styles.selectButtonText, !selectedTournament && styles.placeholderText]}>
+                                {loadingTournaments ? "Yuklanmoqda..." : getSelectedName('tournament')}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color="#00FF66" />
+                        </TouchableOpacity>
+                    </>
+                ) : null}
+
+                {selectedTournament ? (
+                    <>
+                        <Text style={styles.label}>Yangi Jamoani Tanlang</Text>
+                        <TouchableOpacity 
+                            style={styles.selectButton} 
+                            onPress={() => openModal('team')}
+                            disabled={loadingTeams || teams.length === 0}
+                        >
+                            <Text style={[styles.selectButtonText, !selectedTeam && styles.placeholderText]}>
+                                {loadingTeams ? "Yuklanmoqda..." : getSelectedName('team')}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color="#00FF66" />
+                        </TouchableOpacity>
+                    </>
+                ) : null}
 
                 <Text style={styles.label}>O'tish Sababi</Text>
                 <TextInput
@@ -115,11 +261,11 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                 />
 
                 <TouchableOpacity
-                    style={[styles.submitButton, loading && styles.disabledButton]}
+                    style={[styles.submitButton, loadingSubmit && styles.disabledButton]}
                     onPress={handleSubmit}
-                    disabled={loading}
+                    disabled={loadingSubmit}
                 >
-                    {loading ? (
+                    {loadingSubmit ? (
                         <ActivityIndicator color="#000" />
                     ) : (
                         <>
@@ -129,6 +275,54 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                     )}
                 </TouchableOpacity>
             </ScrollView>
+
+            {/* Bottom Sheet Modal for Selections */}
+            <Modal
+                visible={modalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)} />
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>
+                            {modalType === 'league' ? 'Ligani Tanlang' : modalType === 'tournament' ? 'Turnirni Tanlang' : 'Jamoani Tanlang'}
+                        </Text>
+                        <TouchableOpacity onPress={() => setModalVisible(false)}>
+                            <Ionicons name="close-circle" size={28} color="#666" />
+                        </TouchableOpacity>
+                    </View>
+                    
+                    <View style={styles.searchContainer}>
+                        <Ionicons name="search" size={20} color="#666" />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Qidirish..."
+                            placeholderTextColor="#666"
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                    </View>
+
+                    <FlatList
+                        data={getModalData()}
+                        keyExtractor={(item) => item._id || item.id}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity 
+                                style={styles.modalItem}
+                                onPress={() => handleSelect(item)}
+                            >
+                                <Text style={styles.modalItemText}>{item.name}</Text>
+                                <Ionicons name="chevron-forward" size={20} color="#333" />
+                            </TouchableOpacity>
+                        )}
+                        ItemSeparatorComponent={() => <View style={styles.separator} />}
+                        ListEmptyComponent={<Text style={styles.emptyText}>Hech narsa topilmadi</Text>}
+                        showsVerticalScrollIndicator={false}
+                    />
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -180,17 +374,25 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         marginLeft: 5,
     },
-    pickerContainer: {
+    selectButton: {
         backgroundColor: '#111',
         borderRadius: 12,
         marginBottom: 25,
         borderWidth: 1,
         borderColor: '#333',
-        overflow: 'hidden',
-    },
-    picker: {
-        color: '#FFF',
         height: 55,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 15,
+    },
+    selectButtonText: {
+        color: '#FFF',
+        fontSize: 15,
+        flex: 1,
+    },
+    placeholderText: {
+        color: '#666',
     },
     textArea: {
         backgroundColor: '#111',
@@ -224,6 +426,67 @@ const styles = StyleSheet.create({
     },
     disabledButton: {
         opacity: 0.6,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+    },
+    modalContent: {
+        backgroundColor: '#1A1A1A',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        height: '75%',
+        padding: 20,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    modalTitle: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#0A0A0A',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        marginBottom: 15,
+        height: 45,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    searchInput: {
+        flex: 1,
+        color: '#FFF',
+        marginLeft: 10,
+        fontSize: 15,
+    },
+    modalItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 15,
+    },
+    modalItemText: {
+        color: '#FFF',
+        fontSize: 16,
+    },
+    separator: {
+        height: 1,
+        backgroundColor: '#333',
+    },
+    emptyText: {
+        color: '#666',
+        textAlign: 'center',
+        marginTop: 20,
+        fontSize: 15,
     },
 });
 

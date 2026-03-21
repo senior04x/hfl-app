@@ -1,10 +1,10 @@
 import axios from 'axios';
 
 // Production Render URL
-// const BASE_URL = 'https://hfl-backend.onrender.com/api';
+const BASE_URL = 'https://hfl-backend.onrender.com/api';
 
 // Local development URL (Use your machine IP for mobile connectivity)
-const BASE_URL = 'http://192.168.0.111:3002/api';
+// const BASE_URL = 'http://192.168.0.111:3002/api';
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -39,6 +39,8 @@ export const apiService = {
     },
     getTeamById: (id: string) =>
         api.get(`/teams/${id}`).then(res => res.data.data),
+    updateTeam: (id: string, data: any) =>
+        api.put(`/teams/${id}`, data).then(res => res.data),
     getPlayersByTeam: async (teamId: string) => {
         try {
             const res = await api.get(`/teams/${teamId}/players`);
@@ -92,8 +94,8 @@ export const apiService = {
         api.get(`/applications/${phone}`).then(res => res.data.data),
 
     // Auth
-    simpleLogin: (phone: string) =>
-        api.post('/simple-login', { phone }).then(res => res.data),
+    simpleLogin: (phone: string, role?: string, profileId?: string) =>
+        api.post('/simple-login', { phone, role, profileId }).then(res => res.data),
 };
 
 export default api;

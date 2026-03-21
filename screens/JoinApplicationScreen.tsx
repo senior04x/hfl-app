@@ -169,8 +169,20 @@ const JoinApplicationScreen = ({ navigation }: any) => {
 
         try {
             setLoading(true);
+            
+            // Format phone number before sending
+            let phone = formData.phone.replace(/\D/g, '');
+            if (phone.length === 9) {
+                phone = `+998${phone}`;
+            } else if (phone.length === 12 && phone.startsWith('998')) {
+                phone = `+${phone}`;
+            } else if (!phone.startsWith('+')) {
+                phone = `+${phone}`;
+            }
+
             const applicationData = {
                 ...formData,
+                phone: phone,
                 type: applicationType,
                 status: 'pending',
                 createdAt: new Date(),
@@ -339,16 +351,26 @@ const JoinApplicationScreen = ({ navigation }: any) => {
                             )}
 
                             <View style={styles.inputBox}>
-                                <Text style={styles.boxLabel}>TELEFON RAQAM (+998)</Text>
-                                <TextInput
-                                    style={styles.textInput}
-                                    value={formData.phone}
-                                    onChangeText={(t) => setFormData({...formData, phone: t})}
-                                    placeholder="90 123 45 67"
-                                    keyboardType="phone-pad"
-                                    maxLength={9}
-                                    placeholderTextColor="rgba(255,255,255,0.2)"
-                                />
+                                <Text style={styles.boxLabel}>TELEFON RAQAM</Text>
+                                <View style={styles.phoneInputContainer}>
+                                    <View style={styles.phonePrefix}>
+                                        <Text style={styles.phonePrefixText}>+998</Text>
+                                    </View>
+                                    <TextInput
+                                        style={styles.phoneInput}
+                                        value={formData.phone}
+                                        onChangeText={(t) => {
+                                            const cleaned = t.replace(/\D/g, '');
+                                            if (cleaned.length <= 9) {
+                                                setFormData({ ...formData, phone: cleaned });
+                                            }
+                                        }}
+                                        placeholder="90 123 45 67"
+                                        keyboardType="phone-pad"
+                                        maxLength={9}
+                                        placeholderTextColor="rgba(255,255,255,0.2)"
+                                    />
+                                </View>
                             </View>
                         </View>
                     </View>
@@ -585,6 +607,36 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.05)',
+    },
+    phoneInputContainer: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 12,
+        height: 52,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        overflow: 'hidden',
+    },
+    phonePrefix: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        paddingHorizontal: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRightWidth: 1,
+        borderRightColor: 'rgba(255,255,255,0.05)',
+    },
+    phonePrefixText: {
+        color: Colors.primary,
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    phoneInput: {
+        flex: 1,
+        paddingHorizontal: 16,
+        color: Colors.text,
+        fontSize: 16,
+        fontWeight: '700',
+        letterSpacing: 1,
     },
     positionCloud: {
         flexDirection: 'row',
