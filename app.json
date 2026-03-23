@@ -5,18 +5,41 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121212"
+    },
     "scheme": "hflsoccerapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.amatora.app"
+      "bundleIdentifier": "com.amatora.app",
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#121212",
+        "dark": {
+          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#000000"
+        }
+      }
     },
     "android": {
       "package": "com.amatora.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#000000"
+      },
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#121212",
+        "dark": {
+          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#000000"
+        }
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
