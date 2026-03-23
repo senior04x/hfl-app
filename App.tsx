@@ -23,7 +23,13 @@ import TeamProfileScreen from './screens/TeamProfileScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
 
+import * as SplashScreenExpo from 'expo-splash-screen';
 import SplashScreen from './screens/SplashScreen';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreenExpo.preventAutoHideAsync().catch(() => {
+    /* reloading the app might cause this error, safe to ignore */
+});
 
 const Stack = createStackNavigator();
 
@@ -32,7 +38,13 @@ export default function App() {
     const [isSplashVisible, setIsSplashVisible] = React.useState(true);
 
     if (isSplashVisible) {
-        return <SplashScreen onFinish={() => setIsSplashVisible(false)} />;
+        return (
+            <SplashScreen 
+                onFinish={() => {
+                    setIsSplashVisible(false);
+                }} 
+            />
+        );
     }
 
     return (

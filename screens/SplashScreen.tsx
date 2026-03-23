@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Image, StatusBar } from 'react-native';
+import * as SplashScreenExpo from 'expo-splash-screen';
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
@@ -12,6 +13,9 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
     const letterSpacing = useRef(new Animated.Value(-10)).current; // Faded in bunched
 
     useEffect(() => {
+        // Hide the native splash as soon as the animated component is mounted
+        SplashScreenExpo.hideAsync().catch(() => {});
+
         // Sequenced animation
         Animated.sequence([
             // 1. Logo Fade In at center
