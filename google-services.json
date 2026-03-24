@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "602318189245",
+    "project_id": "havas-football-league",
+    "storage_bucket": "havas-football-league.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:602318189245:android:db2a39872602a2da1ffdd4",
+        "android_client_info": {
+          "package_name": "com.amatora.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuy7nl9QGt9lHHwqWszJXrsk5WCRiv970"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

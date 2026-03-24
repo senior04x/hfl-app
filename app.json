@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "com.amatora.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
@@ -54,7 +55,7 @@
       "**/*"
     ],
     "plugins": [
-      "./plugins/withGradleProperties",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {

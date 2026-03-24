@@ -22,8 +22,17 @@ export const notificationService = {
    */
   registerForPushNotificationsAsync: async (userId: string) => {
     if (!Device.isDevice) {
-      console.log('Must use physical device for Push Notifications');
+      console.log('NOTICE: Must use physical device for Push Notifications');
       return null;
+    }
+
+    // Check if running in Expo Go (remote notifications not supported in SDK 53+)
+    const isExpoGo = Constants.appOwnership === 'expo' || Constants.appOwnership === 'guest';
+    console.log(`DEBUG: appOwnership=${Constants.appOwnership}, platform=${Platform.OS}`);
+    
+    if (isExpoGo && Platform.OS === 'android') {
+       console.log('NOTICE: Android Push Notifications (remote) are not supported in Expo Go (SDK 53+). Please use a development build.');
+       // We still try to get the token for internal use, but handle errors silently
     }
 
     try {
@@ -44,6 +53,7 @@ export const notificationService = {
       // Project ID is required for SDK 49+
       const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
       
+      console.log(`DEBUG: Fetching Expo token for project ${projectId}...`);
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId
       });
@@ -51,7 +61,16 @@ export const notificationService = {
       const token = tokenData.data;
       console.log('Expo Push Token:', token);
 
+      // Get native device token (FCM/APNs) for direct Firebase messaging
+      try {
+        const deviceTokenData = await Notifications.getDevicePushTokenAsync();
+        console.log('Device Push Token (FCM/APNs):', deviceTokenData.data);
+      } catch (e) {
+        console.log('NOTICE: Could not get device push token (expected in Expo Go)');
+      }
+
       // Register with our backend
+      // Register Expo Token with our backend
       if (userId) {
         await apiService.registerPushToken({
           token,
@@ -59,12 +78,33 @@ export const notificationService = {
           platform: Platform.OS,
           deviceId: Constants.installationId || Device.osBuildId || 'unknown'
         });
+
+        // Also register native device token (FCM/APNs) for direct Firebase messaging
+        try {
+          const deviceTokenData = await Notifications.getDevicePushTokenAsync();
+          if (deviceTokenData.data && deviceTokenData.data !== token) {
+            await apiService.registerPushToken({
+              token: deviceTokenData.data,
+              userId,
+              platform: Platform.OS,
+              deviceId: (Constants.installationId || Device.osBuildId || 'unknown') + '_fcm'
+            });
+            console.log('Registered Native Token with backend');
+          }
+        } catch (e) {
+          console.log('NOTICE: Direct FCM registration skipped in current environment');
+        }
       }
 
       return token;
     } catch (error) {
-      console.error('Error during push notification registration:', error);
-      return null;
+       const isExpoGo = Constants.appOwnership === 'expo' || Constants.appOwnership === 'guest';
+       if (isExpoGo) {
+         console.log('NOTICE: Push orientation failed in Expo Go (expected). Use Dev Build for full support.');
+       } else {
+         console.error('Error during push notification registration:', error);
+       }
+       return null;
     }
   },
 
