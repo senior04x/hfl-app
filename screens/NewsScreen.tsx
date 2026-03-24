@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,22 +7,28 @@ import {
     TouchableOpacity,
     Dimensions,
     RefreshControl,
-    ScrollView
+    ScrollView,
+    Modal,
+    TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Video, ResizeMode } from 'expo-av';
+import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import { News } from '../types';
 import SmartImage from '../components/SmartImage';
 import { useNavigation } from '@react-navigation/native';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export default function NewsScreen() {
     const [news, setNews] = useState<News[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState('Barchasi');
+    const [isSearchVisible, setIsSearchVisible] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const navigation = useNavigation<any>();
 
     const categories = ['Barchasi', 'Turnirlar', 'Jamoalar', 'Transferlar', 'Amatora TV'];
@@ -31,7 +37,7 @@ export default function NewsScreen() {
         try {
             setIsLoading(true);
             const category = selectedCategory === 'Barchasi' ? undefined : selectedCategory;
-            const data = await apiService.getNews(1, 20, category);
+            const data = await apiService.getNews(1, 40, category); 
             setNews(data || []);
         } catch (error) {
             console.error('Error fetching news:', error);
@@ -44,44 +50,54 @@ export default function NewsScreen() {
         fetchNews();
     }, [selectedCategory]);
 
+    const filteredNews = news.filter(item => 
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.content.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     const renderHeader = () => (
         <View style={styles.header}>
-            <Text style={styles.headerTitle}>YANGILIKLAR</Text>
-            <TouchableOpacity style={styles.searchBtn}>
-                <Ionicons name="search" size={20} color="#000" />
-            </TouchableOpacity>
+            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
+                <Text style={styles.headerTitle}>YANGILIKLAR</Text>
+                <TouchableOpacity style={styles.searchBtn} onPress={() => setIsSearchVisible(true)}>
+                    <Ionicons name="search" size={22} color="#000" />
+                </TouchableOpacity>
+            </View>
         </View>
     );
 
     const renderCategories = () => (
-        <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            style={styles.categoriesContainer}
-            contentContainerStyle={styles.categoriesContent}
-        >
-            {categories.map((cat) => (
-                <TouchableOpacity
-                    key={cat}
-                    style={[
-                        styles.categoryBtn,
-                        selectedCategory === cat && styles.categoryBtnActive
-                    ]}
-                    onPress={() => setSelectedCategory(cat)}
-                >
-                    <Text style={[
-                        styles.categoryText,
-                        selectedCategory === cat && styles.categoryTextActive
-                    ]}>
-                        {cat.toUpperCase()}
-                    </Text>
-                </TouchableOpacity>
-            ))}
-        </ScrollView>
+        <View style={styles.categoriesContainer}>
+            <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.categoriesContent}
+            >
+                {categories.map((cat) => (
+                    <TouchableOpacity
+                        key={cat}
+                        style={[
+                            styles.categoryBtn,
+                            selectedCategory === cat && styles.categoryBtnActive
+                        ]}
+                        onPress={() => setSelectedCategory(cat)}
+                    >
+                        <Text style={[
+                            styles.categoryText,
+                            selectedCategory === cat && styles.categoryTextActive
+                        ]}>
+                            {cat.toUpperCase()}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+        </View>
     );
 
     const renderNewsItem = ({ item, index }: { item: News, index: number }) => {
-        const isFeatured = index === 0 && selectedCategory === 'Barchasi';
+        const isFeatured = index === 0 && selectedCategory === 'Barchasi' && !searchQuery;
 
         if (isFeatured) {
             return (
@@ -94,16 +110,19 @@ export default function NewsScreen() {
                         style={styles.featuredImage}
                     />
                     <View style={styles.featuredOverlay}>
-                        <View style={styles.categoryBadge}>
-                            <Text style={styles.categoryBadgeText}>{item.category || 'YANGILIK'}</Text>
-                        </View>
-                        <Text style={styles.featuredTitle} numberOfLines={2}>{item.title}</Text>
-                        <View style={styles.newsMeta}>
-                            <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.7)" />
-                            <Text style={styles.metaText}>{new Date(item.createdAt).toLocaleDateString('uz-UZ')}</Text>
-                            <View style={styles.metaDivider} />
-                            <Ionicons name="eye-outline" size={14} color="rgba(255,255,255,0.7)" />
-                            <Text style={styles.metaText}>{item.views || 0}</Text>
+                        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={{ padding: 20 }}>
+                            <View style={styles.categoryBadge}>
+                                <Text style={styles.categoryBadgeText}>{item.category?.toUpperCase() || 'YANGILIK'}</Text>
+                            </View>
+                            <Text style={styles.featuredTitle} numberOfLines={2}>{item.title.toUpperCase()}</Text>
+                            <View style={styles.newsMeta}>
+                                <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.7)" />
+                                <Text style={styles.metaText}>{new Date(item.createdAt).toLocaleDateString('uz-UZ')}</Text>
+                                <View style={styles.metaDivider} />
+                                <Ionicons name="eye-outline" size={14} color="rgba(255,255,255,0.7)" />
+                                <Text style={styles.metaText}>{item.views || 0}</Text>
+                            </View>
                         </View>
                     </View>
                 </TouchableOpacity>
@@ -115,18 +134,21 @@ export default function NewsScreen() {
                 style={styles.newsCard}
                 onPress={() => navigation.navigate('NewsDetail', { newsId: item._id, news: item })}
             >
-                <SmartImage
-                    uri={item.imageUrl || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1000'}
-                    style={styles.newsImage}
-                />
-                <View style={styles.newsContent}>
-                    <Text style={styles.newsCategory}>{item.category || 'YANGILIK'}</Text>
-                    <Text style={styles.newsTitle} numberOfLines={2}>{item.title}</Text>
-                    <View style={styles.newsMeta}>
-                        <Text style={styles.metaTextSmall}>{new Date(item.createdAt).toLocaleDateString('uz-UZ')}</Text>
-                        <View style={[styles.metaDivider, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
-                        <Ionicons name="eye-outline" size={12} color={Colors.textMuted} />
-                        <Text style={styles.metaTextSmall}>{item.views || 0}</Text>
+                <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={{ flexDirection: 'row', padding: 12 }}>
+                    <SmartImage
+                        uri={item.imageUrl || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1000'}
+                        style={styles.newsImage}
+                    />
+                    <View style={styles.newsContent}>
+                        <Text style={styles.newsCategory}>{item.category?.toUpperCase() || 'YANGILIK'}</Text>
+                        <Text style={styles.newsTitle} numberOfLines={2}>{item.title.toUpperCase()}</Text>
+                        <View style={styles.newsMeta}>
+                            <Text style={styles.metaTextSmall}>{new Date(item.createdAt).toLocaleDateString('uz-UZ')}</Text>
+                            <View style={[styles.metaDivider, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
+                            <Ionicons name="eye-outline" size={12} color={Colors.textMuted} />
+                            <Text style={styles.metaTextSmall}>{item.views || 0}</Text>
+                        </View>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -134,192 +156,132 @@ export default function NewsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            <FlatList
-                data={news}
-                keyExtractor={(item) => item._id}
-                renderItem={renderNewsItem}
-                ListHeaderComponent={
-                    <View>
-                        {renderHeader()}
-                        {renderCategories()}
-                    </View>
-                }
-                contentContainerStyle={styles.listContent}
-                refreshControl={
-                    <RefreshControl refreshing={isLoading} onRefresh={fetchNews} tintColor={Colors.primary} />
-                }
-                ListEmptyComponent={
-                    !isLoading ? (
-                        <View style={styles.emptyContainer}>
-                            <Ionicons name="newspaper-outline" size={64} color={Colors.textMuted} />
-                            <Text style={styles.emptyText}>Hozircha yangiliklar yo'q</Text>
-                        </View>
-                    ) : null
-                }
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <Video
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                style={StyleSheet.absoluteFill}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay
+                isLooping
+                isMuted
+                useNativeControls={false}
             />
-        </SafeAreaView>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.7)' }]} />
+
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <FlatList
+                    data={searchQuery ? filteredNews : news}
+                    keyExtractor={(item) => item._id}
+                    renderItem={renderNewsItem}
+                    ListHeaderComponent={
+                        <View>
+                            {renderHeader()}
+                            {renderCategories()}
+                            {searchQuery ? (
+                                <View style={styles.searchResultHeader}>
+                                    <Text style={styles.searchResultText}>"{searchQuery.toUpperCase()}" BO'YICHA NATIJALAR: {filteredNews.length}</Text>
+                                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                        <Text style={{ color: Colors.primary, fontWeight: '900', fontSize: 12 }}>TOZALASH</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : null}
+                        </View>
+                    }
+                    contentContainerStyle={styles.listContent}
+                    refreshControl={
+                        <RefreshControl refreshing={isLoading} onRefresh={fetchNews} tintColor={Colors.primary} />
+                    }
+                    ListEmptyComponent={
+                        !isLoading ? (
+                            <View style={styles.emptyContainer}>
+                                <Ionicons name="newspaper-outline" size={64} color="rgba(255,255,255,0.1)" />
+                                <Text style={styles.emptyText}>Hozircha yangiliklar yo'q</Text>
+                            </View>
+                        ) : null
+                    }
+                />
+            </SafeAreaView>
+
+            {/* Search Modal */}
+            <Modal
+                visible={isSearchVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setIsSearchVisible(false)}
+            >
+                <View style={styles.searchModalContainer}>
+                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    <SafeAreaView style={{ flex: 1 }}>
+                        <View style={styles.searchBarContainer}>
+                            <TouchableOpacity onPress={() => { setIsSearchVisible(false); }}>
+                                <Ionicons name="chevron-back" size={28} color={Colors.primary} />
+                            </TouchableOpacity>
+                            <View style={styles.searchInputWrapper}>
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="YANGILIK QIDIRING..."
+                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    autoFocus
+                                    returnKeyType="search"
+                                    onSubmitEditing={() => setIsSearchVisible(false)}
+                                />
+                                {searchQuery !== '' && (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                        <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.5)" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                        <TouchableOpacity 
+                            style={styles.searchConfirmBtn}
+                            onPress={() => setIsSearchVisible(false)}
+                        >
+                            <Text style={styles.searchConfirmText}>NATIJALARNI KO'RISH</Text>
+                        </TouchableOpacity>
+                    </SafeAreaView>
+                </View>
+            </Modal>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: Colors.background,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-    },
-    headerTitle: {
-        color: Colors.text,
-        fontSize: 24,
-        fontWeight: '900',
-        fontStyle: 'italic',
-    },
-    searchBtn: {
-        backgroundColor: Colors.primary,
-        padding: 8,
-        borderRadius: 10,
-    },
-    categoriesContainer: {
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-        backgroundColor: Colors.background,
-        paddingVertical: 10,
-        marginBottom: 15,
-    },
-    categoriesContent: {
-        paddingHorizontal: 15,
-        alignItems: 'center',
-    },
-    categoryBtn: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        marginRight: 10,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
-    },
-    categoryBtnActive: {
-        backgroundColor: Colors.primary,
-        borderColor: Colors.primary,
-    },
-    categoryText: {
-        color: Colors.textMuted,
-        fontSize: 12,
-        fontWeight: '900',
-    },
-    categoryTextActive: {
-        color: '#000',
-    },
-    listContent: {
-        paddingHorizontal: 15,
-        paddingBottom: 40,
-    },
-    featuredCard: {
-        width: '100%',
-        height: 250,
-        borderRadius: 25,
-        overflow: 'hidden',
-        marginBottom: 20,
-        backgroundColor: Colors.surface,
-    },
-    featuredImage: {
-        width: '100%',
-        height: '100%',
-    },
-    featuredOverlay: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 20,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'flex-end',
-    },
-    categoryBadge: {
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-        alignSelf: 'flex-start',
-        marginBottom: 10,
-    },
-    categoryBadgeText: {
-        color: '#000',
-        fontSize: 9,
-        fontWeight: '900',
-    },
-    featuredTitle: {
-        color: '#FFF',
-        fontSize: 20,
-        fontWeight: '900',
-        marginBottom: 10,
-    },
-    newsMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    metaText: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 12,
-        marginLeft: 4,
-    },
-    metaDivider: {
-        width: 1,
-        height: 12,
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        marginHorizontal: 10,
-    },
-    newsCard: {
-        flexDirection: 'row',
-        backgroundColor: Colors.surface,
-        borderRadius: 20,
-        padding: 12,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
-    },
-    newsImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 15,
-    },
-    newsContent: {
-        flex: 1,
-        marginLeft: 15,
-        justifyContent: 'center',
-    },
-    newsCategory: {
-        color: Colors.primary,
-        fontSize: 10,
-        fontWeight: '900',
-        marginBottom: 4,
-    },
-    newsTitle: {
-        color: '#FFF',
-        fontSize: 15,
-        fontWeight: '800',
-        marginBottom: 8,
-    },
-    metaTextSmall: {
-        color: Colors.textMuted,
-        fontSize: 11,
-    },
-    emptyContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 60,
-    },
-    emptyText: {
-        color: Colors.textMuted,
-        fontSize: 16,
-        fontWeight: '600',
-        marginTop: 15,
-    }
+    container: { flex: 1, backgroundColor: 'transparent' },
+    header: { overflow: 'hidden' },
+    headerTitle: { color: '#FFF', fontSize: 24, fontWeight: '900', fontStyle: 'italic' },
+    searchBtn: { backgroundColor: Colors.primary, width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 5 },
+    categoriesContainer: { paddingVertical: 12, marginBottom: 15, overflow: 'hidden', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+    categoriesContent: { paddingHorizontal: 15, alignItems: 'center' },
+    categoryBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, marginRight: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    categoryBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
+    categoryText: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+    categoryTextActive: { color: '#000' },
+    listContent: { paddingHorizontal: 15, paddingBottom: 100 },
+    featuredCard: { width: '100%', height: 260, borderRadius: 24, overflow: 'hidden', marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    featuredImage: { width: '100%', height: '100%' },
+    featuredOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, justifyContent: 'flex-end', overflow: 'hidden' },
+    categoryBadge: { backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 8 },
+    categoryBadgeText: { color: '#000', fontSize: 10, fontWeight: '900' },
+    featuredTitle: { color: '#FFF', fontSize: 20, fontWeight: '900', marginBottom: 8, letterSpacing: 0.5 },
+    newsMeta: { flexDirection: 'row', alignItems: 'center' },
+    metaText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 4, fontWeight: '700' },
+    metaDivider: { width: 1, height: 12, backgroundColor: 'rgba(255,255,255,0.3)', marginHorizontal: 10 },
+    newsCard: { borderRadius: 20, marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+    newsImage: { width: 90, height: 90, borderRadius: 14 },
+    newsContent: { flex: 1, marginLeft: 15, justifyContent: 'center' },
+    newsCategory: { color: Colors.primary, fontSize: 10, fontWeight: '900', marginBottom: 4, letterSpacing: 0.5 },
+    newsTitle: { color: '#FFF', fontSize: 15, fontWeight: '800', marginBottom: 8, letterSpacing: 0.2 },
+    metaTextSmall: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700' },
+    emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
+    emptyText: { color: 'rgba(255,255,255,0.2)', fontSize: 16, fontWeight: '900', marginTop: 15 },
+    searchResultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 5, marginBottom: 20 },
+    searchResultText: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+    searchModalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+    searchBarContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+    searchInputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12, marginLeft: 15, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    searchInput: { flex: 1, color: '#FFF', fontSize: 16, fontWeight: '700' },
+    searchConfirmBtn: { backgroundColor: Colors.primary, marginHorizontal: 20, height: 55, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 15, marginTop: 20 },
+    searchConfirmText: { color: '#000', fontSize: 15, fontWeight: '900', letterSpacing: 1 }
 });

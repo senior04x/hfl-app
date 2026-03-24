@@ -9,14 +9,16 @@ import {
     Alert,
     ActivityIndicator,
     Platform,
-    Image,
     Dimensions,
     SafeAreaView,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
+import { Video, ResizeMode } from 'expo-av';
+import VideoBackground from '../components/VideoBackground';
 
 const { width } = Dimensions.get('window');
 
@@ -138,13 +140,11 @@ const JoinApplicationScreen = ({ navigation }: any) => {
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.5,
-            base64: true,
+            quality: 0.8, // Better quality since WebP compression happens on backend
         });
 
-        if (!result.canceled && result.assets[0].base64) {
-            const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-            setFormData({ ...formData, [field]: base64Image });
+        if (!result.canceled && result.assets[0].uri) {
+            setFormData({ ...formData, [field]: result.assets[0].uri }); // URI saqlaymiz, Base64 emas
         }
     };
 
@@ -169,6 +169,18 @@ const JoinApplicationScreen = ({ navigation }: any) => {
 
         try {
             setLoading(true);
+
+            // 1. Agar rasm bo'lsa, uni alohida API ga yuklaymiz va URL ni olamiz
+            let uploadedPhotoUrl = null;
+            let uploadedTeamLogoUrl = null;
+
+            if (applicationType === 'player' && formData.photo && !formData.photo.startsWith('http')) {
+                const uploadRes = await apiService.uploadPhoto(formData.photo);
+                uploadedPhotoUrl = uploadRes.url;
+            } else if (applicationType === 'team' && formData.teamLogo && !formData.teamLogo.startsWith('http')) {
+                const uploadRes = await apiService.uploadPhoto(formData.teamLogo);
+                uploadedTeamLogoUrl = uploadRes.url;
+            }
             
             // Format phone number before sending
             let phone = formData.phone.replace(/\D/g, '');
@@ -182,6 +194,8 @@ const JoinApplicationScreen = ({ navigation }: any) => {
 
             const applicationData = {
                 ...formData,
+                photo: uploadedPhotoUrl || formData.photo,
+                teamLogo: uploadedTeamLogoUrl || formData.teamLogo,
                 phone: phone,
                 type: applicationType,
                 status: 'pending',
@@ -200,6 +214,7 @@ const JoinApplicationScreen = ({ navigation }: any) => {
                 throw new Error('Server error');
             }
         } catch (error: any) {
+            console.error(error);
             Alert.alert('Xato', 'Ariza yuborishda xatolik yuz berdi');
         } finally {
             setLoading(false);
@@ -243,6 +258,10 @@ const JoinApplicationScreen = ({ navigation }: any) => {
 
     return (
         <View style={styles.container}>
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                overlayOpacity={0.85}
+            >
             <SafeAreaView style={{ flex: 1 }}>
                 {renderHeader()}
                 
@@ -471,6 +490,7 @@ const JoinApplicationScreen = ({ navigation }: any) => {
                     <View style={{ height: 100 }} />
                 </ScrollView>
             </SafeAreaView>
+            </VideoBackground>
         </View>
     );
 };
@@ -478,7 +498,7 @@ const JoinApplicationScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor: 'transparent',
     },
     header: {
         flexDirection: 'row',

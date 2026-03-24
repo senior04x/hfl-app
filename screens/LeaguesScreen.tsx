@@ -17,6 +17,8 @@ import { apiService } from '../services/apiService';
 import { useNavigation } from '@react-navigation/native';
 import SmartImage from '../components/SmartImage';
 import LeaguesSkeleton from '../components/LeaguesSkeleton';
+import { Video, ResizeMode } from 'expo-av';
+import VideoBackground from '../components/VideoBackground';
 
 export default function LeaguesScreen() {
     const { tournaments: groups, setTournaments: setGroups, isLoading, setLoading } = useTournamentStore();
@@ -150,7 +152,12 @@ export default function LeaguesScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.safeArea}>
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                overlayOpacity={0.85}
+            >
+            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
             {/* Main Screen Header */}
             <View style={styles.mainHeader}>
                 <View style={styles.headerTitleRow}>
@@ -181,21 +188,23 @@ export default function LeaguesScreen() {
                     />
                 )}
             </View>
-        </SafeAreaView>
+            </SafeAreaView>
+            </VideoBackground>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor: 'transparent',
     },
     container: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor: 'transparent',
     },
     mainHeader: {
-        backgroundColor: Colors.background,
+        backgroundColor: 'transparent',
         paddingTop: 15,
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,

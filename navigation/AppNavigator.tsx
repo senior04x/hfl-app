@@ -1,7 +1,9 @@
 import React from 'react';
+import { Platform, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
+import { BlurView } from 'expo-blur';
 
 import HomeScreen from '../screens/HomeScreen';
 import TournamentsScreen from '../screens/TournamentsScreen';
@@ -16,25 +18,28 @@ export default function AppNavigator() {
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
-                headerStyle: {
-                    backgroundColor: Colors.surface,
-                    borderBottomWidth: 1,
-                    borderBottomColor: Colors.border,
-                },
-                headerTintColor: Colors.text,
-                headerTitleStyle: {
-                    fontWeight: 'bold',
-                },
                 tabBarStyle: {
-                    backgroundColor: Colors.surface,
+                    position: 'absolute',
+                    backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(10, 15, 30, 0.85)',
                     borderTopWidth: 1,
-                    borderTopColor: Colors.border,
-                    paddingBottom: 5,
-                    paddingTop: 5,
+                    borderTopColor: 'rgba(255,255,255,0.08)',
+                    elevation: 0,
+                    shadowOpacity: 0,
                     height: 60,
                 },
+                tabBarBackground: () => (
+                    <BlurView
+                        intensity={Platform.OS === 'ios' ? 80 : 0}
+                        tint="dark"
+                        style={StyleSheet.absoluteFill}
+                    />
+                ),
                 tabBarActiveTintColor: Colors.primary,
-                tabBarInactiveTintColor: Colors.textMuted,
+                tabBarInactiveTintColor: 'rgba(255,255,255,0.45)',
+                tabBarLabelStyle: {
+                    fontSize: 11,
+                    fontWeight: '600',
+                },
             }}
         >
             <Tab.Screen

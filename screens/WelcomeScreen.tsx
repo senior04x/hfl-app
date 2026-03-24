@@ -27,6 +27,7 @@ import Animated, {
     Easing
 } from 'react-native-reanimated';
 import { Video, ResizeMode } from 'expo-av';
+import VideoBackground from '../components/VideoBackground';
 import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
 import Colors from '../constants/Colors';
@@ -191,16 +192,10 @@ export default function WelcomeScreen({ navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <Video
+            <VideoBackground
                 source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                style={StyleSheet.absoluteFill}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isLooping
-                isMuted
-            />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
-            
+                overlayOpacity={0.6}
+            >
             <StatusBar barStyle="light-content" />
             <SafeAreaView style={{ flex: 1 }}>
                 <KeyboardAvoidingView
@@ -223,7 +218,7 @@ export default function WelcomeScreen({ navigation }: any) {
                                                 style={styles.phoneInput}
                                                 placeholder="00 000 00 00"
                                                 placeholderTextColor={Colors.textMuted}
-                                                keyboardType="phone-pad"
+                                                keyboardType="number-pad"
                                                 value={phone}
                                                 onChangeText={setPhone}
                                                 maxLength={9}
@@ -344,6 +339,7 @@ export default function WelcomeScreen({ navigation }: any) {
                     </View>
                 </View>
             </Modal>
+            </VideoBackground>
         </View>
     );
 }

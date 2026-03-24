@@ -9,11 +9,11 @@ const HomeSkeleton = () => {
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
             {/* Header Skeleton */}
             <View style={styles.header}>
-                <View>
-                    <Skeleton width={100} height={15} style={{ marginBottom: 6 }} />
-                    <Skeleton width={150} height={30} />
+                <Skeleton width={44} height={44} borderRadius={22} style={{ marginRight: 15 }} />
+                <View style={{ flex: 1 }}>
+                    <Skeleton width={100} height={12} style={{ marginBottom: 6 }} />
+                    <Skeleton width={160} height={20} />
                 </View>
-                <Skeleton width={40} height={40} borderRadius={20} />
             </View>
 
             {/* Slider Skeleton */}
@@ -21,48 +21,48 @@ const HomeSkeleton = () => {
                 <Skeleton width={width - 40} height={180} borderRadius={20} />
             </View>
 
-            {/* Section 1 Skeleton (Live or Recommended) */}
+            {/* Section 1 Skeleton */}
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                    <Skeleton width={120} height={25} />
-                    <Skeleton width={60} height={20} />
+                    <Skeleton width={120} height={20} />
+                    <Skeleton width={60} height={15} />
                 </View>
-                <View style={styles.horizontalScroll}>
-                    <View style={styles.hMatchCard}>
-                        {/* Match Header */}
-                        <View style={styles.hMatchHeader}>
-                            <Skeleton width={100} height={15} />
-                            <Skeleton width={40} height={15} />
-                        </View>
-                        {/* Teams Row */}
-                        <View style={styles.hMatchTeamsRow}>
-                            <View style={styles.hTeamColumn}>
-                                <Skeleton width={60} height={60} borderRadius={30} style={{ marginBottom: 10 }} />
-                                <Skeleton width={60} height={15} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
+                    {[1, 2].map((i) => (
+                        <View key={i} style={styles.hMatchCard}>
+                            <View style={styles.hMatchHeader}>
+                                <Skeleton width={80} height={12} />
+                                <Skeleton width={40} height={12} />
                             </View>
-                            <Skeleton width={50} height={30} />
-                            <View style={styles.hTeamColumn}>
-                                <Skeleton width={60} height={60} borderRadius={30} style={{ marginBottom: 10 }} />
-                                <Skeleton width={60} height={15} />
+                            <View style={styles.hMatchTeamsRow}>
+                                <View style={styles.hTeamColumn}>
+                                    <Skeleton width={50} height={50} borderRadius={25} style={{ marginBottom: 8 }} />
+                                    <Skeleton width={40} height={12} />
+                                </View>
+                                <Skeleton width={40} height={25} style={{ marginHorizontal: 10 }} />
+                                <View style={styles.hTeamColumn}>
+                                    <Skeleton width={50} height={50} borderRadius={25} style={{ marginBottom: 8 }} />
+                                    <Skeleton width={40} height={12} />
+                                </View>
                             </View>
                         </View>
-                        {/* Footer */}
-                        <View style={{ alignItems: 'center' }}>
-                            <Skeleton width={80} height={12} />
-                        </View>
-                    </View>
-                </View>
+                    ))}
+                </ScrollView>
             </View>
 
-            {/* Banner Skeleton */}
-            <View style={styles.banner}>
-                <Skeleton width={width - 40} height={100} borderRadius={16} />
+            {/* Mini Banner Skeleton */}
+            <View style={styles.miniBannerSkeleton}>
+                <View style={{ flex: 1 }}>
+                    <Skeleton width={130} height={18} style={{ marginBottom: 6 }} />
+                    <Skeleton width={180} height={12} />
+                </View>
+                <Skeleton width={100} height={32} borderRadius={8} />
             </View>
 
-            {/* Section 2 Skeleton (Recent) */}
+            {/* Section 2 Skeleton */}
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                    <Skeleton width={150} height={25} />
+                    <Skeleton width={140} height={20} />
                 </View>
                 {[1, 2, 3].map((i) => (
                     <View key={i} style={styles.listItem}>
@@ -78,6 +78,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         paddingTop: 15,
+        backgroundColor: 'transparent',
     },
     header: {
         flexDirection: 'row',
@@ -102,11 +103,11 @@ const styles = StyleSheet.create({
     },
     hMatchCard: {
         width: width - 40,
-        backgroundColor: '#0a1020',
+        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 20,
         padding: 20,
         borderWidth: 1,
-        borderColor: '#1A2138',
+        borderColor: 'rgba(255,255,255,0.08)',
     },
     hMatchHeader: {
         flexDirection: 'row',
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         paddingBottom: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#1A2138',
+        borderBottomColor: 'rgba(255,255,255,0.05)',
     },
     hMatchTeamsRow: {
         flexDirection: 'row',
@@ -125,12 +126,16 @@ const styles = StyleSheet.create({
     hTeamColumn: {
         alignItems: 'center',
     },
-    horizontalScroll: {
-        paddingHorizontal: 20,
-    },
-    banner: {
-        paddingHorizontal: 20,
+    miniBannerSkeleton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        marginHorizontal: 20,
+        borderRadius: 16,
         marginBottom: 25,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
     },
     listItem: {
         paddingHorizontal: 20,

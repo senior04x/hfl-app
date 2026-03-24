@@ -1,4 +1,4 @@
-    import React, { useState, useEffect, useRef } from 'react';
+    import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,10 @@ import {
     Linking,
     Animated
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
+import { BlurView } from 'expo-blur';
+import VideoBackground from '../components/VideoBackground';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
@@ -18,82 +22,86 @@ import { useTeamStore } from '../store/useTeamStore';
 import { apiService } from '../services/apiService';
 import { Team } from '../types';
 import TournamentDetailSkeleton from '../components/TournamentDetailSkeleton';
+import TableSkeleton from '../components/TableSkeleton';
+import PlayerListSkeleton from '../components/PlayerListSkeleton';
+import MatchesListSkeleton from '../components/MatchesListSkeleton';
+import GenericListSkeleton from '../components/GenericListSkeleton';
+import { getTeamAbbreviation } from '../utils/stringUtils';
 
 export default function TournamentDetailScreen({ route, navigation }: any) {
     const { tournamentId, tournamentName, tournament } = route?.params || {};
     const currentTournamentId = route?.params?.tournamentId || tournamentId; // Ensure we always have it
     const [activeTab, setActiveTab] = useState('overview'); // overview, standings, players, matches
-
+    
     const { teams, setTeams, isLoading: isTeamsLoading, setLoading: setTeamsLoading } = useTeamStore();
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingStandings, setIsLoadingStandings] = useState(false);
+    const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
+    const [isLoadingMatches, setIsLoadingMatches] = useState(false);
+    
     const [tournamentData, setTournamentData] = useState<any>(tournament);
     const [standings, setStandings] = useState<any[]>([]);
     const [topPlayers, setTopPlayers] = useState<any[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
+    const [latestMatches, setLatestMatches] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [availableTournaments, setAvailableTournaments] = useState<any[]>([]);
     const [isSeasonSelectorOpen, setIsSeasonSelectorOpen] = useState(false);
     const seasonAnimationValue = useRef(new Animated.Value(0)).current;
 
-    const toggleSeasonSelector = () => {
-        const toValue = isSeasonSelectorOpen ? 0 : 1;
+    const toggleSeasonSelector = useCallback(() => {
+        setIsSeasonSelectorOpen(prev => !prev);
+    }, []);
+
+    useEffect(() => {
         Animated.timing(seasonAnimationValue, {
-            toValue,
+            toValue: isSeasonSelectorOpen ? 1 : 0,
             duration: 300,
             useNativeDriver: false,
         }).start();
-        setIsSeasonSelectorOpen(!isSeasonSelectorOpen);
-    };
+    }, [isSeasonSelectorOpen]);
     const [statFilter, setStatFilter] = useState('goals'); // goals, assists, yellowCards, redCards, matchesPlayed
     const [isStatSelectorOpen, setIsStatSelectorOpen] = useState(false);
     const statAnimationValue = useRef(new Animated.Value(0)).current;
 
-    const toggleStatSelector = () => {
-        const toValue = isStatSelectorOpen ? 0 : 1;
+    const toggleStatSelector = useCallback(() => {
+        setIsStatSelectorOpen(prev => !prev);
+    }, []);
+
+    useEffect(() => {
         Animated.timing(statAnimationValue, {
-            toValue,
+            toValue: isStatSelectorOpen ? 1 : 0,
             duration: 300,
             useNativeDriver: false,
         }).start();
-        setIsStatSelectorOpen(!isStatSelectorOpen);
-    };
+    }, [isStatSelectorOpen]);
 
-    const handleStatSelect = (stat: string) => {
+    const handleStatSelect = useCallback((stat: string) => {
         setStatFilter(stat);
-        toggleStatSelector();
-    };
+        setIsStatSelectorOpen(false);
+    }, []);
 
+    // 1. Initial Load: Fetch only the basic tournament details
     useEffect(() => {
         const init = async () => {
             setIsLoading(true);
             try {
-                // 1. Fetch Tournament details (including standings)
-                const t = await apiService.getTournamentById(tournamentId);
+                // Fetch basic info + small batch of matches for Overview
+                const [t, lMatches] = await Promise.all([
+                    apiService.getTournamentById(tournamentId),
+                    apiService.getMatches({ tournamentId, limit: 3, status: 'finished' })
+                ]);
+                
                 setTournamentData(t);
+                setLatestMatches(lMatches || []);
                 if (t?.standings) {
                     setStandings(t.standings);
                 }
 
-                // 2. Fetch Teams for this tournament
-                const teamsData = await apiService.getTeams(1, 100, tournamentId);
-                setTeams(teamsData || []);
-
-                // 3. Fetch Top Scorers for this tournament
-                const playersData = await apiService.getPlayers(1, 10, undefined, tournamentId);
-                setTopPlayers(playersData || []);
-
-                // 4. Fetch Matches for this tournament
-                const matchesData = await apiService.getMatches({ tournamentId });
-                setMatches(matchesData || []);
-
-                // 5. Fetch related tournaments for Season Selector
                 if (t?.leagueId) {
-                    console.log(`🔍 Fetching related tournaments for league: ${t.leagueId}`);
                     const allTournaments = await apiService.getTournaments(1, 100, t.leagueId);
-                    console.log(`✅ Found ${allTournaments?.length || 0} tournaments in league`);
                     setAvailableTournaments(allTournaments || []);
                 }
-
             } catch (error) {
                 console.error('Error fetching tournament details:', error);
             } finally {
@@ -102,6 +110,42 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         };
         init();
     }, [currentTournamentId]);
+
+    // 2. Lazy Loading: Fetch tab data only when needed
+    useEffect(() => {
+        const fetchTabData = async () => {
+            if (!currentTournamentId) return;
+
+            if (activeTab === 'standings' && standings.length === 0) {
+                setIsLoadingStandings(true);
+                try {
+                    const teamsData = await apiService.getTeams(1, 100, currentTournamentId);
+                    setTeams(teamsData || []);
+                    // Some backends return standings inside tournament, some need team fetch
+                    // If standings were empty from tournament fetch, we use team list
+                } finally {
+                    setIsLoadingStandings(false);
+                }
+            } else if (activeTab === 'players' && topPlayers.length === 0) {
+                setIsLoadingPlayers(true);
+                try {
+                    const playersData = await apiService.getPlayers(1, 10, undefined, currentTournamentId);
+                    setTopPlayers(playersData || []);
+                } finally {
+                    setIsLoadingPlayers(false);
+                }
+            } else if (activeTab === 'matches' && matches.length === 0) {
+                setIsLoadingMatches(true);
+                try {
+                    const matchesData = await apiService.getMatches({ tournamentId: currentTournamentId });
+                    setMatches(matchesData || []);
+                } finally {
+                    setIsLoadingMatches(false);
+                }
+            }
+        };
+        fetchTabData();
+    }, [activeTab, currentTournamentId]);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'Belgilanmagan';
@@ -159,26 +203,31 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         return (
             <View style={{ zIndex: 1000 }}>
                 <View style={styles.header}>
-                    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle} numberOfLines={1}>
-                        {tournamentData?.name?.toUpperCase() || tournamentName?.toUpperCase() || 'TURNIR'}
-                    </Text>
-                    <TouchableOpacity 
-                        style={styles.seasonBadge} 
-                        onPress={toggleSeasonSelector}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={styles.seasonText}>{(tournamentData?.season || 'MAVSUM').toUpperCase()}</Text>
-                        {availableTournaments.length > 1 && (
-                            <Ionicons name={isSeasonSelectorOpen ? "chevron-up" : "chevron-down"} size={14} color="#000" />
-                        )}
-                    </TouchableOpacity>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 16, paddingVertical: 12 }}>
+                        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                            <Ionicons name="arrow-back" size={24} color="#FFF" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle} numberOfLines={1}>
+                            {tournamentData?.name?.toUpperCase() || tournamentName?.toUpperCase() || 'TURNIR'}
+                        </Text>
+                        <TouchableOpacity 
+                            style={styles.seasonBadge} 
+                            onPress={toggleSeasonSelector}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.seasonText}>{(tournamentData?.season || 'MAVSUM').toUpperCase()}</Text>
+                            {availableTournaments.length > 1 && (
+                                <Ionicons name={isSeasonSelectorOpen ? "chevron-up" : "chevron-down"} size={14} color="#000" />
+                            )}
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
+                {/* Season Dropdown with Glass Effect */}
                 {availableTournaments.length > 1 && (
                     <Animated.View style={[styles.seasonDropdown, { maxHeight: dropdownHeight, opacity: dropdownOpacity }]}>
+                        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
                         <ScrollView nestedScrollEnabled>
                              {availableTournaments.map((t) => (
                                 <TouchableOpacity 
@@ -186,7 +235,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                     style={[styles.seasonItem, t._id === currentTournamentId && styles.activeSeasonItem]}
                                     onPress={() => {
                                         if (t._id !== currentTournamentId) {
-                                            toggleSeasonSelector();
+                                            setIsSeasonSelectorOpen(false);
                                             navigation.replace('TournamentDetail', { 
                                                 tournamentId: t._id, 
                                                 tournamentName: t.name, 
@@ -219,6 +268,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
     const renderTabs = () => (
         <View style={styles.tabsContainer}>
+            <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {['overview', 'standings', 'players', 'matches'].map((tab) => (
                     <TouchableOpacity
@@ -238,7 +288,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     );
 
     const renderOverview = () => (
-        <ScrollView style={styles.tabContent}>
+        <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 100 }}>
             {/* Information Card */}
             <View style={styles.sectionCard}>
                 <View style={styles.sectionHeader}>
@@ -310,50 +360,52 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             </View>
 
             {/* Latest Matches Card */}
-            {matches.filter(m => m.status === 'finished').length > 0 && (
+            {latestMatches.length > 0 && (
                 <View style={styles.sectionCard}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>SO'NGGI O'YINLAR</Text>
+                    <View style={{ paddingTop: 12 }}>
+                        {latestMatches.slice(0, 2).map((match) => (
+                            <TouchableOpacity
+                                key={match._id}
+                                style={styles.matchCardFull}
+                                onPress={() => navigation.navigate('MatchDetail', { matchData: match })}
+                            >
+                                <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+                                <View style={{ padding: 16 }}>
+                                    <View style={styles.matchMetaRowFull}>
+                                        <Text style={styles.matchMetaText}>{(match.tourNumber || 'O\'YIN').toUpperCase()}</Text>
+                                        <Text style={styles.matchMetaText}>{match.date || match.scheduledAt}</Text>
+                                    </View>
+
+                                    <View style={styles.matchTeamsRowFull}>
+                                        <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.homeTeam?.name || 'HME')}</Text>
+                                        <View style={styles.logoCircleSmall}>
+                                            {match.homeTeam?.logo ? (
+                                                <Image source={{ uri: match.homeTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                                            ) : (
+                                                <Ionicons name="shield" size={24} color={Colors.primary} />
+                                            )}
+                                        </View>
+                                        <Text style={styles.scoreTextFull}>
+                                            {match.status === 'scheduled' ? '- : -' : `${match.score?.home ?? 0} : ${match.score?.away ?? 0}`}
+                                        </Text>
+                                        <View style={styles.logoCircleSmall}>
+                                            {match.awayTeam?.logo ? (
+                                                <Image source={{ uri: match.awayTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                                            ) : (
+                                                <Ionicons name="shield" size={24} color={Colors.primary} />
+                                            )}
+                                        </View>
+                                        <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.awayTeam?.name || 'AWY')}</Text>
+                                    </View>
+
+                                    <View style={styles.stadiumRowFull}>
+                                        <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
+                                        <Text style={styles.stadiumTextFull}>{match.location || 'Amatora Arena'}</Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
                     </View>
-                    {matches.filter(m => m.status === 'finished').slice(0, 2).map((match) => (
-                        <TouchableOpacity
-                            key={match._id}
-                            style={styles.matchCardFull}
-                            onPress={() => navigation.navigate('MatchDetail', { matchData: match })}
-                        >
-                            <View style={styles.matchMetaRowFull}>
-                                <Text style={styles.matchMetaText}>{(match.tourNumber || 'O\'YIN').toUpperCase()}</Text>
-                                <Text style={styles.matchMetaText}>{match.date || match.scheduledAt}</Text>
-                            </View>
-
-                            <View style={styles.matchTeamsRowFull}>
-                                <Text style={styles.teamShortFull}>{match.homeTeam?.name?.substring(0, 3).toUpperCase() || 'HME'}</Text>
-                                <View style={styles.logoCircleSmall}>
-                                    {match.homeTeam?.logo ? (
-                                        <Image source={{ uri: match.homeTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                                    ) : (
-                                        <Ionicons name="shield" size={24} color={Colors.primary} />
-                                    )}
-                                </View>
-                                <Text style={styles.scoreTextFull}>
-                                    {match.status === 'scheduled' ? '- : -' : `${match.score?.home ?? 0} : ${match.score?.away ?? 0}`}
-                                </Text>
-                                <View style={styles.logoCircleSmall}>
-                                    {match.awayTeam?.logo ? (
-                                        <Image source={{ uri: match.awayTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                                    ) : (
-                                        <Ionicons name="shield" size={24} color={Colors.primary} />
-                                    )}
-                                </View>
-                                <Text style={styles.teamShortFull}>{match.awayTeam?.name?.substring(0, 3).toUpperCase() || 'AWY'}</Text>
-                            </View>
-
-                            <View style={styles.stadiumRowFull}>
-                                <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
-                                <Text style={styles.stadiumTextFull}>{match.location || 'Amatora Arena'}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
                 </View>
             )}
         </ScrollView>
@@ -382,7 +434,10 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 <Text style={[styles.tableHeaderText, styles.colStatPts, { textAlign: 'right', paddingRight: 10 }]}>O</Text>
             </View>
 
-            <ScrollView>
+            {isLoadingStandings ? (
+                <TableSkeleton count={10} />
+            ) : (
+                <ScrollView>
                 {filteredStandings.length === 0 ? (
                     <View style={styles.empty}>
                         <Text style={styles.emptyText}>MA'LUMOT TOPILMADI</Text>
@@ -442,6 +497,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     })
                 )}
             </ScrollView>
+            )}
         </View>
     );
 
@@ -522,7 +578,10 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     </Animated.View>
                 </View>
 
-                <ScrollView>
+                {isLoadingPlayers ? (
+                    <PlayerListSkeleton count={8} />
+                ) : (
+                    <ScrollView>
                     {filteredPlayers.length === 0 ? (
                         <View style={styles.empty}>
                             <Text style={styles.emptyText}>MA'LUMOT TOPILMADI</Text>
@@ -536,26 +595,30 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                     style={styles.playerRow}
                                     onPress={() => navigation.navigate('PlayerStats', { playerId: player._id, player: player })}
                                 >
-                                    <Text style={styles.playerIndex}>{index + 1}</Text>
-                                    <View style={styles.playerHexImage}>
-                                        {player.photo ? (
-                                            <Image source={{ uri: player.photo }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                                        ) : (
-                                            <Ionicons name="person-circle" size={40} color={Colors.textMuted} />
-                                        )}
-                                    </View>
-                                    <View style={styles.playerInfo}>
-                                        <Text style={styles.playerStatName}>{(player.firstName + ' ' + player.lastName).toUpperCase()}</Text>
-                                        <Text style={styles.playerTeamText}>{player.teamName?.toUpperCase()}</Text>
-                                    </View>
-                                    <View style={styles.playerStatBadge}>
-                                        <Text style={styles.playerGoals}>{statValue}</Text>
+                                    <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 16, paddingVertical: 12 }}>
+                                        <Text style={styles.playerIndex}>{index + 1}</Text>
+                                        <View style={styles.playerHexImage}>
+                                            {player.photo ? (
+                                                <Image source={{ uri: player.photo }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                                            ) : (
+                                                <Ionicons name="person-circle" size={40} color={Colors.textMuted} />
+                                            )}
+                                        </View>
+                                        <View style={styles.playerInfo}>
+                                            <Text style={styles.playerStatName}>{(player.firstName + ' ' + player.lastName).toUpperCase()}</Text>
+                                            <Text style={styles.playerTeamText}>{player.teamName?.toUpperCase()}</Text>
+                                        </View>
+                                        <View style={styles.playerStatBadge}>
+                                            <Text style={styles.playerGoals}>{statValue}</Text>
+                                        </View>
                                     </View>
                                 </TouchableOpacity>
                             );
                         })
                     )}
                 </ScrollView>
+                )}
             </View>
         );
     };
@@ -573,7 +636,10 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 />
             </View>
 
-            <ScrollView>
+            {isLoadingMatches ? (
+                <MatchesListSkeleton count={6} />
+            ) : (
+                <ScrollView>
                 {filteredMatches.length === 0 ? (
                     <View style={styles.empty}>
                         <Text style={styles.emptyText}>Hozircha o'yinlar belgilanmagan</Text>
@@ -585,77 +651,88 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             style={styles.matchCardFull}
                             onPress={() => navigation.navigate('MatchDetail', { matchData: match })}
                         >
-                            <View style={styles.matchMetaRowFull}>
-                                <Text style={styles.matchMetaText}>{(match.tourNumber || 'O\'YIN').toUpperCase()}</Text>
-                                <Text style={styles.matchMetaText}>{match.date || match.scheduledAt}</Text>
-                            </View>
-
-                            <View style={styles.matchTeamsRowFull}>
-                                <Text style={styles.teamShortFull}>{match.homeTeam?.name?.substring(0, 3).toUpperCase() || 'HME'}</Text>
-                                <View style={styles.logoCircleSmall}>
-                                    {match.homeTeam?.logo ? (
-                                        <Image source={{ uri: match.homeTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                                    ) : (
-                                        <Ionicons name="shield" size={24} color={Colors.primary} />
-                                    )}
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={{ padding: 16 }}>
+                                <View style={styles.matchMetaRowFull}>
+                                    <Text style={styles.matchMetaText}>{(match.tourNumber || 'O\'YIN').toUpperCase()}</Text>
+                                    <Text style={styles.matchMetaText}>{match.date || match.scheduledAt}</Text>
                                 </View>
-                                <Text style={styles.scoreTextFull}>{match.score?.home ?? 0} : {match.score?.away ?? 0}</Text>
-                                <View style={styles.logoCircleSmall}>
-                                    {match.awayTeam?.logo ? (
-                                        <Image source={{ uri: match.awayTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                                    ) : (
-                                        <Ionicons name="shield" size={24} color={Colors.primary} />
-                                    )}
-                                </View>
-                                <Text style={styles.teamShortFull}>{match.awayTeam?.name?.substring(0, 3).toUpperCase() || 'AWY'}</Text>
-                            </View>
 
-                            <View style={styles.stadiumRowFull}>
-                                <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
-                                <Text style={styles.stadiumTextFull}>{match.location || 'HFL Arena'}</Text>
+                                <View style={styles.matchTeamsRowFull}>
+                                    <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.homeTeam?.name || 'HME')}</Text>
+                                    <View style={styles.logoCircleSmall}>
+                                        {match.homeTeam?.logo ? (
+                                            <Image source={{ uri: match.homeTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                                        ) : (
+                                            <Ionicons name="shield" size={24} color={Colors.primary} />
+                                        )}
+                                    </View>
+                                    <Text style={styles.scoreTextFull}>{match.score?.home ?? 0} : {match.score?.away ?? 0}</Text>
+                                    <View style={styles.logoCircleSmall}>
+                                        {match.awayTeam?.logo ? (
+                                            <Image source={{ uri: match.awayTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                                        ) : (
+                                            <Ionicons name="shield" size={24} color={Colors.primary} />
+                                        )}
+                                    </View>
+                                    <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.awayTeam?.name || 'AWY')}</Text>
+                                </View>
+
+                                <View style={styles.stadiumRowFull}>
+                                    <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
+                                    <Text style={styles.stadiumTextFull}>{match.location || 'HFL Arena'}</Text>
+                                </View>
                             </View>
                         </TouchableOpacity>
                     ))
                 )}
             </ScrollView>
+            )}
         </View>
     );
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-            {renderHeader()}
-            {renderTabs()}
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+            {/* Cinematic Video Background */}
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                overlayOpacity={0.85}
+                style={StyleSheet.absoluteFill}
+            />
 
-            {isLoading ? (
-                <TournamentDetailSkeleton />
-            ) : (
-                <>
-                    {activeTab === 'overview' && renderOverview()}
-                    {activeTab === 'standings' && renderStandings()}
-                    {activeTab === 'players' && renderPlayers()}
-                    {activeTab === 'matches' && renderMatches()}
-                </>
-            )}
-        </SafeAreaView>
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                {renderHeader()}
+                {renderTabs()}
+
+                {isLoading ? (
+                    <TournamentDetailSkeleton />
+                ) : (
+                    <>
+                        {activeTab === 'overview' && renderOverview()}
+                        {activeTab === 'standings' && renderStandings()}
+                        {activeTab === 'players' && renderPlayers()}
+                        {activeTab === 'matches' && renderMatches()}
+                    </>
+                )}
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#020610' }, // Very dark blue/black background
-    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#020610' },
+    container: { flex: 1, backgroundColor: 'transparent' },
+    header: { overflow: 'hidden' }, 
     backButton: { marginRight: 16 },
     headerTitle: { flex: 1, color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-    seasonBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 }, // Bright blue button like AFL -> transformed to green
+    seasonBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 }, 
     seasonText: { color: '#000', fontWeight: 'bold', marginRight: 4, fontSize: 12 },
 
     seasonDropdown: {
         position: 'absolute',
         top: 60,
         right: 16,
-        width: 150,
-        backgroundColor: '#1A2138',
-        borderRadius: 8,
-        paddingVertical: 8,
+        width: 200,
+        borderRadius: 12,
         elevation: 5,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -663,6 +740,8 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         zIndex: 1000,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     seasonItem: {
         flexDirection: 'row',
@@ -685,18 +764,34 @@ const styles = StyleSheet.create({
         color: '#FFF',
     },
 
-    tabsContainer: { borderBottomWidth: 1, borderBottomColor: '#1A2138', backgroundColor: '#020610' },
+    tabsContainer: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', backgroundColor: 'transparent', overflow: 'hidden' },
     tab: { paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' },
     activeTab: { borderBottomColor: Colors.primary },
     tabText: { color: '#6A7185', fontSize: 14, fontWeight: '600' },
     activeTabText: { color: '#FFF' },
 
-    tabContent: { flex: 1, backgroundColor: '#020610' },
+    tabContent: { flex: 1, backgroundColor: 'transparent' },
+    tabLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+    loadingText: { color: '#6A7185', fontSize: 12, fontWeight: 'bold', marginTop: 10, letterSpacing: 1 },
 
     // Overview Styles
-    sectionCard: { marginTop: 10, backgroundColor: '#081021', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#1A2138' },
-    sectionHeader: { backgroundColor: '#040B18', paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#1A2138' },
-    sectionTitle: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+    sectionCard: { 
+        marginTop: 15, 
+        marginHorizontal: 16, 
+        backgroundColor: 'rgba(255,255,255,0.03)', 
+        borderRadius: 16, 
+        borderWidth: 1, 
+        borderColor: 'rgba(255,255,255,0.05)',
+        overflow: 'hidden'
+    },
+    sectionHeader: { 
+        backgroundColor: 'rgba(255,255,255,0.05)', 
+        paddingVertical: 12, 
+        paddingHorizontal: 16, 
+        borderBottomWidth: 1, 
+        borderBottomColor: 'rgba(255,255,255,0.05)' 
+    },
+    sectionTitle: { color: '#FFF', fontSize: 14, fontWeight: 'bold', letterSpacing: 1 },
     infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
     infoLabel: { color: '#FFF', fontSize: 14, fontWeight: '500' },
     dashedLine: { flex: 1, height: 1, borderStyle: 'dashed', borderWidth: 1, borderColor: '#1A2138', marginHorizontal: 10, opacity: 0.5 },
@@ -712,7 +807,7 @@ const styles = StyleSheet.create({
     phoneBtn: { padding: 8 },
 
     // Search Bar
-    searchContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#1A2138', backgroundColor: '#020610' },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', backgroundColor: 'transparent' },
     searchIcon: { marginRight: 10 },
     searchInput: { flex: 1, color: '#FFF', fontSize: 16 },
 
@@ -720,10 +815,10 @@ const styles = StyleSheet.create({
     statsSelectorContainer: {
         marginHorizontal: 16,
         marginVertical: 10,
-        backgroundColor: '#081021',
+        backgroundColor: 'rgba(255,255,255,0.03)',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#1A2138',
+        borderColor: 'rgba(255,255,255,0.05)',
         zIndex: 10,
     },
     activeStatBtn: {
@@ -825,7 +920,14 @@ const styles = StyleSheet.create({
     ptsText: { fontWeight: '900', color: Colors.primary },
 
     // Players List
-    playerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1A2138' },
+    playerRow: {
+        marginHorizontal: 16,
+        marginBottom: 8,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.03)',
+    },
     playerIndex: { color: '#FFF', fontSize: 14, width: 24 },
     playerHexImage: { marginRight: 12 },
     playerInfo: { flex: 1 },
@@ -835,7 +937,15 @@ const styles = StyleSheet.create({
     playerGoals: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 
     // Matches List
-    matchCardFull: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#1A2138', backgroundColor: '#081021' },
+    matchCardFull: {
+        marginHorizontal: 16,
+        marginBottom: 12,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+    },
     matchMetaRowFull: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
     matchMetaText: { color: '#6A7185', fontSize: 12 },
     matchTeamsRowFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

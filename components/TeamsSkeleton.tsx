@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Skeleton from './Skeleton';
 
 const TeamsSkeleton = () => {
@@ -27,9 +27,7 @@ const TeamsSkeleton = () => {
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
+    container: { flex: 1, backgroundColor: 'transparent' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -37,24 +35,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#2a3245',
+        borderBottomColor: 'rgba(255,255,255,0.06)',
     },
-    list: {
-        padding: 16,
-    },
+    list: { padding: 16 },
     teamCard: {
-        backgroundColor: '#121722',
+        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 12,
         padding: 12,
         marginBottom: 12,
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#2a3245',
+        borderColor: 'rgba(255,255,255,0.08)',
     },
-    info: {
-        flex: 1,
-    },
+    info: { flex: 1 },
 });
 
 export default TeamsSkeleton;

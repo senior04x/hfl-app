@@ -1,11 +1,10 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import Skeleton from './Skeleton';
-import Colors from '../constants/Colors';
 
 const CalendarSkeleton = () => {
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <Skeleton width={50} height={24} style={{ marginRight: 10 }} />
@@ -21,7 +20,7 @@ const CalendarSkeleton = () => {
             {/* Date Filters */}
             <View style={styles.dateFiltersRow}>
                 <Skeleton width="45%" height={45} borderRadius={8} />
-                <View style={{ width: 1, height: '70%', backgroundColor: '#1A2138', marginHorizontal: 10 }} />
+                <View style={{ width: 1, height: '70%', backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 10 }} />
                 <Skeleton width="45%" height={45} borderRadius={8} />
             </View>
 
@@ -29,12 +28,9 @@ const CalendarSkeleton = () => {
             <ScrollView style={styles.listContainer}>
                 {[1, 2, 3].map(day => (
                     <View key={day} style={styles.dayGroup}>
-                        {/* Section Header */}
                         <View style={styles.sectionHeaderContainer}>
                             <Skeleton width={150} height={30} borderRadius={6} />
                         </View>
-
-                        {/* Tournament Rows */}
                         <View style={styles.tournamentsList}>
                             {[1, 2, 3, 4].map(tourney => (
                                 <View key={tourney} style={styles.tournamentRow}>
@@ -49,20 +45,27 @@ const CalendarSkeleton = () => {
                     </View>
                 ))}
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.background },
+    container: { flex: 1, backgroundColor: 'transparent' },
     header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
-    tabsContainer: { flexDirection: 'row', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#1A2138' },
+    tabsContainer: { flexDirection: 'row', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
     dateFiltersRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center' },
     listContainer: { flex: 1 },
     dayGroup: { marginBottom: 20 },
     sectionHeaderContainer: { paddingHorizontal: 16, marginTop: 15, marginBottom: 5 },
     tournamentsList: { paddingHorizontal: 16 },
-    tournamentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#1A2138' },
+    tournamentRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+    },
 });
 
 export default CalendarSkeleton;

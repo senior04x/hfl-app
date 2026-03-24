@@ -16,6 +16,8 @@ import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import TableSkeleton from '../components/TableSkeleton';
 import { useSocket } from '../context/SocketContext';
+import { Video, ResizeMode } from 'expo-av';
+import VideoBackground from '../components/VideoBackground';
 
 const StandingsScreen = ({ route, navigation }: any) => {
     const { tournamentId: initialTournamentId, tournamentName: initialTournamentName } = route.params || {};
@@ -145,8 +147,15 @@ const StandingsScreen = ({ route, navigation }: any) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.screenHeader}>
+        <View style={styles.container}>
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                overlayOpacity={0.85}
+                style={StyleSheet.absoluteFill}
+            />
+            
+            <SafeAreaView style={{ flex: 1 }}>
+                <View style={styles.screenHeader}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                     <Ionicons name="chevron-back" size={24} color={Colors.primary} />
                 </TouchableOpacity>
@@ -194,14 +203,15 @@ const StandingsScreen = ({ route, navigation }: any) => {
                     }
                 />
             )}
-        </SafeAreaView>
+            </SafeAreaView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor:Colors.background,
+        backgroundColor: 'transparent',
     },
     screenHeader: {
         flexDirection: 'row',

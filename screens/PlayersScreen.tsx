@@ -16,6 +16,9 @@ import { apiService } from '../services/apiService';
 import { Player } from '../types';
 import PlayerListSkeleton from '../components/PlayerListSkeleton';
 
+import { Video, ResizeMode } from 'expo-av';
+import VideoBackground from '../components/VideoBackground';
+
 export default function PlayersScreen({ route, navigation }: any) {
     const { teamId, tournamentId, tournamentName } = route?.params || {};
     const { players, setPlayers, isLoading, setLoading } = usePlayerStore();
@@ -68,7 +71,14 @@ export default function PlayersScreen({ route, navigation }: any) {
     );
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.container}>
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                overlayOpacity={0.8}
+                style={StyleSheet.absoluteFill}
+            />
+            
+            <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -94,14 +104,15 @@ export default function PlayersScreen({ route, navigation }: any) {
                     }
                 />
             )}
-        </SafeAreaView>
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor: 'transparent',
     },
     header: {
         flexDirection: 'row',

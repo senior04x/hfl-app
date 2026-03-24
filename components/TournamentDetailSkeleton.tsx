@@ -56,11 +56,11 @@ const TournamentDetailSkeleton = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#020610' },
-    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#020610' },
-    tabsContainer: { borderBottomWidth: 1, borderBottomColor: '#1A2138', backgroundColor: '#020610' },
-    sectionCard: { marginTop: 10, backgroundColor: '#081021', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#1A2138' },
-    sectionHeader: { backgroundColor: '#040B18', paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#1A2138' },
+    container: { flex: 1, backgroundColor: 'transparent' },
+    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: 'transparent' },
+    tabsContainer: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', backgroundColor: 'transparent' },
+    sectionCard: { marginTop: 15, marginHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' },
+    sectionHeader: { backgroundColor: 'rgba(255,255,255,0.05)', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
     infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
     organizerRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
 });

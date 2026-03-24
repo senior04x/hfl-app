@@ -14,6 +14,8 @@ import {
     StatusBar
 } from 'react-native';
 import { apiService } from '../services/apiService';
+import { Video, ResizeMode } from 'expo-av';
+import { BlurView } from 'expo-blur';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
@@ -21,6 +23,27 @@ import { useAuthStore } from '../store/useAuthStore';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 
 const { width } = Dimensions.get('window');
+
+const getPositionFullUz = (pos: string) => {
+    const map: any = {
+        'GK': 'Darvozabon',
+        'LB': 'Chap qanot himoyachisi',
+        'CB': 'Markaziy himoyachi',
+        'RB': "O'ng qanot himoyachisi",
+        'CDM': 'Tayanch yarim himoyachisi',
+        'CM': 'Markaziy yarim himoyachisi',
+        'CAM': 'Hujumkor yarim himoyachisi',
+        'LW': 'Chap qanot hujumchisi',
+        'RW': "O'ng qanot hujumchisi",
+        'ST': 'Markaziy hujumchi',
+        'CF': 'Ikkinchi hujumchi',
+        'LM': 'Chap qanot yarim himoyachisi',
+        'RM': "O'ng qanot yarim himoyachisi",
+        'LWB': 'Chap qanot qanot himoyachisi',
+        'RWB': "O'ng qanot qanot himoyachisi",
+    };
+    return map[pos?.toUpperCase()] || pos || 'FUTBOLCHI';
+};
 
 const MyStatsScreen = ({ navigation }: any) => {
     const user = useAuthStore((state) => state.user);
@@ -196,6 +219,7 @@ const MyStatsScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.physicalInfoBox}>
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={styles.cardContent}>
                     <View style={styles.statItem}>
                         <View style={styles.statIconBox}>
@@ -233,6 +257,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                     <Text style={styles.sectionTitle}>SHAXSIY <Text style={styles.sectionTitleHighlight}>MA'LUMOTLAR</Text></Text>
                 </View>
                 <View style={styles.infoList}>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <InfoRow label="OTASINING ISMI" value={player.fatherName || '---'} icon="person" />
                     <InfoRow label="MILLATI" value={player.citizenship || '---'} icon="planet" />
                     <InfoRow label="POZITSIYA" value={player.positionUz || player.position || '---'} icon="shield" />
@@ -240,13 +265,6 @@ const MyStatsScreen = ({ navigation }: any) => {
                 </View>
             </View>
             
-            <TouchableOpacity 
-                style={styles.editProfileBtn}
-                onPress={() => Linking.openURL('https://t.me/amatora_support')}
-            >
-                <Ionicons name="create-outline" size={20} color="#000" />
-                <Text style={styles.editProfileBtnText}>MA'LUMOTLARNI TAHRIRLASH</Text>
-            </TouchableOpacity>
         </ScrollView>
     );
 
@@ -345,17 +363,25 @@ const MyStatsScreen = ({ navigation }: any) => {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                <View style={styles.heroSection}>
-                    <View style={styles.heroBackgroundContainer}>
-                        <Image 
-                            source={{ uri: player.photo || player.avatar }} 
-                            style={[styles.heroBackgroundImage, { opacity: 0.3 }]} 
-                            blurRadius={20}
-                        />
-                        <View style={styles.heroOverlay} />
-                    </View>
+            
+            {/* Cinematic Video Background */}
+            <Video
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                style={StyleSheet.absoluteFill}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay
+                isLooping
+                isMuted
+                useNativeControls={false}
+            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.85)' }]} />
 
+            <ScrollView 
+                contentContainerStyle={styles.scrollContent} 
+                showsVerticalScrollIndicator={false}
+                style={{ flex: 1 }}
+            >
+                <View style={styles.heroSection}>
                     <View style={styles.header}>
                         <TouchableOpacity onPress={() => navigation.goBack()}>
                             <Ionicons name="arrow-back" size={24} color="#FFF" />
@@ -366,13 +392,13 @@ const MyStatsScreen = ({ navigation }: any) => {
 
                     <View style={styles.profileHeader}>
                         <View style={styles.photoContainer}>
-                            <View style={[styles.mainPhotoWrapper, { shadowColor: (player.team as any)?.color || Colors.primary }]}>
+                            <View style={[styles.mainPhotoWrapper, { shadowColor: 'transparent' }]}>
                                 <SmartImage
                                     uri={player.photo || player.avatar}
                                     style={styles.profilePhoto}
                                     contentFit="cover"
                                     fallbackIcon="person"
-                                    borderRadius={30}
+                                    borderRadius={15}
                                 />
                             </View>
                             <View style={styles.numberOverlay}>
@@ -402,7 +428,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                             <Text style={styles.lastName}>{player.lastName}</Text>
                             
                             <View style={styles.posBadge}>
-                                <Text style={styles.posText}>{player?.positionUz || player?.position || 'O\'YINCHI'}</Text>
+                                <Text style={styles.posText}>{player?.position || 'O\'YINCHI'}</Text>
                             </View>
                         </View>
                     </View>
@@ -416,6 +442,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                 styles.tabCarouselCard,
                                 { transform: [{ translateX: slideAnim }] }
                             ]}>
+                                <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={styles.compactTabInfo}>
                                     <View style={styles.miniIconBox}>
                                         <Ionicons 
@@ -455,6 +482,7 @@ const MyStatsScreen = ({ navigation }: any) => {
 
 const StatBox = ({ label, value, icon, color }: any) => (
     <View style={styles.statBox}>
+        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
             <Ionicons name={icon} size={20} color={color} />
         </View>
@@ -478,6 +506,7 @@ const InfoRow = ({ label, value, icon }: any) => (
 const MatchCard = ({ match }: any) => {
     return (
         <View style={styles.matchCard}>
+            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={styles.matchTop}>
                 <Text style={styles.matchLeague}>{match.leagueName || 'Amatora Turniri'}</Text>
                 <Text style={styles.matchDate}>{new Date(match.date).toLocaleDateString('uz-UZ')}</Text>
@@ -551,29 +580,10 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     heroSection: {
-        backgroundColor: '#050A18',
         paddingTop: 10,
         paddingBottom: 20,
         paddingHorizontal: 24,
-        borderBottomLeftRadius: 50,
-        borderBottomRightRadius: 50,
         position: 'relative',
-    },
-    heroBackgroundContainer: {
-        ...StyleSheet.absoluteFillObject,
-        zIndex: -1,
-        overflow: 'hidden',
-        borderBottomLeftRadius: 50,
-        borderBottomRightRadius: 50,
-    },
-    heroBackgroundImage: {
-        ...StyleSheet.absoluteFillObject,
-        width: '100%',
-        height: '100%',
-    },
-    heroOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(5, 10, 24, 0.7)',
     },
     profileHeader: {
         flexDirection: 'row',
@@ -584,9 +594,9 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     mainPhotoWrapper: {
-        width: 120,
-        height: 120,
-        borderRadius: 40,
+        width: 160,
+        height: 160,
+        borderRadius: 15,
         backgroundColor: '#000',
         overflow: 'hidden',
         borderWidth: 2,
@@ -702,12 +712,13 @@ const styles = StyleSheet.create({
     },
     statBox: {
         width: (width - 55) / 2,
-        backgroundColor: '#1A2138',
+        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 30,
         padding: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
         alignItems: 'center',
+        overflow: 'hidden',
     },
     statIconContainer: {
         width: 44,
@@ -731,12 +742,13 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
     physicalInfoBox: {
-        backgroundColor: '#1A2138',
+        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 24,
         padding: 20,
         marginBottom: 30,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
     },
     cardContent: {
         flexDirection: 'row',
@@ -784,11 +796,12 @@ const styles = StyleSheet.create({
         color: Colors.primary,
     },
     infoList: {
-        backgroundColor: '#1A2138',
+        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 30,
         padding: 5,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
     },
     infoRow: {
         flexDirection: 'row',
@@ -834,13 +847,14 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     tabCarouselCard: {
-        backgroundColor: '#1A2138',
+        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 20,
         padding: 15,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
         flexDirection: 'row',
         alignItems: 'center',
+        overflow: 'hidden',
     },
     compactTabInfo: {
         flexDirection: 'row',
@@ -993,11 +1007,12 @@ const styles = StyleSheet.create({
         gap: 15,
     },
     matchCard: {
-        backgroundColor: '#1A2138',
+        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 24,
         padding: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
     },
     matchTop: {
         flexDirection: 'row',
@@ -1094,6 +1109,10 @@ const styles = StyleSheet.create({
         color: '#000',
         fontWeight: '900',
     },
+    playerName: { color: '#FFF', fontSize: 24, fontWeight: '900', marginBottom: 10, textTransform: 'uppercase' },
+    careerTimelineContainer: { paddingHorizontal: 5 },
+    noDataBox: { padding: 40, alignItems: 'center' },
+    noDataText: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500' },
     editProfileBtn: {
         flexDirection: 'row',
         alignItems: 'center',

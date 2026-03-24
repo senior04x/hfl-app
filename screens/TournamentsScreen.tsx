@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -23,98 +23,32 @@ import { useTournamentStore } from '../store/useTournamentStore';
 import { apiService } from '../services/apiService';
 import GenericListSkeleton from '../components/GenericListSkeleton';
 import Skeleton from '../components/Skeleton';
+import TournamentsSkeleton from '../components/TournamentsSkeleton';
+import { RefreshControl } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
+import { BlurView } from 'expo-blur';
+import VideoBackground from '../components/VideoBackground';
+
 
 const { width } = Dimensions.get('window');
 
-export default function TournamentsScreen({ navigation }: any) {
-    const { tournaments, setTournaments, isLoading, setLoading } = useTournamentStore();
-    const [activeTab, setActiveTab] = useState('league'); // 'league' or 'favorites'
-    const [searchQuery, setSearchQuery] = useState('');
-    const [leagues, setLeagues] = useState<any[]>([]);
-    const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
-    const [isLeagueSelectorOpen, setIsLeagueSelectorOpen] = useState(false);
-    const [isLeaguesLoading, setIsLeaguesLoading] = useState(false);
-
-    const animationValue = useRef(new Animated.Value(0)).current;
-
-    const toggleLeagueSelector = () => {
-        const toValue = isLeagueSelectorOpen ? 0 : 1;
-        
-        Animated.timing(animationValue, {
-            toValue,
-            duration: 500,
-            useNativeDriver: false, // Height/maxHeight doesn't support native driver
-        }).start();
-
-        setIsLeagueSelectorOpen(!isLeagueSelectorOpen);
-    };
-
-    const fetchLeagues = async () => {
-        try {
-            setIsLeaguesLoading(true);
-            const data = await apiService.getLeagues();
-            if (data && Array.isArray(data)) {
-                setLeagues(data);
-                if (data.length > 0 && !selectedLeague) {
-                    setSelectedLeague(data[0]);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching leagues:', error);
-        } finally {
-            setIsLeaguesLoading(false);
-        }
-    };
-
-    const fetchTournaments = async (leagueId?: string) => {
-        try {
-            setLoading(true);
-            const data = await apiService.getTournaments();
-            if (data && Array.isArray(data)) {
-                // Filter tournaments by league if one is selected
-                const filtered = leagueId 
-                    ? data.filter((t: any) => t.leagueId === leagueId || t.league === leagueId)
-                    : data;
-                setTournaments(filtered);
-            }
-        } catch (error) {
-            console.error('Error fetching tournaments:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchLeagues();
-    }, []);
-
-    useEffect(() => {
-        fetchTournaments(selectedLeague?._id);
-    }, [selectedLeague]);
-
-    const handleLeagueSelect = (league: any) => {
-        Animated.timing(animationValue, {
-            toValue: 0,
-            duration: 400,
-            useNativeDriver: false,
-        }).start();
-        setSelectedLeague(league);
-        setIsLeagueSelectorOpen(false);
-    };
-
-    const handleSocialPress = (url?: string) => {
-        if (url) {
-            Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
-        }
-    };
-
-    const filteredTournaments = tournaments.filter(t => 
-        t.name?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
+// Stable Header Component to prevent unwanted re-renders during selection
+const TournamentsHeader = ({
+    activeTab,
+    setActiveTab,
+    isLeagueSelectorOpen,
+    toggleLeagueSelector,
+    isLeaguesLoading,
+    selectedLeague,
+    handleSocialPress,
+    animationValue,
+    leagues,
+    handleLeagueSelect,
+    tournaments
+}: any) => {
     const accordionHeight = animationValue.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, 300], // Adjust based on your list size or use measure
+        outputRange: [0, 500], // Increased to ensure no overflow issues
     });
 
     const accordionOpacity = animationValue.interpolate({
@@ -122,137 +56,121 @@ export default function TournamentsScreen({ navigation }: any) {
         outputRange: [0, 1],
     });
 
-    const renderHeader = () => (
+    return (
         <View style={styles.headerContent}>
-            {/* ... Tabs Row kept same ... */}
+            {/* Tabs Row with Glass Effect */}
             <View style={styles.tabsRow}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'league' && styles.activeTab]}
-                    onPress={() => setActiveTab('league')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'league' && styles.activeTabText]}>
-                        Liga turnirlari
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'favorites' && styles.activeTab]}
-                    onPress={() => setActiveTab('favorites')}
-                >
-                    <Ionicons
-                        name="star"
-                        size={16}
-                        color={activeTab === 'favorites' ? '#FFF' : Colors.textMuted}
-                        style={{ marginRight: 8 }}
-                    />
-                    <Text style={[styles.tabText, activeTab === 'favorites' && styles.activeTabText]}>
-                        Saralanganlar
-                    </Text>
-                </TouchableOpacity>
+                <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={{ flexDirection: 'row', width: '100%', padding: 4 }}>
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'league' && styles.activeTab]}
+                        onPress={() => setActiveTab('league')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'league' && styles.activeTabText]}>
+                            Liga turnirlari
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'favorites' && styles.activeTab]}
+                        onPress={() => setActiveTab('favorites')}
+                    >
+                        <Ionicons
+                            name="star"
+                            size={16}
+                            color={activeTab === 'favorites' ? Colors.primary : Colors.textMuted}
+                            style={{ marginRight: 8 }}
+                        />
+                        <Text style={[styles.tabText, activeTab === 'favorites' && styles.activeTabText]}>
+                            Saralanganlar
+                        </Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
-            {/* League Info Card */}
-            <TouchableOpacity style={styles.leagueCard} onPress={toggleLeagueSelector}>
-                <View style={styles.logoBox}>
-                    {selectedLeague?.logo ? (
-                        <Image 
-                            source={{ uri: selectedLeague.logo }} 
-                            style={styles.headerLeagueLogo}
-                            resizeMode="contain"
-                        />
-                    ) : (
-                        <Text style={styles.logoText}>AMATORA</Text>
-                    )}
-                </View>
-                <View style={styles.leagueDetails}>
-                    <View style={styles.locationRow}>
-                        <Image
-                            source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png' }}
-                            style={styles.flagIcon}
-                        />
-                        <Text style={styles.locationText}>{selectedLeague?.location || 'Toshkent'}</Text>
+            {/* League Info Card with Glass Effect */}
+            <TouchableOpacity 
+                style={styles.leagueCard} 
+                onPress={toggleLeagueSelector}
+            >
+                <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={{ flexDirection: 'row', padding: 16 }}>
+                    <View style={styles.logoBox}>
+                        {isLeaguesLoading || !selectedLeague ? (
+                            <Skeleton circle width={80} height={80} />
+                        ) : selectedLeague?.logo ? (
+                            <Image
+                                source={{ uri: selectedLeague.logo }}
+                                style={styles.headerLeagueLogo}
+                                resizeMode="contain"
+                            />
+                        ) : (
+                            <View style={styles.logoCircleSmall}>
+                                <Ionicons name="shield" size={40} color={Colors.primary} />
+                            </View>
+                        )}
                     </View>
-                    <View style={styles.leagueNameRow}>
-                        <Text style={styles.leagueNameTitle} numberOfLines={1}>
-                            {(selectedLeague?.name || 'AMATORA TASHKENT 8X8').toUpperCase()}
-                        </Text>
-                        <Ionicons 
-                            name={isLeagueSelectorOpen ? "chevron-up" : "chevron-down"} 
-                            size={20} 
-                            color={Colors.primary} 
-                        />
-                    </View>
-                    <View style={styles.socialRow}>
-                        {selectedLeague?.instagram && (
-                            <TouchableOpacity 
-                                style={styles.socialIcon} 
-                                onPress={() => handleSocialPress(selectedLeague.instagram)}
+                    <View style={{ flex: 1, paddingLeft: 12, justifyContent: 'center', zIndex: 100 }}>
+                        {/* Status/Location Row */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                            <Image
+                                source={{
+                                    uri: selectedLeague?.location?.toLowerCase().includes('rossiya') || selectedLeague?.location?.toLowerCase().includes('russia')
+                                        ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Russia.svg/1200px-Flag_of_Russia.svg.png'
+                                        : 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
+                                }}
+                                style={[styles.flagIcon, { shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 2 }]}
+                            />
+                            <Text style={{ color: '#00FF66', fontSize: 13, fontWeight: '700', marginLeft: 4 }}>
+                                {(selectedLeague?.location || 'O\'zbekiston').toUpperCase()}
+                            </Text>
+                        </View>
+
+                        {/* League Title Area */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <Text 
+                                style={{ 
+                                    color: '#FFFFFF', 
+                                    fontSize: 19, 
+                                    fontWeight: '900', 
+                                    textShadowColor: 'black', 
+                                    textShadowRadius: 3,
+                                    marginRight: 6
+                                }}
                             >
-                                <Ionicons name="logo-instagram" size={20} color={Colors.primary} />
-                            </TouchableOpacity>
-                        )}
-                        {selectedLeague?.telegram && (
-                            <TouchableOpacity 
-                                style={styles.socialIcon} 
-                                onPress={() => handleSocialPress(selectedLeague.telegram)}
-                            >
-                                <Ionicons name="paper-plane" size={20} color={Colors.primary} />
-                            </TouchableOpacity>
-                        )}
-                        {selectedLeague?.facebook && (
-                            <TouchableOpacity 
-                                style={styles.socialIcon} 
-                                onPress={() => handleSocialPress(selectedLeague.facebook)}
-                            >
-                                <Ionicons name="logo-facebook" size={20} color={Colors.primary} />
-                            </TouchableOpacity>
-                        )}
-                        {selectedLeague?.youtube && (
-                            <TouchableOpacity 
-                                style={styles.socialIcon} 
-                                onPress={() => handleSocialPress(selectedLeague.youtube)}
-                            >
-                                <Ionicons name="logo-youtube" size={20} color={Colors.primary} />
-                            </TouchableOpacity>
-                        )}
-                        {selectedLeague?.tiktok && (
-                            <TouchableOpacity 
-                                style={styles.socialIcon} 
-                                onPress={() => handleSocialPress(selectedLeague.tiktok)}
-                            >
-                                <Ionicons name="logo-tiktok" size={20} color={Colors.primary} />
-                            </TouchableOpacity>
-                        )}
-                        {selectedLeague?.website && (
-                            <TouchableOpacity 
-                                style={styles.socialIcon} 
-                                onPress={() => handleSocialPress(selectedLeague.website)}
-                            >
-                                <Ionicons name="globe-outline" size={20} color={Colors.primary} />
-                            </TouchableOpacity>
-                        )}
-                        {!selectedLeague?.instagram && !selectedLeague?.telegram && !selectedLeague?.facebook && !selectedLeague?.youtube && !selectedLeague?.tiktok && !selectedLeague?.website && (
-                            <Text style={{ color: Colors.textMuted, fontSize: 12 }}>Ijtimoiy tarmoqlar yo'q</Text>
-                        )}
+                                {(selectedLeague?.name || 'HFL SUPER LIGA').toUpperCase()}
+                            </Text>
+                            <Ionicons
+                                name={isLeagueSelectorOpen ? "chevron-up" : "chevron-down"}
+                                size={20}
+                                color={Colors.primary}
+                                style={{ opacity: 1, zIndex: 110 }}
+                            />
+                        </View>
                     </View>
                 </View>
             </TouchableOpacity>
 
+
             {/* Accordion Expansion: League List with Animated.View */}
             <Animated.View style={[
                 styles.leagueAccordion,
-                { 
-                    maxHeight: accordionHeight, 
-                    opacity: accordionOpacity, 
+                {
+                    maxHeight: accordionHeight,
+                    opacity: accordionOpacity,
                     overflow: 'hidden',
                     marginBottom: animationValue.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0, 20]
-                    })
+                    }),
+                    zIndex: 10,
                 }
             ]}>
-                <ScrollView 
+                <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.accordionContent}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
                 >
                     {isLeaguesLoading ? (
                         <View style={{ padding: 16 }}>
@@ -261,7 +179,7 @@ export default function TournamentsScreen({ navigation }: any) {
                             <Skeleton width="100%" height={40} borderRadius={6} />
                         </View>
                     ) : (
-                        leagues.map((league) => (
+                        leagues.map((league: any) => (
                             <TouchableOpacity
                                 key={league._id}
                                 style={[
@@ -286,111 +204,282 @@ export default function TournamentsScreen({ navigation }: any) {
                 </ScrollView>
             </Animated.View>
 
-            {/* Stats Row - Dynamic Counts */}
+            {/* Stats Row with Glass Effect */}
             <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>Turnirlar</Text>
-                    <Text style={styles.statValue}>{tournaments.length}</Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>Holati</Text>
-                    <Text style={styles.statValue}>
-                        {tournaments.filter(t => t.status === 'ongoing').length} faol
-                    </Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>Region</Text>
-                    <Text style={styles.statValue}>1</Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>Tashkilot</Text>
-                    <Text style={styles.statValue}>{selectedLeague?.organization?.toUpperCase() || 'AMATORA'}</Text>
+                <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statLabel}>Turnirlar</Text>
+                        {isLeaguesLoading || !selectedLeague ? (
+                            <Skeleton width={30} height={16} borderRadius={4} />
+                        ) : (
+                            <Text style={styles.statValue}>{tournaments.length}</Text>
+                        )}
+                    </View>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statLabel}>Holati</Text>
+                        {isLeaguesLoading || !selectedLeague ? (
+                            <Skeleton width={50} height={16} borderRadius={4} />
+                        ) : (
+                            <Text style={styles.statValue}>
+                                {tournaments.filter((t: any) => t.status === 'ongoing' || t.status === 'active').length} faol
+                            </Text>
+                        )}
+                    </View>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statLabel}>Region</Text>
+                        {isLeaguesLoading || !selectedLeague ? (
+                            <Skeleton width={70} height={16} borderRadius={4} />
+                        ) : (
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Image
+                                    source={{
+                                        uri: selectedLeague?.location?.toLowerCase().includes('rossiya') || selectedLeague?.location?.toLowerCase().includes('russia')
+                                            ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Russia.svg/1200px-Flag_of_Russia.svg.png'
+                                            : 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
+                                    }}
+                                    style={[styles.flagIcon, { width: 14, height: 10, marginRight: 4 }]}
+                                />
+                                <Text style={styles.statValue}>{selectedLeague?.location?.split(' ')[0] || 'O\'zbekiston'}</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
             </View>
 
-            {/* Action Buttons */}
+            {/* Action Buttons with Glass Effect */}
             <View style={styles.actionsRow}>
                 <TouchableOpacity style={styles.participateBtn}>
-                    <Text style={styles.participateBtnText}>Qatnashish</Text>
+                    <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+                    <Text style={styles.participateBtnText}>QATNASHISH</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.hallOfFameBtn}>
-                    <Text style={styles.hallOfFameBtnText}>Shuhrat zali</Text>
-                    <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={styles.hallOfFameBtnText}>SHUHRAT ZALI</Text>
+                        <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
+                    </View>
                 </TouchableOpacity>
             </View>
 
-            {/* Tournament List Header */}
+            {/* Tournament List Header with Glass Effect */}
             <View style={styles.listHeader}>
                 <View style={styles.listHeaderBadge}>
-                    <Image
-                        source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png' }}
-                        style={styles.miniFlag}
-                    />
-                    <Text style={styles.listHeaderText}>Turnirlar ro'yxati</Text>
+                    <BlurView intensity={10} tint="light" style={StyleSheet.absoluteFill} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6 }}>
+                        <Image
+                            source={{
+                                uri: selectedLeague?.location?.toLowerCase().includes('rossiya') || selectedLeague?.location?.toLowerCase().includes('russia')
+                                    ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Russia.svg/1200px-Flag_of_Russia.svg.png'
+                                    : 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
+                            }}
+                            style={styles.miniFlag}
+                        />
+                        <Text style={styles.listHeaderText}>TURNIRLAR RO'YXATI</Text>
+                    </View>
                 </View>
             </View>
         </View>
     );
+};
 
-    const renderTournamentItem = ({ item: tournament }: { item: any }) => (
-        <TouchableOpacity
-            key={tournament._id}
-            style={styles.tournamentItem}
-            onPress={() => navigation.navigate('TournamentDetail', {
-                tournamentId: tournament._id,
-                tournamentName: tournament.name,
-                tournament: tournament
-            })}
-        >
-            <View style={styles.tournamentMainInfo}>
-                <Text style={styles.tournamentName}>{tournament.name?.toUpperCase() || 'CHAMPION LEAGUE'}</Text>
-                <View style={styles.statusRow}>
-                    <View style={[styles.statusDot, { backgroundColor: tournament.status === 'ongoing' ? Colors.primary : Colors.textMuted }]} />
-                    <Text style={styles.seasonText}>{tournament.season || 'ноябрь - июнь 2026'}</Text>
-                </View>
-            </View>
-            <Ionicons name="star-outline" size={20} color={Colors.surfaceLight} />
-        </TouchableOpacity>
+export default function TournamentsScreen({ navigation }: any) {
+    const [tournaments, setTournaments] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState('league'); // 'league' or 'favorites'
+    const [searchQuery, setSearchQuery] = useState('');
+    const [leagues, setLeagues] = useState<any[]>([]);
+    const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
+    const [isLeagueSelectorOpen, setIsLeagueSelectorOpen] = useState(false);
+    const [isLeaguesLoading, setIsLeaguesLoading] = useState(true);
+
+    const animationValue = useRef(new Animated.Value(0)).current;
+
+    const toggleLeagueSelector = useCallback(() => {
+        setIsLeagueSelectorOpen(prev => !prev);
+    }, []);
+
+    useEffect(() => {
+        Animated.timing(animationValue, {
+            toValue: isLeagueSelectorOpen ? 1 : 0,
+            duration: 300,
+            useNativeDriver: false,
+        }).start();
+    }, [isLeagueSelectorOpen]);
+
+    const fetchLeagues = async () => {
+        try {
+            setIsLeaguesLoading(true);
+            const data = await apiService.getLeagues();
+            if (data && Array.isArray(data)) {
+                setLeagues(data);
+                if (data.length > 0 && !selectedLeague) {
+                    const firstLeague = data[0];
+                    setSelectedLeague(firstLeague);
+                    // Await tournaments to keep the skeleton active until both are done
+                    await fetchTournaments(firstLeague._id);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching leagues:', error);
+        } finally {
+            setIsLeaguesLoading(false);
+        }
+    };
+
+    const fetchTournaments = async (leagueId?: string) => {
+        try {
+            setIsLoading(true);
+            // Fetch tournaments filtered by leagueId directly from API if provided
+            const data = await apiService.getTournaments(1, 100, leagueId);
+            if (data && Array.isArray(data)) {
+                setTournaments(data);
+            } else {
+                setTournaments([]);
+            }
+        } catch (error) {
+            console.error('Error fetching tournaments:', error);
+            setTournaments([]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchLeagues();
+    }, []);
+
+    useEffect(() => {
+        // Only fetch via useEffect if it's NOT the first load (which is already handled in fetchLeagues)
+        if (selectedLeague?._id && leagues.length > 0 && !isLeaguesLoading) {
+            fetchTournaments(selectedLeague._id);
+        }
+    }, [selectedLeague?._id]);
+
+    const handleLeagueSelect = useCallback((league: any) => {
+        setIsLeagueSelectorOpen(false);
+        // Only trigger data fetch/clear if the selection actually changed
+        if (selectedLeague?._id !== league._id) {
+            setTournaments([]); // Clear for unified skeleton
+            setSelectedLeague(league);
+        }
+    }, [selectedLeague?._id]);
+
+
+    const handleSocialPress = useCallback((url?: string) => {
+        if (url) {
+            Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+        }
+    }, []);
+
+    const filteredTournaments = tournaments.filter(t =>
+        t.name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const renderTournamentItem = ({ item: tournament, index }: { item: any, index: number }) => {
+        if (tournament._isSkeleton) {
+            return (
+                <View style={[styles.tournamentItem, { borderBottomWidth: 0 }]} key={`skeleton-${index}`}>
+                    <View style={styles.tournamentMainInfo}>
+                        <Skeleton width={width * 0.6} height={18} borderRadius={4} style={{ marginBottom: 8 }} />
+                        <View style={styles.statusRow}>
+                            <Skeleton circle width={6} height={6} style={{ marginRight: 8 }} />
+                            <Skeleton width={width * 0.4} height={14} borderRadius={4} />
+                        </View>
+                    </View>
+                    <Skeleton circle width={20} height={20} />
+                </View>
+            );
+        }
+
+        return (
+            <TouchableOpacity
+                key={tournament._id}
+                style={styles.tournamentItem}
+                onPress={() => navigation.navigate('TournamentDetail', {
+                    tournamentId: tournament._id,
+                    tournamentName: tournament.name,
+                    tournament: tournament
+                })}
+            >
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 16, paddingHorizontal: 20 }}>
+                    <View style={styles.tournamentMainInfo}>
+                        <Text style={styles.tournamentName}>{tournament.name?.toUpperCase() || 'CHAMPION LEAGUE'}</Text>
+                        <View style={styles.statusRow}>
+                            <View style={[styles.statusDot, { backgroundColor: tournament.status === 'ongoing' ? Colors.primary : Colors.textMuted }]} />
+                            <Text style={styles.seasonText}>{tournament.season || 'ноябрь - июнь 2026'}</Text>
+                        </View>
+                    </View>
+                    <Ionicons name="star-outline" size={20} color={Colors.primary} />
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={styles.mainWrapper}>
+            {/* Cinematic Video Background */}
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                overlayOpacity={0.7}
+                style={StyleSheet.absoluteFill}
+            />
+
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* Custom Navbar */}
                 <View style={styles.navbar}>
-                    <View style={styles.navbarLeft}>
-                        <Text style={styles.navLogoText}>AMATORA</Text>
-                        <Text style={styles.navTitle}>Turnirlar</Text>
-                    </View>
-                    <View style={styles.navSearchContainer}>
-                        <TextInput
-                            style={styles.navSearchInput}
-                            placeholder="Qidirish..."
-                            placeholderTextColor="rgba(255,255,255,0.5)"
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                        />
-                        <Ionicons name="search" size={20} color="#FFF" />
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 16, paddingVertical: 12 }}>
+                        <View style={styles.navbarLeft}>
+                            <Text style={styles.navLogoText}>AMATORA</Text>
+                            <Text style={styles.navTitle}>Turnirlar</Text>
+                        </View>
+                        <View style={styles.navSearchContainer}>
+                            <TextInput
+                                style={styles.navSearchInput}
+                                placeholder="Qidirish..."
+                                placeholderTextColor="rgba(255,255,255,0.5)"
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                            />
+                            <Ionicons name="search" size={20} color="#FFF" />
+                        </View>
                     </View>
                 </View>
 
-                {isLoading && tournaments.length === 0 ? (
-                    <View style={{ flex: 1 }}>
-                        <View style={{ padding: 20 }}>
-                            <Skeleton width={width - 40} height={100} borderRadius={10} style={{ marginBottom: 20 }} />
-                            <Skeleton width={width - 40} height={60} borderRadius={10} />
-                        </View>
-                        <GenericListSkeleton itemHeight={60} count={6} />
-                    </View>
+
+                {isLeaguesLoading || (isLoading && tournaments.length === 0) ? (
+                    <TournamentsSkeleton />
                 ) : (
                     <FlatList
-                        data={filteredTournaments}
-                        keyExtractor={(item) => item._id}
+                        data={isLoading ? Array(6).fill({ _isSkeleton: true }) : filteredTournaments}
+                        keyExtractor={(item, index) => item?._id || `skeleton-${index}`}
                         renderItem={renderTournamentItem}
-                        ListHeaderComponent={renderHeader}
+                        ListHeaderComponent={
+                            <TournamentsHeader
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                                isLeagueSelectorOpen={isLeagueSelectorOpen}
+                                toggleLeagueSelector={toggleLeagueSelector}
+                                isLeaguesLoading={isLeaguesLoading}
+                                selectedLeague={selectedLeague}
+                                handleSocialPress={handleSocialPress}
+                                animationValue={animationValue}
+                                leagues={leagues}
+                                handleLeagueSelect={handleLeagueSelect}
+                                tournaments={tournaments}
+                            />
+                        }
                         contentContainerStyle={styles.list}
-                        refreshing={isLoading}
-                        onRefresh={fetchTournaments}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={isLoading && tournaments.length > 0}
+                                onRefresh={() => fetchTournaments(selectedLeague?._id)}
+                                tintColor={Colors.primary}
+                                colors={[Colors.primary]}
+                            />
+                        }
                     />
                 )}
             </SafeAreaView>
@@ -401,7 +490,7 @@ export default function TournamentsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     mainWrapper: {
         flex: 1,
-        backgroundColor: '#050a18', // Deep dark blue background
+        backgroundColor: '#000',
     },
     safeArea: {
         flex: 1,
@@ -412,7 +501,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#050a18',
+        backgroundColor: 'transparent',
     },
     navbarLeft: {
         flexDirection: 'row',
@@ -451,8 +540,12 @@ const styles = StyleSheet.create({
     },
     tabsRow: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
+        marginHorizontal: 16,
         marginBottom: 20,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
     tab: {
         flex: 1,
@@ -460,9 +553,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         paddingVertical: 10,
-        borderRadius: 4,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        marginRight: 8,
+        borderRadius: 8,
+        backgroundColor: 'transparent',
     },
     activeTab: {
         backgroundColor: 'rgba(0, 255, 102, 0.15)',
@@ -477,16 +569,23 @@ const styles = StyleSheet.create({
     },
     leagueCard: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
+        marginHorizontal: 16,
         marginBottom: 25,
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
     },
     logoBox: {
-        width: 100,
-        height: 100,
-        backgroundColor: 'transparent',
+        width: 80,
+        height: 80,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 20,
+        marginRight: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
     },
     logoText: {
         color: '#000',
@@ -497,6 +596,7 @@ const styles = StyleSheet.create({
     leagueDetails: {
         flex: 1,
         justifyContent: 'center',
+        paddingRight: 8,
     },
     locationRow: {
         flexDirection: 'row',
@@ -509,8 +609,12 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
     locationText: {
-        color: Colors.textMuted,
+        color: '#FFF',
         fontSize: 14,
+        fontWeight: '700',
+        textShadowColor: 'rgba(0,0,0,0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     leagueNameRow: {
         flexDirection: 'row',
@@ -519,9 +623,12 @@ const styles = StyleSheet.create({
     },
     leagueNameTitle: {
         color: '#FFF',
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontWeight: '900',
         marginRight: 6,
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     socialRow: {
         flexDirection: 'row',
@@ -530,57 +637,70 @@ const styles = StyleSheet.create({
         marginRight: 16,
     },
     statsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
+        marginHorizontal: 16,
         marginBottom: 25,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     statItem: {
         alignItems: 'center',
     },
     statLabel: {
-        color: Colors.textMuted,
+        color: 'rgba(255,255,255,0.5)',
         fontSize: 12,
         marginBottom: 6,
+        fontWeight: '700',
     },
     statValue: {
         color: '#FFF',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '900',
     },
     actionsRow: {
         flexDirection: 'row',
         paddingHorizontal: 16,
-        marginBottom: 20,
+        marginBottom: 25,
     },
     participateBtn: {
         flex: 1,
         backgroundColor: Colors.primary,
-        paddingVertical: 12,
-        borderRadius: 4,
+        height: 44,
+        borderRadius: 12,
         alignItems: 'center',
-        marginRight: 12,
+        justifyContent: 'center',
+        marginRight: 10,
+        overflow: 'hidden',
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 10,
+        elevation: 5,
     },
     participateBtnText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 14,
+        color: '#000',
+        fontWeight: '900',
+        fontSize: 13,
+        letterSpacing: 1.5,
     },
     hallOfFameBtn: {
         flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        height: 44,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
-        paddingVertical: 12,
-        borderRadius: 4,
-        flexDirection: 'row',
-        justifyContent: 'center',
+        borderRadius: 12,
+        overflow: 'hidden',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     hallOfFameBtnText: {
         color: '#FFF',
-        fontWeight: '600',
-        fontSize: 14,
+        fontWeight: '900',
+        fontSize: 13,
         marginRight: 8,
+        letterSpacing: 1,
     },
     adBanner: {
         height: 80,
@@ -612,13 +732,13 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     listHeaderBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 85, 255, 0.2)',
+        overflow: 'hidden',
+        backgroundColor: 'rgba(0, 255, 102, 0.15)',
         alignSelf: 'flex-start',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderTopRightRadius: 10,
+        borderTopRightRadius: 12,
+        borderBottomRightRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.2)',
     },
     miniFlag: {
         width: 14,
@@ -631,13 +751,12 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     tournamentItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.03)',
+        marginHorizontal: 16,
+        marginBottom: 12,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
     tournamentMainInfo: {
         flex: 1,
@@ -671,13 +790,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerLeagueLogo: {
-        width: 80,
-        height: 80,
+        width: 60,
+        height: 60,
     },
     leagueAccordion: {
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        backgroundColor: 'transparent',
         borderTopWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        overflow: 'hidden',
     },
     accordionContent: {
         paddingVertical: 8,
@@ -710,5 +830,15 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         flex: 1,
+    },
+    logoCircleSmall: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
 });

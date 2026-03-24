@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
+import { useAuthStore } from '../store/useAuthStore';
 
 const SOCKET_URL = 'https://hfl-backend.onrender.com';
 
@@ -20,7 +21,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
-        // Initialize socket with multiple transports for better reliability on Render
         const socket = io(SOCKET_URL, {
             transports: ['polling', 'websocket'],
             autoConnect: true,
@@ -34,6 +34,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         socket.on('connect', () => {
             console.log('🔌 Socket.IO connected');
             setIsConnected(true);
+            
+            // Join team room globally if user is logged in
+            const { user } = useAuthStore.getState();
+            if (user?.teamId) {
+                console.log('🔌 Joining team room:', user.teamId);
+                socket.emit('join-team', user.teamId);
+            }
         });
 
         socket.on('disconnect', () => {
@@ -46,14 +53,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         // Global listeners
-        socket.on('match-update', (data) => {
-            console.log('🏟️ Match Update Received:', data);
-            // We can emit a local event or update a store here if needed
-        });
+        socket.on('new-team-message', (message) => {
+            const { user, incrementUnreadCount } = useAuthStore.getState();
+            // Increment unread count if it's not my message AND it belongs to my team (extra safety)
+            const myTeamId = user?.teamId?._id || user?.teamId;
+            const msgTeamId = message.teamId?._id || message.teamId;
 
-        socket.on('goal-alert', (data) => {
-            console.log('⚽ GOAL ALERT:', data);
-            // Future: Show a toast or local notification
+            if (user && String(message.senderId) !== String(user._id || user.id)) {
+                if (String(myTeamId) === String(msgTeamId)) {
+                    incrementUnreadCount();
+                }
+            }
         });
 
         return () => {
@@ -62,6 +72,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         };
     }, []);
+
+    // Watch for user login to join room immediately
+    const userTeamId = useAuthStore(state => state.user?.teamId);
+    useEffect(() => {
+        if (socketRef.current && isConnected && userTeamId) {
+            console.log('🔌 User team detected, joining room:', userTeamId);
+            socketRef.current.emit('join-team', userTeamId);
+        }
+    }, [userTeamId, isConnected]);
 
     return (
         <SocketContext.Provider value={{ socket: socketRef.current, isConnected }}>

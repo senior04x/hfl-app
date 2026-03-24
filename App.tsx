@@ -22,6 +22,7 @@ import CalendarMatchesScreen from './screens/CalendarMatchesScreen';
 import TeamProfileScreen from './screens/TeamProfileScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
+import { notificationService } from './services/notificationService';
 
 import * as SplashScreenExpo from 'expo-splash-screen';
 import SplashScreen from './screens/SplashScreen';
@@ -34,8 +35,21 @@ SplashScreenExpo.preventAutoHideAsync().catch(() => {
 const Stack = createStackNavigator();
 
 export default function App() {
-    const { isAuthenticated, isGuest } = useAuthStore();
+    const { isAuthenticated, isGuest, user } = useAuthStore();
     const [isSplashVisible, setIsSplashVisible] = React.useState(true);
+
+    React.useEffect(() => {
+        if (isAuthenticated && user) {
+            const setupNotifications = async () => {
+                const userId = (user as any)._id || (user as any).id;
+                if (userId) {
+                    await notificationService.setupAndroidChannel();
+                    await notificationService.registerForPushNotificationsAsync(userId);
+                }
+            };
+            setupNotifications();
+        }
+    }, [isAuthenticated, user]);
 
     if (isSplashVisible) {
         return (

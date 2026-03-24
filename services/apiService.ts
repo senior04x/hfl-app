@@ -58,8 +58,8 @@ export const apiService = {
         api.post('/transfers/player', data).then(res => res.data),
 
     // Chat
-    getChatMessages: (teamId: string) =>
-        api.get(`/chats/team/${teamId}`).then(res => res.data.data),
+    getChatMessages: (teamId: string, page = 1, limit = 20) =>
+        api.get(`/chats/team/${teamId}`, { params: { page, limit } }).then(res => res.data.data),
 
     // Tournaments
     getTournaments: (page = 1, limit = 20, leagueId?: string) =>
@@ -93,9 +93,32 @@ export const apiService = {
     getApplicationsByPhone: (phone: string) =>
         api.get(`/applications/${phone}`).then(res => res.data.data),
 
+    // Upload Data
+    uploadPhoto: async (imageUri: string) => {
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop() || 'photo.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+        formData.append('photo', {
+            uri: imageUri,
+            name: filename,
+            type,
+        } as any);
+
+        const res = await axios.post(`${BASE_URL}/upload/photo`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return res.data;
+    },
+
     // Auth
     simpleLogin: (phone: string, role?: string, profileId?: string) =>
         api.post('/simple-login', { phone, role, profileId }).then(res => res.data),
+
+    // Notifications
+    registerPushToken: (data: { token: string, userId: string, platform: string, deviceId?: string }) =>
+        api.post('/notifications/register', data).then(res => res.data),
 };
 
 export default api;

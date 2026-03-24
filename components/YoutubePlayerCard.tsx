@@ -15,8 +15,8 @@ const YoutubePlayerCard: React.FC<YoutubePlayerCardProps> = ({ videoUrl }) => {
     const videoId = useMemo(() => {
         if (!videoUrl) return null;
         
-        // Regex for various YouTube formats (watch, share, shorts)
-        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+        // Regex for various YouTube formats (watch, share, shorts, live)
+        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|watch\?v=|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
         const match = videoUrl.match(regex);
         return match ? match[1] : null;
     }, [videoUrl]);

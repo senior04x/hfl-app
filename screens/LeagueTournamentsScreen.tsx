@@ -15,6 +15,8 @@ import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import GenericListSkeleton from '../components/GenericListSkeleton';
 import SmartImage from '../components/SmartImage';
+import { Video, ResizeMode } from 'expo-av';
+import VideoBackground from '../components/VideoBackground';
 
 export default function LeagueTournamentsScreen({ route, navigation }: any) {
     const { leagueId, leagueName, league } = route?.params || {};
@@ -144,7 +146,12 @@ export default function LeagueTournamentsScreen({ route, navigation }: any) {
     );
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.safeArea}>
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                overlayOpacity={0.85}
+            >
+            <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -175,24 +182,26 @@ export default function LeagueTournamentsScreen({ route, navigation }: any) {
                 )}
             </View>
         </SafeAreaView>
+        </VideoBackground>
+    </View>
     );
 }
 
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor: 'transparent',
     },
     container: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor: 'transparent',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 15,
-        backgroundColor: Colors.background,
+        backgroundColor: 'transparent',
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
     },

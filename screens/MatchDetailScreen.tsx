@@ -10,14 +10,20 @@ import {
     Dimensions,
     Animated,
     Linking,
+    RefreshControl,
+    Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Video, ResizeMode } from 'expo-av';
+import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import MatchDetailSkeleton from '../components/MatchDetailSkeleton';
+import VideoBackground from '../components/VideoBackground';
 import YoutubePlayerCard from '../components/YoutubePlayerCard';
 import TacticsBoard from '../components/TacticsBoard';
 import { apiService } from '../services/apiService';
+import { useSocket } from '../context/SocketContext';
 
 const { width } = Dimensions.get('window');
 
@@ -30,69 +36,81 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const [awayPlayers, setAwayPlayers] = useState<any[]>([]);
     const [playersLoading, setPlayersLoading] = useState(false);
     const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const { socket, isConnected } = useSocket();
     
     // Animation refs
     const slideAnim = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-        const fetchMatch = async () => {
-            const id = matchId || matchData?._id;
-            if (!id) {
-                setLoading(false);
-                return;
-            }
-            try {
-                setLoading(true);
-                const data = await apiService.getMatchById(id);
-                console.log('🏟️ Match Data Fetched:', JSON.stringify({
-                    id: data?._id,
-                    homeTeam: data?.homeTeamName,
-                    homeFormation: !!data?.homeTeam?.formation,
-                    awayTeam: data?.awayTeamName,
-                    awayFormation: !!data?.awayTeam?.formation
-                }, null, 2));
-                setMatch(data);
-                
-                // Set default selected team to home team
-                if (data.homeTeamId) setSelectedTeamId(data.homeTeamId);
+    const fetchMatch = async (isRefreshing = false) => {
+        const id = matchId || matchData?._id;
+        if (!id) {
+            setLoading(false);
+            return;
+        }
+        try {
+            if (isRefreshing) setRefreshing(true);
+            else setLoading(true);
 
-                // Fetch players for both teams
-                if (data.homeTeamId && data.awayTeamId) {
-                    setPlayersLoading(true);
-                    const [homeData, awayData] = await Promise.all([
-                        apiService.getPlayers(1, 100, data.homeTeamId),
-                        apiService.getPlayers(1, 100, data.awayTeamId)
-                    ]);
-                    setHomePlayers(homeData || []);
-                    setAwayPlayers(awayData || []);
-                }
-            } catch (error) {
-                console.error('Error fetching match detail:', error);
-            } finally {
-                setLoading(false);
-                setPlayersLoading(false);
+            const data = await apiService.getMatchById(id);
+            setMatch(data);
+            
+            if (data.homeTeamId) setSelectedTeamId(data.homeTeamId);
+
+            if (data.homeTeamId && data.awayTeamId) {
+                setPlayersLoading(true);
+                const [homeData, awayData] = await Promise.all([
+                    apiService.getPlayers(1, 100, data.homeTeamId),
+                    apiService.getPlayers(1, 100, data.awayTeamId)
+                ]);
+                setHomePlayers(homeData || []);
+                setAwayPlayers(awayData || []);
             }
-        };
+        } catch (error) {
+            console.error('Error fetching match detail:', error);
+        } finally {
+            setLoading(false);
+            setPlayersLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
         fetchMatch();
     }, [matchId, matchData?._id]);
+
+    useEffect(() => {
+        if (socket && isConnected) {
+            const currentId = matchId || matchData?._id;
+            
+            socket.on('match-update', (data: any) => {
+                if (data.matchId === currentId) {
+                    setMatch(data.match);
+                }
+            });
+
+            return () => {
+                socket.off('match-update');
+            };
+        }
+    }, [socket, isConnected, matchId, matchData?._id]);
+
+    const onRefresh = () => {
+        fetchMatch(true);
+    };
 
     const switchTeam = () => {
         const isHome = selectedTeamId === match?.homeTeamId;
         const nextId = isHome ? match?.awayTeamId : match?.homeTeamId;
-        
-        // Direction of slide (always slide to one side for toggle feel)
         const slideOutValue = -50;
 
-        // Slide out
         Animated.timing(slideAnim, {
             toValue: slideOutValue,
             duration: 150,
             useNativeDriver: true,
         }).start(() => {
             setSelectedTeamId(nextId);
-            // Pre-position for slide in from opposite side
             slideAnim.setValue(50);
-            // Slide in
             Animated.spring(slideAnim, {
                 toValue: 0,
                 friction: 8,
@@ -121,11 +139,12 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const renderHeader = () => {
         return (
             <View style={styles.headerContainer}>
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={styles.topNav}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                         <Ionicons name="chevron-back" size={28} color={Colors.primary} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{match?.tournamentName || 'Turnir'}</Text>
+                    <Text style={styles.headerTitle}>{(match?.tournamentName || 'TURNIR').toUpperCase()}</Text>
                     {match?.round ? (
                         <View style={styles.tourBadge}>
                             <Text style={styles.tourBadgeText}>{match.round.toString().includes('TUR') ? match.round : `${match.round}-TUR`}</Text>
@@ -135,16 +154,16 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
                 <View style={styles.matchScoreCard}>
                     <View style={styles.dateRow}>
-                        <Ionicons name="calendar-outline" size={14} color="#8A94A6" />
+                        <Ionicons name="calendar-outline" size={14} color="rgba(255,255,255,0.5)" />
                         <Text style={styles.dateText}>
-                            {formatDate(match?.date)}
+                            {formatDate(match?.date).toUpperCase()}
                         </Text>
                     </View>
 
                     <View style={styles.teamsScoreRow}>
                         <View style={styles.teamBlockRight}>
                             <Text style={styles.teamNameText} numberOfLines={1}>
-                                {match?.homeTeamName || match?.homeTeam?.name || 'JAMOA A'}
+                                {(match?.homeTeamName || match?.homeTeam?.name || 'JAMOA A').toUpperCase()}
                             </Text>
                             <View style={styles.logoCircle}>
                                 {match?.homeTeamLogo || match?.homeTeam?.logo ? (
@@ -156,7 +175,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         </View>
 
                         <Text style={styles.scoreTextMain}>
-                            {match?.score?.home ?? match?.homeScore ?? 0} : {match?.score?.away ?? match?.awayScore ?? 0}
+                            {match?.score?.home ?? match?.homeScore ?? 0}:{match?.score?.away ?? match?.awayScore ?? 0}
                         </Text>
 
                         <View style={styles.teamBlockLeft}>
@@ -168,14 +187,14 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                 )}
                             </View>
                             <Text style={styles.teamNameText} numberOfLines={1}>
-                                {match?.awayTeamName || match?.awayTeam?.name || 'JAMOA B'}
+                                {(match?.awayTeamName || match?.awayTeam?.name || 'JAMOA B').toUpperCase()}
                             </Text>
                         </View>
                     </View>
 
                     <View style={styles.locationRow}>
-                        <Ionicons name="location-outline" size={14} color="#8A94A6" />
-                        <Text style={styles.locationText}>{match?.venue || 'Maydon belgilanmagan'}</Text>
+                        <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.5)" />
+                        <Text style={styles.locationText}>{(match?.venue || 'Amatora Arena').toUpperCase()}</Text>
                     </View>
                 </View>
             </View>
@@ -184,6 +203,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
     const renderTabs = () => (
         <View style={styles.tabsContainer}>
+            <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {['lineups', 'overview', 'preview', 'media', 'staff'].map((tab) => (
                     <TouchableOpacity
@@ -192,10 +212,10 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         onPress={() => setActiveTab(tab)}
                     >
                         <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                            {tab === 'lineups' ? "Tarkib" :
-                                tab === 'overview' ? 'Obzor' :
-                                    tab === 'preview' ? 'Prevyu' :
-                                        tab === 'media' ? 'Media' : 'Xodimlar'}
+                            {tab === 'lineups' ? "TARKIB" :
+                                tab === 'overview' ? 'OBZOR' :
+                                    tab === 'preview' ? 'PREVYU' :
+                                        tab === 'media' ? 'MEDIA' : 'XODIMLAR'}
                         </Text>
                     </TouchableOpacity>
                 ))}
@@ -206,22 +226,22 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const renderTimelineEvent = (event: any, index: number, isLast: boolean) => {
         let iconName: any = 'football';
         let iconColor = '#FFF';
-        let title = 'Voqea';
+        let title = 'VOQEA';
 
         if (event.type === 'goal') {
             iconName = 'football';
-            title = 'Gol!';
+            title = 'GOL!';
         } else if (event.type === 'yellowCard') {
             iconName = 'square';
             iconColor = '#FACC15';
-            title = 'Sariq kartochka';
+            title = 'SARIQ KARTОCHKА';
         } else if (event.type === 'redCard') {
             iconName = 'square';
             iconColor = '#EF4444';
-            title = 'Qizil kartochka';
+            title = 'QIZIL KARTОCHKА';
         } else if (event.type === 'assist') {
             iconName = 'footsteps';
-            title = 'Assist';
+            title = 'ASSIST';
         }
 
         return (
@@ -235,10 +255,11 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                 </View>
 
                 <View style={styles.timelineEventCard}>
+                    <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.eventContentWrapper}>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.eventTitle}>{title}</Text>
-                            <Text style={styles.eventDesc}>{event.playerName}</Text>
+                            <Text style={styles.eventDesc}>{event.playerName?.toUpperCase()}</Text>
                         </View>
                         <View style={styles.eventLogo}>
                             <Text style={styles.eventLogoText}>{event.isHomeTeam ? 'UY' : 'MH'}</Text>
@@ -253,7 +274,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         if (match?.status === 'scheduled') {
             return (
                 <View style={styles.notStartedContainer}>
-                    <Text style={styles.notStartedText}>O'yin hali boshlanmagan</Text>
+                    <Text style={styles.notStartedText}>O'YIN HALI BOSHLANMAGAN</Text>
                 </View>
             );
         }
@@ -261,12 +282,23 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const events = match?.events || [];
 
         return (
-            <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16 }}>
+            <ScrollView 
+                style={styles.tabContent} 
+                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
+                }
+            >
                 {events.length > 0 ? (
                     events.map((ev: any, idx: number) => renderTimelineEvent(ev, idx, idx === events.length - 1))
                 ) : (
                     <View style={styles.notStartedContainer}>
-                        <Text style={styles.notStartedText}>Hozircha voqealar yo'q</Text>
+                        <Text style={styles.notStartedText}>HOZIRCHA VOQEALAR YO'Q</Text>
                     </View>
                 )}
             </ScrollView>
@@ -274,10 +306,10 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     const renderPreview = () => (
-        <ScrollView style={styles.tabContent}>
+        <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 100 }}>
             <View style={styles.placeholderContainer}>
-                <Ionicons name="stats-chart-outline" size={48} color="#2A344A" />
-                <Text style={styles.placeholderText}>Prevyu ma'lumotlari tez orada...</Text>
+                <Ionicons name="stats-chart-outline" size={48} color="rgba(255,255,255,0.1)" />
+                <Text style={styles.placeholderText}>PREVYU MA'LUMOTLARI TEZ ORADA...</Text>
             </View>
         </ScrollView>
     );
@@ -294,34 +326,49 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                 style={styles.playerCardCompact}
                 onPress={() => navigation.navigate('PlayerStats', { player: player, playerId: player._id })}
             >
-                <View style={styles.playerAvatarSmall}>
-                    {player.photo ? (
-                        <Image source={{ uri: player.photo }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                    ) : (
-                        <View style={styles.playerInitials}>
-                            <Text style={styles.initialsText}>{player.firstName?.charAt(0)}</Text>
-                        </View>
-                    )}
+                <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, width: '100%' }}>
+                    <View style={styles.playerAvatarSmall}>
+                        {player.photo ? (
+                            <Image source={{ uri: player.photo }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                        ) : (
+                            <View style={styles.playerInitials}>
+                                <Text style={styles.initialsText}>{player.firstName?.charAt(0)}</Text>
+                            </View>
+                        )}
+                    </View>
+                    <View style={styles.playerInfoCompact}>
+                        <Text style={styles.playerNameCompact} numberOfLines={1}>
+                            {(player.firstName + ' ' + (player.lastName || '')).toUpperCase()}
+                        </Text>
+                        <Text style={styles.playerNumberCompact}>#{player.number} • {(player.positionUz || player.position || 'O\'YINCHI').toUpperCase()}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
                 </View>
-                <View style={styles.playerInfoCompact}>
-                    <Text style={styles.playerNameCompact} numberOfLines={1}>
-                        {player.firstName} {player.lastName}
-                    </Text>
-                    <Text style={styles.playerNumberCompact}>#{player.number} • {player.positionUz || player.position}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#4A5568" />
             </TouchableOpacity>
         );
 
         return (
-            <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 40 }}>
-                {/* Refined One-Side Arrow Selector */}
+            <ScrollView 
+                style={styles.tabContent} 
+                contentContainerStyle={{ paddingBottom: 100 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
+                }
+            >
                 <View style={styles.carouselContainer}>
+                    <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.animatedCardWrapper}>
                         <Animated.View style={[
                             styles.teamCarouselCard,
                             { transform: [{ translateX: slideAnim }] }
                         ]}>
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <View style={styles.compactTeamInfo}>
                                 <View style={styles.miniLogoBox}>
                                     {currentLogo ? (
@@ -332,14 +379,15 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 10 }}>
                                     <Text style={styles.miniTeamType}>TANLANGAN JAMOA</Text>
-                                    <Text style={styles.miniTeamName} numberOfLines={1}>{currentTeamName}</Text>
+                                    <Text style={styles.miniTeamName} numberOfLines={1}>{currentTeamName.toUpperCase()}</Text>
                                 </View>
                             </View>
                         </Animated.View>
                     </View>
 
                     <TouchableOpacity onPress={switchTeam} style={styles.navArrowBtnOneSide}>
-                        <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
+                        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                        <Ionicons name="swap-horizontal" size={22} color={Colors.primary} />
                     </TouchableOpacity>
                 </View>
 
@@ -347,16 +395,13 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
                 ) : (
                     <View style={styles.lineupListWrapper}>
-                        {/* Tactics Board Section */}
                         {((isHome ? match?.homeTeam?.formation : match?.awayTeam?.formation) || 
                           (isHome ? match?.homeTeam?.players : match?.awayTeam?.players)) ? (
                             <TacticsBoard 
                                 players={((isHome ? (match?.homeTeam?.formation?.players || match?.homeTeam?.players) : 
                                                    (match?.awayTeam?.formation?.players || match?.awayTeam?.players)) || []).map((p: any) => {
-                                    // Count goals for this player in this match from match.events
                                     const playerId = p.id || p._id;
                                     const playerGoals = match.events?.filter((e: any) => e.playerId === playerId && e.type === 'goal').length || 0;
-                                    // Find more info from currentPlayers if needed
                                     const fullPlayer = currentPlayers.find((cp: any) => (cp._id || cp.id) === playerId);
                                     return {
                                         ...p,
@@ -368,23 +413,20 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                         y: p.y || 50
                                     };
                                 })}
-                                teamColor={isHome ? '#3B82F6' : '#EF4444'} // Default colors
+                                teamColor={isHome ? '#3B82F6' : '#EF4444'} 
                             />
                         ) : null}
 
                         <View style={styles.listHeader}>
-                            <Text style={styles.listTitle}>{currentTeamName} tarkibi</Text>
-                            <View style={styles.countBadge}>
-                                <Text style={styles.countText}>{currentPlayers.length} ta</Text>
-                            </View>
+                            <Text style={styles.listTitle}>{currentTeamName.toUpperCase()} TARKIBI</Text>
                         </View>
 
                         {currentPlayers.length > 0 ? (
                             currentPlayers.map(renderPlayerItem)
                         ) : (
                             <View style={styles.emptyPlayersBox}>
-                                <Ionicons name="people-outline" size={40} color="#1A2138" />
-                                <Text style={styles.emptyPlayersText}>O'yinchilar ro'yxati mavjud emas</Text>
+                                <Ionicons name="people-outline" size={40} color="rgba(255,255,255,0.1)" />
+                                <Text style={styles.emptyPlayersText}>O'YINCHILAR RO'YXATI MAVJUD EMAS</Text>
                             </View>
                         )}
                     </View>
@@ -397,13 +439,24 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const videoUrl = match?.youtubeLink || match?.videoUrl;
 
         return (
-            <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16 }}>
+            <ScrollView 
+                style={styles.tabContent} 
+                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
+                }
+            >
                 {videoUrl ? (
                     <YoutubePlayerCard videoUrl={videoUrl} />
                 ) : (
                     <View style={styles.placeholderContainer}>
-                        <Ionicons name="images-outline" size={48} color="#2A344A" />
-                        <Text style={styles.placeholderText}>Media ma'lumotlari mavjud emas</Text>
+                        <Ionicons name="images-outline" size={48} color="rgba(255,255,255,0.1)" />
+                        <Text style={styles.placeholderText}>MEDIA MA'LUMOTLARI MAVJUD EMAS</Text>
                     </View>
                 )}
             </ScrollView>
@@ -411,20 +464,23 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     const renderStaff = () => (
-        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16 }}>
+        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
             <View style={styles.placeholderContainer}>
                 {match?.referee ? (
                     <View style={styles.staffMemberCard}>
-                        <View style={styles.staffIconBox}>
-                            <Ionicons name="person" size={24} color={Colors.primary} />
-                        </View>
-                        <View>
-                            <Text style={styles.staffLabel}>Bosh hakam</Text>
-                            <Text style={styles.staffValue}>{match.referee}</Text>
+                        <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, width: '100%' }}>
+                            <View style={styles.staffIconBox}>
+                                <Ionicons name="person" size={24} color={Colors.primary} />
+                            </View>
+                            <View>
+                                <Text style={styles.staffLabel}>BOSH HAKAM</Text>
+                                <Text style={styles.staffValue}>{match.referee.toUpperCase()}</Text>
+                            </View>
                         </View>
                     </View>
                 ) : (
-                    <Text style={styles.placeholderText}>Rasmiy vakillar ro'yxati belgilanmagan</Text>
+                    <Text style={styles.placeholderText}>RASMIY VAKILLAR RO'YXATI BELGILANMAGAN</Text>
                 )}
             </View>
         </ScrollView>
@@ -435,238 +491,91 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-            {renderHeader()}
-            {renderTabs()}
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                posterSource={require('../assets/images/splash-icon.png')}
+                overlayOpacity={0.85}
+                style={StyleSheet.absoluteFill}
+            />
 
-            {activeTab === 'overview' ? renderOverview() :
-                activeTab === 'preview' ? renderPreview() :
-                    activeTab === 'lineups' ? renderLineups() :
-                        activeTab === 'media' ? renderMedia() :
-                            activeTab === 'staff' ? renderStaff() : null}
-        </SafeAreaView>
+            <SafeAreaView style={styles.container} edges={['top']}>
+                {renderHeader()}
+                {renderTabs()}
+
+                {activeTab === 'overview' ? renderOverview() :
+                    activeTab === 'preview' ? renderPreview() :
+                        activeTab === 'lineups' ? renderLineups() :
+                            activeTab === 'media' ? renderMedia() :
+                                activeTab === 'staff' ? renderStaff() : null}
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#020610' },
-    headerContainer: {
-        backgroundColor: '#051024',
-        borderBottomWidth: 1,
-        borderBottomColor: '#1A2138',
-        paddingBottom: 20
-    },
-    topNav: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: 10,
-        marginBottom: 20,
-    },
+    container: { flex: 1, backgroundColor: 'transparent' },
+    headerContainer: { overflow: 'hidden', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', paddingBottom: 20 },
+    topNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 10, marginBottom: 20 },
     backBtn: { padding: 4 },
-    headerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-    tourBadge: {
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
-    },
-    tourBadgeText: {
-        color: '#000',
-        fontSize: 12,
-        fontWeight: '900',
-    },
-
-    matchScoreCard: {
-        alignItems: 'center',
-        paddingHorizontal: 20,
-    },
+    headerTitle: { color: '#FFF', fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
+    tourBadge: { backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+    tourBadgeText: { color: '#000', fontSize: 11, fontWeight: '900' },
+    matchScoreCard: { alignItems: 'center', paddingHorizontal: 20 },
     dateRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-    dateText: { color: '#8A94A6', fontSize: 13, marginLeft: 6 },
-
-    teamsScoreRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        marginBottom: 15,
-    },
+    dateText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginLeft: 6, fontWeight: '700' },
+    teamsScoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 15 },
     teamBlockRight: { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end' },
     teamBlockLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-start' },
-    teamNameText: { color: '#FFF', fontSize: 18, fontWeight: '900', marginHorizontal: 10 },
-    logoCircle: {
-        width: 36, height: 36, borderRadius: 18, backgroundColor: '#1A2138',
-        justifyContent: 'center', alignItems: 'center'
-    },
+    teamNameText: { color: '#FFF', fontSize: 16, fontWeight: '900', marginHorizontal: 10 },
+    logoCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
     scoreTextMain: { color: '#FFF', fontSize: 32, fontWeight: '900', marginHorizontal: 20, letterSpacing: 2 },
-
     locationRow: { flexDirection: 'row', alignItems: 'center' },
-    locationText: { color: '#8A94A6', fontSize: 13, marginLeft: 6 },
-
-    tabsContainer: { borderBottomWidth: 1, borderBottomColor: '#1A2138', backgroundColor: '#020610' },
+    locationText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginLeft: 6, fontWeight: '700' },
+    tabsContainer: { height: 50, overflow: 'hidden', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
     tab: { paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' },
     activeTab: { borderBottomColor: Colors.primary },
-    tabText: { color: '#6A7185', fontSize: 14, fontWeight: '600' },
+    tabText: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '800' },
     activeTabText: { color: '#FFF' },
-
-    tabContent: { flex: 1, backgroundColor: '#020610' },
-
-    // Carousel Selector
-    carouselContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#051024',
-        borderBottomWidth: 1,
-        borderBottomColor: '#1A2138',
-    },
-    navArrowBtnOneSide: {
-        padding: 10,
-        backgroundColor: '#0A152E',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#1A2138',
-        marginLeft: 12,
-    },
-    animatedCardWrapper: {
-        flex: 1,
-        overflow: 'hidden',
-    },
-    teamCarouselCard: {
-        backgroundColor: '#081021',
-        borderRadius: 14,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: Colors.primary + '30',
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    compactTeamInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        width: '100%',
-    },
-    miniLogoBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#1A2138',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    miniTeamType: {
-        color: Colors.primary,
-        fontSize: 9,
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    miniTeamName: {
-        color: '#FFF',
-        fontSize: 15,
-        fontWeight: 'bold',
-        marginTop: 1,
-    },
-
-    // Lineup List
-    lineupListWrapper: {
-        padding: 16,
-    },
-    listHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    listTitle: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    countBadge: {
-        backgroundColor: '#0A152E',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    countText: {
-        color: Colors.primary,
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    playerCardCompact: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#081021',
-        padding: 12,
-        borderRadius: 12,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: '#1A2138',
-    },
-    playerAvatarSmall: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#1A2138',
-        marginRight: 12,
-        overflow: 'hidden',
-    },
-    playerInitials: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    initialsText: {
-        color: '#8A94A6',
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    playerInfoCompact: {
-        flex: 1,
-    },
-    playerNameCompact: {
-        color: '#FFF',
-        fontSize: 15,
-        fontWeight: 'bold',
-    },
-    playerNumberCompact: {
-        color: '#8A94A6',
-        fontSize: 13,
-        marginTop: 2,
-    },
-    emptyPlayersBox: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 40,
-    },
-    emptyPlayersText: {
-        color: '#4A5568',
-        fontSize: 14,
-        marginTop: 10,
-    },
-
-    // Timeline etc (kept from previous implementation)
-    timelineRow: { flexDirection: 'row', marginBottom: 16 },
-    timelineLeftColumn: { width: 40, alignItems: 'center', position: 'relative' },
-    timelineIcon: { backgroundColor: '#020610', zIndex: 2 },
+    tabContent: { flex: 1 },
+    carouselContainer: { flexDirection: 'row', alignItems: 'center', padding: 12, height: 80, overflow: 'hidden' },
+    navArrowBtnOneSide: { width: 48, height: 50, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginLeft: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    animatedCardWrapper: { flex: 1, overflow: 'hidden' },
+    teamCarouselCard: { height: 50, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(0,255,102,0.2)' },
+    compactTeamInfo: { flexDirection: 'row', alignItems: 'center', width: '100%', padding: 8 },
+    miniLogoBox: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
+    miniTeamType: { color: Colors.primary, fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+    miniTeamName: { color: '#FFF', fontSize: 14, fontWeight: '900' },
+    lineupListWrapper: { padding: 16 },
+    listHeader: { marginBottom: 16 },
+    listTitle: { color: '#FFF', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+    playerCardCompact: { borderRadius: 12, marginBottom: 10, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+    playerAvatarSmall: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 12, overflow: 'hidden' },
+    playerInitials: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
+    initialsText: { color: 'rgba(255,255,255,0.4)', fontSize: 18, fontWeight: 'bold' },
+    playerInfoCompact: { flex: 1 },
+    playerNameCompact: { color: '#FFF', fontSize: 14, fontWeight: '900' },
+    playerNumberCompact: { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2, fontWeight: '700' },
+    emptyPlayersBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
+    emptyPlayersText: { color: 'rgba(255,255,255,0.2)', fontSize: 12, fontWeight: '900', marginTop: 10 },
+    timelineRow: { flexDirection: 'row', marginBottom: 20 },
+    timelineLeftColumn: { width: 45, alignItems: 'center', position: 'relative' },
+    timelineIcon: { zIndex: 2 },
     cardIcon: { width: 14, height: 20, borderRadius: 2, zIndex: 2 },
-    timelineTimeText: { color: '#8A94A6', fontSize: 12, marginTop: 4, fontWeight: 'bold', backgroundColor: '#020610', zIndex: 2 },
-    timelineLine: { position: 'absolute', top: 25, bottom: -30, width: 2, backgroundColor: '#1A2138', zIndex: 1 },
-    timelineEventCard: { backgroundColor: '#081021', borderRadius: 8, padding: 12, marginLeft: 8, flex: 1, borderWidth: 1, borderColor: '#1A2138' },
-    eventContentWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    eventTitle: { fontWeight: 'bold', color: '#FFF', fontSize: 14, marginBottom: 4 },
-    eventDesc: { color: '#8A94A6', fontSize: 12 },
-    eventLogo: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#1A2138', justifyContent: 'center', alignItems: 'center', marginLeft: 12 },
-    eventLogoText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
-    notStartedContainer: { alignItems: 'center', marginTop: 40 },
-    notStartedText: { color: '#8A94A6', fontSize: 15 },
+    timelineTimeText: { color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 6, fontWeight: '900', zIndex: 2 },
+    timelineLine: { position: 'absolute', top: 25, bottom: -30, width: 1, backgroundColor: 'rgba(255,255,255,0.1)', zIndex: 1 },
+    timelineEventCard: { borderRadius: 12, padding: 1, marginLeft: 8, flex: 1, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+    eventContentWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12 },
+    eventTitle: { fontWeight: '900', color: Colors.primary, fontSize: 12, marginBottom: 4 },
+    eventDesc: { color: '#FFF', fontSize: 13, fontWeight: '800' },
+    eventLogo: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', marginLeft: 12 },
+    eventLogoText: { color: 'rgba(255,255,255,0.5)', fontWeight: '900', fontSize: 10 },
+    notStartedContainer: { alignItems: 'center', marginTop: 60 },
+    notStartedText: { color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '900' },
     placeholderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 200 },
-    placeholderText: { color: '#6A7185', textAlign: 'center' },
-    staffMemberCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#081021', padding: 16, borderRadius: 12, width: '100%', borderWidth: 1, borderColor: '#1A2138' },
-    staffIconBox: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#1A2138', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-    staffLabel: { color: '#8A94A6', fontSize: 12, fontWeight: '600' },
-    staffValue: { color: '#FFF', fontSize: 16, fontWeight: 'bold', marginTop: 2 }
+    placeholderText: { color: 'rgba(255,255,255,0.3)', textAlign: 'center', fontWeight: '900', fontSize: 12 },
+    staffMemberCard: { borderRadius: 16, overflow: 'hidden', width: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+    staffIconBox: { width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(0,255,102,0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    staffLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900' },
+    staffValue: { color: '#FFF', fontSize: 15, fontWeight: '900', marginTop: 2 }
 });

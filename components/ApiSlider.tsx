@@ -12,6 +12,7 @@ import {
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import SmartImage from './SmartImage';
+import Skeleton from './Skeleton';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth * 0.9;
@@ -19,7 +20,8 @@ const CARD_SPACING = 10;
 const SIDE_PADDING = (screenWidth - CARD_WIDTH) / 2;
 
 interface SliderItem {
-    id: string;
+    _id?: string;
+    id?: string;
     title: string;
     imageUrl: string;
     link?: string;
@@ -27,16 +29,35 @@ interface SliderItem {
     isActive: boolean;
 }
 
-const ApiSlider: React.FC = () => {
-    const [items, setItems] = useState<SliderItem[]>([]);
-    const [loading, setLoading] = useState(true);
+interface ApiSliderProps {
+    initialItems?: SliderItem[];
+    externalLoading?: boolean;
+}
+
+const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) => {
+    const [items, setItems] = useState<SliderItem[]>(initialItems || []);
+    const [loading, setLoading] = useState(externalLoading !== undefined ? externalLoading : true);
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
     const scrollViewRef = useRef<ScrollView>(null);
 
     useEffect(() => {
-        loadSliderItems();
-    }, []);
+        if (initialItems && initialItems.length > 0) {
+            setItems(initialItems);
+            setLoading(false);
+        } else if (externalLoading === false) {
+             // If not loading and no items, maybe we need to fetch or show fallback
+             loadSliderItems();
+        } else if (externalLoading === undefined) {
+            loadSliderItems();
+        }
+    }, [initialItems]);
+
+    useEffect(() => {
+        if (externalLoading !== undefined) {
+            setLoading(externalLoading);
+        }
+    }, [externalLoading]);
 
     const loadSliderItems = async () => {
         try {
@@ -87,10 +108,10 @@ const ApiSlider: React.FC = () => {
         setCurrentIndex(index);
     };
 
-    if (loading) {
+    if (loading && items.length === 0) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator color={Colors.primary} />
+                <Skeleton width={screenWidth - 40} height={180} borderRadius={20} />
             </View>
         );
     }
@@ -130,18 +151,6 @@ const ApiSlider: React.FC = () => {
                     </TouchableOpacity>
                 ))}
             </ScrollView>
-
-            <View style={styles.pagination}>
-                {items.map((_, index) => (
-                    <View
-                        key={index}
-                        style={[
-                            styles.dot,
-                            currentIndex === index ? styles.activeDot : null
-                        ]}
-                    />
-                ))}
-            </View>
         </View>
     );
 };
