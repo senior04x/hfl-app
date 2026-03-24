@@ -118,7 +118,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
             else setIsFetchingMore(true);
 
             const [msgData, tInfo, tPlayers] = await Promise.all([
-                apiService.getChatMessages(teamId, pageNum, 20),
+                apiService.getChatMessages(teamId, 1, 300), // Load 300 at once for now
                 pageNum === 1 ? apiService.getTeamById(teamId) : Promise.resolve(teamInfo),
                 pageNum === 1 ? apiService.getPlayersByTeam(teamId) : Promise.resolve(teamPlayers)
             ]);
