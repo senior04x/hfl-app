@@ -118,7 +118,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
             else setIsFetchingMore(true);
 
             const [msgData, tInfo, tPlayers] = await Promise.all([
-                apiService.getChatMessages(teamId, pageNum, 100),
+                apiService.getChatMessages(teamId, pageNum, 20),
                 pageNum === 1 ? apiService.getTeamById(teamId) : Promise.resolve(teamInfo),
                 pageNum === 1 ? apiService.getPlayersByTeam(teamId) : Promise.resolve(teamPlayers)
             ]);
@@ -142,7 +142,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                 }
             }
 
-            if (!msgData || msgData.length < 100) {
+            if (!msgData || msgData.length < 20) {
                 setHasMore(false);
             } else {
                 setHasMore(true);
