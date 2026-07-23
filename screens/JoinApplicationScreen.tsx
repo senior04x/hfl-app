@@ -264,8 +264,9 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             }
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: false,
-                quality: 0.8,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.5,
             });
             if (!result.canceled && result.assets[0]?.uri) {
                 onPick(result.assets[0].uri);
@@ -284,8 +285,9 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             }
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
-                allowsEditing: false,
-                quality: 0.8,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.5,
             });
             if (!result.canceled && result.assets[0]?.uri) {
                 onPick(result.assets[0].uri);
