@@ -783,28 +783,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                         <Ionicons name="create-outline" size={22} color="#FFF" />
                                     </TouchableOpacity>
                                 )}
-
-                                {(String(selectedMessage.senderId) === String(user?._id || user?.id) || user?.role === 'team' || user?.role === 'admin') && (
-                            ]}
-                        >
-                            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-                            
-                            <TouchableOpacity style={styles.menuItem} onPress={() => copyToClipboard(selectedMessage.text)}>
-                                <Ionicons name="copy-outline" size={20} color="#FFF" />
-                                <Text style={styles.menuItemText}>Nusxa olish</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={styles.menuItem} onPress={handleReply}>
-                                <Ionicons name="arrow-undo-outline" size={20} color="#FFF" />
-                                <Text style={styles.menuItemText}>Javob berish</Text>
-                            </TouchableOpacity>
-
-                            {String(selectedMessage.senderId) === String(user?._id || user?.id) && (
-                                <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
-                                    <Ionicons name="create-outline" size={20} color="#FFF" />
-                                    <Text style={styles.menuItemText}>Tahrirlash</Text>
-                                </TouchableOpacity>
-                            )}
+                            </View>
                         </Animated.View>
                     )}
                 </TouchableOpacity>
