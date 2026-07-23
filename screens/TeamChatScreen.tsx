@@ -785,34 +785,53 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                 )}
 
                                 {(String(selectedMessage.senderId) === String(user?._id || user?.id) || user?.role === 'team' || user?.role === 'admin') && (
-                                    <TouchableOpacity style={[styles.menuItem, styles.menuBorder, { paddingVertical: 16 }]} onPress={() => { closeMenu(); handleDelete(selectedMessage._id || selectedMessage.id); }}>
-                                        <Text style={[styles.menuItemText, { color: Colors.danger, fontSize: 18 }]}>O'chirish</Text>
-                                        <Ionicons name="trash-outline" size={22} color={Colors.danger} />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
+                            ]}
+                        >
+                            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                            
+                            <TouchableOpacity style={styles.menuItem} onPress={() => copyToClipboard(selectedMessage.text)}>
+                                <Ionicons name="copy-outline" size={20} color="#FFF" />
+                                <Text style={styles.menuItemText}>Nusxa olish</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.menuItem} onPress={handleReply}>
+                                <Ionicons name="arrow-undo-outline" size={20} color="#FFF" />
+                                <Text style={styles.menuItemText}>Javob berish</Text>
+                            </TouchableOpacity>
+
+                            {String(selectedMessage.senderId) === String(user?._id || user?.id) && (
+                                <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
+                                    <Ionicons name="create-outline" size={20} color="#FFF" />
+                                    <Text style={styles.menuItemText}>Tahrirlash</Text>
+                                </TouchableOpacity>
+                            )}
                         </Animated.View>
                     )}
                 </TouchableOpacity>
             </Modal>
 
-            {/* Team Members Modal */}
+            {/* Members List Modal */}
             <Modal
                 visible={showMembers}
                 animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowMembers(false)}
+                transparent={false}
+                statusBarTranslucent={true}
+                onRequestClose={() => {
+                    setShowMembers(false);
+                    pan.setValue({ x: 0, y: 0 });
+                }}
             >
                 <Animated.View 
                     style={[
                         styles.modalOverlay, 
+                        StyleSheet.absoluteFill,
                         { transform: [{ translateY: pan.y.interpolate({ inputRange: [0, height], outputRange: [0, height], extrapolate: 'clamp' }) }] }
                     ]}
                 >
                     <AnimatedBackground overlayOpacity={0.85} />
                     
                     <SafeAreaView style={{ flex: 1 }}>
-                        <View {...panResponder.panHandlers} style={{ paddingBottom: 20 }}>
+                        <View {...panResponder.panHandlers} style={{ paddingBottom: 10 }}>
                             <View style={styles.dragHandleContainer}>
                                 <View style={styles.dragHandle} />
                             </View>
@@ -837,12 +856,13 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                         <FlatList
                             data={teamPlayers}
                             keyExtractor={(item) => item._id || item.id}
-                            contentContainerStyle={{ padding: 20 }}
+                            contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
                             renderItem={({ item }) => (
                                 <TouchableOpacity 
                                     style={styles.memberItem}
                                     onPress={() => {
                                         setShowMembers(false);
+                                        pan.setValue({ x: 0, y: 0 });
                                         navigation.navigate('PlayerStats', { playerId: item._id });
                                     }}
                                 >
