@@ -17,6 +17,7 @@ import {
     Modal,
     ImageBackground,
     Linking,
+    ScrollView,
 } from 'react-native';
 import Animated, {
     useSharedValue,
