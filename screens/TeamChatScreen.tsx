@@ -67,6 +67,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
     }
 
     const { height } = Dimensions.get('window');
+    const pan = useRef(new Animated.ValueXY()).current;
     const openMembersModal = () => {
         pan.setValue({ x: 0, y: 0 });
         setShowMembers(true);
