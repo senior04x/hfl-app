@@ -444,11 +444,19 @@ export default function WelcomeScreen({ navigation }: any) {
                                         }}
                                     >
                                         <View style={styles.accountOptionIcon}>
-                                            <Ionicons
-                                                name={acc.role === 'manager' ? 'shield-half' : 'football'}
-                                                size={24}
-                                                color={Colors.primary}
-                                            />
+                                            {acc.photo ? (
+                                                <Image
+                                                    source={{ uri: acc.photo }}
+                                                    style={{ width: 44, height: 44, borderRadius: 22 }}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <Ionicons
+                                                    name={acc.role === 'manager' ? 'shield-half' : 'football'}
+                                                    size={24}
+                                                    color={Colors.primary}
+                                                />
+                                            )}
                                         </View>
                                         <View style={{ flex: 1, marginLeft: 12 }}>
                                             <Text style={styles.accountOptionName}>{acc.name}</Text>
@@ -709,6 +717,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: 'rgba(0, 255, 102, 0.3)',
+        overflow: 'hidden',
     },
     accountOptionName: {
         fontSize: 15,
