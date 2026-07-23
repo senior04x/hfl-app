@@ -126,6 +126,9 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const [isLeagueDropdownOpen, setIsLeagueDropdownOpen] = useState(false);
     const leagueAnimVal = useRef(new Animated.Value(0)).current;
 
+    const [isTeamDropdownOpen, setIsTeamDropdownOpen] = useState(false);
+    const teamAnimVal = useRef(new Animated.Value(0)).current;
+
     useEffect(() => {
         Animated.timing(leagueAnimVal, {
             toValue: isLeagueDropdownOpen ? 1 : 0,
@@ -135,14 +138,27 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     }, [isLeagueDropdownOpen]);
 
     useEffect(() => {
+        Animated.timing(teamAnimVal, {
+            toValue: isTeamDropdownOpen ? 1 : 0,
+            duration: 250,
+            useNativeDriver: false,
+        }).start();
+    }, [isTeamDropdownOpen]);
+
+    useEffect(() => {
         if (route?.params?.initialType) {
             setApplicationType(route.params.initialType);
         }
         loadLeaguesData();
+        handleLeagueSelect('Super liga');
         if (targetTeamId) {
             autoPreSelectTeam(targetTeamId);
         }
     }, [targetTeamId, route?.params?.initialType]);
+
+    const getSelectedTeamObj = () => {
+        return teams.find(t => (t.id || t._id) === formData.selectedTeam);
+    };
 
     const autoPreSelectTeam = async (tId: string) => {
         try {
@@ -548,111 +564,238 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                         {/* SECTION 1: TURNIR TANLASH (EXPANDABLE SELECT) */}
                         {!targetTeamId && (
-                            <View style={styles.card}>
-                                <View style={styles.cardTitleRow}>
-                                    <Ionicons name="trophy" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                    <Text style={styles.cardTitle}>TURNIR (LIGA) TANLASH</Text>
-                                </View>
-                                
-                                {/* Selected Trigger Button */}
-                                <TouchableOpacity
-                                    style={styles.leagueSelectTrigger}
-                                    onPress={() => setIsLeagueDropdownOpen(prev => !prev)}
-                                    activeOpacity={0.8}
-                                >
-                                    <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                                    <View style={styles.leagueTriggerLeft}>
-                                        <View style={styles.triggerLogoWrapper}>
-                                            {LEAGUE_LOGOS[formData.selectedLeague] ? (
-                                                <Image
-                                                    source={LEAGUE_LOGOS[formData.selectedLeague]}
-                                                    style={styles.triggerLeagueLogo}
-                                                    contentFit="contain"
-                                                />
-                                            ) : (
-                                                <Ionicons name="trophy" size={24} color={Colors.primary} />
-                                            )}
-                                        </View>
-                                        <View style={{ marginLeft: 12, flex: 1 }}>
-                                            <Text style={styles.triggerLeagueTitle} numberOfLines={1}>
-                                                {(formData.selectedLeague || 'LIGA TANLANG').toUpperCase()}
-                                            </Text>
-                                            <Text style={styles.triggerLeagueSubTitle} numberOfLines={1}>
-                                                {LEAGUE_OPTIONS.find(l => l.id === formData.selectedLeague)?.subLabel || 'Musobaqa ligasini tanlang'}
-                                            </Text>
-                                        </View>
+                            <>
+                                <View style={styles.card}>
+                                    <View style={styles.cardTitleRow}>
+                                        <Ionicons name="trophy" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+                                        <Text style={styles.cardTitle}>TURNIR (LIGA) TANLASH</Text>
                                     </View>
-
-                                    <View style={styles.triggerRightBadge}>
-                                        <Ionicons
-                                            name={isLeagueDropdownOpen ? "chevron-up" : "chevron-down"}
-                                            size={20}
-                                            color="#00FF66"
-                                        />
-                                    </View>
-                                </TouchableOpacity>
-
-                                {/* Animated Expandable Dropdown List */}
-                                <Animated.View style={[
-                                    styles.leagueDropdownContainer,
-                                    {
-                                        maxHeight: leagueAnimVal.interpolate({
-                                            inputRange: [0, 1],
-                                            outputRange: [0, 360]
-                                        }),
-                                        opacity: leagueAnimVal,
-                                        overflow: 'hidden',
-                                        marginTop: leagueAnimVal.interpolate({
-                                            inputRange: [0, 1],
-                                            outputRange: [0, 8]
-                                        })
-                                    }
-                                ]}>
-                                    {LEAGUE_OPTIONS.map((league) => {
-                                        const isSelected = formData.selectedLeague === league.id;
-                                        return (
-                                            <TouchableOpacity
-                                                key={league.id}
-                                                style={[styles.leagueOptionItem, isSelected && styles.leagueOptionItemActive]}
-                                                onPress={() => {
-                                                    handleLeagueSelect(league.id);
-                                                    setIsLeagueDropdownOpen(false);
-                                                }}
-                                                activeOpacity={0.7}
-                                            >
-                                                <BlurView intensity={isSelected ? 30 : 15} tint="dark" style={StyleSheet.absoluteFill} />
-                                                <View style={styles.leagueOptionLeft}>
-                                                    <View style={styles.optionLogoWrapper}>
-                                                        {LEAGUE_LOGOS[league.id] ? (
-                                                            <Image
-                                                                source={LEAGUE_LOGOS[league.id]}
-                                                                style={styles.optionLeagueLogo}
-                                                                contentFit="contain"
-                                                            />
-                                                        ) : (
-                                                            <Ionicons name="shield" size={20} color={Colors.primary} />
-                                                        )}
-                                                    </View>
-                                                    <View style={{ marginLeft: 12, flex: 1 }}>
-                                                        <Text style={[styles.optionLeagueTitle, isSelected && styles.optionLeagueTitleActive]}>
-                                                            {league.label.toUpperCase()}
-                                                        </Text>
-                                                        <Text style={styles.optionLeagueSubTitle}>
-                                                            {league.subLabel}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-
-                                                {isSelected && (
-                                                    <View style={styles.optionCheckBadge}>
-                                                        <Ionicons name="checkmark-circle" size={20} color="#00FF66" />
-                                                    </View>
+                                    
+                                    {/* Selected Trigger Button */}
+                                    <TouchableOpacity
+                                        style={styles.leagueSelectTrigger}
+                                        onPress={() => setIsLeagueDropdownOpen(prev => !prev)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                                        <View style={styles.leagueTriggerLeft}>
+                                            <View style={styles.triggerLogoWrapper}>
+                                                {LEAGUE_LOGOS[formData.selectedLeague] ? (
+                                                    <Image
+                                                        source={LEAGUE_LOGOS[formData.selectedLeague]}
+                                                        style={styles.triggerLeagueLogo}
+                                                        contentFit="contain"
+                                                    />
+                                                ) : (
+                                                    <Ionicons name="trophy" size={24} color={Colors.primary} />
                                                 )}
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </Animated.View>
-                            </View>
+                                            </View>
+                                            <View style={{ marginLeft: 12, flex: 1 }}>
+                                                <Text style={styles.triggerLeagueTitle} numberOfLines={1}>
+                                                    {(formData.selectedLeague || 'LIGA TANLANG').toUpperCase()}
+                                                </Text>
+                                                <Text style={styles.triggerLeagueSubTitle} numberOfLines={1}>
+                                                    {LEAGUE_OPTIONS.find(l => l.id === formData.selectedLeague)?.subLabel || 'Musobaqa ligasini tanlang'}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.triggerRightBadge}>
+                                            <Ionicons
+                                                name={isLeagueDropdownOpen ? "chevron-up" : "chevron-down"}
+                                                size={20}
+                                                color="#00FF66"
+                                            />
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    {/* Animated Expandable Dropdown List */}
+                                    <Animated.View style={[
+                                        styles.leagueDropdownContainer,
+                                        {
+                                            maxHeight: leagueAnimVal.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [0, 360]
+                                            }),
+                                            opacity: leagueAnimVal,
+                                            overflow: 'hidden',
+                                            marginTop: leagueAnimVal.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [0, 8]
+                                            })
+                                        }
+                                    ]}>
+                                        {LEAGUE_OPTIONS.map((league) => {
+                                            const isSelected = formData.selectedLeague === league.id;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={league.id}
+                                                    style={[styles.leagueOptionItem, isSelected && styles.leagueOptionItemActive]}
+                                                    onPress={() => {
+                                                        handleLeagueSelect(league.id);
+                                                        setIsLeagueDropdownOpen(false);
+                                                    }}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <BlurView intensity={isSelected ? 30 : 15} tint="dark" style={StyleSheet.absoluteFill} />
+                                                    <View style={styles.leagueOptionLeft}>
+                                                        <View style={styles.optionLogoWrapper}>
+                                                            {LEAGUE_LOGOS[league.id] ? (
+                                                                <Image
+                                                                    source={LEAGUE_LOGOS[league.id]}
+                                                                    style={styles.optionLeagueLogo}
+                                                                    contentFit="contain"
+                                                                />
+                                                            ) : (
+                                                                <Ionicons name="shield" size={20} color={Colors.primary} />
+                                                            )}
+                                                        </View>
+                                                        <View style={{ marginLeft: 12, flex: 1 }}>
+                                                            <Text style={[styles.optionLeagueTitle, isSelected && styles.optionLeagueTitleActive]}>
+                                                                {league.label.toUpperCase()}
+                                                            </Text>
+                                                            <Text style={styles.optionLeagueSubTitle}>
+                                                                {league.subLabel}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+
+                                                    {isSelected && (
+                                                        <View style={styles.optionCheckBadge}>
+                                                            <Ionicons name="checkmark-circle" size={20} color="#00FF66" />
+                                                        </View>
+                                                    )}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </Animated.View>
+                                </View>
+
+                                {/* TEAM SELECTION (FILTERED BY SELECTED LEAGUE) */}
+                                <View style={styles.card}>
+                                    <View style={styles.cardTitleRow}>
+                                        <Ionicons name="shield" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+                                        <Text style={styles.cardTitle}>JAMOA TANLASH (IXTIYORIY)</Text>
+                                    </View>
+                                    
+                                    {/* Selected Team Trigger */}
+                                    <TouchableOpacity
+                                        style={styles.leagueSelectTrigger}
+                                        onPress={() => setIsTeamDropdownOpen(prev => !prev)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                                        <View style={styles.leagueTriggerLeft}>
+                                            <View style={styles.triggerLogoWrapper}>
+                                                {getSelectedTeamObj()?.logo_url || getSelectedTeamObj()?.logo ? (
+                                                    <Image
+                                                        source={{ uri: getSelectedTeamObj()?.logo_url || getSelectedTeamObj()?.logo }}
+                                                        style={styles.triggerLeagueLogo}
+                                                        contentFit="contain"
+                                                    />
+                                                ) : (
+                                                    <Ionicons name="shield-outline" size={24} color={Colors.primary} />
+                                                )}
+                                            </View>
+                                            <View style={{ marginLeft: 12, flex: 1 }}>
+                                                <Text style={styles.triggerLeagueTitle} numberOfLines={1}>
+                                                    {(getSelectedTeamObj()?.name || 'JAMOANI TANLANG').toUpperCase()}
+                                                </Text>
+                                                <Text style={styles.triggerLeagueSubTitle} numberOfLines={1}>
+                                                    {getSelectedTeamObj() ? `${formData.selectedLeague} jamoasi` : 'O\'tmoqchi bo\'lgan jamoangizni tanlang'}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.triggerRightBadge}>
+                                            <Ionicons
+                                                name={isTeamDropdownOpen ? "chevron-up" : "chevron-down"}
+                                                size={20}
+                                                color="#00FF66"
+                                            />
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    {/* Animated Expandable Teams List */}
+                                    <Animated.View style={[
+                                        styles.leagueDropdownContainer,
+                                        {
+                                            maxHeight: teamAnimVal.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [0, 360]
+                                            }),
+                                            opacity: teamAnimVal,
+                                            overflow: 'hidden',
+                                            marginTop: teamAnimVal.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [0, 8]
+                                            })
+                                        }
+                                    ]}>
+                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 300 }}>
+                                            {loadingData ? (
+                                                <View style={{ padding: 20, alignItems: 'center' }}>
+                                                    <ActivityIndicator color={Colors.primary} />
+                                                    <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>Jamoalar yuklanmoqda...</Text>
+                                                </View>
+                                            ) : teams.length === 0 ? (
+                                                <View style={{ padding: 16, alignItems: 'center' }}>
+                                                    <Text style={{ color: '#888', fontSize: 13 }}>Ushbu ligada jamoalar topilmadi</Text>
+                                                </View>
+                                            ) : (
+                                                teams.map((team) => {
+                                                    const teamId = team.id || team._id;
+                                                    const isSelected = formData.selectedTeam === teamId;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={teamId}
+                                                            style={[styles.leagueOptionItem, isSelected && styles.leagueOptionItemActive]}
+                                                            onPress={() => {
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    selectedTeam: teamId,
+                                                                    teamName: team.name || ''
+                                                                }));
+                                                                setIsTeamDropdownOpen(false);
+                                                            }}
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <BlurView intensity={isSelected ? 30 : 15} tint="dark" style={StyleSheet.absoluteFill} />
+                                                            <View style={styles.leagueOptionLeft}>
+                                                                <View style={styles.optionLogoWrapper}>
+                                                                    {team.logo_url || team.logo ? (
+                                                                        <Image
+                                                                            source={{ uri: team.logo_url || team.logo }}
+                                                                            style={styles.optionLeagueLogo}
+                                                                            contentFit="contain"
+                                                                        />
+                                                                    ) : (
+                                                                        <Ionicons name="shield-outline" size={20} color={Colors.primary} />
+                                                                    )}
+                                                                </View>
+                                                                <View style={{ marginLeft: 12, flex: 1 }}>
+                                                                    <Text style={[styles.optionLeagueTitle, isSelected && styles.optionLeagueTitleActive]}>
+                                                                        {(team.name || 'Jamoa').toUpperCase()}
+                                                                    </Text>
+                                                                    <Text style={styles.optionLeagueSubTitle}>
+                                                                        {team.league || formData.selectedLeague}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+
+                                                            {isSelected && (
+                                                                <View style={styles.optionCheckBadge}>
+                                                                    <Ionicons name="checkmark-circle" size={20} color="#00FF66" />
+                                                                </View>
+                                                            )}
+                                                        </TouchableOpacity>
+                                                    );
+                                                })
+                                            )}
+                                        </ScrollView>
+                                    </Animated.View>
+                                </View>
+                            </>
                         )}
 
                         {/* MODE 1: YAKKAXON OYINCHI FORM */}
