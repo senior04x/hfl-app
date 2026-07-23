@@ -397,33 +397,97 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         }
 
         const renderPlayerItem = (player: any) => {
-            const pId = String(player._id || player.id);
+            const pId = String(player._id || player.id || '');
+            const pNameClean = `${player.firstName || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim().toLowerCase();
+
             const formPlayer = tacticsPlayers.find((tp: any) => String(tp.id) === pId);
             const displayNum = formPlayer?.number || player.number || player.player_number || player.shirt_number || '-';
+
+            // Filter match events for this player by ID or by Name
+            const events = match?.events || [];
+            const playerEvents = events.filter((e: any) => {
+                const evPlayerId = String(e.playerId || e.player_id || e.player?.id || e.player?._id || '');
+                if (evPlayerId && pId && evPlayerId === pId) return true;
+                const evName = String(e.playerName || e.player_name || '').trim().toLowerCase();
+                if (evName && pNameClean && (evName.includes(pNameClean) || pNameClean.includes(evName))) return true;
+                return false;
+            });
+
+            const goalsCount = playerEvents.filter((e: any) => {
+                const t = String(e.type || e.rawType || e.event_type || '').toLowerCase();
+                return t.includes('goal');
+            }).length;
+
+            const assistsCount = playerEvents.filter((e: any) => {
+                const t = String(e.type || e.rawType || e.event_type || '').toLowerCase();
+                return t.includes('assist');
+            }).length;
+
+            const yellowCount = playerEvents.filter((e: any) => {
+                const t = String(e.type || e.rawType || e.event_type || '').toLowerCase();
+                return t.includes('yellow');
+            }).length;
+
+            const redCount = playerEvents.filter((e: any) => {
+                const t = String(e.type || e.rawType || e.event_type || '').toLowerCase();
+                return t.includes('red');
+            }).length;
+
+            const photoUri = player.photo || player.photo_url || player.avatar;
 
             return (
                 <TouchableOpacity 
                     key={player._id || player.id} 
                     style={styles.playerCardCompact}
-                    onPress={() => navigation.navigate('PlayerStats', { player: player, playerId: player._id })}
+                    onPress={() => navigation.navigate('PlayerStats', { player: player, playerId: player._id || player.id })}
                 >
                     <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, width: '100%' }}>
                         <View style={styles.playerAvatarSmall}>
-                            {player.photo ? (
-                                <Image source={{ uri: player.photo }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                            {photoUri ? (
+                                <Image source={{ uri: photoUri }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                             ) : (
                                 <View style={styles.playerInitials}>
-                                    <Text style={styles.initialsText}>{player.firstName?.charAt(0)}</Text>
+                                    <Text style={styles.initialsText}>{(player.firstName || player.first_name || 'F').charAt(0)}</Text>
                                 </View>
                             )}
                         </View>
+                        
                         <View style={styles.playerInfoCompact}>
                             <Text style={styles.playerNameCompact} numberOfLines={1}>
-                                {(player.firstName + ' ' + (player.lastName || '')).toUpperCase()}
+                                {`${player.firstName || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim().toUpperCase()}
                             </Text>
                             <Text style={styles.playerNumberCompact}>#{displayNum} • {(player.positionUz || player.position || 'O\'YINCHI').toUpperCase()}</Text>
                         </View>
+
+                        {/* Match Event Badges (Goals, Assists, Yellow & Red Cards) */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 6 }}>
+                            {goalsCount > 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,255,102,0.12)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(0,255,102,0.3)' }}>
+                                    <Ionicons name="football" size={14} color="#00FF66" />
+                                    <Text style={{ color: '#00FF66', fontSize: 12, fontWeight: '700', marginLeft: 3 }}>x{goalsCount}</Text>
+                                </View>
+                            )}
+                            {assistsCount > 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(59,130,246,0.12)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)' }}>
+                                    <Ionicons name="footsteps" size={13} color="#3B82F6" />
+                                    <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: '700', marginLeft: 3 }}>x{assistsCount}</Text>
+                                </View>
+                            )}
+                            {yellowCount > 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(250,204,21,0.12)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(250,204,21,0.4)' }}>
+                                    <View style={{ width: 10, height: 14, backgroundColor: '#FACC15', borderRadius: 2, marginRight: 3 }} />
+                                    {yellowCount > 1 && <Text style={{ color: '#FACC15', fontSize: 12, fontWeight: '700' }}>x{yellowCount}</Text>}
+                                </View>
+                            )}
+                            {redCount > 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(239,68,68,0.12)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)' }}>
+                                    <View style={{ width: 10, height: 14, backgroundColor: '#EF4444', borderRadius: 2, marginRight: 3 }} />
+                                    {redCount > 1 && <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>x{redCount}</Text>}
+                                </View>
+                            )}
+                        </View>
+
                         <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
                     </View>
                 </TouchableOpacity>

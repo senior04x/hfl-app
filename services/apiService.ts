@@ -658,6 +658,7 @@ export const apiService = {
 
                 return {
                     id: e.id,
+                    playerId: e.player_id || e.player?.id || e.player?._id,
                     type: normalizedType,
                     rawType: e.event_type,
                     minute: e.minute || 0,
