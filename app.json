@@ -16,6 +16,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.amatora.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "splash": {
         "image": "./assets/images/splash-icon.png",
         "resizeMode": "contain",

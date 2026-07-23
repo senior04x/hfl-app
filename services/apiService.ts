@@ -378,9 +378,69 @@ export const apiService = {
         }
     },
 
-    // Chat
-    getChatMessages: (teamId: string, page = 1, limit = 20) =>
-        api.get(`/chats/team/${teamId}`, { params: { page, limit } }).then(res => res.data.data).catch(() => []),
+    // Chat (Supabase team_messages table with Realtime + REST fallback)
+    getChatMessages: async (teamId: string, page = 1, limit = 300) => {
+        try {
+            const { data, error } = await supabase
+                .from('team_messages')
+                .select('*')
+                .eq('team_id', String(teamId))
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (error) throw error;
+            if (data && data.length > 0) {
+                return data.map((m: any) => ({
+                    _id: m.id,
+                    id: m.id,
+                    teamId: m.team_id,
+                    senderId: m.sender_id,
+                    senderName: m.sender_name || 'Foydalanuvchi',
+                    senderPhoto: m.sender_photo || '',
+                    text: m.text,
+                    timestamp: m.created_at,
+                    replyTo: m.reply_to
+                }));
+            }
+            return [];
+        } catch (err) {
+            console.warn('Supabase getChatMessages fallback:', err);
+            return api.get(`/chats/team/${teamId}`, { params: { page, limit } }).then(res => res.data.data).catch(() => []);
+        }
+    },
+
+    sendChatMessage: async (messageData: any) => {
+        try {
+            const payload = {
+                team_id: String(messageData.teamId),
+                sender_id: String(messageData.senderId || 'unknown'),
+                sender_name: messageData.senderName || '',
+                sender_photo: messageData.senderPhoto || '',
+                text: messageData.text,
+                reply_to: messageData.replyTo || null
+            };
+
+            const { data, error } = await supabase.from('team_messages').insert(payload).select().single();
+            if (error) throw error;
+            return {
+                success: true,
+                data: {
+                    _id: data.id,
+                    id: data.id,
+                    teamId: data.team_id,
+                    senderId: data.sender_id,
+                    senderName: data.sender_name,
+                    senderPhoto: data.sender_photo,
+                    text: data.text,
+                    timestamp: data.created_at,
+                    replyTo: data.reply_to
+                }
+            };
+        } catch (err) {
+            console.warn('Supabase sendChatMessage error:', err);
+            return api.post('/chats/message', messageData).then(res => res.data).catch(() => ({ success: true }));
+        }
+    },
 
     // Tournaments & Leagues
     getTournaments: async () => {

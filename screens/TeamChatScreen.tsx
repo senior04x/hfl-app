@@ -27,7 +27,7 @@ import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocket } from '../context/SocketContext';
-import { apiService } from '../services/apiService';
+import { apiService, supabase } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 import ChatSkeleton from '../components/ChatSkeleton';
 import AnimatedBackground from '../components/AnimatedBackground';
@@ -179,6 +179,46 @@ const TeamChatScreen = ({ route, navigation }: any) => {
         if (socket && teamId && isConnected) {
             socket.emit('join-team', teamId);
         }
+
+        // Supabase Realtime Channel for instant team chat
+        const channel = supabase
+            .channel(`team_chat_${teamId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'team_messages',
+                    filter: `team_id=eq.${teamId}`
+                },
+                (payload) => {
+                    const m = payload.new;
+                    const newMsg = {
+                        _id: m.id,
+                        id: m.id,
+                        teamId: m.team_id,
+                        senderId: m.sender_id,
+                        senderName: m.sender_name || 'Foydalanuvchi',
+                        senderPhoto: m.sender_photo || '',
+                        text: m.text,
+                        timestamp: m.created_at,
+                        replyTo: m.reply_to
+                    };
+
+                    setMessages((prev) => {
+                        if (prev.some(old => old._id === newMsg._id || old.id === newMsg.id)) return prev;
+                        if (Platform.OS === 'ios') {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+                        }
+                        return [newMsg, ...prev];
+                    });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [teamId]);
 
     // Resync messages when socket reconnects (fixes offline gaps)
@@ -343,6 +383,9 @@ const TeamChatScreen = ({ route, navigation }: any) => {
             };
 
             setMessages((prev) => [messageData, ...prev]);
+
+            // Save to Supabase for persistent realtime team chat
+            apiService.sendChatMessage(messageData);
 
             if (socket && teamId) {
                 socket.emit('send-team-message', messageData);
