@@ -194,26 +194,21 @@ export default function WelcomeScreen({ navigation }: any) {
         try {
             setLoading(true);
             const fullPhone = `+998${phone.replace(/\D/g, '')}`;
-            const res = await apiService.requestOTP(fullPhone);
+            const res = await apiService.findAccountsByPhone(fullPhone);
 
-            if (res.success) {
-                setDeliveredVia(res.deliveredVia as any || 'bot_link');
-                if (res.otpCode) {
-                    setServerOtpCode(res.otpCode);
+            if (res.success && res.accounts) {
+                if (res.accounts.length > 1) {
+                    setAccountOptions(res.accounts);
+                    setShowAccountModal(true);
+                } else if (res.user) {
+                    Alert.alert('🎉 Muvaffaqiyatli!', `Xush kelibsiz, ${res.user.name || 'Foydalanuvchi'}!`);
+                    setAuth(res.user);
                 }
-                setLoginStep('otp');
-                startTimer();
             } else {
                 Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi.");
-                const mockUser = {
-                    id: 'test_' + phone.replace(/\D/g, ''),
-                    name: 'Test Foydalanuvchi',
-                    phone: fullPhone,
-                    role: 'player'
-                };
             }
         } catch (error: any) {
-            console.error('Send OTP error:', error);
+            console.error('Phone login error:', error);
             Alert.alert('Xato', 'Server bilan bog\'lanishda xatolik yuz berdi.');
         } finally {
             setLoading(false);
@@ -310,8 +305,8 @@ export default function WelcomeScreen({ navigation }: any) {
                                                         <ActivityIndicator color="#000" />
                                                     ) : (
                                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                            <Text style={styles.confirmButtonText}>KOD OLISH</Text>
-                                                            <Ionicons name="paper-plane" size={16} color="#000" style={{ marginLeft: 6 }} />
+                                                            <Text style={styles.confirmButtonText}>KIRISH</Text>
+                                                            <Ionicons name="arrow-forward" size={16} color="#000" style={{ marginLeft: 6 }} />
                                                         </View>
                                                     )}
                                                 </TouchableOpacity>

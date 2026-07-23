@@ -1015,6 +1015,75 @@ export const apiService = {
         }
     },
 
+    findAccountsByPhone: async (phone: string) => {
+        try {
+            const cleanPhone = phone.replace(/\D/g, '').slice(-9);
+            const accountsList: any[] = [];
+
+            // 1. Check Manager profile in teams table
+            const { data: teamData } = await supabase
+                .from('teams')
+                .select('*')
+                .or(`captain_phone.ilike.%${cleanPhone}%`);
+
+            if (teamData && teamData.length > 0) {
+                teamData.forEach((t: any) => {
+                    accountsList.push({
+                        ...t,
+                        _id: t.id,
+                        id: t.id,
+                        role: 'manager',
+                        teamId: t.id,
+                        phone: t.captain_phone || phone,
+                        name: t.name ? `${t.name} (Sardor)` : 'Jamoa Sardori',
+                        title: 'Jamoa Sardori / Menejer',
+                        subTitle: t.league || 'HFL Liga',
+                        photo: t.logo_url || t.logo || ''
+                    });
+                });
+            }
+
+            // 2. Check Player profiles in applications table
+            const { data: appData } = await supabase
+                .from('applications')
+                .select('*, teams(*)')
+                .or(`phone.ilike.%${cleanPhone}%`)
+                .order('created_at', { ascending: false });
+
+            if (appData && appData.length > 0) {
+                appData.forEach((app: any) => {
+                    const teamName = app.teams?.name || 'Yakkaxon o\'yinchi';
+                    accountsList.push({
+                        ...app,
+                        _id: app.id,
+                        id: app.id,
+                        role: 'player',
+                        teamId: app.team_id || app.teams?.id,
+                        phone: app.phone || phone,
+                        name: `${app.first_name || ''} ${app.last_name || ''}`.trim() || 'Futbolchi',
+                        title: `Futbolchi (${teamName})`,
+                        subTitle: `${app.position || 'O\'yinchi'} • ${teamName}`,
+                        photo: app.photo_url || app.photo || ''
+                    });
+                });
+            }
+
+            if (accountsList.length > 0) {
+                return {
+                    success: true,
+                    multipleAccounts: accountsList.length > 1,
+                    accounts: accountsList,
+                    user: accountsList[0]
+                };
+            }
+
+            return { success: false, reason: "Ushbu telefon raqamiga tegishli profil topilmadi. Iltimos, avval ariza topshiring!" };
+        } catch (error: any) {
+            console.error('findAccountsByPhone error:', error);
+            return { success: false, reason: "Profildan izlashda xatolik yuz berdi." };
+        }
+    },
+
     verifyOTP: async (phone: string, code: string, fallbackOtpCode?: string) => {
         try {
             const cleanPhone = phone.replace(/\D/g, '').slice(-9);
