@@ -33,30 +33,7 @@ export default function HomeScreen({ navigation }: any) {
 
     useEffect(() => {
         loadData();
-    }, []);
-
-    useEffect(() => {
-        if (user?.id) {
-            loadUserProfile();
-        } else {
-            setUserProfile(null);
-        }
     }, [user?.id]);
-
-    const loadUserProfile = async () => {
-        try {
-            if (user.role === 'player') {
-                const player = await apiService.getPlayerById(user.id);
-                if (player) setUserProfile(player);
-            } else if (user.role === 'manager') {
-                const teamId = user.teamId || user.team_id || user.id || user._id;
-                const team = await apiService.getTeamById(teamId);
-                if (team) setUserProfile(team);
-            }
-        } catch (e) {
-            console.error('Error loading profile in HomeScreen:', e);
-        }
-    };
 
     useEffect(() => {
         if (socket && isConnected) {
@@ -70,24 +47,45 @@ export default function HomeScreen({ navigation }: any) {
         }
     }, [socket, isConnected]);
 
+    const fetchUserProfileData = async () => {
+        if (!user?.id) return null;
+        try {
+            if (user.role === 'player') {
+                return await apiService.getPlayerById(user.id);
+            } else if (user.role === 'manager') {
+                const teamId = user.teamId || user.team_id || user.id || user._id;
+                return await apiService.getTeamById(teamId);
+            }
+        } catch (e) {
+            console.error('Error fetching profile in HomeScreen:', e);
+        }
+        return null;
+    };
+
     const loadData = async (isRefreshing = false) => {
         try {
             if (isRefreshing) setRefreshing(true);
             else setLoading(true);
             
-            // Parallelize matches and slider items fetching
-            const [matchesData, sliderData] = await Promise.all([
+            // Parallelize matches, slider items, and user profile fetching
+            const [matchesData, sliderData, profileData] = await Promise.all([
                 apiService.getMatches().catch(err => { console.error('Matches fetch err:', err); return []; }),
-                apiService.getSliderItems().catch(err => { console.error('Slider fetch err:', err); return []; })
+                apiService.getSliderItems().catch(err => { console.error('Slider fetch err:', err); return []; }),
+                fetchUserProfileData().catch(err => { console.error('Profile fetch err:', err); return null; })
             ]);
 
             if (matchesData && Array.isArray(matchesData)) {
-                // We'll sort specifically for each section in the derived state
                 setMatches(matchesData);
             }
 
             if (sliderData && Array.isArray(sliderData)) {
-                setSliderItems(sliderData.filter((item: any) => item.isActive));
+                setSliderItems(sliderData.filter((item: any) => item.isActive !== false));
+            }
+
+            if (profileData) {
+                setUserProfile(profileData);
+            } else if (!user?.id) {
+                setUserProfile(null);
             }
         } catch (error) {
             console.error('Error loading home data:', error);
