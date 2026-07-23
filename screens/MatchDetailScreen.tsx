@@ -174,7 +174,16 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     </View>
 
                     <View style={styles.teamsScoreRow}>
-                        <View style={styles.teamBlockRight}>
+                        <TouchableOpacity 
+                            style={styles.teamBlockRight}
+                            activeOpacity={0.7}
+                            onPress={() => {
+                                const hId = match?.homeTeamId || match?.home_team_id || match?.homeTeam?.id || match?.homeTeam?._id;
+                                if (hId) {
+                                    navigation.navigate('TeamProfile', { teamId: hId });
+                                }
+                            }}
+                        >
                             <Text style={styles.teamNameText} numberOfLines={1}>
                                 {(formatShortTeamName(match?.homeTeamName || match?.homeTeam?.name || 'JAMOA A', 12) || 'JAMOA A').toUpperCase()}
                             </Text>
@@ -187,13 +196,22 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                     fallbackIconSize={20}
                                 />
                             </View>
-                        </View>
+                        </TouchableOpacity>
 
                         <Text style={styles.scoreTextMain}>
                             {match?.score?.home ?? match?.home_score ?? match?.homeScore ?? 0}:{match?.score?.away ?? match?.away_score ?? match?.awayScore ?? 0}
                         </Text>
 
-                        <View style={styles.teamBlockLeft}>
+                        <TouchableOpacity 
+                            style={styles.teamBlockLeft}
+                            activeOpacity={0.7}
+                            onPress={() => {
+                                const aId = match?.awayTeamId || match?.away_team_id || match?.awayTeam?.id || match?.awayTeam?._id;
+                                if (aId) {
+                                    navigation.navigate('TeamProfile', { teamId: aId });
+                                }
+                            }}
+                        >
                             <View style={styles.logoCircle}>
                                 <SmartImage
                                     uri={match?.awayTeamLogo || match?.awayTeam?.logo || match?.away_team_logo || match?.away_team?.logo_url}
@@ -206,7 +224,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             <Text style={styles.teamNameText} numberOfLines={1}>
                                 {(formatShortTeamName(match?.awayTeamName || match?.awayTeam?.name || 'JAMOA B', 12) || 'JAMOA B').toUpperCase()}
                             </Text>
-                        </View>
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.locationRow}>
