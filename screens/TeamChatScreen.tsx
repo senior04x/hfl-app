@@ -788,34 +788,18 @@ const TeamChatScreen = ({ route, navigation }: any) => {
             <Modal
                 visible={showMembers}
                 animationType="slide"
-                transparent={false}
+                presentationStyle="fullScreen"
                 statusBarTranslucent={true}
-                onRequestClose={() => {
-                    setShowMembers(false);
-                    pan.setValue({ x: 0, y: 0 });
-                }}
+                onRequestClose={() => setShowMembers(false)}
             >
-                <Animated.View 
-                    style={[
-                        styles.modalOverlay, 
-                        StyleSheet.absoluteFill,
-                        { transform: [{ translateY: pan.y.interpolate({ inputRange: [-100, 0, height], outputRange: [0, 0, height], extrapolate: 'clamp' }) }] }
-                    ]}
-                >
+                <View style={{ flex: 1, backgroundColor: '#0a0f1d' }}>
                     <AnimatedBackground overlayOpacity={0.85} />
                     
                     <SafeAreaView style={{ flex: 1 }}>
-                        <View {...panResponder.panHandlers} style={{ paddingBottom: 10 }}>
-                            <View style={styles.dragHandleContainer}>
-                                <View style={styles.dragHandle} />
-                            </View>
-
+                        <View style={{ paddingBottom: 10 }}>
                             <TouchableOpacity 
                                 style={styles.closeButton} 
-                                onPress={() => {
-                                    setShowMembers(false);
-                                    pan.setValue({ x: 0, y: 0 });
-                                }}
+                                onPress={() => setShowMembers(false)}
                             >
                                 <Ionicons name="close" size={28} color="#FFF" />
                             </TouchableOpacity>
@@ -836,7 +820,6 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                     style={styles.memberItem}
                                     onPress={() => {
                                         setShowMembers(false);
-                                        pan.setValue({ x: 0, y: 0 });
                                         navigation.navigate('PlayerStats', { playerId: item._id });
                                     }}
                                 >
@@ -857,7 +840,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                             )}
                         />
                     </SafeAreaView>
-                </Animated.View>
+                </View>
             </Modal>
         </AnimatedBackground>
     );
