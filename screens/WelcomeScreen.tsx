@@ -455,10 +455,9 @@ export default function WelcomeScreen({ navigation }: any) {
                                                 />
                                             )}
                                         </View>
-                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <View style={{ flex: 1, marginLeft: 12, justifyContent: 'center' }}>
                                             <Text style={styles.accountOptionName}>{acc.name}</Text>
-                                            <Text style={styles.accountOptionTitle}>{acc.title}</Text>
-                                            <Text style={styles.accountOptionSubtitle}>{acc.subTitle}</Text>
+                                            {!!acc.subTitle && <Text style={styles.accountOptionSubtitle}>{acc.subTitle}</Text>}
                                         </View>
                                         <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
                                     </TouchableOpacity>

@@ -1035,9 +1035,9 @@ export const apiService = {
                         role: 'manager',
                         teamId: t.id,
                         phone: t.captain_phone || phone,
-                        name: t.name ? `${t.name} (Sardor)` : 'Jamoa Sardori',
-                        title: 'Jamoa Sardori / Menejer',
-                        subTitle: t.league || 'HFL Liga',
+                        name: t.name || 'Jamoa',
+                        title: t.name || 'Jamoa',
+                        subTitle: t.league || '',
                         photo: t.logo_url || t.logo || ''
                     });
                 });
@@ -1052,7 +1052,7 @@ export const apiService = {
 
             if (appData && appData.length > 0) {
                 appData.forEach((app: any) => {
-                    const teamName = app.teams?.name || 'Yakkaxon o\'yinchi';
+                    const fullName = `${app.first_name || ''} ${app.last_name || ''}`.trim() || 'Futbolchi';
                     accountsList.push({
                         ...app,
                         _id: app.id,
@@ -1060,9 +1060,9 @@ export const apiService = {
                         role: 'player',
                         teamId: app.team_id || app.teams?.id,
                         phone: app.phone || phone,
-                        name: `${app.first_name || ''} ${app.last_name || ''}`.trim() || 'Futbolchi',
-                        title: `Futbolchi (${teamName})`,
-                        subTitle: `${app.position || 'O\'yinchi'} • ${teamName}`,
+                        name: fullName,
+                        title: fullName,
+                        subTitle: app.teams?.name || '',
                         photo: app.photo_url || app.photo || ''
                     });
                 });
