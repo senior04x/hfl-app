@@ -966,6 +966,55 @@ export const apiService = {
         }
     },
 
+    // Photo Upload (Supabase Storage + Base64 Fallback for Web Admin)
+    uploadPhoto: async (uri: string) => {
+        try {
+            if (!uri) return { url: '' };
+            if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:image')) {
+                return { url: uri };
+            }
+
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            
+            const fileExt = uri.split('.').pop()?.split('?')[0] || 'jpg';
+            const fileName = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `uploads/${fileName}`;
+
+            // Try uploading to Supabase Storage bucket 'photos'
+            try {
+                const { data, error } = await supabase.storage.from('photos').upload(filePath, blob, {
+                    contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+                    upsert: true
+                });
+
+                if (!error && data) {
+                    const { data: publicUrlData } = supabase.storage.from('photos').getPublicUrl(filePath);
+                    if (publicUrlData?.publicUrl) {
+                        return { url: publicUrlData.publicUrl };
+                    }
+                }
+            } catch (sErr) {
+                console.warn('Storage upload error:', sErr);
+            }
+
+            // Fallback to Base64 (100% visible on web admin panel & mobile app)
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve({ url: reader.result as string });
+                };
+                reader.onerror = () => {
+                    resolve({ url: uri });
+                };
+                reader.readAsDataURL(blob);
+            });
+        } catch (err) {
+            console.error('uploadPhoto error:', err);
+            return { url: uri };
+        }
+    },
+
     // Notifications
     registerPushToken: (data: { token: string, userId: string, platform: string, deviceId?: string }) =>
         api.post('/notifications/register', data).then(res => res.data).catch(() => ({ success: true })),
