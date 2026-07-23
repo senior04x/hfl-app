@@ -206,7 +206,30 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                     };
 
                     setMessages((prev) => {
+                        // 1. Exact ID match check
                         if (prev.some(old => old._id === newMsg._id || old.id === newMsg.id)) return prev;
+
+                        // 2. Replace optimistic temp message sent by current user
+                        const currentUserId = String(user?._id || user?.id || '');
+                        const isMyMessage = String(newMsg.senderId) === currentUserId;
+                        if (isMyMessage) {
+                            const tempIndex = prev.findIndex(old => 
+                                (old._id && String(old._id).startsWith('temp-')) || 
+                                (old.localId && String(old.localId).startsWith('local-')) ||
+                                (old.text === newMsg.text && String(old.senderId) === currentUserId)
+                            );
+                            if (tempIndex !== -1) {
+                                return prev.map((old, idx) => idx === tempIndex ? { ...newMsg, localId: old.localId } : old);
+                            }
+                        }
+
+                        // 3. Deduplicate recent message with same text & senderId
+                        const isDuplicateRecent = prev.some(old => 
+                            old.text === newMsg.text && 
+                            String(old.senderId) === String(newMsg.senderId)
+                        );
+                        if (isDuplicateRecent) return prev;
+
                         if (Platform.OS === 'ios') {
                             LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
                         }
@@ -219,14 +242,13 @@ const TeamChatScreen = ({ route, navigation }: any) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [teamId]);
+    }, [teamId, user?._id, user?.id]);
 
     // Resync messages when socket reconnects (fixes offline gaps)
     const prevConnectedRef = useRef(isConnected);
     const isFetchingGapRef = useRef(false);
     useEffect(() => {
         if (!prevConnectedRef.current && isConnected) {
-            // SAFE FIX: Prevent duplicate rapid fetch calls on network flutter using a simple ref guard
             if (!isFetchingGapRef.current) {
                 isFetchingGapRef.current = true;
                 console.log('🔄 Socket reconnected, fetching missed messages gap safely...');
@@ -242,18 +264,24 @@ const TeamChatScreen = ({ route, navigation }: any) => {
         if (socket && teamId) {
             const messageHandler = (message: any) => {
                 setMessages((prev) => {
+                    if (prev.some(m => m._id === message._id || m.id === message._id)) return prev;
+
                     const isMyMessage = String(message.senderId) === String(user?._id || user?.id);
-                    
                     if (isMyMessage) {
-                        const tempIndex = prev.findIndex(m => (m.localId && m.localId === message.localId) || (m._id?.startsWith('temp-') && m.text === message.text));
+                        const tempIndex = prev.findIndex(m => 
+                            (m.localId && m.localId === message.localId) || 
+                            (m._id?.startsWith('temp-') && m.text === message.text)
+                        );
                         if (tempIndex !== -1) {
                             return prev.map((m, i) => i === tempIndex ? { ...message, localId: m.localId } : m);
                         }
                     }
 
-                    if (prev.some(m => m._id === message._id)) return prev;
+                    const isDuplicateText = prev.some(m => 
+                        m.text === message.text && String(m.senderId) === String(message.senderId)
+                    );
+                    if (isDuplicateText) return prev;
 
-                    // Smooth animation (Only for non-my messages or if not found)
                     if (Platform.OS === 'ios') {
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
                     }
