@@ -627,9 +627,9 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                     >
                         <Text style={styles.headerTitle} numberOfLines={1}>{(teamInfo?.name || 'JAMOA CHATI').toUpperCase()}</Text>
                         <View style={styles.statusBadge}>
-                            <View style={[styles.statusDot, { backgroundColor: isConnected ? Colors.primary : Colors.danger }]} />
-                            <Text style={[styles.headerStatus, { color: isConnected ? Colors.primary : Colors.danger }]}>
-                                {isConnected ? 'ONLINE' : 'ULANILMOQDA...'}
+                            <View style={[styles.statusDot, { backgroundColor: Colors.primary }]} />
+                            <Text style={[styles.headerStatus, { color: Colors.primary }]}>
+                                {teamPlayers.length > 0 ? `${teamPlayers.length} TA A'ZO` : 'ONLAYN'}
                             </Text>
                         </View>
                     </TouchableOpacity>
