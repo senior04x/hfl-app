@@ -164,9 +164,10 @@ export default function AccountScreen({ navigation }: any) {
                                             const lName = detailedData?.lastName || user?.lastName || '';
                                             displayName = `${fName} ${lName}`.trim() || 'O\'YINCHI';
                                         } else if (isManager) {
-                                            const managerName = (user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : null) || user?.name || detailedData?.managerName;
-                                            displayName = managerName || detailedData?.name || detailedData?.team_name || user?.teamName || 'MURABBIY';
+                                            const rawName = detailedData?.name || detailedData?.team_name || user?.teamName || user?.name || (user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'JAMOA');
+                                            displayName = rawName || 'JAMOA';
                                         }
+                                        displayName = displayName.replace(/\(sardor\)/gi, '').replace(/\(menejer\)/gi, '').trim();
 
                                         let displaySubtitle = 'AMATORA AZ\'OSI';
                                         if (isGuest) {
@@ -174,7 +175,7 @@ export default function AccountScreen({ navigation }: any) {
                                         } else if (isPlayer) {
                                             displaySubtitle = getPositionFullUz(detailedData?.position || user?.position || 'O\'YINCHI').toUpperCase();
                                         } else if (isManager) {
-                                            displaySubtitle = 'JAMOASI';
+                                            displaySubtitle = (detailedData?.league || user?.league || 'JAMOA SARDORI').toUpperCase();
                                         }
 
                                         return (
