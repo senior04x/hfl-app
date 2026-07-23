@@ -80,18 +80,23 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
         : items;
 
     useEffect(() => {
-        loadSliderItems();
-    }, []);
+        if (initialItems && initialItems.length > 0) {
+            setItems(initialItems);
+            setLoading(false);
+        } else {
+            loadSliderItems();
+        }
+    }, [initialItems]);
 
     useEffect(() => {
         if (externalLoading !== undefined) {
-            setLoading(externalLoading);
+            setLoading(externalLoading && items.length === 0);
         }
-    }, [externalLoading]);
+    }, [externalLoading, items.length]);
 
     const loadSliderItems = async () => {
         try {
-            setLoading(true);
+            if (items.length === 0) setLoading(true);
             const data = await apiService.getSliderItems();
             if (data && Array.isArray(data) && data.length > 0) {
                 setItems(data);
