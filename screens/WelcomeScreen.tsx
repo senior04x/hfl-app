@@ -201,7 +201,6 @@ export default function WelcomeScreen({ navigation }: any) {
                     setAccountOptions(res.accounts);
                     setShowAccountModal(true);
                 } else if (res.user) {
-                    Alert.alert('🎉 Muvaffaqiyatli!', `Xush kelibsiz, ${res.user.name || 'Foydalanuvchi'}!`);
                     setAuth(res.user);
                 }
             } else {
@@ -231,7 +230,6 @@ export default function WelcomeScreen({ navigation }: any) {
                     setAccountOptions(res.accounts);
                     setShowAccountModal(true);
                 } else if (res.user) {
-                    Alert.alert('🎉 Muvaffaqiyatli!', `Xush kelibsiz, ${res.user.name || 'Foydalanuvchi'}!`);
                     setAuth(res.user);
                 }
             } else {
@@ -439,7 +437,6 @@ export default function WelcomeScreen({ navigation }: any) {
                                         activeOpacity={0.8}
                                         onPress={() => {
                                             setShowAccountModal(false);
-                                            Alert.alert('🎉 Muvaffaqiyatli!', `Xush kelibsiz, ${acc.name || 'Foydalanuvchi'}!`);
                                             setAuth(acc);
                                         }}
                                     >
