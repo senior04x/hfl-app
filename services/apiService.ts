@@ -197,7 +197,7 @@ export const apiService = {
         }
     },
 
-    // Teams (Direct from Supabase 'teams' table)
+    // Teams (Direct from Supabase 'teams' table with Standings calculation)
     getTeams: async (page = 1, limit = 100, leagueName?: string) => {
         try {
             let query = supabase.from('teams').select('*').order('name');
@@ -213,9 +213,71 @@ export const apiService = {
                     query = query.ilike('league', `%${keyword}%`);
                 }
             }
-            const { data, error } = await query;
+            const { data: rawTeams, error } = await query;
             if (error) throw error;
-            return data || [];
+            if (!rawTeams) return [];
+
+            // Fetch finished matches to compute points dynamically
+            const { data: finishedMatches } = await supabase
+                .from('matches')
+                .select('*')
+                .eq('status', 'finished');
+
+            const matchesList = finishedMatches || [];
+
+            const teamsWithStats = rawTeams.map((t: any) => {
+                let points = parseInt(t.penalty_points || 0);
+                let played = 0;
+                let won = 0;
+                let drawn = 0;
+                let lost = 0;
+                let gf = 0;
+                let ga = 0;
+
+                matchesList.forEach((m: any) => {
+                    const isHome = String(m.home_team_id) === String(t.id);
+                    const isAway = String(m.away_team_id) === String(t.id);
+
+                    if (isHome || isAway) {
+                        const myScore = parseInt(isHome ? (m.home_score || 0) : (m.away_score || 0));
+                        const oppScore = parseInt(isHome ? (m.away_score || 0) : (m.home_score || 0));
+
+                        played += 1;
+                        gf += myScore;
+                        ga += oppScore;
+
+                        if (myScore > oppScore) {
+                            won += 1;
+                            points += 3;
+                        } else if (myScore === oppScore) {
+                            drawn += 1;
+                            points += 1;
+                        } else {
+                            lost += 1;
+                        }
+                    }
+                });
+
+                return {
+                    ...t,
+                    _id: t.id,
+                    logo: t.logo_url || t.logo || '',
+                    logo_url: t.logo_url || t.logo || '',
+                    points: points,
+                    stats: {
+                        points,
+                        played,
+                        won,
+                        drawn,
+                        lost,
+                        goalsFor: gf,
+                        goalsAgainst: ga,
+                        goalDifference: gf - ga
+                    }
+                };
+            });
+
+            return teamsWithStats;
         } catch (error) {
             console.warn('Supabase getTeams fallback:', error);
             const res = await api.get(`/teams?page=${page}&limit=${limit}`).catch(() => ({ data: { data: [] } }));
@@ -235,11 +297,69 @@ export const apiService = {
                 } catch (e) {}
             }
 
+            // Calculate points & stats dynamically from finished matches
+            let points = parseInt(data?.penalty_points || 0);
+            let played = 0;
+            let won = 0;
+            let drawn = 0;
+            let lost = 0;
+            let gf = 0;
+            let ga = 0;
+
+            try {
+                const { data: homeMatches } = await supabase
+                    .from('matches')
+                    .select('*')
+                    .eq('home_team_id', id)
+                    .eq('status', 'finished');
+
+                const { data: awayMatches } = await supabase
+                    .from('matches')
+                    .select('*')
+                    .eq('away_team_id', id)
+                    .eq('status', 'finished');
+
+                const allFinished = [...(homeMatches || []), ...(awayMatches || [])];
+
+                allFinished.forEach((m: any) => {
+                    const isHome = String(m.home_team_id) === String(id);
+                    const myScore = parseInt(isHome ? (m.home_score || 0) : (m.away_score || 0));
+                    const oppScore = parseInt(isHome ? (m.away_score || 0) : (m.home_score || 0));
+
+                    played += 1;
+                    gf += myScore;
+                    ga += oppScore;
+
+                    if (myScore > oppScore) {
+                        won += 1;
+                        points += 3;
+                    } else if (myScore === oppScore) {
+                        drawn += 1;
+                        points += 1;
+                    } else {
+                        lost += 1;
+                    }
+                });
+            } catch (calcErr) {
+                console.warn('Team stats calculation error:', calcErr);
+            }
+
             return {
                 ...data,
                 _id: data.id,
                 logo: data.logo_url || data.logo || '',
                 logo_url: data.logo_url || data.logo || '',
+                points: points,
+                stats: {
+                    points,
+                    played,
+                    won,
+                    drawn,
+                    lost,
+                    goalsFor: gf,
+                    goalsAgainst: ga,
+                    goalDifference: gf - ga
+                },
                 formation: parsedFormation || { players: [] }
             };
         } catch (err) {
