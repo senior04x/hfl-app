@@ -1021,58 +1021,76 @@ export const apiService = {
             const inputCode = code.trim();
 
             let isValid = false;
+            const accountsList: any[] = [];
 
-            // 1. Fetch user profile first
-            let userProfile: any = null;
-            let role = 'player';
-
+            // 1. Check Manager profile in teams table
             const { data: teamData } = await supabase
                 .from('teams')
                 .select('*')
-                .or(`captain_phone.ilike.%${cleanPhone}%`)
-                .limit(1);
+                .or(`captain_phone.ilike.%${cleanPhone}%`);
 
             if (teamData && teamData.length > 0) {
-                userProfile = teamData[0];
-                role = 'manager';
-            } else {
-                const { data: appData } = await supabase
-                    .from('applications')
-                    .select('*, teams(*)')
-                    .or(`phone.ilike.%${cleanPhone}%`)
-                    .order('created_at', { ascending: false })
-                    .limit(1);
+                teamData.forEach((t: any) => {
+                    accountsList.push({
+                        ...t,
+                        _id: t.id,
+                        id: t.id,
+                        role: 'manager',
+                        teamId: t.id,
+                        phone: t.captain_phone || phone,
+                        name: t.name ? `${t.name} (Sardor)` : 'Jamoa Sardori',
+                        title: 'Jamoa Sardori / Menejer',
+                        subTitle: t.league || 'HFL Liga',
+                        photo: t.logo_url || t.logo || '',
+                        storedOtp: t.telegram_message_id
+                    });
+                });
+            }
 
-                if (appData && appData.length > 0) {
-                    userProfile = appData[0];
-                    role = 'player';
+            // 2. Check Player profiles in applications table
+            const { data: appData } = await supabase
+                .from('applications')
+                .select('*, teams(*)')
+                .or(`phone.ilike.%${cleanPhone}%`)
+                .order('created_at', { ascending: false });
+
+            if (appData && appData.length > 0) {
+                appData.forEach((app: any) => {
+                    const teamName = app.teams?.name || 'Yakkaxon o\'yinchi';
+                    accountsList.push({
+                        ...app,
+                        _id: app.id,
+                        id: app.id,
+                        role: 'player',
+                        teamId: app.team_id || app.teams?.id,
+                        phone: app.phone || phone,
+                        name: `${app.first_name || ''} ${app.last_name || ''}`.trim() || 'Futbolchi',
+                        title: `Futbolchi (${teamName})`,
+                        subTitle: `${app.position || 'O\'yinchi'} • ${teamName}`,
+                        photo: app.photo_url || app.photo || '',
+                        storedOtp: app.telegram_message_id
+                    });
+                });
+            }
+
+            // 3. Validate OTP code
+            if (accountsList.length > 0) {
+                const hasValidStoredOtp = accountsList.some(acc => acc.storedOtp === `OTP_${inputCode}`);
+                if (fallbackOtpCode && inputCode === fallbackOtpCode.trim()) {
+                    isValid = true;
+                } else if (hasValidStoredOtp) {
+                    isValid = true;
+                } else if (inputCode.length === 6) {
+                    isValid = true;
                 }
             }
 
-            // 2. Validate OTP code
-            if (fallbackOtpCode && inputCode === fallbackOtpCode.trim()) {
-                isValid = true;
-            } else if (userProfile && userProfile.telegram_message_id === `OTP_${inputCode}`) {
-                isValid = true;
-            } else if (userProfile && inputCode.length === 6) {
-                // If code matches fallback or stored code or 6 digits for user matching cleanPhone
-                isValid = true;
-            }
-
-            if (isValid && userProfile) {
-                const teamId = role === 'manager' 
-                    ? (userProfile.id || userProfile._id) 
-                    : (userProfile.team_id || userProfile.teams?.id || userProfile.teamId);
-
+            if (isValid && accountsList.length > 0) {
                 return {
                     success: true,
-                    user: {
-                        ...userProfile,
-                        role,
-                        teamId,
-                        phone: userProfile.phone || userProfile.captain_phone,
-                        name: userProfile.name || `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim()
-                    }
+                    multipleAccounts: accountsList.length > 1,
+                    accounts: accountsList,
+                    user: accountsList[0]
                 };
             }
 
@@ -1080,7 +1098,7 @@ export const apiService = {
                 return { success: false, reason: "Kiritilgan tasdiqlash kodi noto'g'ri yoki muddati o'tgan!" };
             }
 
-            return { success: false, reason: "Foydalanuvchi profili topilmadi." };
+            return { success: false, reason: "Ushbu raqamga tegishli profil topilmadi." };
         } catch (error: any) {
             console.error('verifyOTP error:', error);
             return { success: false, reason: "Kodni tekshirishda xatolik yuz berdi." };

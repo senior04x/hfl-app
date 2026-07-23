@@ -118,6 +118,10 @@ export default function WelcomeScreen({ navigation }: any) {
     const [serverOtpCode, setServerOtpCode] = useState('');
     const [deliveredVia, setDeliveredVia] = useState<'telegram' | 'bot_link'>('bot_link');
     
+    // Account Selection Modal State
+    const [accountOptions, setAccountOptions] = useState<any[]>([]);
+    const [showAccountModal, setShowAccountModal] = useState(false);
+
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
     const [loading, setLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(60);
@@ -182,29 +186,30 @@ export default function WelcomeScreen({ navigation }: any) {
 
     const handleSendOTP = async () => {
         if (phone.length < 9) {
-            Alert.alert('Xato', 'Iltimos, telefon raqamini to\'liq kiriting.');
+            Alert.alert('Xato', 'Iltimos, 9 xonali telefon raqamingizni kiriting.');
             return;
         }
 
         try {
             setLoading(true);
             const fullPhone = `+998${phone.replace(/\D/g, '')}`;
-            
-            // DIRECT LOGIN BYPASS FOR TESTING
-            const res = await apiService.verifyOTP(fullPhone, '123456', '123456');
+            const res = await apiService.requestOTP(fullPhone);
 
-            if (res.success && res.user) {
-                Alert.alert('🎉 Test Kirish!', `Xush kelibsiz, ${res.user.name || 'Foydalanuvchi'}!`);
-                setAuth(res.user);
+            if (res.success) {
+                setDeliveredVia(res.deliveredVia as any || 'bot_link');
+                if (res.otpCode) {
+                    setServerOtpCode(res.otpCode);
+                }
+                setLoginStep('otp');
+                startTimer();
             } else {
+                Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi.");
                 const mockUser = {
                     id: 'test_' + phone.replace(/\D/g, ''),
                     name: 'Test Foydalanuvchi',
                     phone: fullPhone,
                     role: 'player'
                 };
-                Alert.alert('🎉 Test Kirish!', `Telefon: ${fullPhone}`);
-                setAuth(mockUser);
             }
         } catch (error: any) {
             console.error('Send OTP error:', error);
@@ -225,9 +230,14 @@ export default function WelcomeScreen({ navigation }: any) {
             const fullPhone = `+998${phone.replace(/\D/g, '')}`;
             const res = await apiService.verifyOTP(fullPhone, otpCode, serverOtpCode);
 
-            if (res.success && res.user) {
-                Alert.alert('🎉 Muvaffaqiyatli!', `Xush kelibsiz, ${res.user.name || 'Foydalanuvchi'}!`);
-                setAuth(res.user);
+            if (res.success) {
+                if (res.multipleAccounts && res.accounts && res.accounts.length > 1) {
+                    setAccountOptions(res.accounts);
+                    setShowAccountModal(true);
+                } else if (res.user) {
+                    Alert.alert('🎉 Muvaffaqiyatli!', `Xush kelibsiz, ${res.user.name || 'Foydalanuvchi'}!`);
+                    setAuth(res.user);
+                }
             } else {
                 Alert.alert('Xato', res.reason || "Tasdiqlash kodi noto'g'ri.");
             }
@@ -405,6 +415,65 @@ export default function WelcomeScreen({ navigation }: any) {
                     </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
+
+            {/* Account Selection Modal */}
+            <Modal
+                visible={showAccountModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowAccountModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.accountModalCard}>
+                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={{ padding: 20 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                <Ionicons name="people" size={24} color={Colors.primary} style={{ marginRight: 8 }} />
+                                <Text style={styles.accountModalTitle}>AKKOUNTNI TANLANG</Text>
+                            </View>
+                            <Text style={styles.accountModalSubtitle}>
+                                Ushbu telefon raqamiga bir nechta profil bog'langan. Qaysi profil sifatida kirmoqchisiz?
+                            </Text>
+
+                            <ScrollView style={{ maxHeight: 280, marginVertical: 14 }}>
+                                {accountOptions.map((acc, index) => (
+                                    <TouchableOpacity
+                                        key={acc.id || acc._id || index}
+                                        style={styles.accountOptionCard}
+                                        activeOpacity={0.8}
+                                        onPress={() => {
+                                            setShowAccountModal(false);
+                                            Alert.alert('🎉 Muvaffaqiyatli!', `Xush kelibsiz, ${acc.name || 'Foydalanuvchi'}!`);
+                                            setAuth(acc);
+                                        }}
+                                    >
+                                        <View style={styles.accountOptionIcon}>
+                                            <Ionicons
+                                                name={acc.role === 'manager' ? 'shield-half' : 'football'}
+                                                size={24}
+                                                color={Colors.primary}
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={styles.accountOptionName}>{acc.name}</Text>
+                                            <Text style={styles.accountOptionTitle}>{acc.title}</Text>
+                                            <Text style={styles.accountOptionSubtitle}>{acc.subTitle}</Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            <TouchableOpacity
+                                style={styles.cancelModalBtn}
+                                onPress={() => setShowAccountModal(false)}
+                            >
+                                <Text style={styles.cancelModalBtnText}>BEKOR QILISH</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </AnimatedBackground>
     );
 }
@@ -595,6 +664,84 @@ const styles = StyleSheet.create({
         color: 'rgba(255, 255, 255, 0.6)',
         fontSize: 12,
         fontWeight: '700',
+        letterSpacing: 1,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    accountModalCard: {
+        width: '100%',
+        maxWidth: 400,
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        backgroundColor: '#121212',
+    },
+    accountModalTitle: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#FFF',
+        letterSpacing: 1,
+    },
+    accountModalSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.6)',
+        marginTop: 4,
+        lineHeight: 18,
+    },
+    accountOptionCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        padding: 14,
+        borderRadius: 16,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    accountOptionIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.3)',
+    },
+    accountOptionName: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#FFF',
+    },
+    accountOptionTitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: Colors.primary,
+        marginTop: 2,
+    },
+    accountOptionSubtitle: {
+        fontSize: 11,
+        color: 'rgba(255, 255, 255, 0.5)',
+        marginTop: 2,
+    },
+    cancelModalBtn: {
+        height: 44,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    cancelModalBtnText: {
+        color: '#FFF',
+        fontWeight: '800',
+        fontSize: 13,
         letterSpacing: 1,
     },
 });
