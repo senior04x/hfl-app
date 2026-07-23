@@ -12,8 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import { News } from '../types';
@@ -57,20 +58,13 @@ export default function NewsDetailScreen({ route, navigation }: any) {
 
     if (isLoading) {
         return (
-            <View style={styles.loadingContainer}>
-                <StatusBar barStyle="light-content" />
-                <Video
-                    source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                    style={StyleSheet.absoluteFill}
-                    resizeMode={ResizeMode.COVER}
-                    shouldPlay
-                    isLooping
-                    isMuted
-                />
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)' }]} />
-                <Ionicons name="newspaper-outline" size={60} color={Colors.primary} />
-                <Text style={styles.loadingText}>YANGILIK YUKLANMOQDA...</Text>
-            </View>
+            <AnimatedBackground overlayOpacity={0.8} backgroundImage={backgroundImage}>
+                <View style={styles.loadingContainer}>
+                    <StatusBar barStyle="light-content" />
+                    <Ionicons name="newspaper-outline" size={60} color={Colors.primary} />
+                    <Text style={styles.loadingText}>YANGILIK YUKLANMOQDA...</Text>
+                </View>
+            </AnimatedBackground>
         );
     }
 
@@ -86,18 +80,8 @@ export default function NewsDetailScreen({ route, navigation }: any) {
     }
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <AnimatedBackground overlayOpacity={0.85} backgroundImage={backgroundImage}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-            <Video
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                style={StyleSheet.absoluteFill}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isLooping
-                isMuted
-                useNativeControls={false}
-            />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.85)' }]} />
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
                 <View style={styles.imageContainer}>
@@ -156,7 +140,7 @@ export default function NewsDetailScreen({ route, navigation }: any) {
                     </View>
                 </View>
             </ScrollView>
-        </View>
+        </AnimatedBackground>
     );
 }
 

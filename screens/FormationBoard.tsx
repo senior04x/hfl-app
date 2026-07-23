@@ -12,8 +12,9 @@ import {
     ScrollView,
     FlatList,
 } from 'react-native';
-import { apiService } from '../services/apiService';
+import { apiService, supabase } from '../services/apiService';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { 
     PanGestureHandler, 
     GestureHandlerRootView,
@@ -26,6 +27,7 @@ import Animated, {
     runOnJS,
 } from 'react-native-reanimated';
 import { useSocket } from '../context/SocketContext';
+import { useAuthStore } from '../store/useAuthStore';
 import Colors from '../constants/Colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -41,7 +43,10 @@ interface PlayerPosition {
 }
 
 const FormationBoard = ({ route, navigation }: any) => {
-    const { teamId, isReadOnly = false } = route.params || {};
+    const { teamId } = route.params || {};
+    const { user } = useAuthStore();
+    const isReadOnly = route.params?.isReadOnly || user?.role === 'player';
+
     const [loading, setLoading] = useState(true);
     const [playersOnPitch, setPlayersOnPitch] = useState<PlayerPosition[]>([]);
     const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
@@ -51,9 +56,10 @@ const FormationBoard = ({ route, navigation }: any) => {
     useEffect(() => {
         fetchData();
         
-        if (socket) {
+        if (socket && (teamId || user?.teamId)) {
+            const activeTeamId = teamId || user?.teamId;
             socket.on('formation-updated', (data: any) => {
-                if (data.teamId === teamId) {
+                if (data.teamId === activeTeamId) {
                     setPlayersOnPitch(data.formation.players);
                 }
             });
@@ -61,19 +67,53 @@ const FormationBoard = ({ route, navigation }: any) => {
                 socket.off('formation-updated');
             };
         }
-    }, [teamId, socket]);
+    }, [teamId, user, socket]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [team, teamPlayers] = await Promise.all([
-                apiService.getTeamById(teamId),
-                apiService.getPlayersByTeam(teamId)
-            ]);
+            let targetTeamId = teamId || user?.team_id || user?.teamId;
+
+            if (!targetTeamId && user) {
+                const phoneVal = user.phone || user.captain_phone;
+                if (phoneVal) {
+                    const cleanPhone = String(phoneVal).replace(/\D/g, '').slice(-9);
+                    const { data: teamRow } = await supabase
+                        .from('teams')
+                        .select('id')
+                        .ilike('captain_phone', `%${cleanPhone}%`)
+                        .limit(1);
+
+                    if (teamRow && teamRow.length > 0) {
+                        targetTeamId = teamRow[0].id;
+                    } else {
+                        const { data: appRow } = await supabase
+                            .from('applications')
+                            .select('team_id')
+                            .ilike('phone', `%${cleanPhone}%`)
+                            .limit(1);
+                        if (appRow && appRow.length > 0) {
+                            targetTeamId = appRow[0].team_id;
+                        }
+                    }
+                }
+            }
+
+            let teamPlayers: any[] = [];
+            let team: any = null;
+
+            if (targetTeamId) {
+                const [tRes, pRes] = await Promise.all([
+                    apiService.getTeamById(targetTeamId),
+                    apiService.getPlayersByTeam(targetTeamId)
+                ]);
+                team = tRes;
+                teamPlayers = pRes || [];
+            }
 
             setAvailablePlayers(teamPlayers || []);
 
-            if (team?.formation?.players) {
+            if (team?.formation?.players && Array.isArray(team.formation.players)) {
                 setPlayersOnPitch(team.formation.players);
             }
         } catch (error) {
@@ -86,9 +126,36 @@ const FormationBoard = ({ route, navigation }: any) => {
     const handleSave = async () => {
         try {
             setSaving(true);
-            const response = await apiService.updateFormation(teamId, { players: playersOnPitch });
+            let targetId = teamId || user?.team_id || user?.teamId;
+
+            if (!targetId && user) {
+                const phoneVal = user.phone || user.captain_phone;
+                if (phoneVal) {
+                    const cleanPhone = String(phoneVal).replace(/\D/g, '').slice(-9);
+                    const { data: teamRow } = await supabase
+                        .from('teams')
+                        .select('id')
+                        .ilike('captain_phone', `%${cleanPhone}%`)
+                        .limit(1);
+                    if (teamRow && teamRow.length > 0) {
+                        targetId = teamRow[0].id;
+                    }
+                }
+            }
+
+            if (!targetId) {
+                Alert.alert('Xatolik', 'Jamoa aniqlanmadi.');
+                return;
+            }
+
+            const response = await apiService.updateFormation(targetId, { players: playersOnPitch });
             if (response.success) {
-                Alert.alert('Muvaffaqiyat', 'Sostav muvaffaqiyatli saqlandi');
+                if (socket) {
+                    socket.emit('update-formation', { teamId: targetId, formation: { players: playersOnPitch } });
+                }
+                Alert.alert('🎉 Muvaffaqiyat!', 'Sostav bazaga muvaffaqiyatli saqlandi va o\'yin obzorida ko\'rinadi!');
+            } else {
+                Alert.alert('Xatolik', 'Sostavni saqlashda xatolik yuz berdi.');
             }
         } catch (error) {
             console.error('Error saving formation:', error);
@@ -160,6 +227,13 @@ const FormationBoard = ({ route, navigation }: any) => {
                 </View>
 
                 <ScrollView contentContainerStyle={styles.scrollContent}>
+                    {/* ASOSIY TARKIB HEADER */}
+                    <View style={styles.sectionHeaderRow}>
+                        <Ionicons name="football-outline" size={18} color={Colors.primary} />
+                        <Text style={styles.sectionHeaderTitle}>ASOSIY TARKIB</Text>
+                        <Text style={styles.sectionHeaderCount}>{playersOnPitch.length} / 11 O'YINCHI</Text>
+                    </View>
+
                     <View style={styles.fieldWrapper}>
                         <View style={styles.field}>
                             {/* Stripes */}
@@ -185,35 +259,75 @@ const FormationBoard = ({ route, navigation }: any) => {
                         </View>
                     </View>
 
-                    {!isReadOnly && (
-                        <View style={styles.subsSection}>
-                            <View style={styles.subsHeader}>
-                                <Ionicons name="people" size={18} color={Colors.primary} />
-                                <Text style={styles.subsTitle}>ZAXIRA O'YINCHILARI</Text>
-                                <Text style={styles.subsCount}>{playersOnPitch.length} / 11</Text>
-                            </View>
-                            
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subsList}>
-                                {availablePlayers.map(player => {
-                                    const id = (player._id || player.id).toString();
-                                    const isOnPitch = !!playersOnPitch.find(p => p.id === id);
-                                    return (
-                                        <TouchableOpacity 
-                                            key={id} 
-                                            style={[styles.subCard, isOnPitch && styles.subCardActive]}
-                                            onPress={() => addPlayerToPitch(player)}
-                                            disabled={isOnPitch}
-                                        >
-                                            <View style={[styles.subIcon, { backgroundColor: isOnPitch ? '#333' : Colors.primary }]}>
-                                                <Text style={styles.subNumber}>{player.number || '00'}</Text>
-                                            </View>
-                                            <Text style={styles.subName} numberOfLines={1}>{player.firstName}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </ScrollView>
+                    {/* ZAXIRA O'YINCHILARI SECTION (Always visible so players & managers can see bench) */}
+                    <View style={styles.subsSection}>
+                        <View style={styles.subsHeader}>
+                            <Ionicons name="people-outline" size={18} color={Colors.primary} />
+                            <Text style={styles.subsTitle}>ZAXIRA O'YINCHILARI</Text>
+                            <Text style={styles.subsCount}>
+                                {availablePlayers.filter(p => {
+                                    const id = (p._id || p.id).toString();
+                                    return !playersOnPitch.some(pitchP => pitchP.id === id);
+                                }).length} NAFAAR
+                            </Text>
                         </View>
-                    )}
+                        
+                        <View style={styles.subsListVertical}>
+                            {availablePlayers.map(player => {
+                                const id = (player._id || player.id).toString();
+                                const isOnPitch = !!playersOnPitch.find(p => p.id === id);
+                                const firstName = player.firstName || player.first_name || player.name || 'O\'yinchi';
+                                const lastName = player.lastName || player.last_name || '';
+                                const number = player.number || player.player_number || player.shirt_number || '-';
+                                const photo = player.photo_url || player.photo || player.photoUrl;
+
+                                return (
+                                    <TouchableOpacity 
+                                        key={id} 
+                                        style={[styles.subRow, isOnPitch && styles.subRowActive]}
+                                        onPress={() => addPlayerToPitch(player)}
+                                        disabled={isReadOnly || isOnPitch}
+                                        activeOpacity={0.7}
+                                    >
+                                        {/* Player Photo */}
+                                        <View style={styles.subRowPhotoContainer}>
+                                            {photo ? (
+                                                <Image 
+                                                    source={{ uri: photo }} 
+                                                    style={styles.subRowPhoto} 
+                                                    contentFit="cover"
+                                                />
+                                            ) : (
+                                                <Ionicons name="person" size={20} color="#666" />
+                                            )}
+                                        </View>
+
+                                        {/* Name & Surname (Name bold on top, Surname thin below) */}
+                                        <View style={styles.subRowInfo}>
+                                            <Text style={styles.subRowFirstName}>{firstName}</Text>
+                                            {lastName ? (
+                                                <Text style={styles.subRowLastName}>{lastName}</Text>
+                                            ) : null}
+                                        </View>
+
+                                        {/* Shirt Number */}
+                                        <View style={styles.subRowNumberContainer}>
+                                            <View style={[styles.subRowNumberCircle, { backgroundColor: isOnPitch ? '#333' : Colors.primary }]}>
+                                                <Text style={[styles.subRowNumberText, { color: isOnPitch ? '#AAA' : '#000' }]}>{number}</Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Status Badge */}
+                                        <View style={styles.subRowBadgeContainer}>
+                                            <Text style={[styles.subStatusBadge, isOnPitch ? styles.badgeMain : styles.badgeSub]}>
+                                                {isOnPitch ? 'ASOSIY' : 'ZAXIRA'}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
                 </ScrollView>
             </SafeAreaView>
         </GestureHandlerRootView>
@@ -225,6 +339,11 @@ const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly }: any
     const translateX = useSharedValue((player.x / 100) * FIELD_WIDTH);
     const translateY = useSharedValue((player.y / 100) * FIELD_HEIGHT);
     const context = useSharedValue({ x: 0, y: 0 });
+
+    useEffect(() => {
+        translateX.value = (player.x / 100) * FIELD_WIDTH;
+        translateY.value = (player.y / 100) * FIELD_HEIGHT;
+    }, [player.x, player.y]);
 
     const panGesture = Gesture.Pan()
         .enabled(!isReadOnly)
@@ -300,9 +419,28 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: 40,
     },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        marginVertical: 10,
+        gap: 8,
+    },
+    sectionHeaderTitle: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 2,
+    },
+    sectionHeaderCount: {
+        color: Colors.primary,
+        fontSize: 11,
+        fontWeight: '900',
+        marginLeft: 'auto',
+    },
     fieldWrapper: {
         alignItems: 'center',
-        paddingVertical: 10,
+        paddingVertical: 5,
     },
     field: {
         width: FIELD_WIDTH,
@@ -426,41 +564,91 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         marginLeft: 'auto',
     },
-    subsList: {
+    subsListVertical: {
+        flexDirection: 'column',
+    },
+    subRow: {
         flexDirection: 'row',
-    },
-    subCard: {
-        width: 80,
-        height: 100,
-        backgroundColor: '#1A1A1A',
-        borderRadius: 20,
-        marginRight: 12,
         alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
-    },
-    subCardActive: {
-        opacity: 0.3,
-    },
-    subIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
+        backgroundColor: '#161616',
+        borderRadius: 14,
+        padding: 10,
         marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.04)',
     },
-    subNumber: {
-        color: '#000',
-        fontWeight: '900',
-        fontSize: 14,
+    subRowActive: {
+        opacity: 0.65,
+        backgroundColor: '#0F0F0F',
     },
-    subName: {
+    subRowPhotoContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#252525',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    subRowPhoto: {
+        width: '100%',
+        height: '100%',
+    },
+    subRowInfo: {
+        flex: 1,
+        marginLeft: 12,
+        justifyContent: 'center',
+    },
+    subRowFirstName: {
         color: '#FFF',
-        fontSize: 10,
-        fontWeight: '900',
+        fontSize: 14,
+        fontWeight: 'bold',
         textTransform: 'uppercase',
+    },
+    subRowLastName: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 12,
+        fontWeight: '300',
+        marginTop: 1,
+    },
+    subRowNumberContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    subRowNumberCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    subRowNumberText: {
+        fontWeight: '900',
+        fontSize: 13,
+    },
+    subRowBadgeContainer: {
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+    },
+    subStatusBadge: {
+        fontSize: 9,
+        fontWeight: '900',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        overflow: 'hidden',
+        letterSpacing: 0.5,
+    },
+    badgeMain: {
+        backgroundColor: 'rgba(0, 255, 102, 0.15)',
+        color: '#00FF66',
+    },
+    badgeSub: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        color: '#888',
     },
 });
 

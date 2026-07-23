@@ -1,3 +1,4 @@
+import 'expo-dev-client';
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
@@ -39,16 +40,20 @@ export default function App() {
     const [isSplashVisible, setIsSplashVisible] = React.useState(true);
 
     React.useEffect(() => {
-        if (isAuthenticated && user) {
-            const setupNotifications = async () => {
-                const userId = (user as any)._id || (user as any).id;
-                if (userId) {
-                    await notificationService.setupAndroidChannel();
-                    await notificationService.registerForPushNotificationsAsync(userId);
-                }
-            };
-            setupNotifications();
-        }
+        const setupNotifications = async () => {
+            try {
+                // Register for push notifications regardless of being logged in or not
+                // (Anonymous tokens will be used for broadcast)
+                const userId = user ? ((user as any)._id || (user as any).id) : 'guest';
+                
+                await notificationService.setupAndroidChannel();
+                await notificationService.registerForPushNotificationsAsync(userId);
+                console.log('🔔 Push system initialized for:', userId);
+            } catch (error) {
+                console.warn('⚠️ Push setup error:', error);
+            }
+        };
+        setupNotifications();
     }, [isAuthenticated, user]);
 
     if (isSplashVisible) {

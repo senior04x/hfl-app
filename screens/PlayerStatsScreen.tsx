@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { apiService } from '../services/apiService';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import VideoBackground from '../components/VideoBackground';
 import Colors from '../constants/Colors';
@@ -23,6 +22,7 @@ import SmartImage from '../components/SmartImage';
 import { Player } from '../types';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { formatShortTeamName } from '../utils/stringUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -124,7 +124,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
 
     if (!player) return null;
 
-    const stats = player.stats || { goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0 };
+    const stats = player.stats || { goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0, rating: 0 };
 
     const renderProfil = () => (
         <View style={styles.tabContent}>
@@ -132,7 +132,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 <StatBox label="GOLLAR" value={stats.goals} icon="football" color={Colors.primary} />
                 <StatBox label="ASSISTLAR" value={stats.assists} icon="star" color="#3b82f6" />
                 <StatBox label="O'YINLAR" value={stats.matchesPlayed} icon="calendar" color="#FFF" />
-                <StatBox label="REYTING" value={player.rating || 0} icon="trending-up" color="#FACC15" />
+                <StatBox label="REYTING" value={stats.rating || 0} icon="trending-up" color="#FACC15" />
             </View>
 
             <View style={styles.glassCard}>
@@ -171,6 +171,146 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         </View>
     );
 
+    const renderKaryera = () => {
+        const teamName = player?.teams?.name || player?.team_name || 'HFL FK';
+        const teamLogo = player?.teams?.logo_url || player?.team_logo || '';
+        const leagueName = player?.teams?.league || 'HFL Liga';
+
+        return (
+            <View style={styles.tabContent}>
+                <View style={styles.infoSection}>
+                    <View style={[styles.sectionHeader, { paddingHorizontal: 0 }]}>
+                        <Ionicons name="trophy" size={20} color={Colors.primary} />
+                        <Text style={styles.sectionTitle}>HOZIRGI <Text style={styles.sectionTitleHighlight}>JAMOA</Text></Text>
+                    </View>
+                    <View style={styles.glassList}>
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.careerTeamRow}>
+                            <View style={styles.careerLogoCircle}>
+                                {teamLogo ? (
+                                    <Image source={{ uri: teamLogo }} style={styles.careerTeamLogo} />
+                                ) : (
+                                    <Ionicons name="shield" size={24} color={Colors.primary} />
+                                )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.careerTeamName}>{teamName.toUpperCase()}</Text>
+                                <Text style={styles.careerLeagueText}>{leagueName.toUpperCase()}</Text>
+                            </View>
+                            <View style={styles.activeTagBadge}>
+                                <Text style={styles.activeTagText}>ASOSIY</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={styles.infoSection}>
+                    <View style={[styles.sectionHeader, { paddingHorizontal: 0 }]}>
+                        <Ionicons name="analytics" size={20} color={Colors.primary} />
+                        <Text style={styles.sectionTitle}>UMUMIY <Text style={styles.sectionTitleHighlight}>KARYERA STATISTIKASI</Text></Text>
+                    </View>
+                    <View style={styles.glassList}>
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <InfoRow label="O'YINLAR SONI" value={`${stats.matchesPlayed || 0} TA O'YIN`} icon="shirt" />
+                        <InfoRow label="JAMI GOLLAR" value={`${stats.goals || 0} TA GOL`} icon="football" />
+                        <InfoRow label="JAMI ASSISTLAR" value={`${stats.assists || 0} TA UZATMA`} icon="star" />
+                        <InfoRow label="SARIQ KARTOTCHKALAR" value={`${stats.yellowCards || 0} TA`} icon="square" />
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
+    const renderOyinlari = () => {
+        if (matchesLoading) {
+            return (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                </View>
+            );
+        }
+
+        if (!matches || matches.length === 0) {
+            return (
+                <View style={styles.emptyMatchesBox}>
+                    <Ionicons name="football-outline" size={48} color="rgba(255,255,255,0.2)" />
+                    <Text style={styles.emptyMatchesText}>Ushbu futbolchi o'yinlari hali kiritilmagan</Text>
+                </View>
+            );
+        }
+
+        return (
+            <View style={styles.tabContent}>
+                {matches.map((matchObj: any, index: number) => {
+                    const homeLogo = matchObj.homeTeamLogo || matchObj.homeTeam?.logo;
+                    const awayLogo = matchObj.awayTeamLogo || matchObj.awayTeam?.logo;
+
+                    return (
+                        <TouchableOpacity
+                            key={matchObj._id || matchObj.id || index}
+                            style={styles.playerMatchCard}
+                            onPress={() => navigation.navigate('MatchDetail', {
+                                matchId: matchObj._id || matchObj.id,
+                                match: matchObj
+                            })}
+                            activeOpacity={0.7}
+                        >
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={styles.playerMatchInner}>
+                                <View style={styles.playerMatchDateRow}>
+                                    <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.5)" />
+                                    <Text style={styles.playerMatchDateText}>{matchObj.match_date || matchObj.date || 'O\'yin'}</Text>
+                                    <View style={styles.eventBadgeSmall}>
+                                        <Text style={styles.eventBadgeSmallText}>
+                                            {matchObj.eventLabel || "O'YIN"}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.playerMatchScoreRow}>
+                                    {/* Home Team */}
+                                    <View style={styles.playerMatchTeamCol}>
+                                        <View style={styles.miniTeamLogoCircle}>
+                                            {homeLogo ? (
+                                                <Image source={{ uri: homeLogo }} style={styles.miniTeamLogoImg} />
+                                            ) : (
+                                                <Ionicons name="shield" size={18} color={Colors.primary} />
+                                            )}
+                                        </View>
+                                        <Text style={styles.playerMatchTeamName} numberOfLines={1}>
+                                            {formatShortTeamName(matchObj.homeTeamName || matchObj.homeTeam?.name || 'UY JAMOA', 10)}
+                                        </Text>
+                                    </View>
+
+                                    {/* Score */}
+                                    <View style={styles.scoreContainerSmall}>
+                                        <Text style={styles.playerMatchScoreText}>
+                                            {matchObj.home_score ?? matchObj.score?.home ?? 0} - {matchObj.away_score ?? matchObj.score?.away ?? 0}
+                                        </Text>
+                                    </View>
+
+                                    {/* Away Team */}
+                                    <View style={styles.playerMatchTeamCol}>
+                                        <View style={styles.miniTeamLogoCircle}>
+                                            {awayLogo ? (
+                                                <Image source={{ uri: awayLogo }} style={styles.miniTeamLogoImg} />
+                                            ) : (
+                                                <Ionicons name="shield" size={18} color={Colors.primary} />
+                                            )}
+                                        </View>
+                                        <Text style={styles.playerMatchTeamName} numberOfLines={1}>
+                                            {formatShortTeamName(matchObj.awayTeamName || matchObj.awayTeam?.name || 'MEHMON', 10)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+        );
+    };
+
     return (
         <View style={{ flex: 1, backgroundColor: '#000' }}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
@@ -208,11 +348,11 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                                     <View style={[styles.statusBadge, player.status !== 'active' && { borderColor: Colors.danger + '40', backgroundColor: Colors.danger + '10' }]}>
                                         <Text style={[styles.statusText, player.status !== 'active' && { color: Colors.danger }]}>{(player.status || 'FAOL').toUpperCase()} O'YINCHI</Text>
                                     </View>
-                                    <View style={styles.ratingBadge}><Text style={styles.ratingText}>★ {player?.rating || 0}</Text></View>
+                                    <View style={styles.ratingBadge}><Text style={styles.ratingText}>★ {stats.rating || 0}</Text></View>
                                 </View>
 
-                                <Text style={styles.firstName}>{player.firstName.toUpperCase()}</Text>
-                                <Text style={styles.lastName}>{player.lastName.toUpperCase()}</Text>
+                                <Text style={styles.firstName}>{(player.firstName || player.first_name || 'FUTBOLCHI').toUpperCase()}</Text>
+                                <Text style={styles.lastName}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
 
                                 <View style={styles.socialRow}>
                                     {['instagram', 'facebook', 'youtube'].map(plat => (
@@ -247,9 +387,8 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 <View style={styles.mainContent}>
                     <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
                         {activeTab === 'profil' && renderProfil()}
-                        {/* More components like Career/Matches can be added/glassified as needed */}
-                        {activeTab === 'karyerasi' && <View style={{ padding: 20 }}><Text style={{ color: '#FFF' }}>KARYERA MA'LUMOTLAR...</Text></View>}
-                        {activeTab === 'oyinlari' && <View style={{ padding: 20 }}><Text style={{ color: '#FFF' }}>O'YINLAR RO'YXATI...</Text></View>}
+                        {activeTab === 'karyerasi' && renderKaryera()}
+                        {activeTab === 'oyinlari' && renderOyinlari()}
                     </Animated.View>
                 </View>
             </ScrollView>
@@ -320,6 +459,29 @@ const styles = StyleSheet.create({
     infoIconBox: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
     infoLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '900', letterSpacing: 1, marginBottom: 3 },
     infoValue: { color: '#FFF', fontSize: 15, fontWeight: '900' },
+    careerTeamRow: { flexDirection: 'row', alignItems: 'center', padding: 18 },
+    careerLogoCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center', marginRight: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    careerTeamLogo: { width: 34, height: 34, borderRadius: 17 },
+    careerTeamName: { color: '#FFF', fontSize: 16, fontWeight: '900' },
+    careerLeagueText: { color: Colors.primary, fontSize: 12, fontWeight: '700', marginTop: 2 },
+    activeTagBadge: { backgroundColor: 'rgba(0,255,102,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(0,255,102,0.3)' },
+    activeTagText: { color: '#00FF66', fontSize: 10, fontWeight: '900' },
+
+    emptyMatchesBox: { padding: 40, alignItems: 'center' },
+    emptyMatchesText: { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 12, fontWeight: '600' },
+    playerMatchCard: { borderRadius: 20, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+    playerMatchInner: { padding: 16 },
+    playerMatchDateRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    playerMatchDateText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginLeft: 6, flex: 1 },
+    eventBadgeSmall: { backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)' },
+    eventBadgeSmallText: { color: '#FFD700', fontSize: 10, fontWeight: '900' },
+    playerMatchScoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
+    playerMatchTeamCol: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    miniTeamLogoCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center', marginBottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    miniTeamLogoImg: { width: 28, height: 28, borderRadius: 14 },
+    playerMatchTeamName: { color: '#FFF', fontSize: 13, fontWeight: '800', textAlign: 'center' },
+    scoreContainerSmall: { backgroundColor: 'rgba(0, 255, 102, 0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(0, 255, 102, 0.25)', marginHorizontal: 8 },
+    playerMatchScoreText: { color: Colors.primary, fontSize: 16, fontWeight: '900' },
 });
 
 export default PlayerStatsScreen;

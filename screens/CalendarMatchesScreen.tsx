@@ -13,8 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
-import { Video, ResizeMode } from 'expo-av';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 
 export default function CalendarMatchesScreen({ route, navigation }: any) {
     const { 
@@ -125,11 +125,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
     };
 
     return (
-        <View style={styles.container}>
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.85}
-            >
+        <AnimatedBackground overlayOpacity={0.85} backgroundImage={backgroundImage}>
             <SafeAreaView style={{ flex: 1 }}>
             {/* Custom Header */}
             <View style={styles.header}>
@@ -177,8 +173,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                 />
             )}
             </SafeAreaView>
-            </VideoBackground>
-        </View>
+        </AnimatedBackground>
     );
 }
 

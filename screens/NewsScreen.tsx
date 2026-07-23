@@ -13,8 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import { News } from '../types';
@@ -156,18 +157,7 @@ export default function NewsScreen() {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <Video
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                style={StyleSheet.absoluteFill}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isLooping
-                isMuted
-                useNativeControls={false}
-            />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.7)' }]} />
-
+        <AnimatedBackground overlayOpacity={0.7} backgroundImage={backgroundImage}>
             <SafeAreaView style={styles.container} edges={['top']}>
                 <FlatList
                     data={searchQuery ? filteredNews : news}
@@ -243,7 +233,7 @@ export default function NewsScreen() {
                     </SafeAreaView>
                 </View>
             </Modal>
-        </View>
+        </AnimatedBackground>
     );
 }
 

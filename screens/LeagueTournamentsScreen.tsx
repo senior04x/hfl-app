@@ -15,8 +15,8 @@ import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import GenericListSkeleton from '../components/GenericListSkeleton';
 import SmartImage from '../components/SmartImage';
-import { Video, ResizeMode } from 'expo-av';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 
 export default function LeagueTournamentsScreen({ route, navigation }: any) {
     const { leagueId, leagueName, league } = route?.params || {};
@@ -146,11 +146,7 @@ export default function LeagueTournamentsScreen({ route, navigation }: any) {
     );
 
     return (
-        <View style={styles.safeArea}>
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.85}
-            >
+        <AnimatedBackground overlayOpacity={0.85} backgroundImage={backgroundImage}>
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
             {/* Header */}
             <View style={styles.header}>
@@ -182,8 +178,7 @@ export default function LeagueTournamentsScreen({ route, navigation }: any) {
                 )}
             </View>
         </SafeAreaView>
-        </VideoBackground>
-    </View>
+        </AnimatedBackground>
     );
 }
 

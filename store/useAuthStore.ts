@@ -1,11 +1,23 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import * as SecureStore from 'expo-secure-store';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+
+const secureStorage: StateStorage = {
+    getItem: async (name: string): Promise<string | null> => {
+        return (await SecureStore.getItemAsync(name)) || null;
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+        await SecureStore.setItemAsync(name, value);
+    },
+    removeItem: async (name: string): Promise<void> => {
+        await SecureStore.deleteItemAsync(name);
+    },
+};
 
 interface AuthState {
     isGuest: boolean;
     isAuthenticated: boolean;
-    user: any | null;
+    user: any | null; // Note: Ensure backend session.token is correctly stored here
     unreadCount: number;
     isChatMuted: boolean;
     setGuest: (isGuest: boolean) => void;
@@ -32,8 +44,8 @@ export const useAuthStore = create<AuthState>()(
             toggleChatMute: () => set((state) => ({ isChatMuted: !state.isChatMuted })),
         }),
         {
-            name: 'auth-storage',
-            storage: createJSONStorage(() => AsyncStorage),
+            name: 'secure-auth-storage',
+            storage: createJSONStorage(() => secureStorage),
         }
     )
 );

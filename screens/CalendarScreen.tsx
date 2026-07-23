@@ -17,7 +17,8 @@ import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import CalendarSkeleton from '../components/CalendarSkeleton';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 
 export default function CalendarScreen({ navigation }: any) {
     const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
@@ -200,12 +201,7 @@ export default function CalendarScreen({ navigation }: any) {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.75}
-                style={StyleSheet.absoluteFill}
-            />
+        <AnimatedBackground overlayOpacity={0.75} backgroundImage={backgroundImage}>
 
             <SafeAreaView style={styles.container}>
                 {/* Header */}
@@ -349,7 +345,7 @@ export default function CalendarScreen({ navigation }: any) {
                     </View>
                 </Modal>
             </SafeAreaView>
-        </View>
+        </AnimatedBackground>
     );
 }
 

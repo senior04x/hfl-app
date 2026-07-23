@@ -10,9 +10,10 @@ import HomeSkeleton from '../components/HomeSkeleton';
 import Skeleton from '../components/Skeleton';
 import { useAuthStore } from '../store/useAuthStore';
 import SmartImage from '../components/SmartImage';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
+import { formatShortTeamName } from '../utils/stringUtils';
 
 
 const { width } = Dimensions.get('window');
@@ -28,10 +29,34 @@ export default function HomeScreen({ navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const { socket, isConnected } = useSocket();
     const { user } = useAuthStore();
+    const [userProfile, setUserProfile] = useState<any>(null);
 
     useEffect(() => {
         loadData();
     }, []);
+
+    useEffect(() => {
+        if (user?.id) {
+            loadUserProfile();
+        } else {
+            setUserProfile(null);
+        }
+    }, [user?.id]);
+
+    const loadUserProfile = async () => {
+        try {
+            if (user.role === 'player') {
+                const player = await apiService.getPlayerById(user.id);
+                if (player) setUserProfile(player);
+            } else if (user.role === 'manager') {
+                const teamId = user.teamId || user.team_id || user.id || user._id;
+                const team = await apiService.getTeamById(teamId);
+                if (team) setUserProfile(team);
+            }
+        } catch (e) {
+            console.error('Error loading profile in HomeScreen:', e);
+        }
+    };
 
     useEffect(() => {
         if (socket && isConnected) {
@@ -95,21 +120,35 @@ export default function HomeScreen({ navigation }: any) {
 
     // Reusable Match Card Component
     const renderMatchCard = (match: any, isLive: boolean = false, isVertical: boolean = false) => {
-        const matchDate = new Date(match.date);
+        const rawDate = match.date || match.match_date;
+        const matchDate = new Date(rawDate);
+        const isValidDate = !isNaN(matchDate.getTime());
+
         const months = [
             'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 
             'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
         ];
-        const day = matchDate.getDate();
-        const month = months[matchDate.getMonth()];
-        const year = matchDate.getFullYear();
-        const formattedTime = matchDate.toLocaleTimeString('uz-UZ', { 
-            timeZone: 'Asia/Tashkent', 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: false
-        });
-        const formattedFullDate = `${day}-${month}, ${year}`;
+        const day = isValidDate ? matchDate.getDate() : '';
+        const month = isValidDate ? months[matchDate.getMonth()] : '';
+        const year = isValidDate ? matchDate.getFullYear() : '';
+        
+        let formattedTime = String(match.match_time || match.time || '').trim();
+        if (formattedTime && formattedTime.includes(':')) {
+            const timeParts = formattedTime.split(':');
+            if (timeParts.length >= 2) {
+                formattedTime = `${timeParts[0].padStart(2, '0')}:${timeParts[1].padStart(2, '0')}`;
+            }
+        }
+        if (!formattedTime && isValidDate) {
+            const hrs = String(matchDate.getHours()).padStart(2, '0');
+            const mins = String(matchDate.getMinutes()).padStart(2, '0');
+            if (hrs !== '00' || mins !== '00') {
+                formattedTime = `${hrs}:${mins}`;
+            }
+        }
+        if (!formattedTime) formattedTime = '18:00';
+
+        const formattedFullDate = isValidDate ? `${day}-${month}, ${year}` : (match.date_str || "Bo'lajak o'yin");
 
         return (
             <TouchableOpacity
@@ -144,7 +183,7 @@ export default function HomeScreen({ navigation }: any) {
                                     <Text style={styles.hLogoText}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
                                 )}
                             </View>
-                            <Text style={styles.hTeamName} numberOfLines={1}>{match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi'}</Text>
+                            <Text style={styles.hTeamName} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi', 12)}</Text>
                         </View>
 
                         {/* Score or VS */}
@@ -168,7 +207,7 @@ export default function HomeScreen({ navigation }: any) {
                                     <Text style={styles.hLogoText}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
                                 )}
                             </View>
-                            <Text style={styles.hTeamName} numberOfLines={1}>{match.awayTeamName || match.awayTeam?.name || 'Mehmon'}</Text>
+                            <Text style={styles.hTeamName} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12)}</Text>
                         </View>
                     </View>
 
@@ -181,161 +220,171 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {/* Cinematic Video Background */}
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.6}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {loading && matches.length === 0 ? (
-                <HomeSkeleton />
-            ) : (
-                <ScrollView 
-                    style={styles.container} 
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor={Colors.primary}
-                            colors={[Colors.primary]}
-                        />
-                    }
-                >
-                {/* Header Section */}
-                <View style={styles.header}>
-                    <TouchableOpacity 
-                        onPress={() => {
-                            if (!user) return navigation.navigate('Welcome');
-                            if (user.role === 'manager') {
-                                navigation.navigate('TeamProfile', { teamId: user.id });
-                            } else {
-                                navigation.navigate('MyStats', { playerId: user.id });
-                            }
-                        }}
-                    >
-                        {user && (user.photo || user.logo || user.avatar) ? (
-                            <SmartImage 
-                                uri={user.photo || user.logo || user.avatar} 
-                                style={{ width: 48, height: 48, marginRight: 15, borderRadius: 12, overflow: 'hidden' }}
-                                fallbackIcon={user.role === 'manager' ? 'people' : 'person'}
-                                contentFit="contain"
+        <AnimatedBackground overlayOpacity={0.6} backgroundImage={backgroundImage}>
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {loading && matches.length === 0 ? (
+                    <HomeSkeleton />
+                ) : (
+                    <ScrollView 
+                        style={styles.container} 
+                        showsVerticalScrollIndicator={false}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                tintColor={Colors.primary}
+                                colors={[Colors.primary]}
                             />
-                        ) : (
-                            <Ionicons name="person-circle-outline" size={44} color={Colors.primary} style={{ marginRight: 15 }} />
-                        )}
-                    </TouchableOpacity>
+                        }
+                    >
+                        {/* Header Section */}
+                        {(() => {
+                            const avatarUri = userProfile?.photoUrl || userProfile?.photo_url || userProfile?.photo || userProfile?.logoUrl || userProfile?.logo_url || userProfile?.logo || userProfile?.avatar || user?.photoUrl || user?.photo_url || user?.photo || user?.logoUrl || user?.logo_url || user?.logo || user?.avatar;
+                            const displayName = userProfile?.teamName || userProfile?.name || (userProfile?.firstName ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim() : null) || user?.teamName || user?.name || user?.firstName || user?.team_name || 'AMATORA';
 
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.welcomeText}>Xush kelibsiz!</Text>
-                        <Text style={styles.brandText} numberOfLines={1}>{user ? (user.name || user.firstName || 'AMATORA')?.toUpperCase() : 'AMATORA SPORTS'}</Text>
-                    </View>
-                </View>
+                            const hour = new Date().getHours();
+                            let greeting = 'Xayrli kun!';
+                            if (hour >= 5 && hour < 12) greeting = 'Xayrli tong!';
+                            else if (hour >= 12 && hour < 18) greeting = 'Xayrli kun!';
+                            else if (hour >= 18 && hour < 23) greeting = 'Xayrli kech!';
+                            else greeting = 'Xayrli tun!';
 
+                            return (
+                                <View style={styles.header}>
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            if (!user) return navigation.navigate('Welcome');
+                                            if (user.role === 'manager') {
+                                                const teamId = userProfile?.id || user.teamId || user.team_id || user.id;
+                                                navigation.navigate('TeamProfile', { teamId });
+                                            } else {
+                                                navigation.navigate('MyStats', { playerId: user.id });
+                                            }
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        {avatarUri ? (
+                                            <View style={{ width: 46, height: 46, marginRight: 14, borderRadius: 5, overflow: 'hidden', backgroundColor: 'rgba(255, 255, 255, 0.08)' }}>
+                                                <SmartImage 
+                                                    uri={avatarUri} 
+                                                    style={{ width: '100%', height: '100%' }}
+                                                    fallbackIcon={user?.role === 'manager' ? 'shield' : 'person'}
+                                                    contentFit="cover"
+                                                />
+                                            </View>
+                                        ) : (
+                                            <View style={{ width: 46, height: 46, marginRight: 14, borderRadius: 5, backgroundColor: 'rgba(255, 255, 255, 0.08)', justifyContent: 'center', alignItems: 'center' }}>
+                                                <Ionicons name={user?.role === 'manager' ? 'shield' : 'person'} size={24} color="#FFFFFF" />
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
 
-
-                {/* Slider / Stories Area */}
-                <View style={styles.sliderContainer}>
-                    <ApiSlider initialItems={sliderItems} externalLoading={loading} />
-                </View>
-
-                {/* LIVE Matches Section - Snapping Slider */}
-                {liveMatches.length > 0 && (
-                    <View style={styles.sectionContainer}>
-                        <ScrollView 
-                            horizontal 
-                            showsHorizontalScrollIndicator={false} 
-                            contentContainerStyle={styles.carouselScrollContent}
-                            snapToInterval={CARD_WIDTH + CARD_SPACING}
-                            decelerationRate="fast"
-                            scrollEventThrottle={16}
-                        >
-                            {liveMatches.map((m, index) => (
-                                <View 
-                                    key={m._id || index} 
-                                    style={{ marginRight: index === liveMatches.length - 1 ? 0 : CARD_SPACING }}
-                                >
-                                    {renderMatchCard(m, true, false)}
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-                )}
-
-                {/* Recommended Upcoming Matches - Vertical List */}
-                <View style={styles.sectionContainer}>
-                
-                    {loading ? (
-                        <View style={{ paddingHorizontal: 20 }}>
-                            <Skeleton width="100%" height={180} borderRadius={20} />
-                        </View>
-                    ) : upcomingMatches.length > 0 ? (
-                        <View style={styles.verticalMatchList}>
-                            {upcomingMatches.map(m => renderMatchCard(m, false, true))}
-                        </View>
-                    ) : (
-                        <View style={styles.emptyCard}>
-                            <Ionicons name="calendar-outline" size={32} color={Colors.textMuted} />
-                            <Text style={styles.emptyText}>Rejalashtirilgan o'yinlar qolmadi</Text>
-                        </View>
-                    )}
-                </View>
-
-
-
-                {/* Recent Results */}
-                <View style={styles.sectionContainer}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>So'nggi Natijalar</Text>
-                    </View>
-
-                    {loading ? (
-                        <View style={{ paddingHorizontal: 20 }}>
-                            <Skeleton width="100%" height={60} borderRadius={12} style={{ marginBottom: 10 }} />
-                            <Skeleton width="100%" height={60} borderRadius={12} />
-                        </View>
-                    ) : finishedMatches.length > 0 ? (
-                        finishedMatches.map((match, idx) => (
-                            <TouchableOpacity
-                                key={match._id || idx}
-                                style={styles.recentMatchItem}
-                                onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
-                            >
-                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingHorizontal: 16, paddingVertical: 14 }}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.recentTeams} numberOfLines={1}>
-                                            {match.homeTeam?.name} <Text style={styles.recentScore}>{match.score?.home} - {match.score?.away}</Text> {match.awayTeam?.name}
-                                        </Text>
+                                        <Text style={styles.welcomeText}>{greeting}</Text>
+                                        <Text style={styles.brandText} numberOfLines={1}>{user ? displayName.toUpperCase() : 'AMATORA SPORTS'}</Text>
                                     </View>
-                                    <Text style={styles.recentDate}>
-                                        {new Date(match.date).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' })}
-                                    </Text>
-                                    <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} style={{ marginLeft: 8 }} />
                                 </View>
-                            </TouchableOpacity>
-                        ))
-                    ) : (
-                        <View style={styles.emptyCard}>
-                            <Ionicons name="football-outline" size={32} color={Colors.textMuted} />
-                            <Text style={styles.emptyText}>Hozircha o'yinlar yo'q</Text>
-                        </View>
-                    )}
-                </View>
+                            );
+                        })()}
 
-                <View style={{ height: 60 }} />
-            </ScrollView>
-            )}
-        </SafeAreaView>
+                        {/* Slider / Stories Area */}
+                        <View style={styles.sliderContainer}>
+                            <ApiSlider initialItems={sliderItems} externalLoading={loading} />
+                        </View>
+
+                        {/* LIVE Matches Section - Snapping Slider */}
+                        {liveMatches.length > 0 && (
+                            <View style={styles.sectionContainer}>
+                                <ScrollView 
+                                    horizontal 
+                                    showsHorizontalScrollIndicator={false} 
+                                    contentContainerStyle={styles.carouselScrollContent}
+                                    snapToInterval={CARD_WIDTH + CARD_SPACING}
+                                    decelerationRate="fast"
+                                    scrollEventThrottle={16}
+                                >
+                                    {liveMatches.map((m, index) => (
+                                        <View 
+                                            key={m._id || index} 
+                                            style={{ marginRight: index === liveMatches.length - 1 ? 0 : CARD_SPACING }}
+                                        >
+                                            {renderMatchCard(m, true, false)}
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
+                        {/* Recommended Upcoming Matches - Vertical List */}
+                        <View style={styles.sectionContainer}>
+                            {loading ? (
+                                <View style={{ paddingHorizontal: 20 }}>
+                                    <Skeleton width="100%" height={180} borderRadius={20} />
+                                </View>
+                            ) : upcomingMatches.length > 0 ? (
+                                <View style={styles.verticalMatchList}>
+                                    {upcomingMatches.map(m => renderMatchCard(m, false, true))}
+                                </View>
+                            ) : (
+                                <View style={styles.emptyCard}>
+                                    <Ionicons name="calendar-outline" size={32} color={Colors.textMuted} />
+                                    <Text style={styles.emptyText}>Rejalashtirilgan o'yinlar qolmadi</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Recent Results */}
+                        <View style={styles.sectionContainer}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>So'nggi Natijalar</Text>
+                            </View>
+
+                            {loading ? (
+                                <View style={{ paddingHorizontal: 20 }}>
+                                    <Skeleton width="100%" height={60} borderRadius={12} style={{ marginBottom: 10 }} />
+                                    <Skeleton width="100%" height={60} borderRadius={12} />
+                                </View>
+                            ) : finishedMatches.length > 0 ? (
+                                finishedMatches.map((match, idx) => (
+                                    <TouchableOpacity
+                                        key={match._id || idx}
+                                        style={styles.recentMatchItem}
+                                        onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
+                                    >
+                                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingHorizontal: 16, paddingVertical: 14 }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.recentTeams} numberOfLines={1}>
+                                                    {match.homeTeam?.name} <Text style={styles.recentScore}>{match.score?.home} - {match.score?.away}</Text> {match.awayTeam?.name}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.recentDate}>
+                                                {new Date(match.date).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' })}
+                                            </Text>
+                                            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} style={{ marginLeft: 8 }} />
+                                        </View>
+                                    </TouchableOpacity>
+                                ))
+                            ) : (
+                                <View style={styles.emptyCard}>
+                                    <Ionicons name="football-outline" size={32} color={Colors.textMuted} />
+                                    <Text style={styles.emptyText}>Hozircha o'yinlar yo'q</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={{ height: 60 }} />
+                    </ScrollView>
+                )}
+            </SafeAreaView>
+        </AnimatedBackground>
     );
 }
 
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#000',
+        backgroundColor: 'transparent',
     },
     container: {
         flex: 1,

@@ -14,6 +14,7 @@ import {
     FlatList,
     Pressable,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { apiService } from '../services/apiService';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
@@ -21,131 +22,64 @@ import { useAuthStore } from '../store/useAuthStore';
 const TransferRequestScreen = ({ route, navigation }: any) => {
     const { user } = useAuthStore();
     const { playerId } = route.params || {};
-    const [leagues, setLeagues] = useState<any[]>([]);
+
+    const LEAGUES = [
+        { id: 'super', name: 'Super liga' },
+        { id: 'pro', name: 'Pro liga' },
+        { id: '3liga', name: '3-liga' },
+        { id: '7x7', name: '7x7 liga' }
+    ];
+
     const [selectedLeague, setSelectedLeague] = useState('');
-    const [loadingLeagues, setLoadingLeagues] = useState(false);
-
-    const [tournaments, setTournaments] = useState<any[]>([]);
-    const [selectedTournament, setSelectedTournament] = useState('');
-    const [loadingTournaments, setLoadingTournaments] = useState(false);
-
+    const [leagueModalVisible, setLeagueModalVisible] = useState(false);
     const [teams, setTeams] = useState<any[]>([]);
     const [selectedTeam, setSelectedTeam] = useState('');
     const [loadingTeams, setLoadingTeams] = useState(false);
-
     const [reason, setReason] = useState('');
     const [loadingSubmit, setLoadingSubmit] = useState(false);
 
     // Modal state
     const [modalVisible, setModalVisible] = useState(false);
-    const [modalType, setModalType] = useState<'league' | 'tournament' | 'team'>('league');
     const [searchQuery, setSearchQuery] = useState('');
 
-    const openModal = (type: 'league' | 'tournament' | 'team') => {
-        setModalType(type);
-        setSearchQuery('');
-        setModalVisible(true);
-    };
-
-    const getModalData = () => {
-        let data: any[] = [];
-        if (modalType === 'league') data = leagues;
-        if (modalType === 'tournament') data = tournaments;
-        if (modalType === 'team') data = teams;
-        
-        if (searchQuery) {
-            return data.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
-        }
-        return data;
-    };
-
-    const handleSelect = (item: any) => {
-        if (modalType === 'league') {
-            setSelectedLeague(item._id || item.id);
-        } else if (modalType === 'tournament') {
-            setSelectedTournament(item._id || item.id);
-        } else if (modalType === 'team') {
-            setSelectedTeam(item._id || item.id);
-        }
-        setModalVisible(false);
-    };
-
-    const getSelectedName = (type: 'league' | 'tournament' | 'team') => {
-        if (type === 'league') {
-            return leagues.find(l => (l._id || l.id) === selectedLeague)?.name || 'Ligani tanlang...';
-        }
-        if (type === 'tournament') {
-            return tournaments.find(t => (t._id || t.id) === selectedTournament)?.name || 'Turnirni tanlang...';
-        }
-        if (type === 'team') {
-            return teams.find(t => (t._id || t.id) === selectedTeam)?.name || 'Jamoani tanlang...';
-        }
-        return '';
-    };
+    // Player & current team info
+    const [playerInfo, setPlayerInfo] = useState<any>(null);
+    const [currentTeam, setCurrentTeam] = useState<any>(null);
 
     useEffect(() => {
-        fetchLeagues();
+        fetchPlayerInfo();
     }, []);
 
-    const fetchLeagues = async () => {
+    const fetchPlayerInfo = async () => {
         try {
-            setLoadingLeagues(true);
-            const data = await apiService.getLeagues();
-            if (data && Array.isArray(data)) {
-                setLeagues(data);
+            if (playerId) {
+                const player = await apiService.getPlayerById(playerId);
+                if (player) {
+                    setPlayerInfo(player);
+                    const teamId = player.team_id || player.teamId;
+                    if (teamId) {
+                        const team = await apiService.getTeamById(teamId);
+                        if (team) setCurrentTeam(team);
+                    }
+                }
             }
-        } catch (error) {
-            console.error('Error fetching leagues:', error);
-        } finally {
-            setLoadingLeagues(false);
+        } catch (e) {
+            console.warn('Error fetching player info:', e);
         }
     };
 
-    useEffect(() => {
-        if (selectedLeague) {
-            fetchTournaments(selectedLeague);
-        } else {
-            setTournaments([]);
-            setSelectedTournament('');
-            setTeams([]);
-            setSelectedTeam('');
-        }
-    }, [selectedLeague]);
-
-    const fetchTournaments = async (leagueId: string) => {
-        try {
-            setLoadingTournaments(true);
-            const data = await apiService.getTournaments(1, 100, leagueId);
-            if (data && Array.isArray(data)) {
-                setTournaments(data);
-            }
-            setSelectedTournament('');
-            setTeams([]);
-            setSelectedTeam('');
-        } catch (error) {
-            console.error('Error fetching tournaments:', error);
-        } finally {
-            setLoadingTournaments(false);
-        }
-    };
-
-    useEffect(() => {
-        if (selectedTournament) {
-            fetchTeamsForTournament(selectedTournament);
-        } else {
-            setTeams([]);
-            setSelectedTeam('');
-        }
-    }, [selectedTournament]);
-
-    const fetchTeamsForTournament = async (tournamentId: string) => {
+    const fetchTeams = async (leagueName: string) => {
         try {
             setLoadingTeams(true);
-            const data = await apiService.getTeams(1, 100, tournamentId);
+            const data = await apiService.getTeams(1, 100, leagueName);
             if (data && Array.isArray(data)) {
-                setTeams(data);
+                // Filter out current team
+                const currentTeamId = user?.teamId || user?.team_id;
+                const filtered = currentTeamId
+                    ? data.filter((t: any) => t.id !== currentTeamId && t._id !== currentTeamId)
+                    : data;
+                setTeams(filtered);
             }
-            setSelectedTeam('');
         } catch (error) {
             console.error('Error fetching teams:', error);
         } finally {
@@ -153,12 +87,22 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
         }
     };
 
+    const getFilteredTeams = () => {
+        if (!searchQuery) return teams;
+        return teams.filter((t: any) =>
+            (t.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    };
+
+    const getSelectedTeamObj = () => {
+        return teams.find((t: any) => (t._id || t.id) === selectedTeam);
+    };
+
     const handleSubmit = async () => {
-        if (!selectedTeam || !reason.trim()) {
-            Alert.alert('Xatolik', 'Iltimos, barcha tanlovlarni bajaring va sababni yozing');
+        if (!selectedTeam) {
+            Alert.alert('Xatolik', 'Iltimos, yangi jamoani tanlang');
             return;
         }
-
         if (reason.trim().length < 10) {
             Alert.alert('Xatolik', "O'tish sababi eng kamida 10 ta belgidan iborat bo'lishi shart.");
             return;
@@ -168,25 +112,30 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
             setLoadingSubmit(true);
             const transferData = {
                 playerId,
-                currentTeamId: user?.teamId || 'unknown_old_team',
+                currentTeamId: user?.teamId || user?.team_id || 'unknown_old_team',
                 newTeamId: selectedTeam,
                 reason: reason.trim(),
             };
 
             const response = await apiService.createTransferRequest(transferData);
             if (response.success) {
-                Alert.alert('Muvaffaqiyat', 'Transfer so\'rovi yuborildi. Admin javobini kuting.');
-                navigation.goBack();
+                Alert.alert(
+                    'Muvaffaqiyat! ✅',
+                    "Transfer so'rovi yuborildi. Admin ko'rib chiqqach siz bilan bog'lanadi.",
+                    [{ text: 'TUSHUNDIM', onPress: () => navigation.goBack() }]
+                );
             } else {
-                Alert.alert('Xatolik', response.error || 'So\'rov yuborib bo\'lmadi');
+                Alert.alert('Xatolik', response.error || "So'rov yuborib bo'lmadi");
             }
         } catch (error) {
             console.error('Error submitting transfer request:', error);
-            Alert.alert('Xatolik', 'Server bilan bog\'lanishda xatolik yuz berdi');
+            Alert.alert('Xatolik', "Server bilan bog'lanishda xatolik yuz berdi");
         } finally {
             setLoadingSubmit(false);
         }
     };
+
+    const selectedTeamObj = getSelectedTeamObj();
 
     return (
         <SafeAreaView style={styles.container}>
@@ -199,6 +148,52 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
+                {/* Transfer Visual Card */}
+                {(currentTeam || selectedTeamObj) && (
+                    <View style={styles.transferVisualCard}>
+                        {/* Current Team */}
+                        <View style={styles.teamVisual}>
+                            <View style={styles.teamLogoCircle}>
+                                {currentTeam?.logo_url || currentTeam?.logo ? (
+                                    <Image
+                                        source={{ uri: currentTeam.logo_url || currentTeam.logo }}
+                                        style={styles.teamLogo}
+                                        contentFit="contain"
+                                    />
+                                ) : (
+                                    <Ionicons name="shield" size={28} color="#666" />
+                                )}
+                            </View>
+                            <Text style={styles.teamVisualName} numberOfLines={2}>
+                                {currentTeam?.name || 'Joriy jamoa'}
+                            </Text>
+                        </View>
+
+                        {/* Arrow */}
+                        <View style={styles.arrowContainer}>
+                            <Ionicons name="swap-horizontal" size={28} color="#00FF66" />
+                        </View>
+
+                        {/* New Team */}
+                        <View style={styles.teamVisual}>
+                            <View style={[styles.teamLogoCircle, selectedTeamObj && styles.teamLogoCircleActive]}>
+                                {selectedTeamObj?.logo_url || selectedTeamObj?.logo ? (
+                                    <Image
+                                        source={{ uri: selectedTeamObj.logo_url || selectedTeamObj.logo }}
+                                        style={styles.teamLogo}
+                                        contentFit="contain"
+                                    />
+                                ) : (
+                                    <Ionicons name="help" size={28} color="#444" />
+                                )}
+                            </View>
+                            <Text style={styles.teamVisualName} numberOfLines={2}>
+                                {selectedTeamObj?.name || 'Yangi jamoa?'}
+                            </Text>
+                        </View>
+                    </View>
+                )}
+
                 <View style={styles.infoBox}>
                     <Ionicons name="information-circle-outline" size={20} color="#00FF66" />
                     <Text style={styles.infoText}>
@@ -207,47 +202,34 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                 </View>
 
                 <Text style={styles.label}>Ligani Tanlang</Text>
-                <TouchableOpacity 
-                    style={styles.selectButton} 
-                    onPress={() => openModal('league')}
+                <TouchableOpacity
+                    style={styles.selectButton}
+                    onPress={() => setLeagueModalVisible(true)}
                 >
                     <Text style={[styles.selectButtonText, !selectedLeague && styles.placeholderText]}>
-                        {loadingLeagues ? "Yuklanmoqda..." : getSelectedName('league')}
+                        {selectedLeague || 'Ligani tanlang...'}
                     </Text>
                     <Ionicons name="chevron-down" size={20} color="#00FF66" />
                 </TouchableOpacity>
 
-                {selectedLeague ? (
-                    <>
-                        <Text style={styles.label}>Turnirni Tanlang</Text>
-                        <TouchableOpacity 
-                            style={styles.selectButton} 
-                            onPress={() => openModal('tournament')}
-                            disabled={loadingTournaments || tournaments.length === 0}
-                        >
-                            <Text style={[styles.selectButtonText, !selectedTournament && styles.placeholderText]}>
-                                {loadingTournaments ? "Yuklanmoqda..." : getSelectedName('tournament')}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color="#00FF66" />
-                        </TouchableOpacity>
-                    </>
-                ) : null}
-
-                {selectedTournament ? (
-                    <>
-                        <Text style={styles.label}>Yangi Jamoani Tanlang</Text>
-                        <TouchableOpacity 
-                            style={styles.selectButton} 
-                            onPress={() => openModal('team')}
-                            disabled={loadingTeams || teams.length === 0}
-                        >
-                            <Text style={[styles.selectButtonText, !selectedTeam && styles.placeholderText]}>
-                                {loadingTeams ? "Yuklanmoqda..." : getSelectedName('team')}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color="#00FF66" />
-                        </TouchableOpacity>
-                    </>
-                ) : null}
+                <Text style={styles.label}>Yangi Jamoani Tanlang</Text>
+                <TouchableOpacity
+                    style={[styles.selectButton, !selectedLeague && styles.disabledButton]}
+                    onPress={() => {
+                        if (!selectedLeague) {
+                            Alert.alert('Eslatma', 'Iltimos, avval ligani tanlang');
+                            return;
+                        }
+                        setSearchQuery('');
+                        setModalVisible(true);
+                    }}
+                    disabled={!selectedLeague}
+                >
+                    <Text style={[styles.selectButtonText, !selectedTeam && styles.placeholderText]}>
+                        {loadingTeams ? "Yuklanmoqda..." : (!selectedLeague ? "Avval ligani tanlang..." : (selectedTeamObj?.name || 'Jamoani tanlang...'))}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#00FF66" />
+                </TouchableOpacity>
 
                 <Text style={styles.label}>O'tish Sababi</Text>
                 <TextInput
@@ -276,7 +258,7 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                 </TouchableOpacity>
             </ScrollView>
 
-            {/* Bottom Sheet Modal for Selections */}
+            {/* Team Selection Modal */}
             <Modal
                 visible={modalVisible}
                 transparent={true}
@@ -286,19 +268,17 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                 <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)} />
                 <View style={styles.modalContent}>
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>
-                            {modalType === 'league' ? 'Ligani Tanlang' : modalType === 'tournament' ? 'Turnirni Tanlang' : 'Jamoani Tanlang'}
-                        </Text>
+                        <Text style={styles.modalTitle}>Jamoani Tanlang</Text>
                         <TouchableOpacity onPress={() => setModalVisible(false)}>
                             <Ionicons name="close-circle" size={28} color="#666" />
                         </TouchableOpacity>
                     </View>
-                    
+
                     <View style={styles.searchContainer}>
                         <Ionicons name="search" size={20} color="#666" />
                         <TextInput
                             style={styles.searchInput}
-                            placeholder="Qidirish..."
+                            placeholder="Jamoa nomi..."
                             placeholderTextColor="#666"
                             value={searchQuery}
                             onChangeText={setSearchQuery}
@@ -306,19 +286,85 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                     </View>
 
                     <FlatList
-                        data={getModalData()}
+                        data={getFilteredTeams()}
                         keyExtractor={(item) => item._id || item.id}
                         renderItem={({ item }) => (
-                            <TouchableOpacity 
-                                style={styles.modalItem}
-                                onPress={() => handleSelect(item)}
+                            <TouchableOpacity
+                                style={[styles.modalItem, (item._id || item.id) === selectedTeam && styles.modalItemActive]}
+                                onPress={() => {
+                                    setSelectedTeam(item._id || item.id);
+                                    setModalVisible(false);
+                                }}
                             >
-                                <Text style={styles.modalItemText}>{item.name}</Text>
-                                <Ionicons name="chevron-forward" size={20} color="#333" />
+                                <View style={styles.modalItemRow}>
+                                    <View style={styles.modalTeamLogo}>
+                                        {item.logo_url || item.logo ? (
+                                            <Image
+                                                source={{ uri: item.logo_url || item.logo }}
+                                                style={{ width: 32, height: 32 }}
+                                                contentFit="contain"
+                                            />
+                                        ) : (
+                                            <Ionicons name="shield" size={20} color="#666" />
+                                        )}
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={styles.modalItemText}>{item.name}</Text>
+                                        {item.league && (
+                                            <Text style={styles.modalItemSub}>{item.league}</Text>
+                                        )}
+                                    </View>
+                                </View>
+                                {(item._id || item.id) === selectedTeam && (
+                                    <Ionicons name="checkmark-circle" size={22} color="#00FF66" />
+                                )}
                             </TouchableOpacity>
                         )}
                         ItemSeparatorComponent={() => <View style={styles.separator} />}
                         ListEmptyComponent={<Text style={styles.emptyText}>Hech narsa topilmadi</Text>}
+                        showsVerticalScrollIndicator={false}
+                    />
+                </View>
+            </Modal>
+            {/* League Selection Modal */}
+            <Modal
+                visible={leagueModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setLeagueModalVisible(false)}
+            >
+                <Pressable style={styles.modalOverlay} onPress={() => setLeagueModalVisible(false)} />
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Ligani Tanlang</Text>
+                        <TouchableOpacity onPress={() => setLeagueModalVisible(false)}>
+                            <Ionicons name="close-circle" size={28} color="#666" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <FlatList
+                        data={LEAGUES}
+                        keyExtractor={(item) => item.id}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={[styles.modalItem, item.name === selectedLeague && styles.modalItemActive]}
+                                onPress={() => {
+                                    setSelectedLeague(item.name);
+                                    setSelectedTeam('');
+                                    fetchTeams(item.name);
+                                    setLeagueModalVisible(false);
+                                }}
+                            >
+                                <View style={styles.modalItemRow}>
+                                    <Ionicons name="trophy-outline" size={24} color="#00FF66" />
+                                    <Text style={[styles.modalItemText, { marginLeft: 15 }]}>{item.name}</Text>
+                                </View>
+                                {item.name === selectedLeague && (
+                                    <Ionicons name="checkmark-circle" size={22} color="#00FF66" />
+                                )}
+                            </TouchableOpacity>
+                        )}
+                        ItemSeparatorComponent={() => <View style={styles.separator} />}
                         showsVerticalScrollIndicator={false}
                     />
                 </View>
@@ -348,6 +394,51 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 20,
+    },
+    transferVisualCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#111',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#222',
+    },
+    teamVisual: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    teamLogoCircle: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#1A1A1A',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#333',
+        overflow: 'hidden',
+    },
+    teamLogoCircleActive: {
+        borderColor: '#00FF66',
+    },
+    teamLogo: {
+        width: 40,
+        height: 40,
+    },
+    teamVisualName: {
+        color: '#CCC',
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginTop: 8,
+        maxWidth: 100,
+    },
+    arrowContainer: {
+        paddingHorizontal: 16,
+        paddingBottom: 20,
     },
     infoBox: {
         flexDirection: 'row',
@@ -399,11 +490,12 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         color: '#FFF',
         padding: 15,
-        height: 150,
+        height: 130,
         textAlignVertical: 'top',
         borderWidth: 1,
         borderColor: '#333',
         marginBottom: 30,
+        fontSize: 15,
     },
     submitButton: {
         backgroundColor: '#00FF66',
@@ -472,15 +564,40 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 15,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderRadius: 10,
+    },
+    modalItemActive: {
+        backgroundColor: 'rgba(0, 255, 102, 0.08)',
+    },
+    modalItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    modalTeamLogo: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#222',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
     },
     modalItemText: {
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    modalItemSub: {
+        color: '#666',
+        fontSize: 12,
+        marginTop: 2,
     },
     separator: {
         height: 1,
-        backgroundColor: '#333',
+        backgroundColor: '#222',
     },
     emptyText: {
         color: '#666',

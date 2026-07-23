@@ -23,7 +23,6 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
@@ -31,7 +30,8 @@ import { useSocket } from '../context/SocketContext';
 import { apiService } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 import ChatSkeleton from '../components/ChatSkeleton';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 
 const TeamChatScreen = ({ route, navigation }: any) => {
     const { teamId } = route.params;
@@ -59,6 +59,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
     const menuScaleAnim = useRef(new Animated.Value(0)).current;
     const menuFadeAnim = useRef(new Animated.Value(0)).current;
     const messageRefs = useRef<{ [key: string]: any }>({});
+    const [isRateLimited, setIsRateLimited] = useState(false);
 
     // Initialize LayoutAnimation for Android
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -84,14 +85,20 @@ const TeamChatScreen = ({ route, navigation }: any) => {
     ).current;
 
     // Privacy Check
-    if (!user || (String(user.teamId) !== String(teamId) && user.role !== 'admin' && user.role !== 'trainer')) {
+    const userTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
+    const hasPermission = user && (
+        String(userTeamId) === String(teamId) ||
+        user.role === 'admin' ||
+        user.role === 'manager' ||
+        user.role === 'coach' ||
+        user.role === 'trainer' ||
+        user.role === 'team_admin'
+    );
+
+    if (!hasPermission) {
         return (
             <View style={{ flex: 1, backgroundColor: '#000' }}>
-                <VideoBackground
-                    source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                    overlayOpacity={0.8}
-                    style={StyleSheet.absoluteFill}
-                />
+                <AnimatedBackground />
                 <SafeAreaView style={styles.container} edges={['top']}>
                     <View style={styles.header}>
                         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -137,7 +144,8 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                 (newMsg.localId && oldMsg.localId === newMsg.localId)
                             )
                         );
-                        return [...prev, ...newMessages];
+                        // SAFE FIX: Strictly sort merged lists by timestamp descending without mutating existing list shapes
+                        return [...prev, ...newMessages].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
                     });
                 }
             }
@@ -165,13 +173,30 @@ const TeamChatScreen = ({ route, navigation }: any) => {
     const { resetUnreadCount, isChatMuted, toggleChatMute } = useAuthStore();
 
     useEffect(() => {
-        fetchMessages();
+        fetchMessages(1, true);
         resetUnreadCount();
         
-        if (socket && teamId) {
+        if (socket && teamId && isConnected) {
             socket.emit('join-team', teamId);
         }
     }, [teamId]);
+
+    // Resync messages when socket reconnects (fixes offline gaps)
+    const prevConnectedRef = useRef(isConnected);
+    const isFetchingGapRef = useRef(false);
+    useEffect(() => {
+        if (!prevConnectedRef.current && isConnected) {
+            // SAFE FIX: Prevent duplicate rapid fetch calls on network flutter using a simple ref guard
+            if (!isFetchingGapRef.current) {
+                isFetchingGapRef.current = true;
+                console.log('🔄 Socket reconnected, fetching missed messages gap safely...');
+                fetchMessages(1, true).finally(() => {
+                    setTimeout(() => isFetchingGapRef.current = false, 2000);
+                });
+            }
+        }
+        prevConnectedRef.current = isConnected;
+    }, [isConnected]);
 
     useEffect(() => {
         if (socket && teamId) {
@@ -204,15 +229,57 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                 ));
             };
 
+            const errorHandler = (data: { messageId: string, error: string }) => {
+                setMessages((prev) => prev.map(msg => 
+                    (msg._id === data.messageId || msg.localId === data.messageId)
+                    ? { ...msg, isError: true, errorMessage: data.error } 
+                    : msg
+                ));
+            };
+
+            const generalErrorHandler = (errStr: string) => {
+                if (typeof errStr === 'string' && errStr.toLowerCase().includes('rate limit')) {
+                    Alert.alert('Cheklov', 'Juda ko\'p xabar yubordingiz. Iltimos 5 soniya kuting.');
+                    setIsRateLimited(true);
+                    setTimeout(() => setIsRateLimited(false), 5000);
+                } else if (typeof errStr === 'string') {
+                    Alert.alert('Xatolik', errStr);
+                }
+            };
+
             socket.on('new-team-message', messageHandler);
             socket.on('message-updated', updateHandler);
+            socket.on('message-save-error', errorHandler);
+            socket.on('error', generalErrorHandler);
             
             return () => {
                 socket.off('new-team-message', messageHandler);
                 socket.off('message-updated', updateHandler);
+                socket.off('message-save-error', errorHandler);
+                socket.off('error', generalErrorHandler);
             };
         }
     }, [teamId, socket]);
+
+    const retryMessage = (msg: any) => {
+        if (isRateLimited) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        // Remove error state visually immediately
+        setMessages((prev) => prev.map(m => 
+            (m._id === msg._id || m.localId === msg.localId) 
+            ? { ...m, isError: false, errorMessage: undefined } 
+            : m
+        ));
+
+        if (socket && teamId) {
+            // SAFE FIX: Send exact cloned payload, preserving fixed _id preventing duplicate DB inserts when backend recovers
+            const payload = { ...msg };
+            delete payload.isError;
+            delete payload.errorMessage;
+            socket.emit('send-team-message', payload);
+        }
+    };
 
     const sendMessage = () => {
         if (!inputText.trim() || !user) return;
@@ -416,6 +483,14 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </Text>
                             </View>
+                            {item.isError && (
+                                <TouchableOpacity onPress={() => retryMessage(item)} style={{ marginTop: 4, alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text style={{ color: Colors.danger, fontSize: 10, fontWeight: 'bold', marginRight: 4 }}>
+                                        Yuborilmadi - Qaytadan
+                                    </Text>
+                                    <Ionicons name="refresh-circle" size={14} color={Colors.danger} />
+                                </TouchableOpacity>
+                            )}
                         </View>
                         </View>
                     </View>
@@ -458,14 +533,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
     }, [user, teamInfo]);
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.7}
-                style={StyleSheet.absoluteFill}
-            />
-
+        <AnimatedBackground overlayOpacity={0.8} backgroundImage={backgroundImage}>
             <SafeAreaView style={styles.container} edges={['top']}>
                 <View style={styles.header}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -481,7 +549,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                         <View style={styles.statusBadge}>
                             <View style={[styles.statusDot, { backgroundColor: isConnected ? Colors.primary : Colors.danger }]} />
                             <Text style={[styles.headerStatus, { color: isConnected ? Colors.primary : Colors.danger }]}>
-                                {isConnected ? 'ONLINE' : 'OFLAYN'}
+                                {isConnected ? 'ONLINE' : 'ULANILMOQDA...'}
                             </Text>
                         </View>
                     </TouchableOpacity>
@@ -533,8 +601,9 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                             ) : null}
                             keyboardShouldPersistTaps="handled"
                             keyboardDismissMode="interactive"
-                            initialNumToRender={20}
-                            maxToRenderPerBatch={20}
+                            initialNumToRender={15}
+                            removeClippedSubviews={Platform.OS === 'android'}
+                            maxToRenderPerBatch={10}
                             windowSize={11}
                         />
                     )}
@@ -566,9 +635,9 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                             multiline
                         />
                         <TouchableOpacity 
-                            style={[styles.sendButton, { backgroundColor: Colors.primary }, !inputText.trim() && { opacity: 0.5 }]} 
+                            style={[styles.sendButton, { backgroundColor: Colors.primary }, (!inputText.trim() || isRateLimited) && { opacity: 0.5 }]} 
                             onPress={sendMessage}
-                            disabled={!inputText.trim()}
+                            disabled={!inputText.trim() || isRateLimited}
                         >
                             <Ionicons name={isEditing ? "checkmark" : "send"} size={20} color="#000" />
                         </TouchableOpacity>
@@ -669,11 +738,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                         { transform: [{ translateY: pan.y.interpolate({ inputRange: [0, height], outputRange: [0, height], extrapolate: 'clamp' }) }] }
                     ]}
                 >
-                    <VideoBackground
-                        source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                        overlayOpacity={0.85}
-                        style={StyleSheet.absoluteFill}
-                    />
+                    <AnimatedBackground overlayOpacity={0.85} />
                     
                     <SafeAreaView style={{ flex: 1 }}>
                         <View {...panResponder.panHandlers} style={{ paddingBottom: 20 }}>
@@ -729,7 +794,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                     </SafeAreaView>
                 </Animated.View>
             </Modal>
-        </View>
+        </AnimatedBackground>
     );
 };
 

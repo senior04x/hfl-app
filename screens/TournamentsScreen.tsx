@@ -25,12 +25,19 @@ import GenericListSkeleton from '../components/GenericListSkeleton';
 import Skeleton from '../components/Skeleton';
 import TournamentsSkeleton from '../components/TournamentsSkeleton';
 import { RefreshControl } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 
 
 const { width } = Dimensions.get('window');
+
+const LEAGUE_LOGOS: Record<string, any> = {
+    'super': require('../assets/images/super-liga.png'),
+    'pro': require('../assets/images/pro-liga.png'),
+    '3liga': require('../assets/images/3-liga.png'),
+    '7x7': require('../assets/images/7x7-liga.png'),
+};
 
 // Stable Header Component to prevent unwanted re-renders during selection
 const TournamentsHeader = ({
@@ -44,7 +51,10 @@ const TournamentsHeader = ({
     animationValue,
     leagues,
     handleLeagueSelect,
-    tournaments
+    tournaments,
+    teams,
+    teamsLoading,
+    navigation
 }: any) => {
     const accordionHeight = animationValue.interpolate({
         inputRange: [0, 1],
@@ -55,6 +65,8 @@ const TournamentsHeader = ({
         inputRange: [0, 1],
         outputRange: [0, 1],
     });
+
+    const currentLogoSource = LEAGUE_LOGOS[selectedLeague?.id || selectedLeague?._id || selectedLeague?.logoKey] || (selectedLeague?.logo ? { uri: selectedLeague.logo } : null);
 
     return (
         <View style={styles.headerContent}>
@@ -87,66 +99,36 @@ const TournamentsHeader = ({
                 </View>
             </View>
 
-            {/* League Info Card with Glass Effect */}
+            {/* League Info Card with Glass Effect — Only Large Logo Without Background */}
             <TouchableOpacity 
-                style={styles.leagueCard} 
+                style={styles.leagueCardCentered} 
                 onPress={toggleLeagueSelector}
+                activeOpacity={0.8}
             >
-                <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
-                <View style={{ flexDirection: 'row', padding: 16 }}>
-                    <View style={styles.logoBox}>
+                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={styles.leagueCardCenteredContent}>
+                    {/* Large Logo without background */}
+                    <View style={styles.largeLogoWrapper}>
                         {isLeaguesLoading || !selectedLeague ? (
-                            <Skeleton circle width={80} height={80} />
-                        ) : selectedLeague?.logo ? (
+                            <Skeleton width="92%" height={210} borderRadius={16} />
+                        ) : currentLogoSource ? (
                             <Image
-                                source={{ uri: selectedLeague.logo }}
-                                style={styles.headerLeagueLogo}
+                                source={currentLogoSource}
+                                style={styles.headerLeagueLogoLarge}
                                 resizeMode="contain"
                             />
                         ) : (
-                            <View style={styles.logoCircleSmall}>
-                                <Ionicons name="shield" size={40} color={Colors.primary} />
-                            </View>
+                            <Ionicons name="shield" size={140} color={Colors.primary} />
                         )}
                     </View>
-                    <View style={{ flex: 1, paddingLeft: 12, justifyContent: 'center', zIndex: 100 }}>
-                        {/* Status/Location Row */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                            <Image
-                                source={{
-                                    uri: selectedLeague?.location?.toLowerCase().includes('rossiya') || selectedLeague?.location?.toLowerCase().includes('russia')
-                                        ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Russia.svg/1200px-Flag_of_Russia.svg.png'
-                                        : 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
-                                }}
-                                style={[styles.flagIcon, { shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 2 }]}
-                            />
-                            <Text style={{ color: '#00FF66', fontSize: 13, fontWeight: '700', marginLeft: 4 }}>
-                                {(selectedLeague?.location || 'O\'zbekiston').toUpperCase()}
-                            </Text>
-                        </View>
 
-                        {/* League Title Area */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <Text 
-                                style={{ 
-                                    color: '#FFFFFF', 
-                                    fontSize: 19, 
-                                    fontWeight: '900', 
-                                    textShadowColor: 'black', 
-                                    textShadowRadius: 3,
-                                    marginRight: 6
-                                }}
-                            >
-                                {(selectedLeague?.name || 'HFL SUPER LIGA').toUpperCase()}
-                            </Text>
-                            <Ionicons
-                                name={isLeagueSelectorOpen ? "chevron-up" : "chevron-down"}
-                                size={20}
-                                color={Colors.primary}
-                                style={{ opacity: 1, zIndex: 110 }}
-                            />
-                        </View>
-                    </View>
+                    {/* Green Arrow at Bottom */}
+                    <Ionicons
+                        name={isLeagueSelectorOpen ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color="#00FF66"
+                        style={{ marginTop: -4, marginBottom: 4 }}
+                    />
                 </View>
             </TouchableOpacity>
 
@@ -166,12 +148,7 @@ const TournamentsHeader = ({
                 }
             ]}>
                 <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
-                <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.accordionContent}
-                    nestedScrollEnabled
-                    keyboardShouldPersistTaps="handled"
-                >
+                <View style={styles.accordionContent}>
                     {isLeaguesLoading ? (
                         <View style={{ padding: 16 }}>
                             <Skeleton width="100%" height={40} borderRadius={6} style={{ marginBottom: 12 }} />
@@ -179,29 +156,37 @@ const TournamentsHeader = ({
                             <Skeleton width="100%" height={40} borderRadius={6} />
                         </View>
                     ) : (
-                        leagues.map((league: any) => (
-                            <TouchableOpacity
-                                key={league._id}
-                                style={[
-                                    styles.accordionItem,
-                                    selectedLeague?._id === league._id && styles.activeAccordionItem
-                                ]}
-                                onPress={() => handleLeagueSelect(league)}
-                            >
-                                <View style={styles.accordionLogoContainer}>
-                                    {league.logo ? (
-                                        <Image source={{ uri: league.logo }} style={styles.accordionLogo} />
-                                    ) : (
-                                        <Ionicons name="football" size={18} color={Colors.primary} />
+                        leagues.map((league: any) => {
+                            const isSelected = (selectedLeague?.id === league.id || selectedLeague?._id === league._id);
+                            const itemLogo = LEAGUE_LOGOS[league.id || league._id || league.logoKey] || (league.logo ? { uri: league.logo } : null);
+                            return (
+                                <TouchableOpacity
+                                    key={league.id || league._id}
+                                    style={[
+                                        styles.accordionItem,
+                                        isSelected && styles.activeAccordionItem
+                                    ]}
+                                    onPress={() => handleLeagueSelect(league)}
+                                    activeOpacity={0.6}
+                                >
+                                    <View style={styles.accordionLogoContainer}>
+                                        {itemLogo ? (
+                                            <Image source={itemLogo} style={styles.accordionLogo} resizeMode="contain" />
+                                        ) : (
+                                            <Ionicons name="football" size={18} color={Colors.primary} />
+                                        )}
+                                    </View>
+                                    <Text style={[styles.accordionItemName, isSelected && { color: Colors.primary, fontWeight: '900' }]} numberOfLines={1}>
+                                        {league.name?.toUpperCase()}
+                                    </Text>
+                                    {isSelected && (
+                                        <Ionicons name="checkmark-circle" size={20} color={Colors.primary} style={{ marginLeft: 8 }} />
                                     )}
-                                </View>
-                                <Text style={styles.accordionItemName} numberOfLines={1}>
-                                    {league.name?.toUpperCase()}
-                                </Text>
-                            </TouchableOpacity>
-                        ))
+                                </TouchableOpacity>
+                            );
+                        })
                     )}
-                </ScrollView>
+                </View>
             </Animated.View>
 
             {/* Stats Row with Glass Effect */}
@@ -209,11 +194,11 @@ const TournamentsHeader = ({
                 <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>Turnirlar</Text>
+                        <Text style={styles.statLabel}>Jamoalar</Text>
                         {isLeaguesLoading || !selectedLeague ? (
                             <Skeleton width={30} height={16} borderRadius={4} />
                         ) : (
-                            <Text style={styles.statValue}>{tournaments.length}</Text>
+                            <Text style={styles.statValue}>{teams?.length || 0}</Text>
                         )}
                     </View>
                     <View style={styles.statItem}>
@@ -222,7 +207,7 @@ const TournamentsHeader = ({
                             <Skeleton width={50} height={16} borderRadius={4} />
                         ) : (
                             <Text style={styles.statValue}>
-                                {tournaments.filter((t: any) => t.status === 'ongoing' || t.status === 'active').length} faol
+                                {teams?.length || 0} faol
                             </Text>
                         )}
                     </View>
@@ -249,33 +234,43 @@ const TournamentsHeader = ({
 
             {/* Action Buttons with Glass Effect */}
             <View style={styles.actionsRow}>
-                <TouchableOpacity style={styles.participateBtn}>
+                <TouchableOpacity 
+                    style={styles.participateBtn}
+                    onPress={() => navigation.navigate('JoinApplication')}
+                    activeOpacity={0.8}
+                >
                     <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
                     <Text style={styles.participateBtnText}>QATNASHISH</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.hallOfFameBtn}>
+                <TouchableOpacity 
+                    style={styles.hallOfFameBtn}
+                    onPress={() => {
+                        if (selectedLeague) {
+                            navigation.navigate('TournamentDetail', { 
+                                tournament: selectedLeague,
+                                tournamentId: selectedLeague.id || selectedLeague._id 
+                            });
+                        }
+                    }}
+                    activeOpacity={0.8}
+                >
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={styles.hallOfFameBtnText}>SHUHRAT ZALI</Text>
+                        <Text style={styles.hallOfFameBtnText}>TURNIR HAQIDA</Text>
                         <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
                     </View>
                 </TouchableOpacity>
             </View>
 
-            {/* Tournament List Header with Glass Effect */}
+            {/* Teams List Header */}
             <View style={styles.listHeader}>
                 <View style={styles.listHeaderBadge}>
                     <BlurView intensity={10} tint="light" style={StyleSheet.absoluteFill} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6 }}>
-                        <Image
-                            source={{
-                                uri: selectedLeague?.location?.toLowerCase().includes('rossiya') || selectedLeague?.location?.toLowerCase().includes('russia')
-                                    ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Russia.svg/1200px-Flag_of_Russia.svg.png'
-                                    : 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
-                            }}
-                            style={styles.miniFlag}
-                        />
-                        <Text style={styles.listHeaderText}>TURNIRLAR RO'YXATI</Text>
+                        <Ionicons name="shield-checkmark-outline" size={16} color="#00FF66" style={{ marginRight: 6 }} />
+                        <Text style={styles.listHeaderText}>
+                            {(selectedLeague?.name || 'LIGA').toUpperCase()} JAMOALARI ({teams?.length || 0})
+                        </Text>
                     </View>
                 </View>
             </View>
@@ -284,7 +279,6 @@ const TournamentsHeader = ({
 };
 
 export default function TournamentsScreen({ navigation }: any) {
-    const [tournaments, setTournaments] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('league'); // 'league' or 'favorites'
     const [searchQuery, setSearchQuery] = useState('');
@@ -292,6 +286,8 @@ export default function TournamentsScreen({ navigation }: any) {
     const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
     const [isLeagueSelectorOpen, setIsLeagueSelectorOpen] = useState(false);
     const [isLeaguesLoading, setIsLeaguesLoading] = useState(true);
+    const [teams, setTeams] = useState<any[]>([]);
+    const [teamsLoading, setTeamsLoading] = useState(false);
 
     const animationValue = useRef(new Animated.Value(0)).current;
 
@@ -307,6 +303,19 @@ export default function TournamentsScreen({ navigation }: any) {
         }).start();
     }, [isLeagueSelectorOpen]);
 
+    const fetchLeagueTeams = async (leagueName: string) => {
+        try {
+            setTeamsLoading(true);
+            const teamData = await apiService.getTeams(1, 100, leagueName);
+            setTeams(teamData || []);
+        } catch (error) {
+            console.error('Error fetching league teams:', error);
+            setTeams([]);
+        } finally {
+            setTeamsLoading(false);
+        }
+    };
+
     const fetchLeagues = async () => {
         try {
             setIsLeaguesLoading(true);
@@ -316,8 +325,7 @@ export default function TournamentsScreen({ navigation }: any) {
                 if (data.length > 0 && !selectedLeague) {
                     const firstLeague = data[0];
                     setSelectedLeague(firstLeague);
-                    // Await tournaments to keep the skeleton active until both are done
-                    await fetchTournaments(firstLeague._id);
+                    await fetchLeagueTeams(firstLeague.name || firstLeague.id || '');
                 }
             }
         } catch (error) {
@@ -327,44 +335,21 @@ export default function TournamentsScreen({ navigation }: any) {
         }
     };
 
-    const fetchTournaments = async (leagueId?: string) => {
-        try {
-            setIsLoading(true);
-            // Fetch tournaments filtered by leagueId directly from API if provided
-            const data = await apiService.getTournaments(1, 100, leagueId);
-            if (data && Array.isArray(data)) {
-                setTournaments(data);
-            } else {
-                setTournaments([]);
-            }
-        } catch (error) {
-            console.error('Error fetching tournaments:', error);
-            setTournaments([]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     useEffect(() => {
         fetchLeagues();
     }, []);
 
     useEffect(() => {
-        // Only fetch via useEffect if it's NOT the first load (which is already handled in fetchLeagues)
-        if (selectedLeague?._id && leagues.length > 0 && !isLeaguesLoading) {
-            fetchTournaments(selectedLeague._id);
+        if (selectedLeague && (leagues?.length || 0) > 0 && !isLeaguesLoading) {
+            fetchLeagueTeams(selectedLeague.name || selectedLeague.id || '');
         }
-    }, [selectedLeague?._id]);
+    }, [selectedLeague?._id, selectedLeague?.name]);
 
     const handleLeagueSelect = useCallback((league: any) => {
         setIsLeagueSelectorOpen(false);
-        // Only trigger data fetch/clear if the selection actually changed
-        if (selectedLeague?._id !== league._id) {
-            setTournaments([]); // Clear for unified skeleton
-            setSelectedLeague(league);
-        }
-    }, [selectedLeague?._id]);
-
+        setSelectedLeague(league);
+        fetchLeagueTeams(league.name || league.id || '');
+    }, []);
 
     const handleSocialPress = useCallback((url?: string) => {
         if (url) {
@@ -372,59 +357,59 @@ export default function TournamentsScreen({ navigation }: any) {
         }
     }, []);
 
-    const filteredTournaments = tournaments.filter(t =>
+    const filteredTeams = (teams || []).filter(t =>
         t.name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const renderTournamentItem = ({ item: tournament, index }: { item: any, index: number }) => {
-        if (tournament._isSkeleton) {
+    const renderTeamItem = ({ item: team, index }: { item: any, index: number }) => {
+        if (team._isSkeleton) {
             return (
-                <View style={[styles.tournamentItem, { borderBottomWidth: 0 }]} key={`skeleton-${index}`}>
-                    <View style={styles.tournamentMainInfo}>
-                        <Skeleton width={width * 0.6} height={18} borderRadius={4} style={{ marginBottom: 8 }} />
-                        <View style={styles.statusRow}>
-                            <Skeleton circle width={6} height={6} style={{ marginRight: 8 }} />
-                            <Skeleton width={width * 0.4} height={14} borderRadius={4} />
-                        </View>
+                <View style={[styles.teamItem, { borderBottomWidth: 0 }]} key={`skeleton-${index}`}>
+                    <Skeleton circle width={48} height={48} style={{ marginRight: 14 }} />
+                    <View style={{ flex: 1 }}>
+                        <Skeleton width={width * 0.5} height={18} borderRadius={4} style={{ marginBottom: 6 }} />
+                        <Skeleton width={width * 0.3} height={12} borderRadius={4} />
                     </View>
-                    <Skeleton circle width={20} height={20} />
                 </View>
             );
         }
 
         return (
             <TouchableOpacity
-                key={tournament._id}
-                style={styles.tournamentItem}
-                onPress={() => navigation.navigate('TournamentDetail', {
-                    tournamentId: tournament._id,
-                    tournamentName: tournament.name,
-                    tournament: tournament
-                })}
+                key={team.id || team._id}
+                style={styles.teamItem}
+                onPress={() => navigation.navigate('TeamProfile', { teamId: team.id || team._id, team })}
+                activeOpacity={0.7}
             >
                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 16, paddingHorizontal: 20 }}>
-                    <View style={styles.tournamentMainInfo}>
-                        <Text style={styles.tournamentName}>{tournament.name?.toUpperCase() || 'CHAMPION LEAGUE'}</Text>
-                        <View style={styles.statusRow}>
-                            <View style={[styles.statusDot, { backgroundColor: tournament.status === 'ongoing' ? Colors.primary : Colors.textMuted }]} />
-                            <Text style={styles.seasonText}>{tournament.season || 'ноябрь - июнь 2026'}</Text>
+                <View style={styles.teamItemContent}>
+                    <View style={styles.teamLogoCircle}>
+                        {team.logo_url ? (
+                            <Image source={{ uri: team.logo_url }} style={styles.teamLogoImage} />
+                        ) : (
+                            <Ionicons name="shield" size={24} color={Colors.primary} />
+                        )}
+                    </View>
+                    <View style={styles.teamMainInfo}>
+                        <Text style={styles.teamItemName} numberOfLines={1}>
+                            {(team.name || 'JAMOA').toUpperCase()}
+                        </Text>
+                        <View style={styles.teamBadgeRow}>
+                            <View style={styles.leagueTagBadge}>
+                                <Text style={styles.leagueTagText}>
+                                    {(team.league || selectedLeague?.name || 'HFL LIGA').toUpperCase()}
+                                </Text>
+                            </View>
                         </View>
                     </View>
-                    <Ionicons name="star-outline" size={20} color={Colors.primary} />
+                    <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
                 </View>
             </TouchableOpacity>
         );
     };
 
     return (
-        <View style={styles.mainWrapper}>
-            {/* Cinematic Video Background */}
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.7}
-                style={StyleSheet.absoluteFill}
-            />
+        <AnimatedBackground overlayOpacity={0.7} backgroundImage={backgroundImage}>
 
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* Custom Navbar */}
@@ -438,7 +423,7 @@ export default function TournamentsScreen({ navigation }: any) {
                         <View style={styles.navSearchContainer}>
                             <TextInput
                                 style={styles.navSearchInput}
-                                placeholder="Qidirish..."
+                                placeholder="Jamoalarni qidirish..."
                                 placeholderTextColor="rgba(255,255,255,0.5)"
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
@@ -449,13 +434,13 @@ export default function TournamentsScreen({ navigation }: any) {
                 </View>
 
 
-                {isLeaguesLoading || (isLoading && tournaments.length === 0) ? (
+                {isLeaguesLoading ? (
                     <TournamentsSkeleton />
                 ) : (
                     <FlatList
-                        data={isLoading ? Array(6).fill({ _isSkeleton: true }) : filteredTournaments}
-                        keyExtractor={(item, index) => item?._id || `skeleton-${index}`}
-                        renderItem={renderTournamentItem}
+                        data={teamsLoading ? Array(5).fill({ _isSkeleton: true }) : filteredTeams}
+                        keyExtractor={(item, index) => item?.id || item?._id || `skeleton-${index}`}
+                        renderItem={renderTeamItem}
                         ListHeaderComponent={
                             <TournamentsHeader
                                 activeTab={activeTab}
@@ -468,14 +453,24 @@ export default function TournamentsScreen({ navigation }: any) {
                                 animationValue={animationValue}
                                 leagues={leagues}
                                 handleLeagueSelect={handleLeagueSelect}
-                                tournaments={tournaments}
+                                teams={teams}
+                                teamsLoading={teamsLoading}
+                                navigation={navigation}
                             />
+                        }
+                        ListEmptyComponent={
+                            !teamsLoading ? (
+                                <View style={styles.emptyStateBox}>
+                                    <Ionicons name="shield-outline" size={48} color="rgba(255,255,255,0.2)" />
+                                    <Text style={styles.emptyStateText}>Ushbu ligada hozircha jamoalar kiritilmagan</Text>
+                                </View>
+                            ) : null
                         }
                         contentContainerStyle={styles.list}
                         refreshControl={
                             <RefreshControl
-                                refreshing={isLoading && tournaments.length > 0}
-                                onRefresh={() => fetchTournaments(selectedLeague?._id)}
+                                refreshing={teamsLoading && teams.length > 0}
+                                onRefresh={() => fetchLeagueTeams(selectedLeague?.name || selectedLeague?.id || '')}
                                 tintColor={Colors.primary}
                                 colors={[Colors.primary]}
                             />
@@ -483,7 +478,7 @@ export default function TournamentsScreen({ navigation }: any) {
                     />
                 )}
             </SafeAreaView>
-        </View>
+        </AnimatedBackground>
     );
 }
 
@@ -586,6 +581,15 @@ const styles = StyleSheet.create({
         marginRight: 16,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.08)',
+        padding: 4,
+    },
+    headerLeagueLogo: {
+        width: 72,
+        height: 72,
+    },
+    accordionLogo: {
+        width: 26,
+        height: 26,
     },
     logoText: {
         color: '#000',
@@ -793,6 +797,62 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
     },
+    leagueCardCentered: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    leagueCardCenteredContent: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 4,
+        paddingBottom: 2,
+        paddingHorizontal: 12,
+    },
+    largeLogoWrapper: {
+        width: '100%',
+        height: 110,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 0,
+    },
+    headerLeagueLogoLarge: {
+        width: '80%',
+        height: 110,
+    },
+    leagueTitleCenteredRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 6,
+    },
+    leagueTitleCenteredText: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+        textShadowColor: 'rgba(0,0,0,0.8)',
+        textShadowRadius: 6,
+    },
+    locationBadgeCentered: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.25)',
+    },
+    locationBadgeText: {
+        color: '#00FF66',
+        fontSize: 12,
+        fontWeight: '700',
+        marginLeft: 6,
+    },
     leagueAccordion: {
         backgroundColor: 'transparent',
         borderTopWidth: 1,
@@ -840,5 +900,112 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
+    },
+    teamsSectionContainer: {
+        marginBottom: 25,
+    },
+    teamBadgeCard: {
+        width: 110,
+        height: 100,
+        marginRight: 10,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+    },
+    teamCardInner: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 10,
+    },
+    teamLogoCircleSmall: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    teamLogoSmall: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+    },
+    teamBadgeName: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    noTeamsText: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 13,
+    },
+    teamItem: {
+        marginHorizontal: 16,
+        marginBottom: 10,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    teamItemContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+    },
+    teamLogoCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    teamLogoImage: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+    },
+    teamMainInfo: {
+        flex: 1,
+    },
+    teamItemName: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '800',
+        marginBottom: 4,
+    },
+    teamBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    leagueTagBadge: {
+        backgroundColor: 'rgba(0, 255, 102, 0.15)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.3)',
+    },
+    leagueTagText: {
+        color: '#00FF66',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    emptyStateBox: {
+        padding: 40,
+        alignItems: 'center',
+    },
+    emptyStateText: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 14,
+        marginTop: 12,
+        fontWeight: '600',
     },
 });

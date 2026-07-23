@@ -18,9 +18,9 @@ Notifications.setNotificationHandler({
 export const notificationService = {
   /**
    * Registers the device for push notifications and sends the token to the backend
-   * @param userId The ID of the currently logged-in user
+   * @param userId The ID of the currently logged-in user (optional)
    */
-  registerForPushNotificationsAsync: async (userId: string) => {
+  registerForPushNotificationsAsync: async (userId?: string) => {
     if (!Device.isDevice) {
       console.log('NOTICE: Must use physical device for Push Notifications');
       return null;
@@ -60,6 +60,9 @@ export const notificationService = {
       
       const token = tokenData.data;
       console.log('Expo Push Token:', token);
+      
+      // DIAGNOSTIC ALERT (Temporary)
+      // Alert.alert('Push Registration', `Expo Token: ${token.substring(0, 20)}...`);
 
       // Get native device token (FCM/APNs) for direct Firebase messaging
       try {
@@ -72,12 +75,15 @@ export const notificationService = {
       // Register with our backend
       // Register Expo Token with our backend
       if (userId) {
-        await apiService.registerPushToken({
+        const registrationData = {
           token,
-          userId,
+          userId: userId || 'anonymous',
           platform: Platform.OS,
           deviceId: Constants.installationId || Device.osBuildId || 'unknown'
-        });
+        };
+        
+        await apiService.registerPushToken(registrationData);
+        console.log('Registered Expo Token with backend:', registrationData.userId);
 
         // Also register native device token (FCM/APNs) for direct Firebase messaging
         try {
@@ -103,6 +109,7 @@ export const notificationService = {
          console.log('NOTICE: Push orientation failed in Expo Go (expected). Use Dev Build for full support.');
        } else {
          console.error('Error during push notification registration:', error);
+         Alert.alert('Push Error', error.message || 'Unknown registration error');
        }
        return null;
     }

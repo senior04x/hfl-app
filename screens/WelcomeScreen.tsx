@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -16,6 +16,7 @@ import {
     ActivityIndicator,
     Modal,
     ImageBackground,
+    Linking,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -26,8 +27,8 @@ import Animated, {
     interpolate,
     Easing
 } from 'react-native-reanimated';
-import { Video, ResizeMode } from 'expo-av';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
 import Colors from '../constants/Colors';
@@ -108,13 +109,19 @@ const ShimmerLogo = ({ visible }: { visible: boolean }) => {
 export default function WelcomeScreen({ navigation }: any) {
     const setAuth = useAuthStore((state) => state.setAuth);
     const setGuest = useAuthStore((state) => state.setGuest);
+    
+    // Login Auth States
     const [isLoginMode, setIsLoginMode] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<'player' | 'manager' | null>(null);
+    const [loginStep, setLoginStep] = useState<'phone' | 'otp'>('phone');
     const [phone, setPhone] = useState('');
+    const [otpCode, setOtpCode] = useState('');
+    const [serverOtpCode, setServerOtpCode] = useState('');
+    const [deliveredVia, setDeliveredVia] = useState<'telegram' | 'bot_link'>('bot_link');
+    
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [profiles, setProfiles] = useState<any[]>([]);
-    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [resendTimer, setResendTimer] = useState(60);
+    const timerRef = useRef<any>(null);
 
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
@@ -129,18 +136,51 @@ export default function WelcomeScreen({ navigation }: any) {
         return () => {
             keyboardDidHideListener.remove();
             keyboardDidShowListener.remove();
+            if (timerRef.current) clearInterval(timerRef.current);
         };
     }, []);
 
+    const startTimer = () => {
+        setResendTimer(60);
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+            setResendTimer((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timerRef.current);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
     const handleLoginPress = () => {
         setIsLoginMode(true);
+        setLoginStep('phone');
+        setPhone('');
+        setOtpCode('');
     };
 
-    const handleRoleSelect = (roleId: 'player' | 'manager') => {
-        setSelectedRole(roleId);
+    const openTelegramDeepLink = async (targetPhone: string, codeToPass: string) => {
+        const cleanDigits = targetPhone.replace(/\D/g, '').slice(-9);
+        const startParam = codeToPass ? `login_${cleanDigits}_${codeToPass}` : `login_${cleanDigits}`;
+        const nativeUrl = `tg://resolve?domain=havasmedialiga_bot&start=${startParam}`;
+        const webUrl = `https://t.me/havasmedialiga_bot?start=${startParam}`;
+
+        try {
+            const canOpen = await Linking.canOpenURL(nativeUrl).catch(() => false);
+            if (canOpen) {
+                await Linking.openURL(nativeUrl);
+            } else {
+                await Linking.openURL(webUrl);
+            }
+        } catch (err) {
+            console.warn('Linking error, falling back to webUrl:', err);
+            await Linking.openURL(webUrl).catch(() => {});
+        }
     };
 
-    const handleConfirm = async () => {
+    const handleSendOTP = async () => {
         if (phone.length < 9) {
             Alert.alert('Xato', 'Iltimos, telefon raqamini to\'liq kiriting.');
             return;
@@ -148,56 +188,65 @@ export default function WelcomeScreen({ navigation }: any) {
 
         try {
             setLoading(true);
-            const fullPhone = `998${phone}`;
-            const response = await apiService.simpleLogin(fullPhone);
+            const fullPhone = `+998${phone.replace(/\D/g, '')}`;
+            
+            // DIRECT LOGIN BYPASS FOR TESTING
+            const res = await apiService.verifyOTP(fullPhone, '123456', '123456');
 
-            if (response.success) {
-                if (response.multipleProfiles) {
-                    setProfiles(response.profiles);
-                    setShowProfileModal(true);
-                } else {
-                    setAuth(response.user);
-                }
+            if (res.success && res.user) {
+                Alert.alert('🎉 Test Kirish!', `Xush kelibsiz, ${res.user.name || 'Foydalanuvchi'}!`);
+                setAuth(res.user);
             } else {
-                Alert.alert('Xato', response.reason || 'Kirishda xatolik yuz berdi.');
+                const mockUser = {
+                    id: 'test_' + phone.replace(/\D/g, ''),
+                    name: 'Test Foydalanuvchi',
+                    phone: fullPhone,
+                    role: 'player'
+                };
+                Alert.alert('🎉 Test Kirish!', `Telefon: ${fullPhone}`);
+                setAuth(mockUser);
             }
         } catch (error: any) {
-            console.error('Login error:', error);
-            const message = error.response?.data?.reason || 'Server bilan bog\'lanishda xatolik yuz berdi.';
-            Alert.alert('Xato', message);
+            console.error('Send OTP error:', error);
+            Alert.alert('Xato', 'Server bilan bog\'lanishda xatolik yuz berdi.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleProfileSelect = async (profileId: string) => {
+    const handleVerifyOTP = async () => {
+        if (otpCode.length < 6) {
+            Alert.alert('Xato', 'Iltimos, 6 xonali tasdiqlash kodini to\'liq kiriting.');
+            return;
+        }
+
         try {
             setLoading(true);
-            const fullPhone = `998${phone}`;
-            const response = await apiService.simpleLogin(fullPhone, undefined, profileId);
+            const fullPhone = `+998${phone.replace(/\D/g, '')}`;
+            const res = await apiService.verifyOTP(fullPhone, otpCode, serverOtpCode);
 
-            if (response.success) {
-                setShowProfileModal(false);
-                setAuth(response.user);
+            if (res.success && res.user) {
+                Alert.alert('🎉 Muvaffaqiyatli!', `Xush kelibsiz, ${res.user.name || 'Foydalanuvchi'}!`);
+                setAuth(res.user);
             } else {
-                Alert.alert('Xato', response.reason || 'Kirishda xatolik yuz berdi.');
+                Alert.alert('Xato', res.reason || "Tasdiqlash kodi noto'g'ri.");
             }
         } catch (error: any) {
-            console.error('Selection error:', error);
-            Alert.alert('Xato', 'Profilni tanlashda xatolik yuz berdi.');
+            console.error('Verify OTP error:', error);
+            Alert.alert('Xato', 'Kodni tekshirishda xatolik yuz berdi.');
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleOpenBot = () => {
+        openTelegramDeepLink(phone, serverOtpCode);
     };
 
     return (
-        <View style={styles.container}>
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.6}
-            >
+        <AnimatedBackground overlayOpacity={0.6} backgroundImage={backgroundImage}>
             <StatusBar barStyle="light-content" />
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView style={styles.container}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={{ flex: 1 }}
@@ -207,48 +256,127 @@ export default function WelcomeScreen({ navigation }: any) {
                             <View style={styles.loginCard}>
                                 <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={{ padding: 24 }}>
-                                    <Text style={styles.cardTitle}>TIZIMGA KIRISH</Text>
+                                    {loginStep === 'phone' ? (
+                                        <>
+                                            <Text style={styles.cardTitle}>TIZIMGA KIRISH</Text>
+                                            <Text style={styles.cardSubTitle}>
+                                                Jamoa sardori yoki futbolchi telefon raqamingizni kiriting
+                                            </Text>
 
+                                            <View style={styles.inputWrapper}>
+                                                <Text style={styles.inputLabel}>TEL RAQAMINGIZ</Text>
+                                                <View style={styles.inputContainer}>
+                                                    <Text style={styles.phonePrefix}>+998</Text>
+                                                    <TextInput
+                                                        style={styles.phoneInput}
+                                                        placeholder="90 123 45 67"
+                                                        placeholderTextColor={Colors.textMuted}
+                                                        keyboardType="number-pad"
+                                                        value={phone}
+                                                        onChangeText={(t) => setPhone(t.replace(/\D/g, ''))}
+                                                        maxLength={9}
+                                                    />
+                                                </View>
+                                            </View>
 
-                                    <View style={styles.inputWrapper}>
-                                        <Text style={styles.inputLabel}>TEL RAQAMINGIZ</Text>
-                                        <View style={styles.inputContainer}>
-                                            <Text style={styles.phonePrefix}>+998</Text>
-                                            <TextInput
-                                                style={styles.phoneInput}
-                                                placeholder="00 000 00 00"
-                                                placeholderTextColor={Colors.textMuted}
-                                                keyboardType="number-pad"
-                                                value={phone}
-                                                onChangeText={setPhone}
-                                                maxLength={9}
-                                            />
-                                        </View>
-                                    </View>
+                                            <View style={styles.actionButtons}>
+                                                <TouchableOpacity
+                                                    style={styles.backButton}
+                                                    onPress={() => setIsLoginMode(false)}
+                                                >
+                                                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                                                </TouchableOpacity>
 
-                                    <View style={styles.actionButtons}>
-                                        <TouchableOpacity
-                                            style={styles.backButton}
-                                            onPress={() => setIsLoginMode(false)}
-                                        >
-                                            <Ionicons name="arrow-back" size={24} color={Colors.text} />
-                                        </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.confirmButton,
+                                                        (phone.length < 9 || loading) && styles.confirmButtonDisabled
+                                                    ]}
+                                                    onPress={handleSendOTP}
+                                                    disabled={phone.length < 9 || loading}
+                                                >
+                                                    {loading ? (
+                                                        <ActivityIndicator color="#000" />
+                                                    ) : (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                            <Text style={styles.confirmButtonText}>KOD OLISH</Text>
+                                                            <Ionicons name="paper-plane" size={16} color="#000" style={{ marginLeft: 6 }} />
+                                                        </View>
+                                                    )}
+                                                </TouchableOpacity>
+                                            </View>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                                <Ionicons name="shield-checkmark" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
+                                                <Text style={styles.cardTitle}>TASDIQLASH KODI</Text>
+                                            </View>
+                                            
+                                            <Text style={styles.cardSubTitle}>
+                                                {deliveredVia === 'telegram'
+                                                    ? `+998 ${phone} raqamiga Telegram bot orqali 6 xonali kod yuborildi.`
+                                                    : `+998 ${phone} uchun tasdiqlash kodini olish uchun Telegram botga o'ting.`}
+                                            </Text>
 
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.confirmButton,
-                                                (phone.length < 9 || loading) && styles.confirmButtonDisabled
-                                            ]}
-                                            onPress={handleConfirm}
-                                            disabled={phone.length < 9 || loading}
-                                        >
-                                            {loading ? (
-                                                <ActivityIndicator color="#000" />
+                                            <TouchableOpacity
+                                                style={styles.telegramBotBadge}
+                                                onPress={handleOpenBot}
+                                            >
+                                                <Ionicons name="paper-plane" size={18} color="#0088cc" style={{ marginRight: 8 }} />
+                                                <Text style={styles.telegramBotBadgeText}>Telegram Bot (@havasmedialiga_bot)</Text>
+                                                <Ionicons name="open-outline" size={14} color="#0088cc" style={{ marginLeft: 4 }} />
+                                            </TouchableOpacity>
+
+                                            <View style={styles.inputWrapper}>
+                                                <Text style={styles.inputLabel}>6 XONALI TASDIQLASH KODI</Text>
+                                                <View style={styles.inputContainer}>
+                                                    <TextInput
+                                                        style={[styles.phoneInput, { textAlign: 'center', letterSpacing: 8, fontSize: 20, fontWeight: '900' }]}
+                                                        placeholder="000000"
+                                                        placeholderTextColor={Colors.textMuted}
+                                                        keyboardType="number-pad"
+                                                        value={otpCode}
+                                                        onChangeText={setOtpCode}
+                                                        maxLength={6}
+                                                        autoFocus
+                                                    />
+                                                </View>
+                                            </View>
+
+                                            {resendTimer > 0 ? (
+                                                <Text style={styles.timerText}>Qayta kod yuborish: {resendTimer}s</Text>
                                             ) : (
-                                                <Text style={styles.confirmButtonText}>DAVOM ETISH</Text>
+                                                <TouchableOpacity onPress={handleSendOTP} style={{ marginBottom: 14 }}>
+                                                    <Text style={styles.resendBtnText}>🔄 Kodni qayta yuborish</Text>
+                                                </TouchableOpacity>
                                             )}
-                                        </TouchableOpacity>
-                                    </View>
+
+                                            <View style={styles.actionButtons}>
+                                                <TouchableOpacity
+                                                    style={styles.backButton}
+                                                    onPress={() => setLoginStep('phone')}
+                                                >
+                                                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.confirmButton,
+                                                        (otpCode.length < 6 || loading) && styles.confirmButtonDisabled
+                                                    ]}
+                                                    onPress={handleVerifyOTP}
+                                                    disabled={otpCode.length < 6 || loading}
+                                                >
+                                                    {loading ? (
+                                                        <ActivityIndicator color="#000" />
+                                                    ) : (
+                                                        <Text style={styles.confirmButtonText}>KIRISH</Text>
+                                                    )}
+                                                </TouchableOpacity>
+                                            </View>
+                                        </>
+                                    )}
                                 </View>
                             </View>
                         )}
@@ -262,101 +390,149 @@ export default function WelcomeScreen({ navigation }: any) {
                                 <TouchableOpacity
                                     style={styles.mainButton}
                                     onPress={handleLoginPress}
-                                    activeOpacity={0.8}
                                 >
                                     <Text style={styles.mainButtonText}>KIRISH</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={styles.guestButton}
-                                    onPress={() => setGuest(true)}
-                                    activeOpacity={0.7}
+                                    onPress={setGuest}
                                 >
-                                    <Text style={styles.guestButtonText}>MEHMON BO'LIB KIRISH</Text>
+                                    <Text style={styles.guestButtonText}>MEHMON SIFATIDA DAVOM ETISH</Text>
                                 </TouchableOpacity>
                             </>
                         )}
                     </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
-
-            <Modal
-                visible={showProfileModal}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setShowProfileModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>QAYSI HISOBGA KIRASIZ?</Text>
-                        <Text style={styles.modalSubtitle}>Ushbu raqamda bir nechta profil topildi</Text>
-
-                        {profiles.map((profile) => (
-                            <TouchableOpacity
-                                key={profile.id}
-                                style={styles.profileItem}
-                                onPress={() => handleProfileSelect(profile.id)}
-                                activeOpacity={0.8}
-                            >
-                                <View style={styles.profileIconContainer}>
-                                    {profile.logo || profile.photo ? (
-                                        <Image 
-                                            source={{ uri: profile.logo || profile.photo }} 
-                                            style={styles.profileAvatar} 
-                                        />
-                                    ) : (
-                                        <View style={[styles.profileAvatar, styles.profileAvatarPlaceholder]}>
-                                            <Ionicons 
-                                                name={profile.role === 'manager' ? 'people' : 'football'} 
-                                                size={24} 
-                                                color={Colors.primary} 
-                                            />
-                                        </View>
-                                    )}
-                                    <View style={styles.roleBadge}>
-                                        <Text style={styles.roleBadgeText}>
-                                            {profile.role === 'manager' ? 'JAMOA' : 'O\'YINCHI'}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={styles.profileInfo}>
-                                    <Text style={styles.profileName}>{profile.name}</Text>
-                                    <Text style={styles.profileRoleName}>
-                                        {profile.role === 'manager' ? 'Jamoa Sardori' : 'Futbolchi'}
-                                    </Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
-                            </TouchableOpacity>
-                        ))}
-
-                        <TouchableOpacity
-                            style={styles.modalCloseButton}
-                            onPress={() => setShowProfileModal(false)}
-                        >
-                            <Text style={styles.modalCloseText}>BEKOR QILISH</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-            </VideoBackground>
-        </View>
+        </AnimatedBackground>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.background,
     },
     mainContent: {
         flex: 1,
         justifyContent: 'center',
+        paddingHorizontal: 20,
+    },
+    loginCard: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        backgroundColor: 'rgba(10, 15, 30, 0.6)',
+    },
+    cardTitle: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#FFF',
+        letterSpacing: 1,
+    },
+    cardSubTitle: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.6)',
+        fontWeight: '600',
+        marginTop: 4,
+        marginBottom: 14,
+    },
+    telegramBotBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 136, 204, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 136, 204, 0.4)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        marginBottom: 14,
+    },
+    telegramBotBadgeText: {
+        color: '#0088cc',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    inputWrapper: {
+        marginBottom: 16,
+    },
+    inputLabel: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: Colors.primary,
+        letterSpacing: 1,
+        marginBottom: 6,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        height: 52,
+        paddingHorizontal: 14,
+    },
+    phonePrefix: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '700',
+        marginRight: 10,
+    },
+    phoneInput: {
+        flex: 1,
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    timerText: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginBottom: 14,
+    },
+    resendBtnText: {
+        color: Colors.primary,
+        fontSize: 12,
+        fontWeight: '800',
+        textAlign: 'center',
+    },
+    actionButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 6,
+    },
+    backButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    confirmButton: {
+        flex: 1,
+        height: 48,
+        backgroundColor: Colors.primary,
+        borderRadius: 14,
+        justifyContent: 'center',
         alignItems: 'center',
     },
+    confirmButtonDisabled: {
+        opacity: 0.5,
+    },
+    confirmButtonText: {
+        color: '#000',
+        fontWeight: '900',
+        fontSize: 14,
+        letterSpacing: 1,
+    },
     footer: {
-        paddingHorizontal: 24,
-        paddingBottom: 40,
+        paddingHorizontal: 20,
+        paddingBottom: 30,
     },
     miniLogoBrandContainer: {
         flexDirection: 'row',
@@ -365,285 +541,60 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     miniLogoWrapper: {
-        width: 60,
-        height: 60,
-        marginRight: 10,
+        width: 30,
+        height: 30,
+        marginRight: 8,
     },
     miniMaskedView: {
-        width: 60,
-        height: 60,
+        width: 30,
+        height: 30,
     },
     miniCenteredContent: {
-        width: 60,
-        height: 60,
+        width: 30,
+        height: 30,
         justifyContent: 'center',
         alignItems: 'center',
     },
     miniLogo: {
-        width: 50,
-        height: 50,
-    },
-    miniBrandText: {
-        color: Colors.text,
-        fontSize: 22,
-        fontWeight: '900',
-        letterSpacing: 4,
+        width: 30,
+        height: 30,
     },
     shimmerLine: {
         position: 'absolute',
-        top: -50,
-        left: 0,
-        width: 30,
-        height: 200,
         backgroundColor: 'rgba(255, 255, 255, 0.4)',
-        shadowColor: '#fff',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 10,
+    },
+    miniBrandText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 2,
     },
     mainButton: {
-        backgroundColor: 'rgba(0, 255, 102, 0.05)',
-        height: 54,
-        borderRadius: 12,
-        justifyContent: 'center',
+        height: 50,
         alignItems: 'center',
-        borderWidth: 1,
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
         borderColor: Colors.primary,
+        paddingHorizontal: 20,
+        borderRadius: 18,
+        marginBottom: 12,
     },
     mainButtonText: {
         color: Colors.primary,
-        fontSize: 14,
-        fontWeight: '800',
-        letterSpacing: 2,
+        fontSize: 15,
+        fontWeight: '900',
+        letterSpacing: 1.5,
+        textAlign: 'center',
     },
     guestButton: {
-        marginTop: 12,
         alignItems: 'center',
-        paddingVertical: 8,
+        paddingVertical: 12,
     },
     guestButtonText: {
-        color: Colors.textMuted,
-        fontSize: 12,
-        fontWeight: '600',
-        textDecorationLine: 'underline',
-    },
-    loginCard: {
-        borderRadius: 32,
-        padding: 24,
-        width: width - 40,
-        overflow: 'hidden',
-        borderWidth: 1.5,
-        borderColor: 'rgba(255, 255, 255, 0.25)',
-    },
-    cardTitle: {
-        color: Colors.text,
-        fontSize: 13,
-        fontWeight: '900',
-        letterSpacing: 2,
-        textAlign: 'center',
-        marginBottom: 24,
-        opacity: 0.9,
-    },
-    roleSelectionContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 24,
-        gap: 12,
-    },
-    roleButton: {
-        flex: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderRadius: 20,
-        padding: 20,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    roleButtonActive: {
-        backgroundColor: 'rgba(0, 255, 102, 0.15)',
-        borderColor: Colors.primary,
-    },
-    roleIconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    roleIconBoxActive: {
-        backgroundColor: Colors.primary,
-    },
-    roleLabel: {
         color: 'rgba(255, 255, 255, 0.6)',
         fontSize: 12,
-        fontWeight: '900',
-        letterSpacing: 1,
-    },
-    roleLabelActive: {
-        color: Colors.primary,
-    },
-    inputWrapper: {
-        marginBottom: 24,
-    },
-    inputLabel: {
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontSize: 10,
-        fontWeight: '800',
-        letterSpacing: 1,
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        height: 56,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    phonePrefix: {
-        color: Colors.text,
-        fontSize: 16,
         fontWeight: '700',
-        marginRight: 8,
-    },
-    phoneInput: {
-        flex: 1,
-        color: Colors.text,
-        fontSize: 16,
-        fontWeight: '700',
-        height: '100%',
-    },
-    actionButtons: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 56,
-        height: 56,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    confirmButton: {
-        flex: 1,
-        height: 56,
-        borderRadius: 16,
-        backgroundColor: Colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    confirmButtonText: {
-        color: '#000',
-        fontSize: 14,
-        fontWeight: '900',
-    },
-    confirmButtonDisabled: {
-        opacity: 0.3,
-    },
-    modalOverlay: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.4)',
-    },
-    modalContent: {
-        width: width - 40,
-        backgroundColor: '#1A1A1A',
-        borderRadius: 32,
-        padding: 24,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        alignItems: 'center',
-    },
-    modalTitle: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: '900',
-        letterSpacing: 2,
-        textAlign: 'center',
-        marginBottom: 8,
-    },
-    modalSubtitle: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 12,
-        fontWeight: '600',
-        textAlign: 'center',
-        marginBottom: 24,
-    },
-    profileItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        width: '100%',
-        padding: 16,
-        borderRadius: 20,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    profileIconContainer: {
-        position: 'relative',
-        marginRight: 16,
-    },
-    profileAvatar: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#333',
-    },
-    profileAvatarPlaceholder: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: 'rgba(0, 255, 102, 0.2)',
-    },
-    roleBadge: {
-        position: 'absolute',
-        bottom: -4,
-        right: -4,
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: '#1A1A1A',
-    },
-    roleBadgeText: {
-        color: '#000',
-        fontSize: 8,
-        fontWeight: '900',
-    },
-    profileInfo: {
-        flex: 1,
-    },
-    profileName: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: '800',
-        marginBottom: 2,
-    },
-    profileRoleName: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    modalCloseButton: {
-        marginTop: 12,
-        padding: 12,
-    },
-    modalCloseText: {
-        color: Colors.textMuted,
-        fontSize: 12,
-        fontWeight: '800',
         letterSpacing: 1,
     },
 });

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import io, { Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -19,9 +20,24 @@ export const useSocket = () => useContext(SocketContext);
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef<Socket | null>(null);
+    const prevTeamIdRef = useRef<string | null>(null);
+
+    // Watch token explicitly to rebuild socket if user changes/logs in
+    const userToken = useAuthStore(state => state.user?.token || state.user?.session?.token);
+    const userTeamId = useAuthStore(state => state.user?.teamId);
 
     useEffect(() => {
+        if (!userToken) {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+                setIsConnected(false);
+            }
+            return;
+        }
+
         const socket = io(SOCKET_URL, {
+            auth: { token: userToken },
             transports: ['polling', 'websocket'],
             autoConnect: true,
             reconnection: true,
@@ -32,15 +48,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         socketRef.current = socket;
 
         socket.on('connect', () => {
-            console.log('🔌 Socket.IO connected');
+            console.log('🔌 Socket.IO connected securely');
             setIsConnected(true);
-            
-            // Join team room globally if user is logged in
-            const { user } = useAuthStore.getState();
-            if (user?.teamId) {
-                console.log('🔌 Joining team room:', user.teamId);
-                socket.emit('join-team', user.teamId);
-            }
         });
 
         socket.on('disconnect', () => {
@@ -49,13 +58,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         socket.on('connect_error', (error) => {
-            console.error('🔌 Socket.IO connection error:', error);
+            console.error('🔌 Socket.IO connection error (Likely JWT Auth Failure):', error.message);
+            // Token expiry or invalid auth handling
+            if (error.message.includes('Authentication') || error.message.includes('token') || error.message.includes('jwt')) {
+                console.warn('🔒 Force logging out due to auth failure');
+                useAuthStore.getState().logout();
+            }
         });
 
-        // Global listeners
-        socket.on('new-team-message', (message) => {
+        // Global unread listener
+        const messageHandler = (message: any) => {
             const { user, incrementUnreadCount } = useAuthStore.getState();
-            // Increment unread count if it's not my message AND it belongs to my team (extra safety)
             const myTeamId = user?.teamId?._id || user?.teamId;
             const msgTeamId = message.teamId?._id || message.teamId;
 
@@ -64,21 +77,41 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     incrementUnreadCount();
                 }
             }
-        });
+        };
+
+        socket.on('new-team-message', messageHandler);
 
         return () => {
             if (socket) {
+                socket.off('new-team-message', messageHandler);
                 socket.disconnect();
             }
         };
+    }, [userToken]);
+
+    useEffect(() => {
+        // Handle foreground/background reconnection resilience
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+            if (nextAppState === 'active' && socketRef.current && socketRef.current.disconnected) {
+                console.log('🔄 Foregrounded: Manually forcing socket reconnect...');
+                socketRef.current.connect();
+            }
+        });
+        return () => subscription.remove();
     }, []);
 
-    // Watch for user login to join room immediately
-    const userTeamId = useAuthStore(state => state.user?.teamId);
+    // Room connection lifecycle
     useEffect(() => {
         if (socketRef.current && isConnected && userTeamId) {
+            // Memory leak prevention: Leave previous room if teamId changed
+            if (prevTeamIdRef.current && prevTeamIdRef.current !== userTeamId) {
+                console.log('🔌 Switching contexts: Leaving previous team room:', prevTeamIdRef.current);
+                socketRef.current.emit('leave-team', prevTeamIdRef.current);
+            }
+            
             console.log('🔌 User team detected, joining room:', userTeamId);
             socketRef.current.emit('join-team', userTeamId);
+            prevTeamIdRef.current = String(userTeamId);
         }
     }, [userTeamId, isConnected]);
 

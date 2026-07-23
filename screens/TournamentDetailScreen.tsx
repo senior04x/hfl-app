@@ -11,9 +11,9 @@ import {
     Linking,
     Animated
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -435,7 +435,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             </View>
 
             {isLoadingStandings ? (
-                <TableSkeleton count={10} />
+                <TableSkeleton />
             ) : (
                 <ScrollView>
                 {filteredStandings.length === 0 ? (
@@ -579,7 +579,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 </View>
 
                 {isLoadingPlayers ? (
-                    <PlayerListSkeleton count={8} />
+                    <PlayerListSkeleton />
                 ) : (
                     <ScrollView>
                     {filteredPlayers.length === 0 ? (
@@ -692,15 +692,9 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     );
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-            {/* Cinematic Video Background */}
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.85}
-                style={StyleSheet.absoluteFill}
-            />
-
+        <AnimatedBackground overlayOpacity={0.85} backgroundImage={backgroundImage}>
             <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+
                 {renderHeader()}
                 {renderTabs()}
 
@@ -715,7 +709,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     </>
                 )}
             </SafeAreaView>
-        </View>
+        </AnimatedBackground>
     );
 }
 

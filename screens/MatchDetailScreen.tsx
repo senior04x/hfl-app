@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import MatchDetailSkeleton from '../components/MatchDetailSkeleton';
@@ -24,6 +23,8 @@ import YoutubePlayerCard from '../components/YoutubePlayerCard';
 import TacticsBoard from '../components/TacticsBoard';
 import { apiService } from '../services/apiService';
 import { useSocket } from '../context/SocketContext';
+import { formatShortTeamName } from '../utils/stringUtils';
+import SmartImage from '../components/SmartImage';
 
 const { width } = Dimensions.get('window');
 
@@ -55,13 +56,16 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             const data = await apiService.getMatchById(id);
             setMatch(data);
             
-            if (data.homeTeamId) setSelectedTeamId(data.homeTeamId);
+            const hId = data?.homeTeamId || data?.home_team_id;
+            const aId = data?.awayTeamId || data?.away_team_id;
 
-            if (data.homeTeamId && data.awayTeamId) {
+            if (hId) setSelectedTeamId(hId);
+
+            if (hId && aId) {
                 setPlayersLoading(true);
                 const [homeData, awayData] = await Promise.all([
-                    apiService.getPlayers(1, 100, data.homeTeamId),
-                    apiService.getPlayers(1, 100, data.awayTeamId)
+                    apiService.getPlayers(1, 100, hId),
+                    apiService.getPlayers(1, 100, aId)
                 ]);
                 setHomePlayers(homeData || []);
                 setAwayPlayers(awayData || []);
@@ -123,6 +127,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const formatDate = (dateString: string) => {
         if (!dateString) return 'Vaqt belgilanmagan';
         const date = new Date(dateString);
+        if (isNaN(date.getTime())) return match?.date_str || 'Bo\'lajak o\'yin';
         const months = [
             'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 
             'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
@@ -130,10 +135,18 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const day = date.getDate();
         const month = months[date.getMonth()];
         const year = date.getFullYear();
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
+
+        let timeStr = String(match?.match_time || match?.time || '').trim();
+        if (timeStr && timeStr.includes(':')) {
+            const parts = timeStr.split(':');
+            timeStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+        } else {
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            timeStr = `${hours}:${minutes}`;
+        }
         
-        return `${day}-${month}, ${year} • ${hours}:${minutes}`;
+        return `${day}-${month}, ${year} • ${timeStr}`;
     };
 
     const renderHeader = () => {
@@ -163,31 +176,35 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     <View style={styles.teamsScoreRow}>
                         <View style={styles.teamBlockRight}>
                             <Text style={styles.teamNameText} numberOfLines={1}>
-                                {(match?.homeTeamName || match?.homeTeam?.name || 'JAMOA A').toUpperCase()}
+                                {(formatShortTeamName(match?.homeTeamName || match?.homeTeam?.name || 'JAMOA A', 12) || 'JAMOA A').toUpperCase()}
                             </Text>
                             <View style={styles.logoCircle}>
-                                {match?.homeTeamLogo || match?.homeTeam?.logo ? (
-                                    <Image source={{ uri: match.homeTeamLogo || match.homeTeam?.logo }} style={{ width: 24, height: 24 }} />
-                                ) : (
-                                    <Ionicons name="shield" size={20} color={Colors.primary} />
-                                )}
+                                <SmartImage
+                                    uri={match?.homeTeamLogo || match?.homeTeam?.logo || match?.home_team_logo || match?.home_team?.logo_url}
+                                    style={{ width: 34, height: 34, borderRadius: 17 }}
+                                    contentFit="contain"
+                                    fallbackIcon="shield"
+                                    fallbackIconSize={20}
+                                />
                             </View>
                         </View>
 
                         <Text style={styles.scoreTextMain}>
-                            {match?.score?.home ?? match?.homeScore ?? 0}:{match?.score?.away ?? match?.awayScore ?? 0}
+                            {match?.score?.home ?? match?.home_score ?? match?.homeScore ?? 0}:{match?.score?.away ?? match?.away_score ?? match?.awayScore ?? 0}
                         </Text>
 
                         <View style={styles.teamBlockLeft}>
                             <View style={styles.logoCircle}>
-                                {match?.awayTeamLogo || match?.awayTeam?.logo ? (
-                                    <Image source={{ uri: match.awayTeamLogo || match.awayTeam?.logo }} style={{ width: 24, height: 24 }} />
-                                ) : (
-                                    <Ionicons name="shield" size={20} color={Colors.primary} />
-                                )}
+                                <SmartImage
+                                    uri={match?.awayTeamLogo || match?.awayTeam?.logo || match?.away_team_logo || match?.away_team?.logo_url}
+                                    style={{ width: 34, height: 34, borderRadius: 17 }}
+                                    contentFit="contain"
+                                    fallbackIcon="shield"
+                                    fallbackIconSize={20}
+                                />
                             </View>
                             <Text style={styles.teamNameText} numberOfLines={1}>
-                                {(match?.awayTeamName || match?.awayTeam?.name || 'JAMOA B').toUpperCase()}
+                                {(formatShortTeamName(match?.awayTeamName || match?.awayTeam?.name || 'JAMOA B', 12) || 'JAMOA B').toUpperCase()}
                             </Text>
                         </View>
                     </View>
@@ -224,33 +241,37 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     );
 
     const renderTimelineEvent = (event: any, index: number, isLast: boolean) => {
-        let iconName: any = 'football';
-        let iconColor = '#FFF';
-        let title = 'VOQEA';
+        const eType = String(event.type || event.event_type || '').toLowerCase();
+        const isYellow = eType.includes('yellow');
+        const isRed = eType.includes('red');
+        const isCard = isYellow || isRed;
+        const isGoal = eType.includes('goal');
+        const isAssist = eType.includes('assist');
 
-        if (event.type === 'goal') {
-            iconName = 'football';
+        let title = 'VOQEA';
+        let cardColor = '#FFF';
+
+        if (isGoal) {
             title = 'GOL!';
-        } else if (event.type === 'yellowCard') {
-            iconName = 'square';
-            iconColor = '#FACC15';
-            title = 'SARIQ KARTОCHKА';
-        } else if (event.type === 'redCard') {
-            iconName = 'square';
-            iconColor = '#EF4444';
-            title = 'QIZIL KARTОCHKА';
-        } else if (event.type === 'assist') {
-            iconName = 'footsteps';
+        } else if (isYellow) {
+            title = 'SARIQ KARTOCHKA';
+            cardColor = '#FACC15';
+        } else if (isRed) {
+            title = 'QIZIL KARTOCHKA';
+            cardColor = '#EF4444';
+        } else if (isAssist) {
             title = 'ASSIST';
         }
 
         return (
             <View key={index} style={styles.timelineRow}>
                 <View style={styles.timelineLeftColumn}>
-                    <View style={event.type.includes('Card') ? [styles.cardIcon, { backgroundColor: iconColor }] : null}>
-                        {!event.type.includes('Card') && <Ionicons name={iconName} size={22} color={iconColor} style={styles.timelineIcon} />}
-                    </View>
-                    <Text style={styles.timelineTimeText}>{event.time}'</Text>
+                    {isCard ? (
+                        <View style={[styles.cardIcon, { backgroundColor: cardColor, width: 14, height: 20, borderRadius: 3, marginVertical: 4 }]} />
+                    ) : (
+                        <Ionicons name={isGoal ? 'football' : 'shirt-outline'} size={22} color={isGoal ? '#00FF66' : Colors.primary} style={styles.timelineIcon} />
+                    )}
+                    <Text style={styles.timelineTimeText}>{event.time || event.minute || 0}'</Text>
                     {!isLast && <View style={styles.timelineLine} />}
                 </View>
 
@@ -258,8 +279,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.eventContentWrapper}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.eventTitle}>{title}</Text>
-                            <Text style={styles.eventDesc}>{event.playerName?.toUpperCase()}</Text>
+                            <Text style={[styles.eventTitle, isYellow && { color: '#FACC15' }, isRed && { color: '#EF4444' }]}>{title}</Text>
+                            <Text style={styles.eventDesc}>{(event.playerName || event.player_name || 'FUTBOLCHI').toUpperCase()}</Text>
                         </View>
                         <View style={styles.eventLogo}>
                             <Text style={styles.eventLogoText}>{event.isHomeTeam ? 'UY' : 'MH'}</Text>
@@ -320,33 +341,76 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const currentTeamName = isHome ? (match?.homeTeamName || 'UY JAMOA') : (match?.awayTeamName || 'MEHMON');
         const currentLogo = isHome ? (match?.homeTeamLogo || match?.homeTeam?.logo) : (match?.awayTeamLogo || match?.awayTeam?.logo);
 
-        const renderPlayerItem = (player: any) => (
-            <TouchableOpacity 
-                key={player._id || player.id} 
-                style={styles.playerCardCompact}
-                onPress={() => navigation.navigate('PlayerStats', { player: player, playerId: player._id })}
-            >
-                <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, width: '100%' }}>
-                    <View style={styles.playerAvatarSmall}>
-                        {player.photo ? (
-                            <Image source={{ uri: player.photo }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                        ) : (
-                            <View style={styles.playerInitials}>
-                                <Text style={styles.initialsText}>{player.firstName?.charAt(0)}</Text>
-                            </View>
-                        )}
+        const targetTeamObject = isHome ? match?.homeTeam : match?.awayTeam;
+        const rawFormationPlayers = targetTeamObject?.formation?.players || targetTeamObject?.players || [];
+
+        let tacticsPlayers: any[] = [];
+
+        if (rawFormationPlayers && rawFormationPlayers.length > 0) {
+            tacticsPlayers = rawFormationPlayers.map((p: any) => {
+                const playerId = p.id || p._id;
+                const playerGoals = (match?.events || []).filter((e: any) => e.playerId === playerId && e.type === 'goal').length;
+                const fullPlayer = currentPlayers.find((cp: any) => String(cp._id || cp.id) === String(playerId));
+                return {
+                    ...p,
+                    id: playerId,
+                    name: p.name || `${fullPlayer?.firstName || ''} ${fullPlayer?.lastName || ''}`.trim() || 'O\'yinchi',
+                    number: p.number || fullPlayer?.number || fullPlayer?.player_number || '-',
+                    goals: playerGoals,
+                    x: p.x || 50,
+                    y: p.y || 50
+                };
+            });
+        } else if (currentPlayers && currentPlayers.length > 0) {
+            const defaultCoords = [
+                { x: 50, y: 88 },
+                { x: 20, y: 70 }, { x: 40, y: 72 }, { x: 60, y: 72 }, { x: 80, y: 70 },
+                { x: 30, y: 45 }, { x: 50, y: 45 }, { x: 70, y: 45 },
+                { x: 25, y: 20 }, { x: 50, y: 18 }, { x: 75, y: 20 }
+            ];
+            tacticsPlayers = currentPlayers.slice(0, 11).map((p: any, idx: number) => ({
+                id: p._id || p.id,
+                name: p.firstName || p.first_name || p.name || 'O\'yinchi',
+                number: p.number || p.player_number || p.shirt_number || '-',
+                goals: (match?.events || []).filter((e: any) => e.playerId === (p._id || p.id) && e.type === 'goal').length,
+                x: defaultCoords[idx % defaultCoords.length].x,
+                y: defaultCoords[idx % defaultCoords.length].y
+            }));
+        }
+
+        const renderPlayerItem = (player: any) => {
+            const pId = String(player._id || player.id);
+            const formPlayer = tacticsPlayers.find((tp: any) => String(tp.id) === pId);
+            const displayNum = formPlayer?.number || player.number || player.player_number || player.shirt_number || '-';
+
+            return (
+                <TouchableOpacity 
+                    key={player._id || player.id} 
+                    style={styles.playerCardCompact}
+                    onPress={() => navigation.navigate('PlayerStats', { player: player, playerId: player._id })}
+                >
+                    <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, width: '100%' }}>
+                        <View style={styles.playerAvatarSmall}>
+                            {player.photo ? (
+                                <Image source={{ uri: player.photo }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                            ) : (
+                                <View style={styles.playerInitials}>
+                                    <Text style={styles.initialsText}>{player.firstName?.charAt(0)}</Text>
+                                </View>
+                            )}
+                        </View>
+                        <View style={styles.playerInfoCompact}>
+                            <Text style={styles.playerNameCompact} numberOfLines={1}>
+                                {(player.firstName + ' ' + (player.lastName || '')).toUpperCase()}
+                            </Text>
+                            <Text style={styles.playerNumberCompact}>#{displayNum} • {(player.positionUz || player.position || 'O\'YINCHI').toUpperCase()}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
                     </View>
-                    <View style={styles.playerInfoCompact}>
-                        <Text style={styles.playerNameCompact} numberOfLines={1}>
-                            {(player.firstName + ' ' + (player.lastName || '')).toUpperCase()}
-                        </Text>
-                        <Text style={styles.playerNumberCompact}>#{player.number} • {(player.positionUz || player.position || 'O\'YINCHI').toUpperCase()}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
-                </View>
-            </TouchableOpacity>
-        );
+                </TouchableOpacity>
+            );
+        };
 
         return (
             <ScrollView 
@@ -395,30 +459,18 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
                 ) : (
                     <View style={styles.lineupListWrapper}>
-                        {((isHome ? match?.homeTeam?.formation : match?.awayTeam?.formation) || 
-                          (isHome ? match?.homeTeam?.players : match?.awayTeam?.players)) ? (
-                            <TacticsBoard 
-                                players={((isHome ? (match?.homeTeam?.formation?.players || match?.homeTeam?.players) : 
-                                                   (match?.awayTeam?.formation?.players || match?.awayTeam?.players)) || []).map((p: any) => {
-                                    const playerId = p.id || p._id;
-                                    const playerGoals = match.events?.filter((e: any) => e.playerId === playerId && e.type === 'goal').length || 0;
-                                    const fullPlayer = currentPlayers.find((cp: any) => (cp._id || cp.id) === playerId);
-                                    return {
-                                        ...p,
-                                        id: playerId,
-                                        name: p.name || `${fullPlayer?.firstName || ''} ${fullPlayer?.lastName || ''}`.trim() || 'O\'yinchi',
-                                        number: fullPlayer?.number || p.number,
-                                        goals: playerGoals,
-                                        x: p.x || 50,
-                                        y: p.y || 50
-                                    };
-                                })}
-                                teamColor={isHome ? '#3B82F6' : '#EF4444'} 
-                            />
-                        ) : null}
+                        {tacticsPlayers.length > 0 && (
+                            <View style={{ marginBottom: 20 }}>
+                                <TacticsBoard 
+                                    players={tacticsPlayers}
+                                    teamColor={isHome ? '#3B82F6' : '#EF4444'} 
+                                />
+                            </View>
+                        )}
 
                         <View style={styles.listHeader}>
-                            <Text style={styles.listTitle}>{currentTeamName.toUpperCase()} TARKIBI</Text>
+                            <Ionicons name="shirt-outline" size={18} color={Colors.primary} style={{ marginRight: 6 }} />
+                            <Text style={styles.listTitle}>{currentTeamName.toUpperCase()} TARKIBI ({currentPlayers.length})</Text>
                         </View>
 
                         {currentPlayers.length > 0 ? (

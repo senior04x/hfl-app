@@ -16,7 +16,6 @@ import { apiService } from '../services/apiService';
 import { Team } from '../types';
 import SmartImage from '../components/SmartImage';
 import TeamsSkeleton from '../components/TeamsSkeleton';
-import { Video, ResizeMode } from 'expo-av';
 import VideoBackground from '../components/VideoBackground';
 
 export default function TeamsScreen({ route, navigation }: any) {

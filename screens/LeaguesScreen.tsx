@@ -17,7 +17,6 @@ import { apiService } from '../services/apiService';
 import { useNavigation } from '@react-navigation/native';
 import SmartImage from '../components/SmartImage';
 import LeaguesSkeleton from '../components/LeaguesSkeleton';
-import { Video, ResizeMode } from 'expo-av';
 import VideoBackground from '../components/VideoBackground';
 
 export default function LeaguesScreen() {

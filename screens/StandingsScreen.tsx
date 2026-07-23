@@ -106,8 +106,8 @@ const StandingsScreen = ({ route, navigation }: any) => {
             <Text style={[styles.headerText, { width: 30 }]}>#</Text>
             <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>JAMOA</Text>
             <Text style={[styles.headerText, { width: 30 }]}>O'</Text>
-            <Text style={[styles.headerText, { width: 45 }]}>G/N</Text>
-            <Text style={[styles.headerText, { width: 35, fontWeight: '900' }]}>OCH</Text>
+            <Text style={[styles.headerText, { width: 50 }]}>T/N</Text>
+            <Text style={[styles.headerText, { width: 35, fontWeight: '900' }]}>O</Text>
         </View>
     );
 
@@ -138,10 +138,22 @@ const StandingsScreen = ({ route, navigation }: any) => {
                 </View>
 
                 <Text style={styles.statCell}>{stats.played || 0}</Text>
-                <Text style={[styles.statCell, { width: 45, fontSize: 11, color: Colors.textMuted }]}>
-                    {goalsFor}-{goalsAgainst}
-                </Text>
-                <Text style={[styles.statCell, styles.ptsCell]}>{stats.points || 0}</Text>
+                <View style={{ width: 50, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, color: Colors.text, fontWeight: 'bold' }}>
+                        {goalsFor}-{goalsAgainst}
+                    </Text>
+                    <Text style={{ fontSize: 8, color: (goalsFor - goalsAgainst) >= 0 ? Colors.primary : '#ff4444', fontWeight: '900' }}>
+                        {(goalsFor - goalsAgainst) > 0 ? `+${goalsFor - goalsAgainst}` : (goalsFor - goalsAgainst)}
+                    </Text>
+                </View>
+                <View style={[styles.statCell, styles.ptsCell]}>
+                    <Text style={styles.ptsText}>{item.points || stats.points || 0}</Text>
+                    {item.lastPoints !== 0 && (
+                        <Text style={[styles.lastPtsText, { color: item.lastPoints > 0 ? Colors.primary : '#ff4444' }]}>
+                            ({item.lastPoints > 0 ? `+${item.lastPoints}` : item.lastPoints})
+                        </Text>
+                    )}
+                </View>
             </TouchableOpacity>
         );
     };
@@ -336,9 +348,18 @@ const styles = StyleSheet.create({
     },
     ptsCell: {
         width: 35,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    ptsText: {
         fontWeight: '900',
         color: Colors.primary,
-        fontSize: 15,
+        fontSize: 14,
+    },
+    lastPtsText: {
+        fontSize: 7,
+        fontWeight: 'bold',
+        marginTop: -1,
     },
     emptyContainer: {
         marginTop: 100,

@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import VideoBackground from '../components/VideoBackground';
 import Colors from '../constants/Colors';
@@ -32,29 +31,36 @@ import { useSocket } from '../context/SocketContext';
 const { width } = Dimensions.get('window');
 
 export default function TeamProfileScreen({ route, navigation }: any) {
-    const { teamId } = route?.params || {};
-    const [team, setTeam] = useState<Team | null>(null);
+    const { teamId, team: initialTeam } = route?.params || {};
+    const [team, setTeam] = useState<any | null>(initialTeam || null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(!initialTeam);
     const { user, unreadCount, isChatMuted } = useAuthStore();
     const { socket } = useSocket();
     
-    const isMember = user && team && (user.teamId?.toString() === teamId?.toString() || user.teamId?.toString() === team?._id?.toString());
-    const isAdmin = user && (user.role === 'admin' || user.role === 'trainer');
-    const canEdit = isAdmin || (isMember && user?.role === 'manager');
-    const canChat = isMember || isAdmin;
+    const userTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
+    const activeTeamId = teamId || route?.params?.id || route?.params?.teamId || initialTeam?.id || initialTeam?._id || userTeamId;
+
+    const isOwnerOrMember = user && activeTeamId && userTeamId && (String(userTeamId) === String(activeTeamId));
+    const isSystemAdmin = user && (user.role === 'admin' || user.role === 'trainer');
+
+    const canEdit = isSystemAdmin || (isOwnerOrMember && (user?.role === 'manager' || user?.role === 'coach' || user?.role === 'team_admin'));
+    const canChat = isSystemAdmin || isOwnerOrMember;
 
     const fetchData = async () => {
         try {
-            setIsLoading(true);
+            if (!initialTeam) setIsLoading(true);
+            const currentId = activeTeamId;
+            if (!currentId) return;
+
             const [teamData, playersData, matchesData] = await Promise.all([
-                apiService.getTeamById(teamId),
-                apiService.getPlayersByTeam(teamId),
-                apiService.getMatches({ teamId })
+                apiService.getTeamById(currentId),
+                apiService.getPlayersByTeam(currentId),
+                apiService.getMatches({ teamId: currentId })
             ]);
 
-            setTeam(teamData);
+            if (teamData) setTeam(teamData);
             setPlayers(playersData || []);
             setMatches(matchesData?.slice(0, 5) || []);
         } catch (error) {
@@ -65,11 +71,13 @@ export default function TeamProfileScreen({ route, navigation }: any) {
     };
 
     useEffect(() => {
-        fetchData();
-        if (socket && teamId) {
-            socket.emit('join-team', teamId);
+        if (activeTeamId) {
+            fetchData();
+        }
+        if (socket && activeTeamId) {
+            socket.emit('join-team', activeTeamId);
             socket.on('formation-updated', (data: any) => {
-                if (data.teamId === teamId) {
+                if (data.teamId === activeTeamId) {
                     setTeam(prev => prev ? { ...prev, formation: data.formation } : null);
                 }
             });
@@ -77,7 +85,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                 socket.off('formation-updated');
             };
         }
-    }, [teamId, socket]);
+    }, [activeTeamId, socket]);
 
     const renderHeader = () => (
         <View style={styles.heroSection}>
@@ -88,13 +96,13 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
             <View style={styles.adminActionRow}>
                 {canEdit && (
-                    <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('FormationBoard', { teamId })}>
+                    <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('FormationBoard', { teamId: activeTeamId })}>
                         <Ionicons name="grid-outline" size={20} color="#FFF" />
                         <Text style={styles.adminBtnText}>SOSTAV</Text>
                     </TouchableOpacity>
                 )}
                 {canChat && (
-                    <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('TeamChat', { teamId })}>
+                    <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('TeamChat', { teamId: activeTeamId })}>
                         <Ionicons name="chatbubbles-outline" size={20} color="#FFF" />
                         <Text style={styles.adminBtnText}>CHAT</Text>
                         {unreadCount > 0 && (
@@ -111,25 +119,25 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
             <View style={styles.heroContent}>
                 <View style={[styles.mainLogoWrapper, { shadowColor: team?.color || Colors.primary }]}>
-                    <SmartImage uri={team?.logo} style={styles.mainLogoImage} contentFit="contain" fallbackIcon="shield-outline" />
+                    <SmartImage uri={team?.logo_url || team?.logo} style={styles.mainLogoImage} contentFit="contain" fallbackIcon="shield-outline" />
                 </View>
 
                 <View style={styles.heroTextContainer}>
                     <View style={styles.badgeRow}>
                         <View style={styles.premiumBadge}>
                             <Ionicons name="trophy" size={10} color={Colors.primary} />
-                            <Text style={styles.premiumBadgeText}>OFFICIAL CLUB</Text>
+                            <Text style={styles.premiumBadgeText}>{(team?.league || 'HFL LIGA').toUpperCase()}</Text>
                         </View>
                     </View>
 
-                    <Text style={styles.teamNameHero}>{team?.name?.toUpperCase()}</Text>
+                    <Text style={styles.teamNameHero}>{(team?.name || 'JAMOA').toUpperCase()}</Text>
 
                     <View style={styles.heroStatsRow}>
                         <Ionicons name="people" size={14} color={Colors.primary} />
                         <Text style={styles.heroStatText}>{players.length} O'YINCHI</Text>
                         <View style={styles.statDot} />
                         <Ionicons name="flash" size={14} color={Colors.primary} />
-                        <Text style={styles.heroStatText}>{team?.stats?.points || 0} OCHKO</Text>
+                        <Text style={styles.heroStatText}>{team?.points || team?.stats?.points || 0} OCHKO</Text>
                     </View>
                 </View>
             </View>
@@ -159,23 +167,23 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             </View>
 
             <View style={styles.squadGrid}>
-                {players.map((player) => (
+                {players.map((player: any, idx: number) => (
                     <TouchableOpacity
-                        key={player._id}
+                        key={player._id || player.id || idx}
                         style={styles.playerCard}
-                        onPress={() => navigation.navigate('PlayerStats', { playerId: player._id, player: player })}
+                        onPress={() => navigation.navigate('PlayerStats', { playerId: player._id || player.id, player })}
                     >
                         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={styles.playerPhotoContainer}>
-                            <SmartImage uri={player.photo || player.avatar} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person" />
+                            <SmartImage uri={player.photo || player.photo_url || player.avatar} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person" />
                             <View style={styles.playerNumberBadge}>
-                                <Text style={styles.playerNumberText}>#{player.number || '00'}</Text>
+                                <Text style={styles.playerNumberText}>#{player.number || player.player_number || player.shirt_number || '10'}</Text>
                             </View>
                         </View>
                         <View style={styles.playerInfo}>
-                            <Text style={styles.playerCardName} numberOfLines={1}>{player.firstName.toUpperCase()}</Text>
-                            <Text style={styles.playerCardLastName} numberOfLines={1}>{player.lastName.toUpperCase()}</Text>
-                            <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position).toUpperCase()}</Text>
+                            <Text style={styles.playerCardName} numberOfLines={1}>{(player.firstName || player.name || player.first_name || 'Futbolchi').toUpperCase()}</Text>
+                            <Text style={styles.playerCardLastName} numberOfLines={1}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
+                            <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position || 'O\'yinchi').toUpperCase()}</Text>
                         </View>
                     </TouchableOpacity>
                 ))}

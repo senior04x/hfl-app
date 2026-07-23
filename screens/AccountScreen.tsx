@@ -11,14 +11,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
-import VideoBackground from '../components/VideoBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
+import backgroundImage from '../assets/images/backroud-image.png';
 import { useAuthStore } from '../store/useAuthStore';
 import SmartImage from '../components/SmartImage';
 import { apiService } from '../services/apiService';
-
 const getPositionFullUz = (pos: string) => {
     const map: any = {
         'GK': "Darvozabon",
@@ -44,6 +43,7 @@ export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout, unreadCount, isChatMuted } = useAuthStore();
     const [detailedData, setDetailedData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const currentTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
 
     useEffect(() => {
         if (!isGuest && user?.id) {
@@ -54,11 +54,12 @@ export default function AccountScreen({ navigation }: any) {
     const loadDetailedData = async () => {
         try {
             setLoading(true);
+            const targetTeamId = currentTeamId;
             if (user.role === 'player') {
                 const data = await apiService.getPlayerById(user.id);
                 if (data) setDetailedData(data);
-            } else if (user.role === 'manager' && user.teamId) {
-                const data = await apiService.getTeamById(user.teamId);
+            } else if (user.role === 'manager' && targetTeamId) {
+                const data = await apiService.getTeamById(targetTeamId);
                 if (data) setDetailedData(data);
             }
         } catch (error) {
@@ -119,13 +120,7 @@ export default function AccountScreen({ navigation }: any) {
     );
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.7}
-                style={StyleSheet.absoluteFill}
-            />
-
+        <AnimatedBackground overlayOpacity={0.7} backgroundImage={backgroundImage}>
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <ScrollView 
                     style={styles.container} 
@@ -134,31 +129,70 @@ export default function AccountScreen({ navigation }: any) {
                 >
                     {/* Profile Header */}
                     <View style={styles.profileHeader}>
-                        <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                            <View style={styles.avatarContainer}>
-                                {!isGuest && (user?.photo || user?.logo || user?.avatar) ? (
-                                    <SmartImage 
-                                        uri={user.photo || user.logo || user.avatar}
-                                        style={{ width: 200, height: 200, borderRadius: 25 }}
-                                        fallbackIcon={user.role === 'manager' ? 'people' : 'person'}
-                                    />
-                                ) : (
-                                    <Ionicons name="person" size={60} color={Colors.primary} />
-                                )}
-                            </View>
-                            <Text style={styles.userName}>
-                                {isGuest ? 'MEHMON' : 
-                                 (detailedData?.lastName ? `${detailedData.firstName} ${detailedData.lastName}` : 
-                                  user?.name || user?.firstName || 'FOYDALANUVCHI').toUpperCase()}
-                            </Text>
-                            <View style={styles.roleBadge}>
-                                <Text style={styles.userRole}>
-                                    {isGuest ? 'CHEKLANGAN IMKONIYAT' : 
-                                     user?.role === 'manager' ? 'TREYNER' : 
-                                     user?.role === 'player' ? getPositionFullUz(detailedData?.position || user?.position).toUpperCase() : "AMATORA AZ'OSI"}
-                                </Text>
-                            </View>
-                        </View>
+                        {(() => {
+                            const profileImage = !isGuest ? (
+                                detailedData?.photoUrl || detailedData?.photo_url || detailedData?.photo ||
+                                detailedData?.logoUrl || detailedData?.logo_url || detailedData?.logo ||
+                                user?.photoUrl || user?.photo_url || user?.photo ||
+                                user?.logoUrl || user?.logo_url || user?.logo ||
+                                user?.avatar || user?.team_logo || user?.teamLogo
+                            ) : null;
+
+                            return (
+                                <View style={{ alignItems: 'center', paddingVertical: 30 }}>
+                                    <View style={styles.avatarContainer}>
+                                        {profileImage ? (
+                                            <SmartImage 
+                                                uri={profileImage}
+                                                style={{ width: '100%', height: '100%' }}
+                                                fallbackIcon={user?.role === 'manager' ? 'shield' : 'person'}
+                                                contentFit="cover"
+                                            />
+                                        ) : (
+                                            <Ionicons name={user?.role === 'manager' ? 'shield-outline' : 'person-outline'} size={60} color={Colors.primary} />
+                                        )}
+                                    </View>
+                                    {(() => {
+                                        const isPlayer = user?.role === 'player';
+                                        const isManager = user?.role === 'manager';
+
+                                        let displayName = 'FOYDALANUVCHI';
+                                        if (isGuest) {
+                                            displayName = 'MEHMON';
+                                        } else if (isPlayer) {
+                                            const fName = detailedData?.firstName || user?.firstName || detailedData?.name || user?.name || '';
+                                            const lName = detailedData?.lastName || user?.lastName || '';
+                                            displayName = `${fName} ${lName}`.trim() || 'O\'YINCHI';
+                                        } else if (isManager) {
+                                            const managerName = (user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : null) || user?.name || detailedData?.managerName;
+                                            displayName = managerName || detailedData?.name || detailedData?.team_name || user?.teamName || 'MURABBIY';
+                                        }
+
+                                        let displaySubtitle = 'AMATORA AZ\'OSI';
+                                        if (isGuest) {
+                                            displaySubtitle = 'CHEKLANGAN IMKONIYAT';
+                                        } else if (isPlayer) {
+                                            displaySubtitle = getPositionFullUz(detailedData?.position || user?.position || 'O\'YINCHI').toUpperCase();
+                                        } else if (isManager) {
+                                            displaySubtitle = 'JAMOASI';
+                                        }
+
+                                        return (
+                                            <>
+                                                <Text style={styles.userName}>
+                                                    {displayName.toUpperCase()}
+                                                </Text>
+                                                <View style={styles.roleBadge}>
+                                                    <Text style={styles.userRole}>
+                                                        {displaySubtitle}
+                                                    </Text>
+                                                </View>
+                                            </>
+                                        );
+                                    })()}
+                                </View>
+                            );
+                        })()}
                     </View>
 
                     {/* Account Settings (Guest Only) */}
@@ -198,30 +232,43 @@ export default function AccountScreen({ navigation }: any) {
                                     />
                                 </>
                             )}
-                            {(user?.role === 'player' || user?.role === 'manager' || user?.role === 'coach' || user?.role === 'team_admin') && user?.teamId && (
+                            {currentTeamId && (
                                 <>
                                     <SettingItem
                                         icon="shield-outline"
                                         title="Mening jamoam"
-                                        onPress={() => navigation.navigate('TeamProfile', { teamId: user?.teamId })}
+                                        onPress={() => navigation.navigate('TeamProfile', { teamId: currentTeamId })}
                                     />
                                     <SettingItem
                                         icon="chatbubbles-outline"
                                         title="Jamoa chati"
                                         onPress={() => navigation.navigate('TeamChat', { 
-                                            teamId: user?.teamId, 
+                                            teamId: currentTeamId, 
                                             userId: user?._id || user?.id, 
-                                            userName: user?.firstName || user?.name || 'Foydalanuvchi' 
+                                            userName: user?.firstName || user?.name || user?.first_name || 'Foydalanuvchi' 
                                         })}
                                         badgeCount={unreadCount}
                                         isMuted={isChatMuted}
                                     />
-                                    {(user?.role === 'manager' || user?.role === 'coach' || user?.role === 'team_admin') && (
+                                    {user?.role === 'player' ? (
                                         <SettingItem
                                             icon="grid-outline"
-                                            title="Sostavni tahrirlash"
-                                            onPress={() => navigation.navigate('FormationBoard', { teamId: user?.teamId })}
+                                            title="Jamoa sostavi"
+                                            onPress={() => navigation.navigate('FormationBoard', { teamId: currentTeamId, isReadOnly: true })}
                                         />
+                                    ) : (
+                                        <>
+                                            <SettingItem
+                                                icon="grid-outline"
+                                                title="Sostavni tahrirlash"
+                                                onPress={() => navigation.navigate('FormationBoard', { teamId: currentTeamId, isReadOnly: false })}
+                                            />
+                                            <SettingItem
+                                                icon="person-add-outline"
+                                                title="O'yinchi qo'shish"
+                                                onPress={() => navigation.navigate('JoinApplication', { initialType: 'player', teamId: currentTeamId })}
+                                            />
+                                        </>
                                     )}
                                 </>
                             )}
@@ -258,7 +305,7 @@ export default function AccountScreen({ navigation }: any) {
                     <Text style={styles.versionText}>VERSIYA 2.1.1 • UPDATE VERIFIED</Text>
                 </ScrollView>
             </SafeAreaView>
-        </View>
+        </AnimatedBackground>
     );
 }
 
@@ -266,7 +313,7 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1 },
     profileHeader: { overflow: 'hidden' },
-    avatarContainer: { width: 200, height: 200, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 25, overflow: 'hidden' },
+    avatarContainer: { width: 140, height: 140, borderRadius: 20, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.15)', backgroundColor: 'rgba(255, 255, 255, 0.06)', justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden' },
     userName: { color: '#FFF', fontSize: 32, fontWeight: '900', letterSpacing: 1 },
     roleBadge: { backgroundColor: 'transparent', marginTop: 10 },
     userRole: { color: Colors.primary, fontSize: 14, fontWeight: '900', letterSpacing: 1 },
