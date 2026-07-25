@@ -330,22 +330,11 @@ export default function WelcomeScreen({ navigation }: any) {
                                         </>
                                     ) : (
                                         <>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                                                <Ionicons name="shield-checkmark" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-                                                <Text style={styles.cardTitle}>SMS TASDIQLASH KODI</Text>
-                                            </View>
-                                            
                                             <Text style={styles.cardSubTitle}>
                                                 +998 {phone} raqamingizga SMS xabarnoma orqali 6 xonali tasdiqlash kodi yuborildi.
                                             </Text>
 
-                                            <View style={styles.telegramBotBadge}>
-                                                <Ionicons name="chatbubble-ellipses" size={18} color={Colors.primary} style={{ marginRight: 8 }} />
-                                                <Text style={[styles.telegramBotBadgeText, { color: Colors.primary }]}>Eskiz SMS Gateway</Text>
-                                            </View>
-
                                             <View style={styles.inputWrapper}>
-                                                <Text style={styles.inputLabel}>6 XONALI TASDIQLASH KODI</Text>
                                                 <View style={styles.inputContainer}>
                                                     <TextInput
                                                         style={[styles.phoneInput, { textAlign: 'center', letterSpacing: 8, fontSize: 20, fontWeight: '900' }]}
