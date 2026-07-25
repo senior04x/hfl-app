@@ -39,8 +39,19 @@ const getPositionFullUz = (pos: string) => {
     return map[pos?.toUpperCase()] || pos || 'O\'YINCHI';
 };
 
+import { useJuniorStore } from '../store/useJuniorStore';
+import { useOrganizationStore } from '../store/useOrganizationStore';
+import { Modal, TextInput } from 'react-native';
+
 export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout, unreadCount, isChatMuted } = useAuthStore();
+    const { isJuniorMode, setJuniorMode, verifyPin } = useJuniorStore();
+    const { selectedOrganizationId, setSelectedOrganizationId, organizations } = useOrganizationStore();
+
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [pinInput, setPinInput] = useState('');
+    const [targetJuniorState, setTargetJuniorState] = useState<boolean>(false);
+
     const [detailedData, setDetailedData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const currentTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
@@ -294,6 +305,34 @@ export default function AccountScreen({ navigation }: any) {
                         </View>
                     )}
 
+                    {/* Organization & Junior Mode Section */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>TASHKILOT & REJIMLAR</Text>
+                        
+                        <SettingItem
+                            icon="school-outline"
+                            title="Junior Rejim (U-14)"
+                            type="switch"
+                            value={isJuniorMode}
+                            onPress={(val: boolean) => {
+                                setTargetJuniorState(val);
+                                setPinInput('');
+                                setShowPinModal(true);
+                            }}
+                        />
+
+                        <SettingItem
+                            icon="business-outline"
+                            title="Tashkilot"
+                            value={organizations.find(o => o.id === selectedOrganizationId)?.name || 'Havas Liga'}
+                            onPress={() => {
+                                const nextOrgId = selectedOrganizationId === 1 ? 2 : 1;
+                                setSelectedOrganizationId(nextOrgId);
+                                Alert.alert("Tashkilot Almashtirildi", `Hozirgi tashkilot: ${organizations.find(o => o.id === nextOrgId)?.name}`);
+                            }}
+                        />
+                    </View>
+
                     {/* Logout */}
                     <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                         <View style={styles.logoutInner}>
@@ -305,6 +344,57 @@ export default function AccountScreen({ navigation }: any) {
                     {/* App Version */}
                     <Text style={styles.versionText}>VERSIYA 2.1.1 • UPDATE VERIFIED</Text>
                 </ScrollView>
+
+                {/* PIN Verification Modal */}
+                <Modal visible={showPinModal} transparent animationType="fade" onRequestClose={() => setShowPinModal(false)}>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                        <View style={{ width: '100%', maxWidth: 340, backgroundColor: '#161B26', borderRadius: 20, padding: 25, borderWidth: 1, borderColor: Colors.primary }}>
+                            <View style={{ alignItems: 'center', marginBottom: 15 }}>
+                                <Ionicons name="lock-closed-outline" size={36} color={Colors.primary} />
+                                <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '900', marginTop: 10 }}>PIN-KODNI KIRITING</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center', marginTop: 5 }}>
+                                    {targetJuniorState ? "Junior Rejim (U-14) ga o'tish uchun 4 xonali PIN-kodni kiriting" : "Junior Rejimdan chiqish uchun PIN-kodni kiriting"}
+                                </Text>
+                            </View>
+
+                            <TextInput
+                                style={{ backgroundColor: 'rgba(0,0,0,0.4)', color: Colors.primary, fontSize: 24, fontWeight: '900', textAlign: 'center', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', letterSpacing: 10, marginBottom: 20 }}
+                                value={pinInput}
+                                onChangeText={setPinInput}
+                                keyboardType="number-pad"
+                                maxLength={4}
+                                secureTextEntry
+                                placeholder="••••"
+                                placeholderTextColor="rgba(255,255,255,0.2)"
+                                autoFocus
+                            />
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <TouchableOpacity
+                                    style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', marginRight: 8, alignItems: 'center' }}
+                                    onPress={() => setShowPinModal(false)}
+                                >
+                                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>BEKOR QILISH</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: Colors.primary, marginLeft: 8, alignItems: 'center' }}
+                                    onPress={() => {
+                                        if (verifyPin(pinInput)) {
+                                            setJuniorMode(targetJuniorState);
+                                            setShowPinModal(false);
+                                            Alert.alert("Muvaffaqiyatli", targetJuniorState ? "Junior Rejim (U-14 Academy) faollashtirildi!" : "Standard Rejimga o'tildi.");
+                                        } else {
+                                            Alert.alert("Xato", "PIN-kod noto'g'ri. (Odatiy PIN: 1234)");
+                                        }
+                                    }}
+                                >
+                                    <Text style={{ color: '#000', fontWeight: '900' }}>TASDIQLASH</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </SafeAreaView>
         </AnimatedBackground>
     );
