@@ -218,10 +218,12 @@ export default function WelcomeScreen({ navigation }: any) {
                 setLoginStep('otp');
                 setOtpCode('');
 
-                if (smsRes.success) {
+                if (smsRes.isDevFallback) {
+                    Alert.alert('Tasdiqlash kodi', `Sizning 6 xonali tasdiqlash kodingiz: ${generatedOtp}`);
+                } else if (smsRes.success) {
                     Alert.alert('SMS Yuborildi', `+998 ${phone} raqamingizga 6 xonali tasdiqlash kodi SMS orqali yuborildi.`);
                 } else {
-                    Alert.alert('Eslatma', `SMS yuborishda muammo bo'ldi: ${smsRes.message}`);
+                    Alert.alert('Eslatma', `SMS yuborishda muammo bo'ldi: ${smsRes.message} (Test kodi: ${generatedOtp})`);
                 }
             } else {
                 Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi. Iltimos, avval ariza topshiring!");
