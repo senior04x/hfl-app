@@ -79,7 +79,7 @@ class EskizService {
       return { success: false, message: "Telefon raqami noto'g'ri shaklda" };
     }
 
-    const smsMessage = `HFL ilovasiga kirish uchun tasdiqlash kodi: ${code}`;
+    const smsMessage = `Amatora ilovasiga kirish uchun tasdiqlash kodi: ${code}`;
 
     let attempts = 0;
     while (attempts < 2) {
