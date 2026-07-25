@@ -1,7 +1,12 @@
 import axios from 'axios';
 import { supabase } from './supabase';
+import { useOrganizationStore } from '../store/useOrganizationStore';
+import { useJuniorStore } from '../store/useJuniorStore';
 
 export { supabase };
+
+const getOrgId = () => useOrganizationStore.getState().selectedOrganizationId || 1;
+const getIsJunior = () => useJuniorStore.getState().isJuniorMode;
 
 // Memory Cache Engine for High Performance & 90% Database Load Reduction
 interface CacheEntry<T> {
@@ -53,7 +58,9 @@ const api = axios.create({
 export const apiService = {
     // Players (Direct from Supabase 'applications' table)
     getPlayers: async (page = 1, limit = 100, teamId?: string) => {
-        const cacheKey = `players_${page}_${limit}_${teamId || 'all'}`;
+        const orgId = getOrgId();
+        const isJunior = getIsJunior();
+        const cacheKey = `players_${orgId}_${isJunior}_${page}_${limit}_${teamId || 'all'}`;
         return getCachedData(cacheKey, async () => {
             try {
                 let query = supabase.from('applications').select('*, teams(*)');
@@ -235,7 +242,9 @@ export const apiService = {
 
     // Teams (Direct from Supabase 'teams' table with Standings calculation)
     getTeams: async (page = 1, limit = 100, leagueName?: string) => {
-        const cacheKey = `teams_${page}_${limit}_${leagueName || 'all'}`;
+        const orgId = getOrgId();
+        const isJunior = getIsJunior();
+        const cacheKey = `teams_${orgId}_${isJunior}_${page}_${limit}_${leagueName || 'all'}`;
         return getCachedData(cacheKey, async () => {
             try {
                 let query = supabase.from('teams').select('*').order('name');
