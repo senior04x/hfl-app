@@ -79,7 +79,8 @@ class EskizService {
       return { success: false, message: "Telefon raqami noto'g'ri shaklda" };
     }
 
-    const smsMessage = `Amatora ilovasiga kirish uchun tasdiqlash kodi: ${code}`;
+    const customMessage = `Amatora ilovasiga kirish uchun tasdiqlash kodi: ${code}`;
+    const testMessage = `Bu Eskiz dan test`;
 
     let attempts = 0;
     while (attempts < 2) {
@@ -88,8 +89,8 @@ class EskizService {
 
         const formData = new FormData();
         formData.append('mobile_phone', cleanPhone);
-        formData.append('message', smsMessage);
-        formData.append('from', '4546'); // Default Eskiz sender ID or alpha-name
+        formData.append('message', attempts === 0 ? customMessage : testMessage);
+        formData.append('from', '4546');
 
         const response = await axios.post(`${ESKIZ_API_URL}/message/sms/send`, formData, {
           headers: {
@@ -99,23 +100,35 @@ class EskizService {
         });
 
         if (response.data?.status === 'waiting' || response.data?.id || response.data?.status === 'success') {
-          return { success: true, message: 'SMS kodi telefoningizga jo\'natildi' };
+          const isTest = attempts > 0;
+          return {
+            success: true,
+            isTestStatus: isTest,
+            message: isTest
+              ? `Eskiz akkountingiz Test rejimida bo'lgani uchun 'Bu Eskiz dan test' SMS jo'natildi.`
+              : 'SMS kodi telefoningizga jo\'natildi',
+          };
         } else {
           return { success: true, message: 'SMS yuborildi' };
         }
       } catch (error: any) {
         attempts++;
-        console.error(`Eskiz Send SMS Attempt ${attempts} Error:`, error?.response?.data || error.message);
-        
+        const errData = error?.response?.data;
+        console.error(`Eskiz Send SMS Attempt ${attempts} Error:`, errData || error.message);
+
         if (error?.response?.status === 401 && attempts === 1) {
-          // Token expired, clear and retry once
           await this.clearToken();
+          continue;
+        }
+
+        // If Eskiz restricts custom text in Test mode, retry attempt 2 with testMessage
+        if (errData?.message && String(errData.message).includes('Для теста') && attempts === 1) {
           continue;
         }
 
         return {
           success: false,
-          message: error?.response?.data?.message || "Eskiz API ga ulanishda xatolik yuz berdi",
+          message: errData?.message || "Eskiz API ga ulanishda xatolik yuz berdi",
         };
       }
     }

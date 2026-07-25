@@ -217,7 +217,11 @@ export default function WelcomeScreen({ navigation }: any) {
                     startTimer();
                     setLoginStep('otp');
                     setOtpCode('');
-                    Alert.alert('SMS Yuborildi', `+998 ${phone} raqamingizga 6 xonali tasdiqlash kodi SMS orqali yuborildi.`);
+                    if (smsRes.isTestStatus) {
+                        Alert.alert('SMS Yuborildi (Test rejim)', `+998 ${phone} raqamingizga Eskiz test SMS jo'natildi. (Tasdiqlash kodi: ${generatedOtp})`);
+                    } else {
+                        Alert.alert('SMS Yuborildi', `+998 ${phone} raqamingizga 6 xonali tasdiqlash kodi SMS orqali yuborildi.`);
+                    }
                 } else {
                     Alert.alert('Eskiz API Xatosi', smsRes.message || "SMS jo'natishda xatolik yuz berdi. Iltimos, Eskiz SMS shlyuz sozlamalarini tekshiring.");
                 }
