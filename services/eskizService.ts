@@ -114,14 +114,13 @@ class EskizService {
         }
 
         return {
-          success: true,
-          isDevFallback: true,
-          message: error?.response?.data?.message || "Eskiz API ulanishda xato. (Sinov uchun kod yaratildi)",
+          success: false,
+          message: error?.response?.data?.message || "Eskiz API ga ulanishda xatolik yuz berdi",
         };
       }
     }
 
-    return { success: true, isDevFallback: true, message: "Sinov rejimida kod yaratildi" };
+    return { success: false, message: "SMS yuborishda xatolik yuz berdi" };
   }
 }
 

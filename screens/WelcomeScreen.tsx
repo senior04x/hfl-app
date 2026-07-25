@@ -213,17 +213,13 @@ export default function WelcomeScreen({ navigation }: any) {
                 // 3. Send SMS via Eskiz SMS API
                 const smsRes = await eskizService.sendVerificationSms(fullPhone, generatedOtp);
                 
-                // 4. Start 60s countdown timer & move to OTP step
-                startTimer();
-                setLoginStep('otp');
-                setOtpCode('');
-
-                if (smsRes.isDevFallback) {
-                    Alert.alert('Tasdiqlash kodi', `Sizning 6 xonali tasdiqlash kodingiz: ${generatedOtp}`);
-                } else if (smsRes.success) {
+                if (smsRes.success) {
+                    startTimer();
+                    setLoginStep('otp');
+                    setOtpCode('');
                     Alert.alert('SMS Yuborildi', `+998 ${phone} raqamingizga 6 xonali tasdiqlash kodi SMS orqali yuborildi.`);
                 } else {
-                    Alert.alert('Eslatma', `SMS yuborishda muammo bo'ldi: ${smsRes.message} (Test kodi: ${generatedOtp})`);
+                    Alert.alert('Eskiz API Xatosi', smsRes.message || "SMS jo'natishda xatolik yuz berdi. Iltimos, Eskiz SMS shlyuz sozlamalarini tekshiring.");
                 }
             } else {
                 Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi. Iltimos, avval ariza topshiring!");
