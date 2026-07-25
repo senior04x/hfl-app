@@ -2,8 +2,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ESKIZ_API_URL = 'https://notify.eskiz.uz/api';
-const ESKIZ_EMAIL = 'gccc406@gmail.com';
-const ESKIZ_SECRET = 'tN8Ry@!$JrPw4z2';
+const ESKIZ_EMAIL = 'gcccc406@gmail.com';
+const ESKIZ_SECRET = 'DcPUSpJr9TkkDQYzUV4PmY3ljyqWYJZjRLwKut1f';
 
 const TOKEN_KEY = '@eskiz_token';
 
