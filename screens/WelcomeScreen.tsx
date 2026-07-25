@@ -196,27 +196,15 @@ export default function WelcomeScreen({ navigation }: any) {
             setLoading(true);
             const fullPhone = `+998${phone.replace(/\D/g, '')}`;
             
-            // 1. Check if account exists in database
+            // Check if account exists in database
             const res = await apiService.findAccountsByPhone(fullPhone);
 
             if (res.success && res.accounts && res.accounts.length > 0) {
                 if (res.accounts.length > 1) {
                     setAccountOptions(res.accounts);
+                    setShowAccountModal(true);
                 } else if (res.user) {
-                    setAccountOptions([res.user]);
-                }
-
-                // 2. Generate random 6-digit OTP code
-                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-                setServerOtpCode(generatedOtp);
-
-                // 3. Send SMS via Eskiz SMS API
-                const smsRes = await eskizService.sendVerificationSms(fullPhone, generatedOtp);
-                
-                if (smsRes.success) {
-                    startTimer();
-                    setLoginStep('otp');
-                    setOtpCode('');
+                    setAuth(res.user);
                 }
             } else {
                 Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi. Iltimos, avval ariza topshiring!");
