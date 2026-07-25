@@ -19,6 +19,8 @@ import PlayerListSkeleton from '../components/PlayerListSkeleton';
 import { Video, ResizeMode } from 'expo-av';
 import VideoBackground from '../components/VideoBackground';
 
+import { getOptimizedImageUrl } from '../utils/imageOptimizer';
+
 export default function PlayersScreen({ route, navigation }: any) {
     const { teamId, tournamentId, tournamentName } = route?.params || {};
     const { players, setPlayers, isLoading, setLoading } = usePlayerStore();
@@ -44,31 +46,36 @@ export default function PlayersScreen({ route, navigation }: any) {
         fetchPlayers();
     }, []);
 
-    const renderPlayerItem = ({ item }: { item: Player }) => (
-        <TouchableOpacity
-            style={styles.playerCard}
-            onPress={() => navigation.navigate('PlayerStats', { playerId: item._id, player: item })}
-        >
-            <View style={styles.avatarContainer}>
-                {item.avatar ? (
-                    <Image source={{ uri: item.avatar }} style={styles.avatar} />
-                ) : (
-                    <View style={styles.avatarPlaceholder}>
-                        <Text style={styles.avatarInitial}>{String(item.firstName || 'O').charAt(0).toUpperCase()}</Text>
-                    </View>
-                )}
-            </View>
-            <View style={styles.infoContainer}>
-                <Text style={styles.playerName}>{item.firstName || 'O\'yinchi'} {item.lastName || ''}</Text>
-                <Text style={styles.playerPosition}>
-                    {item.position || "Noma'lum position"} • #{item.number || '--'}
-                </Text>
-            </View>
-            <View style={styles.statsContainer}>
-                <Text style={styles.goals}>{item.stats?.goals || 0} G</Text>
-            </View>
-        </TouchableOpacity>
-    );
+    const renderPlayerItem = ({ item }: { item: Player }) => {
+        const avatarUri = item.avatar || (item as any).photo;
+        const optimizedAvatar = getOptimizedImageUrl(avatarUri, { width: 150, quality: 80 });
+
+        return (
+            <TouchableOpacity
+                style={styles.playerCard}
+                onPress={() => navigation.navigate('PlayerStats', { playerId: item._id, player: item })}
+            >
+                <View style={styles.avatarContainer}>
+                    {avatarUri ? (
+                        <Image source={{ uri: optimizedAvatar }} style={styles.avatar} />
+                    ) : (
+                        <View style={styles.avatarPlaceholder}>
+                            <Text style={styles.avatarInitial}>{String(item.firstName || 'O').charAt(0).toUpperCase()}</Text>
+                        </View>
+                    )}
+                </View>
+                <View style={styles.infoContainer}>
+                    <Text style={styles.playerName}>{item.firstName || 'O\'yinchi'} {item.lastName || ''}</Text>
+                    <Text style={styles.playerPosition}>
+                        {item.position || "Noma'lum position"} • #{item.number || '--'}
+                    </Text>
+                </View>
+                <View style={styles.statsContainer}>
+                    <Text style={styles.goals}>{item.stats?.goals || 0} G</Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -97,6 +104,10 @@ export default function PlayersScreen({ route, navigation }: any) {
                     contentContainerStyle={styles.listContent}
                     refreshing={isLoading}
                     onRefresh={fetchPlayers}
+                    initialNumToRender={12}
+                    maxToRenderPerBatch={15}
+                    windowSize={5}
+                    removeClippedSubviews={true}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <Text style={styles.emptyText}>Hozircha o'yinchilar mavjud emas</Text>

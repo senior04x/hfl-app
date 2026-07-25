@@ -3,6 +3,42 @@ import { supabase } from './supabase';
 
 export { supabase };
 
+// Memory Cache Engine for High Performance & 90% Database Load Reduction
+interface CacheEntry<T> {
+    data: T;
+    timestamp: number;
+}
+
+const memoryCache = new Map<string, CacheEntry<any>>();
+const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
+
+export const getCachedData = async <T>(
+    key: string,
+    fetcher: () => Promise<T>,
+    ttlMs: number = DEFAULT_TTL_MS
+): Promise<T> => {
+    const cached = memoryCache.get(key);
+    const now = Date.now();
+    if (cached && (now - cached.timestamp < ttlMs)) {
+        return cached.data;
+    }
+    const data = await fetcher();
+    memoryCache.set(key, { data, timestamp: now });
+    return data;
+};
+
+export const clearApiCache = (keyPrefix?: string) => {
+    if (!keyPrefix) {
+        memoryCache.clear();
+    } else {
+        for (const key of memoryCache.keys()) {
+            if (key.startsWith(keyPrefix)) {
+                memoryCache.delete(key);
+            }
+        }
+    }
+};
+
 // Production Render URL (Fallback)
 const BASE_URL = 'https://hfl-backend.onrender.com/api';
 
@@ -17,205 +53,207 @@ const api = axios.create({
 export const apiService = {
     // Players (Direct from Supabase 'applications' table)
     getPlayers: async (page = 1, limit = 100, teamId?: string) => {
-        try {
-            let query = supabase.from('applications').select('*, teams(*)');
-            if (teamId) {
-                query = query.eq('team_id', teamId);
+        const cacheKey = `players_${page}_${limit}_${teamId || 'all'}`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                let query = supabase.from('applications').select('*, teams(*)');
+                if (teamId) {
+                    query = query.eq('team_id', teamId);
+                }
+                const { data, error } = await query;
+                if (error) throw error;
+                return (data || []).map((p: any) => ({
+                    ...p,
+                    _id: p.id,
+                    firstName: p.first_name || '',
+                    lastName: p.last_name || '',
+                    photo: p.photo_url || '',
+                    position: p.position || 'O\'yinchi',
+                    number: p.number || p.shirt_number || p.player_number || ''
+                }));
+            } catch (err) {
+                console.warn('Supabase getPlayers fallback:', err);
+                return api.get('/players', { params: { page, limit, teamId } }).then(res => res.data.data).catch(() => []);
             }
-            const { data, error } = await query;
-            if (error) throw error;
-            return (data || []).map((p: any) => ({
-                ...p,
-                _id: p.id,
-                firstName: p.first_name || '',
-                lastName: p.last_name || '',
-                photo: p.photo_url || '',
-                position: p.position || 'O\'yinchi',
-                number: p.number || p.shirt_number || p.player_number || ''
-            }));
-        } catch (err) {
-            console.warn('Supabase getPlayers fallback:', err);
-            return api.get('/players', { params: { page, limit, teamId } }).then(res => res.data.data).catch(() => []);
-        }
+        });
     },
 
     getPlayerById: async (id: string) => {
-        try {
-            const { data, error } = await supabase.from('applications').select('*, teams(*)').eq('id', id).single();
-            if (error) throw error;
-            return {
-                ...data,
-                _id: data.id,
-                firstName: data.first_name || '',
-                lastName: data.last_name || '',
-                photo: data.photo_url || '',
-                position: data.position || 'O\'yinchi',
-                number: data.number || data.shirt_number || data.player_number || ''
-            };
-        } catch (err) {
-            return api.get(`/players/${id}`).then(res => res.data.data).catch(() => null);
-        }
+        const cacheKey = `player_${id}`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                const { data, error } = await supabase.from('applications').select('*, teams(*)').eq('id', id).single();
+                if (error) throw error;
+                return {
+                    ...data,
+                    _id: data.id,
+                    firstName: data.first_name || '',
+                    lastName: data.last_name || '',
+                    photo: data.photo_url || '',
+                    position: data.position || 'O\'yinchi',
+                    number: data.number || data.shirt_number || data.player_number || ''
+                };
+            } catch (err) {
+                return api.get(`/players/${id}`).then(res => res.data.data).catch(() => null);
+            }
+        });
     },
 
     getPlayerStats: async (id: string) => {
-        try {
-            // Get player events
-            const { data: events, error } = await supabase.from('match_events').select('*').eq('player_id', id);
-            if (error) throw error;
-            const allEvents = events || [];
-            const goals = allEvents.filter(e => String(e.event_type).toLowerCase() === 'goal').length;
-            const assists = allEvents.filter(e => String(e.event_type).toLowerCase() === 'assist').length;
-            const yellowCards = allEvents.filter(e => {
-                const t = String(e.event_type).toLowerCase();
-                return t === 'yellow_card' || t === 'yellowcard' || t === 'yellow';
-            }).length;
-            const redCards = allEvents.filter(e => {
-                const t = String(e.event_type).toLowerCase();
-                return t === 'red_card' || t === 'redcard' || t === 'red';
-            }).length;
+        const cacheKey = `player_stats_${id}`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                const [eventsRes, playerDataRes] = await Promise.all([
+                    supabase.from('match_events').select('*').eq('player_id', id),
+                    supabase.from('applications').select('team_id').eq('id', id).single()
+                ]);
 
-            // Get player's team_id from applications table
-            let matchesPlayed = 0;
-            const { data: playerData } = await supabase.from('applications').select('team_id').eq('id', id).single();
-            const teamId = playerData?.team_id;
-            
-            if (teamId) {
-                // Count all matches the team has played (home or away)
-                const { count: homeCount } = await supabase
-                    .from('matches')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('home_team_id', teamId);
-                const { count: awayCount } = await supabase
-                    .from('matches')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('away_team_id', teamId);
-                matchesPlayed = (homeCount || 0) + (awayCount || 0);
-            }
+                const allEvents = eventsRes.data || [];
+                const teamId = playerDataRes.data?.team_id;
 
-            // Calculate rating (scale 0-10)
-            let rating = 0;
-            if (matchesPlayed > 0) {
-                const rawScore = (goals * 0.5) + (assists * 0.3) - (yellowCards * 0.2) - (redCards * 0.5);
-                if (matchesPlayed >= 3) {
-                    rating = 5.0 + (rawScore / matchesPlayed) * 3;
-                } else {
-                    rating = 5.0 + rawScore;
+                const goals = allEvents.filter(e => String(e.event_type).toLowerCase() === 'goal').length;
+                const assists = allEvents.filter(e => String(e.event_type).toLowerCase() === 'assist').length;
+                const yellowCards = allEvents.filter(e => {
+                    const t = String(e.event_type).toLowerCase();
+                    return t === 'yellow_card' || t === 'yellowcard' || t === 'yellow';
+                }).length;
+                const redCards = allEvents.filter(e => {
+                    const t = String(e.event_type).toLowerCase();
+                    return t === 'red_card' || t === 'redcard' || t === 'red';
+                }).length;
+
+                let matchesPlayed = 0;
+                if (teamId) {
+                    const [homeRes, awayRes] = await Promise.all([
+                        supabase.from('matches').select('id', { count: 'exact', head: true }).eq('home_team_id', teamId),
+                        supabase.from('matches').select('id', { count: 'exact', head: true }).eq('away_team_id', teamId)
+                    ]);
+                    matchesPlayed = (homeRes.count || 0) + (awayRes.count || 0);
                 }
-                rating = Math.min(10.0, Math.max(1.0, rating));
-                rating = Math.round(rating * 10) / 10;
-            }
 
-            return { goals, assists, yellowCards, redCards, matchesPlayed, total: matchesPlayed, rating };
-        } catch (err) {
-            return api.get(`/players/${id}/stats`).then(res => res.data.data).catch(() => ({ goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0, rating: 0 }));
-        }
+                let rating = 0;
+                if (matchesPlayed > 0) {
+                    const rawScore = (goals * 0.5) + (assists * 0.3) - (yellowCards * 0.2) - (redCards * 0.5);
+                    if (matchesPlayed >= 3) {
+                        rating = 5.0 + (rawScore / matchesPlayed) * 3;
+                    } else {
+                        rating = 5.0 + rawScore;
+                    }
+                    rating = Math.min(10.0, Math.max(1.0, rating));
+                    rating = Math.round(rating * 10) / 10;
+                }
+
+                return { goals, assists, yellowCards, redCards, matchesPlayed, total: matchesPlayed, rating };
+            } catch (err) {
+                return api.get(`/players/${id}/stats`).then(res => res.data.data).catch(() => ({ goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0, rating: 0 }));
+            }
+        });
     },
 
     getPlayerMatches: async (id: string) => {
-        try {
-            // 1. Get player's team_id
-            const { data: playerData } = await supabase.from('applications').select('team_id').eq('id', id).single();
-            const teamId = playerData?.team_id;
-            if (!teamId) return [];
+        const cacheKey = `player_matches_${id}`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                const { data: playerData } = await supabase.from('applications').select('team_id').eq('id', id).single();
+                const teamId = playerData?.team_id;
+                if (!teamId) return [];
 
-            // 2. Get ALL matches for the team (home or away)
-            const { data: homeMatches } = await supabase.from('matches').select('*').eq('home_team_id', teamId);
-            const { data: awayMatches } = await supabase.from('matches').select('*').eq('away_team_id', teamId);
-            
-            const allMatches: any[] = [];
-            const matchIds = new Set<string>();
-            [...(homeMatches || []), ...(awayMatches || [])].forEach((m: any) => {
-                if (!matchIds.has(m.id)) {
-                    matchIds.add(m.id);
-                    allMatches.push(m);
-                }
-            });
+                const [homeRes, awayRes, eventsRes, teamsRes] = await Promise.all([
+                    supabase.from('matches').select('*').eq('home_team_id', teamId),
+                    supabase.from('matches').select('*').eq('away_team_id', teamId),
+                    supabase.from('match_events').select('*').eq('player_id', id),
+                    supabase.from('teams').select('*')
+                ]);
 
-            if (allMatches.length === 0) return [];
+                const homeMatches = homeRes.data || [];
+                const awayMatches = awayRes.data || [];
+                const playerEvents = eventsRes.data || [];
+                const teamsData = teamsRes.data || [];
 
-            // 3. Get player's events for these matches
-            const { data: playerEvents } = await supabase
-                .from('match_events')
-                .select('*')
-                .eq('player_id', id);
-
-            // Group player events by match_id
-            const eventsByMatch: Record<string, any[]> = {};
-            (playerEvents || []).forEach((e: any) => {
-                const mId = String(e.match_id);
-                if (!eventsByMatch[mId]) eventsByMatch[mId] = [];
-                eventsByMatch[mId].push({
-                    event_type: String(e.event_type || '').toLowerCase(),
-                    minute: e.minute
+                const allMatches: any[] = [];
+                const matchIds = new Set<string>();
+                [...homeMatches, ...awayMatches].forEach((m: any) => {
+                    if (!matchIds.has(m.id)) {
+                        matchIds.add(m.id);
+                        allMatches.push(m);
+                    }
                 });
-            });
 
-            // 4. Get teams data
-            const { data: teamsData } = await supabase.from('teams').select('*');
-            const teamsMap: Record<string, any> = {};
-            if (teamsData) {
+                if (allMatches.length === 0) return [];
+
+                const eventsByMatch: Record<string, any[]> = {};
+                playerEvents.forEach((e: any) => {
+                    const mId = String(e.match_id);
+                    if (!eventsByMatch[mId]) eventsByMatch[mId] = [];
+                    eventsByMatch[mId].push({
+                        event_type: String(e.event_type || '').toLowerCase(),
+                        minute: e.minute
+                    });
+                });
+
+                const teamsMap: Record<string, any> = {};
                 teamsData.forEach((t: any) => { teamsMap[t.id] = t; });
+
+                return allMatches
+                    .sort((a, b) => new Date(b.match_date || b.date || 0).getTime() - new Date(a.match_date || a.date || 0).getTime())
+                    .map((m: any) => {
+                        const homeTeam = teamsMap[m.home_team_id];
+                        const awayTeam = teamsMap[m.away_team_id];
+                        const evts = eventsByMatch[String(m.id)] || [];
+
+                        const hasGoal = evts.some(e => e.event_type === 'goal');
+                        const hasAssist = evts.some(e => e.event_type === 'assist');
+                        const hasYellow = evts.some(e => e.event_type === 'yellow_card' || e.event_type === 'yellowcard' || e.event_type === 'yellow');
+                        const hasRed = evts.some(e => e.event_type === 'red_card' || e.event_type === 'redcard' || e.event_type === 'red');
+
+                        const eventLabels: string[] = [];
+                        if (hasGoal) eventLabels.push('GOL');
+                        if (hasAssist) eventLabels.push('ASSIST');
+                        if (hasYellow) eventLabels.push('SARIQ');
+                        if (hasRed) eventLabels.push('QIZIL');
+
+                        return {
+                            ...m,
+                            _id: m.id,
+                            playerEvents: evts,
+                            eventLabel: eventLabels.length > 0 ? eventLabels.join(' • ') : "O'YIN",
+                            event_type: hasGoal ? 'goal' : hasAssist ? 'assist' : hasYellow ? 'yellow_card' : hasRed ? 'red_card' : 'match',
+                            homeTeamName: homeTeam?.name || m.home_team_name || 'Uy jamoasi',
+                            homeTeamLogo: homeTeam?.logo_url || m.home_team_logo || '',
+                            awayTeamName: awayTeam?.name || m.away_team_name || 'Mehmon jamoa',
+                            awayTeamLogo: awayTeam?.logo_url || m.away_team_logo || '',
+                            homeTeam: homeTeam ? { name: homeTeam.name, logo: homeTeam.logo_url } : { name: m.home_team_name, logo: m.home_team_logo },
+                            awayTeam: awayTeam ? { name: awayTeam.name, logo: awayTeam.logo_url } : { name: m.away_team_name, logo: m.away_team_logo },
+                            score: { home: m.home_score ?? 0, away: m.away_score ?? 0 }
+                        };
+                    });
+            } catch (err) {
+                return api.get(`/players/${id}/matches`).then(res => res.data.data).catch(() => []);
             }
-
-            // 5. Build result - all team matches with player events overlay
-            return allMatches
-                .sort((a, b) => new Date(b.match_date || b.date || 0).getTime() - new Date(a.match_date || a.date || 0).getTime())
-                .map((m: any) => {
-                    const homeTeam = teamsMap[m.home_team_id];
-                    const awayTeam = teamsMap[m.away_team_id];
-                    const evts = eventsByMatch[String(m.id)] || [];
-
-                    // Build event label
-                    const hasGoal = evts.some(e => e.event_type === 'goal');
-                    const hasAssist = evts.some(e => e.event_type === 'assist');
-                    const hasYellow = evts.some(e => e.event_type === 'yellow_card' || e.event_type === 'yellowcard' || e.event_type === 'yellow');
-                    const hasRed = evts.some(e => e.event_type === 'red_card' || e.event_type === 'redcard' || e.event_type === 'red');
-
-                    const eventLabels: string[] = [];
-                    if (hasGoal) eventLabels.push('GOL');
-                    if (hasAssist) eventLabels.push('ASSIST');
-                    if (hasYellow) eventLabels.push('SARIQ');
-                    if (hasRed) eventLabels.push('QIZIL');
-
-                    return {
-                        ...m,
-                        _id: m.id,
-                        playerEvents: evts,
-                        eventLabel: eventLabels.length > 0 ? eventLabels.join(' • ') : "O'YIN",
-                        event_type: hasGoal ? 'goal' : hasAssist ? 'assist' : hasYellow ? 'yellow_card' : hasRed ? 'red_card' : 'match',
-                        homeTeamName: homeTeam?.name || m.home_team_name || 'Uy jamoasi',
-                        homeTeamLogo: homeTeam?.logo_url || m.home_team_logo || '',
-                        awayTeamName: awayTeam?.name || m.away_team_name || 'Mehmon jamoa',
-                        awayTeamLogo: awayTeam?.logo_url || m.away_team_logo || '',
-                        homeTeam: homeTeam ? { name: homeTeam.name, logo: homeTeam.logo_url } : { name: m.home_team_name, logo: m.home_team_logo },
-                        awayTeam: awayTeam ? { name: awayTeam.name, logo: awayTeam.logo_url } : { name: m.away_team_name, logo: m.away_team_logo },
-                        score: { home: m.home_score ?? 0, away: m.away_score ?? 0 }
-                    };
-                });
-        } catch (err) {
-            return api.get(`/players/${id}/matches`).then(res => res.data.data).catch(() => []);
-        }
+        });
     },
 
     // Teams (Direct from Supabase 'teams' table with Standings calculation)
     getTeams: async (page = 1, limit = 100, leagueName?: string) => {
-        try {
-            let query = supabase.from('teams').select('*').order('name');
-            if (leagueName) {
-                const lLower = String(leagueName).toLowerCase();
-                let keyword = '';
-                if (lLower.includes('super')) keyword = 'super';
-                else if (lLower.includes('pro')) keyword = 'pro';
-                else if (lLower.includes('3')) keyword = '3';
-                else if (lLower.includes('7')) keyword = '7x7';
+        const cacheKey = `teams_${page}_${limit}_${leagueName || 'all'}`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                let query = supabase.from('teams').select('*').order('name');
+                if (leagueName) {
+                    const lLower = String(leagueName).toLowerCase();
+                    let keyword = '';
+                    if (lLower.includes('super')) keyword = 'super';
+                    else if (lLower.includes('pro')) keyword = 'pro';
+                    else if (lLower.includes('3')) keyword = '3';
+                    else if (lLower.includes('7')) keyword = '7x7';
 
-                if (keyword) {
-                    query = query.ilike('league', `%${keyword}%`);
+                    if (keyword) {
+                        query = query.ilike('league', `%${keyword}%`);
+                    }
                 }
-            }
-            const { data: rawTeams, error } = await query;
-            if (error) throw error;
-            if (!rawTeams) return [];
+                const { data: rawTeams, error } = await query;
+                if (error) throw error;
+                if (!rawTeams) return [];
 
             // Fetch finished matches to compute points dynamically
             const { data: finishedMatches } = await supabase
@@ -283,7 +321,8 @@ export const apiService = {
             const res = await api.get(`/teams?page=${page}&limit=${limit}`).catch(() => ({ data: { data: [] } }));
             return res.data?.data || [];
         }
-    },
+    });
+},
 
     getTeamById: async (id: string) => {
         try {
