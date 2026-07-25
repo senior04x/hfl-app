@@ -35,6 +35,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { apiService } from '../services/apiService';
+import { eskizService } from '../services/eskizService';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
@@ -194,17 +195,36 @@ export default function WelcomeScreen({ navigation }: any) {
         try {
             setLoading(true);
             const fullPhone = `+998${phone.replace(/\D/g, '')}`;
+            
+            // 1. Check if account exists in database
             const res = await apiService.findAccountsByPhone(fullPhone);
 
-            if (res.success && res.accounts) {
+            if (res.success && res.accounts && res.accounts.length > 0) {
                 if (res.accounts.length > 1) {
                     setAccountOptions(res.accounts);
-                    setShowAccountModal(true);
                 } else if (res.user) {
-                    setAuth(res.user);
+                    setAccountOptions([res.user]);
+                }
+
+                // 2. Generate random 6-digit OTP code
+                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                setServerOtpCode(generatedOtp);
+
+                // 3. Send SMS via Eskiz SMS API
+                const smsRes = await eskizService.sendVerificationSms(fullPhone, generatedOtp);
+                
+                // 4. Start 60s countdown timer & move to OTP step
+                startTimer();
+                setLoginStep('otp');
+                setOtpCode('');
+
+                if (smsRes.success) {
+                    Alert.alert('SMS Yuborildi', `+998 ${phone} raqamingizga 6 xonali tasdiqlash kodi SMS orqali yuborildi.`);
+                } else {
+                    Alert.alert('Eslatma', `SMS yuborishda muammo bo'ldi: ${smsRes.message}`);
                 }
             } else {
-                Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi.");
+                Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi. Iltimos, avval ariza topshiring!");
             }
         } catch (error: any) {
             console.error('Phone login error:', error);
@@ -222,18 +242,21 @@ export default function WelcomeScreen({ navigation }: any) {
 
         try {
             setLoading(true);
-            const fullPhone = `+998${phone.replace(/\D/g, '')}`;
-            const res = await apiService.verifyOTP(fullPhone, otpCode, serverOtpCode);
+            const inputCode = otpCode.trim();
 
-            if (res.success) {
-                if (res.multipleAccounts && res.accounts && res.accounts.length > 1) {
-                    setAccountOptions(res.accounts);
+            if (inputCode === serverOtpCode) {
+                // OTP code matches!
+                if (accountOptions.length > 1) {
                     setShowAccountModal(true);
-                } else if (res.user) {
-                    setAuth(res.user);
+                } else if (accountOptions.length === 1) {
+                    setAuth(accountOptions[0]);
+                } else {
+                    const fullPhone = `+998${phone.replace(/\D/g, '')}`;
+                    const res = await apiService.findAccountsByPhone(fullPhone);
+                    if (res.user) setAuth(res.user);
                 }
             } else {
-                Alert.alert('Xato', res.reason || "Tasdiqlash kodi noto'g'ri.");
+                Alert.alert('Xato', "Tasdiqlash kodi noto'g'ri. Iltimos, qayta kiring.");
             }
         } catch (error: any) {
             console.error('Verify OTP error:', error);
@@ -314,23 +337,17 @@ export default function WelcomeScreen({ navigation }: any) {
                                         <>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                                                 <Ionicons name="shield-checkmark" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-                                                <Text style={styles.cardTitle}>TASDIQLASH KODI</Text>
+                                                <Text style={styles.cardTitle}>SMS TASDIQLASH KODI</Text>
                                             </View>
                                             
                                             <Text style={styles.cardSubTitle}>
-                                                {deliveredVia === 'telegram'
-                                                    ? `+998 ${phone} raqamiga Telegram bot orqali 6 xonali kod yuborildi.`
-                                                    : `+998 ${phone} uchun tasdiqlash kodini olish uchun Telegram botga o'ting.`}
+                                                +998 {phone} raqamingizga SMS xabarnoma orqali 6 xonali tasdiqlash kodi yuborildi.
                                             </Text>
 
-                                            <TouchableOpacity
-                                                style={styles.telegramBotBadge}
-                                                onPress={handleOpenBot}
-                                            >
-                                                <Ionicons name="paper-plane" size={18} color="#0088cc" style={{ marginRight: 8 }} />
-                                                <Text style={styles.telegramBotBadgeText}>Telegram Bot (@havasmedialiga_bot)</Text>
-                                                <Ionicons name="open-outline" size={14} color="#0088cc" style={{ marginLeft: 4 }} />
-                                            </TouchableOpacity>
+                                            <View style={styles.telegramBotBadge}>
+                                                <Ionicons name="chatbubble-ellipses" size={18} color={Colors.primary} style={{ marginRight: 8 }} />
+                                                <Text style={[styles.telegramBotBadgeText, { color: Colors.primary }]}>Eskiz SMS Gateway</Text>
+                                            </View>
 
                                             <View style={styles.inputWrapper}>
                                                 <Text style={styles.inputLabel}>6 XONALI TASDIQLASH KODI</Text>
@@ -400,7 +417,7 @@ export default function WelcomeScreen({ navigation }: any) {
 
                                 <TouchableOpacity
                                     style={styles.guestButton}
-                                    onPress={setGuest}
+                                    onPress={() => setGuest(true)}
                                 >
                                     <Text style={styles.guestButtonText}>MEHMON SIFATIDA DAVOM ETISH</Text>
                                 </TouchableOpacity>
