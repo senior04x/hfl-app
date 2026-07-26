@@ -135,10 +135,6 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
             Alert.alert('Xatolik', 'Iltimos, yangi jamoani tanlang');
             return;
         }
-        if (reason.trim().length < 10) {
-            Alert.alert('Xatolik', "O'tish sababi eng kamida 10 ta belgidan iborat bo'lishi shart.");
-            return;
-        }
 
         try {
             setLoadingSubmit(true);
@@ -147,7 +143,7 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                 playerId: targetPlayerId,
                 currentTeamId: currentTeam?.id || currentTeam?._id || user?.teamId || user?.team_id || 'unknown_old_team',
                 newTeamId: selectedTeam,
-                reason: reason.trim(),
+                reason: reason.trim() || null,
             };
 
             const response = await apiService.createTransferRequest(transferData);
@@ -287,10 +283,10 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                     </TouchableOpacity>
 
                     {/* Step 3: Reason */}
-                    <Text style={styles.label}>3. O'TISH SABABI</Text>
+                    <Text style={styles.label}>3. O'TISH SABABI (IXTIYORIY)</Text>
                     <TextInput
                         style={styles.textArea}
-                        placeholder="Nima uchun jamoani almashtirmoqchisiz? (kamida 10 ta belgi)..."
+                        placeholder="Nima uchun jamoani almashtirmoqchisiz? (ixtiyoriy)..."
                         placeholderTextColor="rgba(255,255,255,0.4)"
                         multiline
                         numberOfLines={5}
