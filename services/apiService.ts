@@ -549,6 +549,26 @@ export const apiService = {
         }
     },
 
+    getTransferWindowStatus: async (orgId?: number | string) => {
+        try {
+            let targetOrgId = orgId;
+            if (!targetOrgId) {
+                targetOrgId = 1;
+            }
+            const { data, error } = await supabase
+                .from('organizations')
+                .select('transfer_window_open')
+                .eq('id', targetOrgId)
+                .single();
+            
+            if (error || !data) return false;
+            return !!data.transfer_window_open;
+        } catch (err) {
+            console.error('getTransferWindowStatus error:', err);
+            return false;
+        }
+    },
+
     // Chat (Supabase team_messages table with Realtime + REST fallback)
     getChatMessages: async (teamId: string, page = 1, limit = 300) => {
         try {

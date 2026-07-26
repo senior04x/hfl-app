@@ -54,13 +54,25 @@ export default function AccountScreen({ navigation }: any) {
 
     const [detailedData, setDetailedData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [transferWindowOpen, setTransferWindowOpen] = useState(false);
     const currentTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
 
     useEffect(() => {
-        if (!isGuest && user?.id) {
-            loadDetailedData();
+        if (!isGuest) {
+            if (user?.id) loadDetailedData();
+            checkTransferWindow();
         }
-    }, [isGuest, user?.id]);
+    }, [isGuest, user?.id, selectedOrganizationId]);
+
+    const checkTransferWindow = async () => {
+        try {
+            const orgId = selectedOrganizationId || user?.organizationId || user?.organization_id || 1;
+            const isOpen = await apiService.getTransferWindowStatus(orgId);
+            setTransferWindowOpen(isOpen);
+        } catch (e) {
+            console.error('Error checking transfer window status:', e);
+        }
+    };
 
     const loadDetailedData = async () => {
         try {
@@ -237,11 +249,13 @@ export default function AccountScreen({ navigation }: any) {
                                         title="Mening statistika"
                                         onPress={() => navigation.navigate('MyStats', { playerId: user?.id })}
                                     />
-                                    <SettingItem
-                                        icon="swap-horizontal-outline"
-                                        title="Transfer so'rovi"
-                                        onPress={() => navigation.navigate('TransferRequest', { playerId: user?.id })}
-                                    />
+                                    {transferWindowOpen && (
+                                        <SettingItem
+                                            icon="swap-horizontal-outline"
+                                            title="Transfer so'rovi"
+                                            onPress={() => navigation.navigate('TransferRequest', { playerId: user?.id })}
+                                        />
+                                    )}
                                 </>
                             )}
                             {currentTeamId && (
