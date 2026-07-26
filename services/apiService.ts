@@ -504,11 +504,13 @@ export const apiService = {
             // Fetch old team info
             let oldTeamName = '';
             let oldTeamLogo = '';
+            let organizationId: any = null;
             if (data.currentTeamId && data.currentTeamId !== 'unknown_old_team') {
-                const { data: oldTeam } = await supabase.from('teams').select('name, logo_url').eq('id', data.currentTeamId).single();
+                const { data: oldTeam } = await supabase.from('teams').select('name, logo_url, organization_id').eq('id', data.currentTeamId).single();
                 if (oldTeam) {
                     oldTeamName = oldTeam.name || '';
                     oldTeamLogo = oldTeam.logo_url || '';
+                    organizationId = oldTeam.organization_id || null;
                 }
             }
 
@@ -516,14 +518,15 @@ export const apiService = {
             let newTeamName = '';
             let newTeamLogo = '';
             if (data.newTeamId) {
-                const { data: newTeam } = await supabase.from('teams').select('name, logo_url').eq('id', data.newTeamId).single();
+                const { data: newTeam } = await supabase.from('teams').select('name, logo_url, organization_id').eq('id', data.newTeamId).single();
                 if (newTeam) {
                     newTeamName = newTeam.name || '';
                     newTeamLogo = newTeam.logo_url || '';
+                    if (!organizationId) organizationId = newTeam.organization_id || null;
                 }
             }
 
-            const transferPayload = {
+            const transferPayload: any = {
                 player_id: data.playerId,
                 old_team_id: data.currentTeamId !== 'unknown_old_team' ? data.currentTeamId : null,
                 new_team_id: data.newTeamId,
@@ -535,6 +538,7 @@ export const apiService = {
                 old_team_logo: oldTeamLogo,
                 new_team_name: newTeamName,
                 new_team_logo: newTeamLogo,
+                ...(organizationId ? { organization_id: organizationId } : {})
             };
 
             const { data: created, error } = await supabase.from('transfers').insert(transferPayload).select().single();
