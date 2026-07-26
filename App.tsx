@@ -1,5 +1,6 @@
 import 'expo-dev-client';
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -24,6 +25,7 @@ import TeamProfileScreen from './screens/TeamProfileScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
 import { notificationService } from './services/notificationService';
+import VideoBackground from './components/VideoBackground';
 
 import * as SplashScreenExpo from 'expo-splash-screen';
 import SplashScreen from './screens/SplashScreen';
@@ -42,8 +44,6 @@ export default function App() {
     React.useEffect(() => {
         const setupNotifications = async () => {
             try {
-                // Register for push notifications regardless of being logged in or not
-                // (Anonymous tokens will be used for broadcast)
                 const userId = user ? ((user as any)._id || (user as any).id) : 'guest';
                 
                 await notificationService.setupAndroidChannel();
@@ -67,43 +67,54 @@ export default function App() {
     }
 
     return (
-        <SafeAreaProvider style={{ backgroundColor: Colors.background }}>
+        <SafeAreaProvider style={{ backgroundColor: '#000' }}>
             <SocketProvider>
-                <NavigationContainer theme={{
-                    ...DarkTheme,
-                    colors: {
-                        ...DarkTheme.colors,
-                        primary: Colors.primary,
-                        background: Colors.background,
-                        card: Colors.surface,
-                        text: Colors.text,
-                        border: Colors.border,
-                        notification: Colors.danger,
-                    }
-                }}>
-                    {isAuthenticated || isGuest ? (
-                        <Stack.Navigator screenOptions={{ headerShown: false }}>
-                            <Stack.Screen name="MainTabs" component={AppNavigator} />
-                            <Stack.Screen name="JoinApplication" component={JoinApplicationScreen} />
-                            <Stack.Screen name="MyStats" component={MyStatsScreen} />
-                            <Stack.Screen name="TransferRequest" component={TransferRequestScreen} />
-                            <Stack.Screen name="FormationBoard" component={FormationBoard} />
-                            <Stack.Screen name="TeamChat" component={TeamChatScreen} />
-                            <Stack.Screen name="Standings" component={StandingsScreen} />
-                            <Stack.Screen name="TournamentDetail" component={TournamentDetailScreen} />
-                            <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
-                            <Stack.Screen name="MatchDetail" component={MatchDetailScreen} />
-                            <Stack.Screen name="CalendarMatches" component={CalendarMatchesScreen} />
-                            <Stack.Screen name="Teams" component={TeamsScreen} />
-                            <Stack.Screen name="TeamProfile" component={TeamProfileScreen} />
-                            <Stack.Screen name="Players" component={PlayersScreen} />
-                            <Stack.Screen name="PlayerStats" component={PlayerStatsScreen} />
-                        </Stack.Navigator>
-                    ) : (
-                        <AuthNavigator />
-                    )}
-                    <StatusBar style="light" />
-                </NavigationContainer>
+                <VideoBackground
+                    source={require('./assets/images/welcomeScreenVideo1.mp4')}
+                    overlayOpacity={0.78}
+                    style={StyleSheet.absoluteFill}
+                >
+                    <NavigationContainer theme={{
+                        ...DarkTheme,
+                        colors: {
+                            ...DarkTheme.colors,
+                            primary: Colors.primary,
+                            background: 'transparent',
+                            card: 'transparent',
+                            text: Colors.text,
+                            border: Colors.border,
+                            notification: Colors.danger,
+                        }
+                    }}>
+                        {isAuthenticated || isGuest ? (
+                            <Stack.Navigator 
+                                screenOptions={{ 
+                                    headerShown: false,
+                                    cardStyle: { backgroundColor: 'transparent' }
+                                }}
+                            >
+                                <Stack.Screen name="MainTabs" component={AppNavigator} />
+                                <Stack.Screen name="JoinApplication" component={JoinApplicationScreen} />
+                                <Stack.Screen name="MyStats" component={MyStatsScreen} />
+                                <Stack.Screen name="TransferRequest" component={TransferRequestScreen} />
+                                <Stack.Screen name="FormationBoard" component={FormationBoard} />
+                                <Stack.Screen name="TeamChat" component={TeamChatScreen} />
+                                <Stack.Screen name="Standings" component={StandingsScreen} />
+                                <Stack.Screen name="TournamentDetail" component={TournamentDetailScreen} />
+                                <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
+                                <Stack.Screen name="MatchDetail" component={MatchDetailScreen} />
+                                <Stack.Screen name="CalendarMatches" component={CalendarMatchesScreen} />
+                                <Stack.Screen name="Teams" component={TeamsScreen} />
+                                <Stack.Screen name="TeamProfile" component={TeamProfileScreen} />
+                                <Stack.Screen name="Players" component={PlayersScreen} />
+                                <Stack.Screen name="PlayerStats" component={PlayerStatsScreen} />
+                            </Stack.Navigator>
+                        ) : (
+                            <AuthNavigator />
+                        )}
+                        <StatusBar style="light" />
+                    </NavigationContainer>
+                </VideoBackground>
             </SocketProvider>
         </SafeAreaProvider>
     );

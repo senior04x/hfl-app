@@ -18,6 +18,7 @@ export default function AppNavigator() {
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
+                sceneContainerStyle: { backgroundColor: 'transparent' },
                 tabBarStyle: {
                     position: 'absolute',
                     backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(10, 15, 30, 0.85)',
