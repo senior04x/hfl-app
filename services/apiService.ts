@@ -537,8 +537,7 @@ export const apiService = {
                 old_team_name: oldTeamName,
                 old_team_logo: oldTeamLogo,
                 new_team_name: newTeamName,
-                new_team_logo: newTeamLogo,
-                ...(organizationId ? { organization_id: organizationId } : {})
+                new_team_logo: newTeamLogo
             };
 
             const { data: created, error } = await supabase.from('transfers').insert(transferPayload).select().single();
