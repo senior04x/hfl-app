@@ -171,11 +171,12 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
     const selectedTeamObj = getSelectedTeamObj();
 
     return (
-        <VideoBackground 
-            source={require('../assets/images/welcomeScreenVideo1.mp4')} 
-            overlayOpacity={0.78}
-            style={StyleSheet.absoluteFill}
-        >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <VideoBackground 
+                source={require('../assets/images/welcomeScreenVideo1.mp4')} 
+                overlayOpacity={0.78}
+                style={StyleSheet.absoluteFill}
+            />
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -432,7 +433,7 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                     </View>
                 </Modal>
             </SafeAreaView>
-        </VideoBackground>
+        </View>
     );
 };
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { View, StyleSheet, StatusBar } from 'react-native';
 import VideoBackground from './VideoBackground';
 
 interface AnimatedBackgroundProps {
@@ -10,17 +10,26 @@ interface AnimatedBackgroundProps {
 
 const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ 
     children, 
-    overlayOpacity = 0.75,
+    overlayOpacity = 0.72,
 }) => {
     return (
-        <VideoBackground 
-            source={require('../assets/images/welcomeScreenVideo1.mp4')} 
-            overlayOpacity={overlayOpacity}
-            style={StyleSheet.absoluteFill}
-        >
+        <View style={styles.wrapper}>
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+            <VideoBackground 
+                source={require('../assets/images/welcomeScreenVideo1.mp4')} 
+                overlayOpacity={overlayOpacity}
+                style={StyleSheet.absoluteFill}
+            />
             {children}
-        </VideoBackground>
+        </View>
     );
 };
+
+const styles = StyleSheet.create({
+    wrapper: {
+        flex: 1,
+        backgroundColor: '#050811',
+    },
+});
 
 export default AnimatedBackground;
