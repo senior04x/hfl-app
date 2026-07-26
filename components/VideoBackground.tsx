@@ -13,13 +13,13 @@ interface VideoBackgroundProps {
 
 /**
  * Reusable Video Background component optimized for Android and iOS.
- * Handles auto-play, looping, and muting.
+ * Handles auto-play, looping, and muting seamlessly across platforms.
  */
 const VideoBackground: React.FC<VideoBackgroundProps> = ({ 
     source, 
     posterSource,
     posterResizeMode = 'cover',
-    overlayOpacity = 0.85,
+    overlayOpacity = 0.78,
     style,
     children 
 }) => {
@@ -27,39 +27,45 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
     const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
     useEffect(() => {
-        // Essential for Android autoplay in standalone builds
-        const setupAudio = async () => {
+        const setupAudioAndPlay = async () => {
             try {
                 await Audio.setAudioModeAsync({
                     allowsRecordingIOS: false,
                     staysActiveInBackground: false,
-                    interruptionModeIOS: 1, // interruptionModeIOS.DoNotMix
+                    interruptionModeIOS: 1, // DoNotMix
                     playsInSilentModeIOS: true,
                     shouldDuckAndroid: true,
-                    interruptionModeAndroid: 1, // interruptionModeAndroid.DoNotMix
+                    interruptionModeAndroid: 1, // DoNotMix
                     playThroughEarpieceAndroid: false,
                 });
             } catch (error) {
                 console.log('Audio mode setup error:', error);
             }
+
+            if (videoRef.current) {
+                try {
+                    await videoRef.current.playAsync();
+                } catch (e) {
+                    console.log('Play async error:', e);
+                }
+            }
         };
 
-        setupAudio();
+        setupAudioAndPlay();
 
-        // Extra push for Android to start playing
         if (Platform.OS === 'android') {
             const timer = setTimeout(() => {
                 if (videoRef.current) {
-                    videoRef.current.playAsync();
+                    videoRef.current.playAsync().catch(() => {});
                 }
-            }, 800);
+            }, 400);
             return () => clearTimeout(timer);
         }
     }, []);
 
     return (
         <View style={[styles.container, style]}>
-            {/* Fallback Image / Poster - Shows while loading or if video fails */}
+            {/* Fallback Image - Only shows if poster specified and video not ready */}
             {posterSource && !isVideoLoaded && (
                 <Image 
                     source={posterSource} 
@@ -71,24 +77,27 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
             <Video
                 ref={videoRef}
                 source={source}
-                posterSource={posterSource}
-                usePoster={true}
-                posterStyle={{ resizeMode: posterResizeMode }}
-                style={[StyleSheet.absoluteFill, { opacity: isVideoLoaded ? 1 : 0 }]}
+                style={StyleSheet.absoluteFill}
                 resizeMode={ResizeMode.COVER}
                 shouldPlay={true}
                 isLooping={true}
                 isMuted={true}
                 useNativeControls={false}
+                usePoster={false}
                 onLoad={() => {
                     setIsVideoLoaded(true);
                     if (videoRef.current) {
-                        videoRef.current.playAsync();
+                        videoRef.current.playAsync().catch(() => {});
+                    }
+                }}
+                onReadyForDisplay={() => {
+                    setIsVideoLoaded(true);
+                    if (videoRef.current) {
+                        videoRef.current.playAsync().catch(() => {});
                     }
                 }}
                 onError={(err) => {
                     console.log('Video Playback Error:', err);
-                    setIsVideoLoaded(false);
                 }}
             />
             {/* Dark Overlay */}
@@ -106,7 +115,7 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000', // Fallback color
+        backgroundColor: '#050811',
     },
 });
 
