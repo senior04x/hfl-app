@@ -1297,6 +1297,50 @@ export const apiService = {
     // Notifications
     registerPushToken: (data: { token: string, userId: string, platform: string, deviceId?: string }) =>
         api.post('/notifications/register', data).then(res => res.data).catch(() => ({ success: true })),
+
+    async updatePlayerInstagram(playerId: string | number, username: string, url: string) {
+        try {
+            await supabase
+                .from('applications')
+                .update({
+                    comment: `[INSTAGRAM:${url}]`
+                })
+                .eq('id', playerId);
+            clearApiCache();
+            return { success: true };
+        } catch (e) {
+            console.error('Error updating instagram:', e);
+            throw e;
+        }
+    },
+
+    async submitProfileUpdateRequest(payload: any) {
+        try {
+            const { playerId, orgId, oldData, newData } = payload;
+            const commentPayload = '[PROFILE_UPDATE]' + JSON.stringify({ oldData, newData, playerId });
+
+            const { error } = await supabase
+                .from('applications')
+                .insert([{
+                    organization_id: orgId || 1,
+                    first_name: newData.firstName || '',
+                    last_name: newData.lastName || '',
+                    father_name: newData.fatherName || '',
+                    phone: newData.phone || '',
+                    position: newData.position || '',
+                    player_number: newData.playerNumber ? Number(newData.playerNumber) : null,
+                    photo_url: newData.photoUrl || null,
+                    comment: commentPayload,
+                    status: 'pending'
+                }]);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (e) {
+            console.error('Error submitting profile update request:', e);
+            throw e;
+        }
+    },
 };
 
 export default api;
