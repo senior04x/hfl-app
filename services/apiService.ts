@@ -956,19 +956,20 @@ export const apiService = {
         }
     },
 
-    getLeaguesByOrgId: async (targetOrgId: number) => {
+    getLeaguesByOrgId: async (targetOrgId: any) => {
         try {
-            if (!targetOrgId) return [];
+            const orgId = Number(targetOrgId);
+            if (!orgId || isNaN(orgId)) return [];
 
             const { data: ownLeagues } = await supabase
                 .from('leagues')
                 .select('*')
-                .eq('organization_id', targetOrgId);
+                .eq('organization_id', orgId);
 
             const { data: collabs } = await supabase
                 .from('league_collabs')
                 .select('*, league:league_id(*)')
-                .or(`receiver_org_id.eq.${targetOrgId},sender_org_id.eq.${targetOrgId}`)
+                .or(`receiver_org_id.eq.${orgId},sender_org_id.eq.${orgId}`)
                 .eq('status', 'accepted');
 
             const collabLeagues = (collabs || []).map((c: any) => c.league).filter(Boolean);

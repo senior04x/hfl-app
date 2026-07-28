@@ -274,11 +274,12 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
         try {
             setLoadingData(true);
-            const lData = await apiService.getLeagues();
+            const lData = await apiService.getLeaguesByOrgId(org.id);
             setLeagues(lData || []);
             setIsLeagueDropdownOpen(true);
         } catch (err) {
             console.warn('Error loading org leagues:', err);
+            setLeagues([]);
         } finally {
             setLoadingData(false);
         }
