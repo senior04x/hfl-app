@@ -270,8 +270,8 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
 
     const renderKaryera = () => {
         const history = player?.careerHistory || [];
-        const currentTeamName = player?.teams?.name || player?.team_name || 'HFL FK';
-        const currentTeamLogo = player?.teams?.logo_url || player?.team_logo || '';
+        const currentTeamName = player?.teams?.name || player?.team_name || player?.teamName || 'HFL FK';
+        const currentTeamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo || player?.logo_url || '';
 
         return (
             <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
@@ -287,20 +287,23 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                                 <Text style={styles.yearHeaderText}>{yearGroup.year}</Text>
                             </View>
 
-                            {yearGroup.teams.map((team: any) => (
-                                <View key={team.teamId} style={styles.teamCareerWrapper}>
-                                    <View style={styles.teamMainRow}>
-                                        <View style={styles.teamIconBox}>
-                                            {team.teamLogo ? (
-                                                <Image source={{ uri: team.teamLogo }} style={styles.teamMiniLogo} />
-                                            ) : (
-                                                <Ionicons name="shield" size={14} color={Colors.primary} />
-                                            )}
+                            {yearGroup.teams.map((team: any) => {
+                                const tLogo = team.teamLogo || team.logo || team.logo_url || team.team_logo || team.teamLogoUrl;
+                                return (
+                                    <View key={team.teamId || team.name} style={styles.teamCareerWrapper}>
+                                        <View style={styles.teamMainRow}>
+                                            <View style={styles.teamIconBox}>
+                                                {tLogo ? (
+                                                    <Image source={{ uri: tLogo }} style={styles.teamMiniLogo} resizeMode="contain" />
+                                                ) : (
+                                                    <Ionicons name="shield" size={14} color={Colors.primary} />
+                                                )}
+                                            </View>
+                                            <Text style={styles.teamNameCareer} numberOfLines={1}>{(team.teamName || team.name || 'Jamoa').toUpperCase()}</Text>
                                         </View>
-                                        <Text style={styles.teamNameCareer} numberOfLines={1}>{team.teamName?.toUpperCase()}</Text>
                                     </View>
-                                </View>
-                            ))}
+                                );
+                            })}
                         </View>
                     ))
                 ) : (
@@ -308,7 +311,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                         <View style={styles.teamMainRow}>
                             <View style={styles.teamIconBox}>
                                 {currentTeamLogo ? (
-                                    <Image source={{ uri: currentTeamLogo }} style={styles.teamMiniLogo} />
+                                    <Image source={{ uri: currentTeamLogo }} style={styles.teamMiniLogo} resizeMode="contain" />
                                 ) : (
                                     <Ionicons name="shield" size={14} color={Colors.primary} />
                                 )}

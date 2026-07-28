@@ -643,30 +643,36 @@ const MyStatsScreen = ({ navigation }: any) => {
                                 <View style={styles.yearHeaderBadge}>
                                     <Text style={styles.yearHeaderText}>{yearGroup.year}</Text>
                                 </View>
-
-                                {yearGroup.teams.map((team: any) => (
-                                    <View key={team.teamId} style={styles.teamCareerWrapper}>
-                                        <View style={styles.teamMainRow}>
-                                            <View style={styles.teamIconBox}>
-                                                {team.teamLogo ? (
-                                                    <Image source={{ uri: team.teamLogo }} style={styles.teamMiniLogo} />
-                                                ) : (
-                                                    <Ionicons name="shield" size={14} color={Colors.primary} />
-                                                )}
-                                            </View>
-                                            <Text style={styles.teamNameCareer} numberOfLines={1}>{team.teamName?.toUpperCase()}</Text>
-                                        </View>
-                                    </View>
-                                ))}
+                                {yearGroup.teams.map((team: any) => {
+                                     const tLogo = team.teamLogo || team.logo || team.logo_url || team.team_logo || team.teamLogoUrl;
+                                     return (
+                                         <View key={team.teamId || team.name} style={styles.teamCareerWrapper}>
+                                             <View style={styles.teamMainRow}>
+                                                 <View style={styles.teamIconBox}>
+                                                     {tLogo ? (
+                                                         <Image source={{ uri: tLogo }} style={styles.teamMiniLogo} resizeMode="contain" />
+                                                     ) : (
+                                                         <Ionicons name="shield" size={14} color={Colors.primary} />
+                                                     )}
+                                                 </View>
+                                                 <Text style={styles.teamNameCareer} numberOfLines={1}>{(team.teamName || team.name || 'Jamoa').toUpperCase()}</Text>
+                                             </View>
+                                         </View>
+                                     );
+                                 })}
                             </View>
                         ))
                     ) : (
                         <View style={styles.teamCareerWrapper}>
                             <View style={styles.teamMainRow}>
                                 <View style={styles.teamIconBox}>
-                                    <Ionicons name="shield" size={14} color={Colors.primary} />
+                                    {player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo || detailedData?.logo_url ? (
+                                        <Image source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo || detailedData?.logo_url }} style={styles.teamMiniLogo} resizeMode="contain" />
+                                    ) : (
+                                        <Ionicons name="shield" size={14} color={Colors.primary} />
+                                    )}
                                 </View>
-                                <Text style={styles.teamNameCareer} numberOfLines={1}>{(player?.teams?.name || 'HFL FK').toUpperCase()}</Text>
+                                <Text style={styles.teamNameCareer} numberOfLines={1}>{(player?.teams?.name || detailedData?.name || 'HFL FK').toUpperCase()}</Text>
                             </View>
                         </View>
                     )}

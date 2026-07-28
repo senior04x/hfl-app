@@ -39,6 +39,20 @@ const LEAGUE_LOGOS: Record<string, any> = {
     '7x7': require('../assets/images/7x7-liga.png'),
 };
 
+const getLeagueLogoSource = (league: any) => {
+    if (!league) return null;
+    const logoUrl = league.logo_url || league.logo;
+    if (logoUrl && typeof logoUrl === 'string' && logoUrl.length > 5) {
+        return { uri: logoUrl };
+    }
+    const lName = String(league.name || league.id || league.label || '').toLowerCase();
+    if (lName.includes('super')) return LEAGUE_LOGOS['super'];
+    if (lName.includes('pro')) return LEAGUE_LOGOS['pro'];
+    if (lName.includes('3')) return LEAGUE_LOGOS['3liga'];
+    if (lName.includes('7')) return LEAGUE_LOGOS['7x7'];
+    return LEAGUE_LOGOS[league.id || league.logoKey] || null;
+};
+
 // Stable Header Component to prevent unwanted re-renders during selection
 const TournamentsHeader = ({
     activeTab,
@@ -66,7 +80,7 @@ const TournamentsHeader = ({
         outputRange: [0, 1],
     });
 
-    const currentLogoSource = LEAGUE_LOGOS[selectedLeague?.id || selectedLeague?._id || selectedLeague?.logoKey] || (selectedLeague?.logo ? { uri: selectedLeague.logo } : null);
+    const currentLogoSource = getLeagueLogoSource(selectedLeague);
 
     return (
         <View style={styles.headerContent}>
@@ -158,7 +172,7 @@ const TournamentsHeader = ({
                     ) : (
                         leagues.map((league: any) => {
                             const isSelected = (selectedLeague?.id === league.id || selectedLeague?._id === league._id);
-                            const itemLogo = LEAGUE_LOGOS[league.id || league._id || league.logoKey] || (league.logo ? { uri: league.logo } : null);
+                            const itemLogo = getLeagueLogoSource(league);
                             return (
                                 <TouchableOpacity
                                     key={league.id || league._id}
