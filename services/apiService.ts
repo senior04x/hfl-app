@@ -968,11 +968,27 @@ export const apiService = {
 
             const { data: collabs } = await supabase
                 .from('league_collabs')
-                .select('*, league:league_id(*)')
+                .select('*')
                 .or(`receiver_org_id.eq.${orgId},sender_org_id.eq.${orgId}`)
                 .eq('status', 'accepted');
 
-            const collabLeagues = (collabs || []).map((c: any) => c.league).filter(Boolean);
+            let collabLeagues: any[] = [];
+            if (collabs && collabs.length > 0) {
+                const collabLeagueIds = collabs.map((c: any) => c.league_id).filter(Boolean);
+                const collabLeagueNames = collabs.map((c: any) => c.league_name || c.league).filter(Boolean);
+
+                let queryParts: string[] = [];
+                if (collabLeagueIds.length > 0) queryParts.push(`id.in.(${collabLeagueIds.join(',')})`);
+                if (collabLeagueNames.length > 0) queryParts.push(`name.in.(${collabLeagueNames.map(n => `"${n}"`).join(',')})`);
+
+                if (queryParts.length > 0) {
+                    const { data: fetchedCollabs } = await supabase
+                        .from('leagues')
+                        .select('*')
+                        .or(queryParts.join(','));
+                    if (fetchedCollabs) collabLeagues = fetchedCollabs;
+                }
+            }
 
             const map = new Map<string, any>();
             (ownLeagues || []).forEach(l => { if (l && l.name) map.set(l.name, l); });
