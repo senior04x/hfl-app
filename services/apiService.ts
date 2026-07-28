@@ -956,45 +956,37 @@ export const apiService = {
         }
     },
 
+    getLeaguesByOrgId: async (targetOrgId: number) => {
+        try {
+            if (!targetOrgId) return [];
+
+            const { data: ownLeagues } = await supabase
+                .from('leagues')
+                .select('*')
+                .eq('organization_id', targetOrgId);
+
+            const { data: collabs } = await supabase
+                .from('league_collabs')
+                .select('*, league:league_id(*)')
+                .or(`receiver_org_id.eq.${targetOrgId},sender_org_id.eq.${targetOrgId}`)
+                .eq('status', 'accepted');
+
+            const collabLeagues = (collabs || []).map((c: any) => c.league).filter(Boolean);
+
+            const map = new Map<string, any>();
+            (ownLeagues || []).forEach(l => { if (l && l.name) map.set(l.name, l); });
+            collabLeagues.forEach(l => { if (l && l.name && !map.has(l.name)) map.set(l.name, l); });
+
+            return Array.from(map.values());
+        } catch (err) {
+            console.error('getLeaguesByOrgId error:', err);
+            return [];
+        }
+    },
+
     getLeagues: async () => {
         const orgId = getOrgId();
-        const cacheKey = `leagues_${orgId}`;
-        return getCachedData(cacheKey, async () => {
-            try {
-                const { data: ownLeagues } = await supabase
-                    .from('leagues')
-                    .select('*')
-                    .eq('organization_id', orgId);
-
-                const { data: collabs } = await supabase
-                    .from('league_collabs')
-                    .select('*, league:league_id(*)')
-                    .or(`receiver_org_id.eq.${orgId},sender_org_id.eq.${orgId}`)
-                    .eq('status', 'accepted');
-
-                const collabLeagues = (collabs || []).map((c: any) => c.league).filter(Boolean);
-
-                const map = new Map<string, any>();
-                (ownLeagues || []).forEach(l => map.set(l.name, l));
-                collabLeagues.forEach(l => {
-                    if (!map.has(l.name)) map.set(l.name, l);
-                });
-
-                const result = Array.from(map.values());
-                if (result.length > 0) return result;
-
-                const { data: allLeagues } = await supabase.from('leagues').select('*');
-                return allLeagues || [];
-            } catch (err) {
-                console.error('getLeagues error:', err);
-                return [
-                    { id: 'super', name: 'Super liga', label: 'Super liga' },
-                    { id: 'pro', name: 'Pro liga', label: 'Pro liga' },
-                    { id: '3liga', name: '3-liga', label: '3-liga' },
-                    { id: '7x7', name: '7x7 liga', label: '7x7 liga' },
-                ];
-            }
-        });
+        return apiService.getLeaguesByOrgId(orgId);
     },
 
     getApplicationsByPhone: async (phone: string) => {

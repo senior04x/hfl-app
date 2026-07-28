@@ -153,7 +153,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     selectedOrgName: firstOrg.name,
                     selectedOrgLogo: (firstOrg as any).logo_url || (firstOrg as any).logo || ''
                 }));
-                const lData = await apiService.getLeagues();
+                const lData = await apiService.getLeaguesByOrgId(firstOrg.id);
                 setLeagues(lData || []);
             }
         } catch (e) {
