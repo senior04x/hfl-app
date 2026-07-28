@@ -148,7 +148,7 @@ export default function AccountScreen({ navigation }: any) {
                 <ScrollView 
                     style={styles.container} 
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 100 }}
+                    contentContainerStyle={{ paddingBottom: 110 }}
                 >
                     {/* Profile Header */}
                     <View style={styles.profileHeader}>

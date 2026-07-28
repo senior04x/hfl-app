@@ -226,6 +226,7 @@ export default function HomeScreen({ navigation }: any) {
                     <ScrollView 
                         style={styles.container} 
                         showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 110 }}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}

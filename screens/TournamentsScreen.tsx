@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
     list: {
-        paddingBottom: 40,
+        paddingBottom: 110,
     },
     loading: {
         flex: 1,

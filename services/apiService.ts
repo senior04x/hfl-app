@@ -56,6 +56,51 @@ const api = axios.create({
 });
 
 export const apiService = {
+    // Organizations
+    getOrganizations: async () => {
+        const cacheKey = `organizations_all`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('organizations')
+                    .select('id, name, slug, logo_url')
+                    .order('id', { ascending: true });
+                if (error) throw error;
+                return data || [];
+            } catch (err) {
+                console.error('getOrganizations error:', err);
+                return [
+                    { id: 1, name: 'Havas Futbol Ligasi', slug: 'havas-liga' },
+                ];
+            }
+        });
+    },
+
+    // Accepted Collab Leagues for an Organization
+    getOrgCollabLeagues: async (orgId: number) => {
+        const cacheKey = `org_collab_leagues_${orgId}`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                const { data: collabs, error } = await supabase
+                    .from('league_collabs')
+                    .select('league_id, league:league_id(name)')
+                    .or(`receiver_org_id.eq.${orgId},sender_org_id.eq.${orgId}`)
+                    .eq('status', 'accepted');
+                if (error) throw error;
+                const names: string[] = [];
+                (collabs || []).forEach((c: any) => {
+                    if (c.league && c.league.name) {
+                        names.push(c.league.name);
+                    }
+                });
+                return names;
+            } catch (err) {
+                console.error('getOrgCollabLeagues error:', err);
+                return [];
+            }
+        });
+    },
+
     // Players (Direct from Supabase 'applications' table)
     getPlayers: async (page = 1, limit = 100, teamId?: string) => {
         const orgId = getOrgId();
@@ -96,9 +141,15 @@ export const apiService = {
                     _id: data.id,
                     firstName: data.first_name || '',
                     lastName: data.last_name || '',
-                    photo: data.photo_url || '',
+                    fatherName: data.father_name || data.fatherName || '',
+                    photo: data.photo_url || data.photo || '',
                     position: data.position || 'O\'yinchi',
-                    number: data.number || data.shirt_number || data.player_number || ''
+                    number: data.number || data.shirt_number || data.player_number || '',
+                    citizenship: data.citizenship || '',
+                    height: data.height || '',
+                    weight: data.weight || '',
+                    instagram_username: data.instagram_username || (data.comment?.match(/\[INSTAGRAM:https?:\/\/[^/]+\/([^/\]]+)/)?.[1]) || '',
+                    instagram_url: data.instagram_url || (data.comment?.match(/\[INSTAGRAM:(https?:\/\/[^\]]+)\]/)?.[1]) || ''
                 };
             } catch (err) {
                 return api.get(`/players/${id}`).then(res => res.data.data).catch(() => null);
@@ -638,20 +689,23 @@ export const apiService = {
         return [{ id: 'super', name: 'Super liga' }, { id: 'pro', name: 'Pro liga' }, { id: '3liga', name: '3-liga' }, { id: '7x7', name: '7x7 liga' }];
     },
     getTournamentById: (id: string) => Promise.resolve({ id, name: `${id} liga` }),
-    getLeagues: async () => [
-        { id: 'super', name: 'Super liga' },
-        { id: 'pro', name: 'Pro liga' },
-        { id: '3liga', name: '3-liga' },
-        { id: '7x7', name: '7x7 liga' }
-    ],
 
     // Matches (Direct from Supabase 'matches' table)
     getMatches: async (params?: any) => {
         try {
-            const { data: matchesData, error: mErr } = await supabase
-                .from('matches')
-                .select('*')
-                .order('match_date', { ascending: false });
+            const orgId = getOrgId();
+            const collabLeagueNames = await apiService.getOrgCollabLeagues(orgId);
+
+            let query = supabase.from('matches').select('*').order('match_date', { ascending: false });
+
+            if (collabLeagueNames && collabLeagueNames.length > 0) {
+                const escapedNames = collabLeagueNames.map(n => `"${n.replace(/"/g, '""')}"`).join(',');
+                query = query.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
+            } else {
+                query = query.eq('organization_id', orgId);
+            }
+
+            const { data: matchesData, error: mErr } = await query;
 
             if (mErr || !matchesData) throw mErr;
 
@@ -902,6 +956,47 @@ export const apiService = {
         }
     },
 
+    getLeagues: async () => {
+        const orgId = getOrgId();
+        const cacheKey = `leagues_${orgId}`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                const { data: ownLeagues } = await supabase
+                    .from('leagues')
+                    .select('*')
+                    .eq('organization_id', orgId);
+
+                const { data: collabs } = await supabase
+                    .from('league_collabs')
+                    .select('*, league:league_id(*)')
+                    .or(`receiver_org_id.eq.${orgId},sender_org_id.eq.${orgId}`)
+                    .eq('status', 'accepted');
+
+                const collabLeagues = (collabs || []).map((c: any) => c.league).filter(Boolean);
+
+                const map = new Map<string, any>();
+                (ownLeagues || []).forEach(l => map.set(l.name, l));
+                collabLeagues.forEach(l => {
+                    if (!map.has(l.name)) map.set(l.name, l);
+                });
+
+                const result = Array.from(map.values());
+                if (result.length > 0) return result;
+
+                const { data: allLeagues } = await supabase.from('leagues').select('*');
+                return allLeagues || [];
+            } catch (err) {
+                console.error('getLeagues error:', err);
+                return [
+                    { id: 'super', name: 'Super liga', label: 'Super liga' },
+                    { id: 'pro', name: 'Pro liga', label: 'Pro liga' },
+                    { id: '3liga', name: '3-liga', label: '3-liga' },
+                    { id: '7x7', name: '7x7 liga', label: '7x7 liga' },
+                ];
+            }
+        });
+    },
+
     getApplicationsByPhone: async (phone: string) => {
         try {
             const { data, error } = await supabase.from('applications').select('*, teams(*)').eq('phone', phone);
@@ -914,57 +1009,46 @@ export const apiService = {
 
     checkTeamOrPhoneExists: async (params: { teamName?: string; phone?: string; type: 'player' | 'team' }) => {
         try {
-            const cleanPhone = (params.phone || '').replace(/\D/g, '');
+            const cleanPhone = (params.phone || '').replace(/\D/g, '').slice(-9);
             
             if (params.type === 'team' && params.teamName && params.teamName.trim().length >= 2) {
-                // Check teams table
+                // Check teams table for duplicate name
                 const { data: teamData } = await supabase
                     .from('teams')
                     .select('id, name')
-                    .or(`name.ilike.${params.teamName.trim()},captain_phone.eq.${cleanPhone}`);
+                    .ilike('name', params.teamName.trim());
                 
-                if (teamData && teamData.length > 0) return { exists: true, message: "Kechirasiz, bu jamoa nomi yoki telefon raqami allaqachon ro'yxatdan o'tgan!" };
+                if (teamData && teamData.length > 0) {
+                    return { exists: true, message: "Kechirasiz, ushbu jamoa nomi allaqachon ro'yxatdan o'tgan!" };
+                }
 
-                // Check applications table
-                const { data: appData } = await supabase
-                    .from('applications')
-                    .select('id, teamName')
-                    .or(`teamName.ilike.${params.teamName.trim()},phone.ilike.%${cleanPhone}`);
-                
-                if (appData && appData.length > 0) return { exists: true, message: "Kechirasiz, ushbu jamoa nomi yoki telefon raqami bo'yicha ariza mavjud!" };
+                if (cleanPhone.length === 9) {
+                    const { data: phoneTeamData } = await supabase
+                        .from('teams')
+                        .select('id')
+                        .or(`captain_phone.ilike.%${cleanPhone}%`);
+
+                    if (phoneTeamData && phoneTeamData.length > 0) {
+                        return { exists: true, message: "Kechirasiz, ushbu telefon raqami allaqachon ro'yxatdan o'tgan!" };
+                    }
+                }
             }
 
-            if (params.type === 'player' && cleanPhone.length === 9) {
+            if (cleanPhone.length === 9) {
                 const { data: appData } = await supabase
                     .from('applications')
                     .select('id')
-                    .or(`phone.ilike.%${cleanPhone}`);
+                    .or(`phone.ilike.%${cleanPhone}%`);
                 
-                if (appData && appData.length > 0) return { exists: true, message: "Kechirasiz, ushbu telefon raqam orqali allaqachon ariza topshirilgan!" };
+                if (appData && appData.length > 0) {
+                    return { exists: true, message: "Kechirasiz, ushbu telefon raqam orqali allaqachon ariza topshirilgan!" };
+                }
             }
 
-            return { exists: false, message: "Davom etishingiz mumkin" };
+            return { exists: false, message: "Ma'lumotlar tasdiqlandi. Ariza topshirishingiz mumkin!" };
         } catch (err) {
             console.error('Check team/phone error:', err);
-            return { exists: false, message: "Davom etishingiz mumkin" };
-        }
-    },
-
-    // Upload Data (Direct to Supabase Storage)
-    uploadPhoto: async (imageUri: string) => {
-        try {
-            const filename = `app_${Date.now()}.jpg`;
-            const response = await fetch(imageUri);
-            const blob = await response.blob();
-            const { data, error } = await supabase.storage.from('hfl-images').upload(filename, blob, {
-                contentType: 'image/jpeg'
-            });
-            if (error) throw error;
-            const { data: publicUrlData } = supabase.storage.from('hfl-images').getPublicUrl(filename);
-            return { success: true, url: publicUrlData.publicUrl };
-        } catch (err) {
-            console.warn('Supabase upload fallback:', err);
-            return { success: false, url: imageUri };
+            return { exists: false, message: "Ma'lumotlar tasdiqlandi. Ariza topshirishingiz mumkin!" };
         }
     },
 

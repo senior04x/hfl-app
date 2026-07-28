@@ -260,7 +260,7 @@ export default function CalendarScreen({ navigation }: any) {
                     data={displayData}
                     keyExtractor={(item) => item.id}
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 100 }}
+                    contentContainerStyle={{ paddingBottom: 110 }}
                     ListEmptyComponent={
                         !loading ? (
                             <View style={{ padding: 40, alignItems: 'center' }}>

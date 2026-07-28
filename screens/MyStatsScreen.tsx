@@ -13,13 +13,19 @@ import {
     SafeAreaView,
     StatusBar,
     Modal,
-    TextInput
+    TextInput,
+    Alert,
+    Platform
 } from 'react-native';
-import { apiService } from '../services/apiService';
+import * as ImagePicker from 'expo-image-picker';
+import { Picker } from '@react-native-picker/picker';
+import { apiService, clearApiCache } from '../services/apiService';
+import { supabase } from '../services/supabase';
 import { BlurView } from 'expo-blur';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
+import VideoBackground from '../components/VideoBackground';
 import { useAuthStore } from '../store/useAuthStore';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 
@@ -43,7 +49,97 @@ const getPositionFullUz = (pos: string) => {
         'LWB': 'Chap qanot qanot himoyachisi',
         'RWB': "O'ng qanot qanot himoyachisi",
     };
-    return map[pos?.toUpperCase()] || pos || 'FUTBOLCHI';
+    return map[pos?.toUpperCase()] || pos || 'O\'YINCHI';
+};
+
+// Universal Player Metadata Extractor
+const extractPlayerData = (data: any) => {
+    if (!data) return null;
+    let citizenship = data.citizenship || '';
+    let height = data.height || '';
+    let weight = data.weight || '';
+    let instaUser = data.instagram_username || '';
+    let instaUrl = data.instagram_url || '';
+
+    if (data.comment && typeof data.comment === 'string') {
+        const metaMatch = data.comment.match(/\[METADATA:({[^\]]+})\]/);
+        if (metaMatch?.[1]) {
+            try {
+                const obj = JSON.parse(metaMatch[1]);
+                if (obj.citizenship && !citizenship) citizenship = obj.citizenship;
+                if (obj.height && !height) height = obj.height;
+                if (obj.weight && !weight) weight = obj.weight;
+            } catch (e) {}
+        }
+
+        const instaMatch = data.comment.match(/\[INSTAGRAM:(https?:\/\/[^\]]+)\]/);
+        if (instaMatch?.[1]) {
+            instaUrl = instaMatch[1];
+            const uMatch = instaUrl.match(/instagram\.com\/([^/]+)/);
+            if (uMatch?.[1]) instaUser = uMatch[1];
+        }
+    }
+
+    return {
+        ...data,
+        citizenship,
+        height,
+        weight,
+        fatherName: data.fatherName || data.father_name || '',
+        instagram_username: instaUser,
+        instagram_url: instaUrl
+    };
+};
+
+const calculateAgeFromBirthDate = (birthStr?: string, defaultAge?: any) => {
+    if (!birthStr) return defaultAge ? `${defaultAge} yosh` : '—';
+    const str = String(birthStr).trim();
+    let day: number | null = null;
+    let month: number | null = null;
+    let year: number | null = null;
+
+    if (str.includes('.')) {
+        const parts = str.split('.');
+        if (parts.length >= 3) {
+            day = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+            year = parseInt(parts[2], 10);
+        }
+    } else if (str.includes('-')) {
+        const parts = str.split('-');
+        if (parts.length >= 3) {
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+            day = parseInt(parts[2], 10);
+        }
+    } else if (/^\d{8}$/.test(str)) {
+        day = parseInt(str.substring(0, 2), 10);
+        month = parseInt(str.substring(2, 4), 10);
+        year = parseInt(str.substring(4, 8), 10);
+    } else {
+        const yrMatch = str.match(/\b(19\d{2}|20\d{2})\b/);
+        if (yrMatch) {
+            year = parseInt(yrMatch[1], 10);
+            month = 1;
+            day = 1;
+        }
+    }
+
+    if (!year || isNaN(year) || year < 1920 || year > 2026) {
+        return defaultAge ? `${defaultAge} yosh` : '—';
+    }
+
+    const today = new Date('2026-07-27');
+    let age = today.getFullYear() - year;
+    if (month && day && !isNaN(month) && !isNaN(day)) {
+        const currentMonth = today.getMonth() + 1;
+        const currentDay = today.getDate();
+        if (currentMonth < month || (currentMonth === month && currentDay < day)) {
+            age--;
+        }
+    }
+
+    return age > 0 ? `${age} yosh` : (defaultAge ? `${defaultAge} yosh` : '—');
 };
 
 const MyStatsScreen = ({ navigation }: any) => {
@@ -64,6 +160,9 @@ const MyStatsScreen = ({ navigation }: any) => {
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [submittingUpdate, setSubmittingUpdate] = useState(false);
+    const [pickerLoading, setPickerLoading] = useState(false);
+
+    const passportNumberRef = useRef<TextInput>(null);
 
     const [updateForm, setUpdateForm] = useState({
         photoUrl: '',
@@ -72,7 +171,16 @@ const MyStatsScreen = ({ navigation }: any) => {
         lastName: '',
         fatherName: '',
         position: '',
-        playerNumber: ''
+        playerNumber: '',
+        passportSeries: '',
+        passportNumber: '',
+        citizenship: '',
+        height: '',
+        weight: '',
+        instagramUsername: '',
+        birthDay: '15',
+        birthMonth: '05',
+        birthYear: '1998'
     });
 
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -118,23 +226,13 @@ const MyStatsScreen = ({ navigation }: any) => {
             setLoading(true);
             const data = await apiService.getPlayerById(user.id);
             if (data) {
-                setPlayer(data);
-                
-                // Parse Instagram if available
-                if (data.instagram_username) {
-                    setInstagramUsername(data.instagram_username);
-                    setInstagramInput(data.instagram_username);
-                } else if (data.instagram_url) {
-                    const match = data.instagram_url.match(/instagram\.com\/([^/]+)/);
-                    if (match?.[1]) {
-                        setInstagramUsername(match[1]);
-                        setInstagramInput(match[1]);
-                    }
+                const parsed = extractPlayerData(data);
+                setPlayer(parsed);
+                if (parsed.instagram_username) {
+                    setInstagramUsername(parsed.instagram_username);
+                    setInstagramInput(parsed.instagram_username);
                 }
-
-                if (activeTab === 'oyinlari') {
-                    fetchPlayerMatches();
-                }
+                if (activeTab === 'oyinlari') fetchPlayerMatches();
             }
         } catch (error) {
             console.error('Error fetching my stats:', error);
@@ -156,7 +254,7 @@ const MyStatsScreen = ({ navigation }: any) => {
         }
     };
 
-    // Save Instagram URL
+    // Save Instagram Username & URL Permanently in DB
     const handleSaveInstagram = async () => {
         if (!instagramInput.trim()) return;
         setSavingInstagram(true);
@@ -164,13 +262,40 @@ const MyStatsScreen = ({ navigation }: any) => {
             const username = instagramInput.trim().replace(/^@/, '').replace(/[^a-zA-Z0-9._]/g, '');
             const fullUrl = `https://www.instagram.com/${username}/`;
 
-            await apiService.updatePlayerInstagram(player.id || user.id, username, fullUrl);
+            const currentComment = player?.comment || '';
+            const cleanComment = currentComment.replace(/\[INSTAGRAM:[^\]]+\]/g, '').trim();
+            const updatedComment = `${cleanComment} [INSTAGRAM:${fullUrl}]`.trim();
+
+            const targetId = player?.id || player?._id || user?.id;
+
+            if (targetId) {
+                await supabase
+                    .from('applications')
+                    .update({ comment: updatedComment })
+                    .eq('id', targetId);
+            }
+            
+            if (user?.phone) {
+                await supabase
+                    .from('applications')
+                    .update({ comment: updatedComment })
+                    .eq('phone', user.phone);
+            }
+
+            clearApiCache();
 
             setInstagramUsername(username);
-            setPlayer((prev: any) => ({ ...prev, instagram_username: username, instagram_url: fullUrl }));
+            setPlayer((prev: any) => ({
+                ...prev,
+                instagram_username: username,
+                instagram_url: fullUrl,
+                comment: updatedComment
+            }));
             setShowInstagramModal(false);
+            Alert.alert('Muvaffaqiyatli', 'Instagram profili saqlandi');
         } catch (err: any) {
             console.error('Error saving instagram:', err);
+            Alert.alert('Xatolik', 'Instagram profili saqlashda xatolik yuz berdi');
         } finally {
             setSavingInstagram(false);
         }
@@ -178,6 +303,25 @@ const MyStatsScreen = ({ navigation }: any) => {
 
     // Open Profile Update Modal
     const handleOpenUpdateModal = () => {
+        const bDate = player?.birth_date || player?.birthDate || '1998-05-15';
+        let day = '15', month = '05', year = '1998';
+
+        if (String(bDate).includes('.')) {
+            const p = String(bDate).split('.');
+            day = p[0] || '15';
+            month = p[1] || '05';
+            year = p[2] || '1998';
+        } else if (String(bDate).includes('-')) {
+            const p = String(bDate).split('-');
+            year = p[0] || '1998';
+            month = p[1] || '05';
+            day = p[2] || '15';
+        } else if (/^\d{8}$/.test(String(bDate))) {
+            day = String(bDate).substring(0, 2);
+            month = String(bDate).substring(2, 4);
+            year = String(bDate).substring(4, 8);
+        }
+
         setUpdateForm({
             photoUrl: player?.photo || player?.avatar || '',
             phone: player?.phone || '',
@@ -185,43 +329,192 @@ const MyStatsScreen = ({ navigation }: any) => {
             lastName: player?.lastName || player?.last_name || '',
             fatherName: player?.fatherName || player?.father_name || '',
             position: player?.position || '',
-            playerNumber: String(player?.number || player?.player_number || '')
+            playerNumber: String(player?.number || player?.player_number || ''),
+            passportSeries: player?.passport_series || player?.passportSeries || '',
+            passportNumber: player?.passport_number || player?.passportNumber || '',
+            citizenship: player?.citizenship || '',
+            height: String(player?.height || ''),
+            weight: String(player?.weight || ''),
+            instagramUsername: player?.instagram_username || instagramUsername || '',
+            birthDay: day.padStart(2, '0'),
+            birthMonth: month.padStart(2, '0'),
+            birthYear: year
         });
         setShowProfileUpdateModal(true);
     };
 
-    // Submit Profile Update Request
+    const handlePickImage = async () => {
+        try {
+            setPickerLoading(true);
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permissionResult.granted) {
+                Alert.alert('Ruxsat kerak', 'Rasmni tanlash uchun galereyaga ruxsat bering');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets && result.assets[0]?.uri) {
+                const localUri = result.assets[0].uri;
+                
+                // 1. Immediately set localUri preview so user sees chosen photo right away!
+                setUpdateForm(prev => ({ ...prev, photoUrl: localUri }));
+
+                const fileExt = localUri.split('.').pop()?.toLowerCase() || 'jpg';
+                const fileName = `update_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                try {
+                    const response = await fetch(localUri);
+                    const blob = await response.blob();
+
+                    const { error: uploadError } = await supabase.storage
+                        .from('player-photos')
+                        .upload(fileName, blob, {
+                            contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+                            upsert: true
+                        });
+
+                    if (!uploadError) {
+                        const { data } = supabase.storage
+                            .from('player-photos')
+                            .getPublicUrl(fileName);
+
+                        if (data?.publicUrl) {
+                            setUpdateForm(prev => ({ ...prev, photoUrl: data.publicUrl }));
+                        }
+                    } else {
+                        console.warn('Supabase storage upload warning:', uploadError);
+                    }
+                } catch (upErr) {
+                    console.warn('Photo upload failed, keeping local uri preview:', upErr);
+                }
+            }
+        } catch (err: any) {
+            console.error('Error picking image:', err);
+            Alert.alert('Xatolik', 'Rasmni tanlashda xatolik yuz berdi');
+        } finally {
+            setPickerLoading(false);
+        }
+    };
+
+    // Submit Profile Update Ticket to Admin
     const handleSubmitProfileUpdate = async () => {
         setSubmittingUpdate(true);
         try {
+            const formattedBirthDate = `${updateForm.birthDay}.${updateForm.birthMonth}.${updateForm.birthYear}`;
+            const targetOrgId = player?.organization_id || 1;
+            const targetPlayerId = player?.id || user?.id;
+
+            const pSeries = (updateForm.passportSeries || '').toUpperCase().trim();
+            const pNumber = (updateForm.passportNumber || '').trim();
+            const cleanInsta = (updateForm.instagramUsername || '').trim().replace(/^@/, '');
+            const instaUrl = cleanInsta ? `https://www.instagram.com/${cleanInsta}/` : '';
+
+            const pData = extractPlayerData(player) || {};
             const payload = {
-                playerId: player?.id || user?.id,
-                orgId: player?.organization_id || 1,
+                playerId: targetPlayerId,
                 oldData: {
-                    firstName: player?.firstName || '',
-                    lastName: player?.lastName || '',
-                    fatherName: player?.fatherName || '',
+                    firstName: player?.firstName || player?.first_name || '',
+                    lastName: player?.lastName || player?.last_name || '',
+                    fatherName: pData.fatherName || player?.father_name || '',
                     phone: player?.phone || '',
                     position: player?.position || '',
-                    playerNumber: player?.number || '',
-                    photoUrl: player?.photo || ''
+                    playerNumber: player?.number || player?.player_number || '',
+                    photoUrl: player?.photo || player?.avatar || '',
+                    passportSeries: player?.passport_series || player?.passportSeries || '',
+                    passportNumber: player?.passport_number || player?.passportNumber || '',
+                    citizenship: pData.citizenship || player?.citizenship || '',
+                    height: String(pData.height || player?.height || ''),
+                    weight: String(pData.weight || player?.weight || ''),
+                    instagramUsername: pData.instagram_username || player?.instagram_username || instagramUsername || '',
+                    birthDate: player?.birth_date || player?.birthDate || ''
                 },
-                newData: updateForm
+                newData: {
+                    ...updateForm,
+                    instagramUsername: cleanInsta,
+                    instagramUrl: instaUrl,
+                    birthDate: formattedBirthDate,
+                    passportSeries: pSeries,
+                    passportNumber: pNumber
+                }
             };
 
-            await apiService.submitProfileUpdateRequest(payload);
+            let commentPayload = '[PROFILE_UPDATE]' + JSON.stringify({ oldData: payload.oldData, newData: payload.newData, playerId: targetPlayerId });
+            if (instaUrl) {
+                commentPayload += ` [INSTAGRAM:${instaUrl}]`;
+            }
+
+            let { error } = await supabase
+                .from('applications')
+                .insert([{
+                    organization_id: targetOrgId,
+                    first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
+                    last_name: updateForm.lastName || player?.last_name || '',
+                    father_name: updateForm.fatherName || player?.father_name || '',
+                    phone: updateForm.phone || player?.phone || '',
+                    position: updateForm.position || player?.position || 'O\'YINCHI',
+                    player_number: updateForm.playerNumber ? Number(updateForm.playerNumber) : (player?.player_number || 0),
+                    passport_series: pSeries,
+                    passport_number: pNumber,
+                    photo_url: updateForm.photoUrl || player?.photo || player?.avatar || null,
+                    birth_date: formattedBirthDate,
+                    comment: commentPayload,
+                    status: 'pending'
+                }]);
+
+            if (error && (error.message.includes('valid_status') || error.code === '23514')) {
+                const retryRes = await supabase
+                    .from('applications')
+                    .insert([{
+                        organization_id: targetOrgId,
+                        first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
+                        last_name: updateForm.lastName || player?.last_name || '',
+                        father_name: updateForm.fatherName || player?.father_name || '',
+                        phone: updateForm.phone || player?.phone || '',
+                        position: updateForm.position || player?.position || 'O\'YINCHI',
+                        player_number: updateForm.playerNumber ? Number(updateForm.playerNumber) : (player?.player_number || 0),
+                        passport_series: pSeries,
+                        passport_number: pNumber,
+                        photo_url: updateForm.photoUrl || player?.photo || player?.avatar || null,
+                        birth_date: formattedBirthDate,
+                        comment: commentPayload,
+                        status: 'PENDING'
+                    }]);
+                error = retryRes.error;
+            }
+
+            if (error) {
+                console.error('Supabase profile update insert error:', error);
+                Alert.alert('Xatolik yuz berdi', error.message);
+                return;
+            }
 
             setShowProfileUpdateModal(false);
             setShowSuccessModal(true);
         } catch (err: any) {
             console.error('Error submitting profile update:', err);
+            Alert.alert('Xatolik', err.message || 'Arizani yuborib bo\'lmadi');
         } finally {
             setSubmittingUpdate(false);
         }
     };
 
     if (loading) {
-        return <PlayerProfileSkeleton />;
+        return (
+            <View style={{ flex: 1, backgroundColor: '#050811' }}>
+                <VideoBackground
+                    source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                    overlayOpacity={0.85}
+                    style={StyleSheet.absoluteFill}
+                />
+                <PlayerProfileSkeleton />
+            </View>
+        );
     }
 
     if (!user || user.role !== 'player' || !player) {
@@ -251,60 +544,41 @@ const MyStatsScreen = ({ navigation }: any) => {
         rating: player.rating || 0
     };
 
+    const instagramUrl = instagramUsername ? `https://www.instagram.com/${instagramUsername}/` : null;
+    const computedAge = calculateAgeFromBirthDate(player.birth_date || player.birthDate, player.age);
+
+    const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
+    const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+    const years = Array.from({ length: 65 }, (_, i) => String(2025 - i));
+
     const renderProfil = () => (
         <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
             <View style={styles.statsGrid}>
-                <StatBox
-                    label="GOLLAR"
-                    value={stats.goals}
-                    icon="football"
-                    color={Colors.primary}
-                />
-                <StatBox
-                    label="ASSISTLAR"
-                    value={stats.assists}
-                    icon="star"
-                    color="#3b82f6"
-                />
-                <StatBox
-                    label="O'YINLAR"
-                    value={stats.matchesPlayed}
-                    icon="calendar"
-                    color="#FFF"
-                />
-                <StatBox
-                    label="REYTING"
-                    value={player.rating || 0}
-                    icon="trending-up"
-                    color="#FACC15"
-                />
+                <StatBox label="GOLLAR" value={stats.goals} icon="football" color={Colors.primary} />
+                <StatBox label="ASSISTLAR" value={stats.assists} icon="shoe-prints" color="#3b82f6" />
+                <StatBox label="O'YINLAR" value={stats.matchesPlayed} icon="calendar" color="#FFF" />
+                <StatBox label="REYTING" value={stats.rating || player.rating || 0} icon="trending-up" color="#FACC15" />
             </View>
 
             <View style={styles.physicalInfoBox}>
                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={styles.cardContent}>
                     <View style={styles.statItem}>
-                        <View style={styles.statIconBox}>
-                            <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
-                        </View>
+                        <View style={styles.statIconBox}><Ionicons name="calendar-outline" size={18} color={Colors.primary} /></View>
                         <View>
                             <Text style={styles.statLabelSmall}>YOSHI</Text>
-                            <Text style={styles.statValueSmall}>{player?.age || '—'}</Text>
+                            <Text style={styles.statValueSmall}>{computedAge}</Text>
                         </View>
                     </View>
                     <View style={styles.statItem}>
-                        <View style={styles.statIconBox}>
-                            <Ionicons name="resize-outline" size={18} color={Colors.primary} />
-                        </View>
+                        <View style={styles.statIconBox}><Ionicons name="resize-outline" size={18} color={Colors.primary} /></View>
                         <View>
                             <Text style={styles.statLabelSmall}>BO'YI</Text>
                             <Text style={styles.statValueSmall}>{player?.height ? `${player.height} SM` : '—'}</Text>
                         </View>
                     </View>
                     <View style={styles.statItem}>
-                        <View style={styles.statIconBox}>
-                            <Ionicons name="fitness-outline" size={18} color={Colors.primary} />
-                        </View>
+                        <View style={styles.statIconBox}><Ionicons name="fitness-outline" size={18} color={Colors.primary} /></View>
                         <View>
                             <Text style={styles.statLabelSmall}>VAZNI</Text>
                             <Text style={styles.statValueSmall}>{player?.weight ? `${player.weight} KG` : '—'}</Text>
@@ -320,35 +594,15 @@ const MyStatsScreen = ({ navigation }: any) => {
                 </View>
                 <View style={styles.infoList}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <InfoRow label="OTASINING ISMI" value={player.fatherName || '---'} icon="person" />
+                    <InfoRow label="OTASINING ISMI" value={player.fatherName || player.father_name || '---'} icon="person" />
                     <InfoRow label="MILLATI" value={player.citizenship || '---'} icon="planet" />
                     <InfoRow label="POZITSIYA" value={player.positionUz || player.position || '---'} icon="shield" />
-                    <InfoRow label="TELEFON" value={player.phone || '---'} icon="call" />
+                    <InfoRow label="TELEFON (raqamingiz faqat sizga ko'rinadi)" value={player.phone || '---'} icon="call" />
                 </View>
             </View>
 
-            {/* INSTAGRAM & UPDATE REQUEST BUTTONS */}
+            {/* UPDATE REQUEST BUTTON */}
             <View style={{ marginTop: 20, gap: 12, marginBottom: 35 }}>
-                <TouchableOpacity
-                    onPress={() => setShowInstagramModal(true)}
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 10,
-                        backgroundColor: 'rgba(225, 48, 108, 0.15)',
-                        borderColor: 'rgba(225, 48, 108, 0.4)',
-                        borderWidth: 1,
-                        paddingVertical: 14,
-                        borderRadius: 16
-                    }}
-                >
-                    <FontAwesome5 name="instagram" size={20} color="#E1306C" />
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 13, textTransform: 'uppercase' }}>
-                        {instagramUsername ? `INSTAGRAM: @${instagramUsername}` : 'INSTAGRAM PROFILINI ULASH'}
-                    </Text>
-                </TouchableOpacity>
-
                 <TouchableOpacity
                     onPress={handleOpenUpdateModal}
                     style={{
@@ -388,11 +642,6 @@ const MyStatsScreen = ({ navigation }: any) => {
                             <View key={yearGroup.year} style={styles.yearBlock}>
                                 <View style={styles.yearHeaderBadge}>
                                     <Text style={styles.yearHeaderText}>{yearGroup.year}</Text>
-                                    <View style={styles.yearStatLabels}>
-                                        <Text style={styles.statColLabel}>И</Text>
-                                        <Text style={styles.statColLabel}>G</Text>
-                                        <Text style={styles.statColLabel}>P</Text>
-                                    </View>
                                 </View>
 
                                 {yearGroup.teams.map((team: any) => (
@@ -404,36 +653,21 @@ const MyStatsScreen = ({ navigation }: any) => {
                                                 ) : (
                                                     <Ionicons name="shield" size={14} color={Colors.primary} />
                                                 )}
-                                                <View style={styles.timelineVerticalLine} />
                                             </View>
                                             <Text style={styles.teamNameCareer} numberOfLines={1}>{team.teamName?.toUpperCase()}</Text>
-                                            <View style={styles.teamTotalStats}>
-                                                <Text style={styles.teamStatVal}>{team.total.matchesPlayed}</Text>
-                                                <Text style={styles.teamStatVal}>{team.total.goals}</Text>
-                                                <Text style={styles.teamStatVal}>{team.total.assists}</Text>
-                                            </View>
                                         </View>
-
-                                        {team.tournaments.map((tour: any, tourIdx: number) => (
-                                            <View key={tourIdx} style={styles.tournamentRow}>
-                                                <View style={styles.tourIconWrap}>
-                                                    <Ionicons name="football" size={12} color="rgba(255,255,255,0.4)" />
-                                                </View>
-                                                <Text style={styles.tourNameText} numberOfLines={1}>{tour.name}</Text>
-                                                <View style={styles.tourStatsRow}>
-                                                    <Text style={styles.tourStatVal}>{tour.matchesPlayed}</Text>
-                                                    <Text style={styles.tourStatVal}>{tour.goals}</Text>
-                                                    <Text style={styles.tourStatVal}>{tour.assists}</Text>
-                                                </View>
-                                            </View>
-                                        ))}
                                     </View>
                                 ))}
                             </View>
                         ))
                     ) : (
-                        <View style={styles.emptyCareer}>
-                            <Text style={styles.emptyCareerText}>Karyera tarixi topilmadi</Text>
+                        <View style={styles.teamCareerWrapper}>
+                            <View style={styles.teamMainRow}>
+                                <View style={styles.teamIconBox}>
+                                    <Ionicons name="shield" size={14} color={Colors.primary} />
+                                </View>
+                                <Text style={styles.teamNameCareer} numberOfLines={1}>{(player?.teams?.name || 'HFL FK').toUpperCase()}</Text>
+                            </View>
                         </View>
                     )}
                 </View>
@@ -452,7 +686,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                 <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
             ) : matches.length > 0 ? (
                 matches.map((match: any) => (
-                    <MatchCard key={match.id} match={match} />
+                    <MatchCard key={match.id || match._id} match={match} />
                 ))
             ) : (
                 <View style={styles.emptyCareer}>
@@ -462,11 +696,14 @@ const MyStatsScreen = ({ navigation }: any) => {
         </ScrollView>
     );
 
-    const instagramUrl = instagramUsername ? `https://www.instagram.com/${instagramUsername}/` : null;
-
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+            <VideoBackground
+                source={require('../assets/images/welcomeScreenVideo1.mp4')}
+                overlayOpacity={0.8}
+                style={StyleSheet.absoluteFill}
+            />
 
             <ScrollView 
                 contentContainerStyle={styles.scrollContent} 
@@ -474,12 +711,16 @@ const MyStatsScreen = ({ navigation }: any) => {
                 style={{ flex: 1 }}
             >
                 <View style={styles.heroSection}>
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()}>
-                            <Ionicons name="arrow-back" size={24} color="#FFF" />
-                        </TouchableOpacity>
+                    {/* AMATORA BRAND HEADER AT VERY TOP CENTERED */}
+                    <View style={styles.brandHeaderWrapper}>
                         <Text style={styles.brandText}>AMATORA</Text>
-                        <View style={{ width: 24 }} />
+                    </View>
+
+                    {/* BACK BUTTON LOWERED BELOW AMATORA HEADER */}
+                    <View style={styles.navHeaderRow}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonBtn}>
+                            <Ionicons name="arrow-back" size={22} color="#FFF" />
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.profileHeader}>
@@ -490,25 +731,21 @@ const MyStatsScreen = ({ navigation }: any) => {
                                     style={styles.profilePhoto}
                                     contentFit="cover"
                                     fallbackIcon="person"
-                                    borderRadius={15}
+                                    borderRadius={22}
                                 />
                             </View>
+                            {/* TILTED/ROTATED SHIRT NUMBER BADGE */}
                             <View style={styles.numberOverlay}>
-                                <Text style={styles.numberText}>#{player.number || '0'}</Text>
+                                <Text style={styles.numberText}>#{player.number || player.player_number || '0'}</Text>
                             </View>
                         </View>
 
                         <View style={styles.nameContainer}>
                             <View style={styles.badgeRow}>
-                                <View style={[
-                                    styles.statusBadge,
-                                    player.status === 'inactive' && { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' }
-                                ]}>
-                                    <Text style={[
-                                        styles.statusText,
-                                        player.status === 'inactive' && { color: '#EF4444' }
-                                    ]}>
-                                        {player.status === 'inactive' ? 'NOFAOL' : 'FAOL'} O'YINCHI
+                                {/* TOP BADGE SHOWS POSITION INSTEAD OF FAOL O'YINCHI */}
+                                <View style={styles.statusBadge}>
+                                    <Text style={styles.statusText}>
+                                        {(player?.position || 'O\'YINCHI').toUpperCase()}
                                     </Text>
                                 </View>
                                 <View style={styles.ratingBadge}>
@@ -516,36 +753,33 @@ const MyStatsScreen = ({ navigation }: any) => {
                                 </View>
                             </View>
 
-                            <Text style={styles.firstName}>{player.firstName}</Text>
-                            <Text style={styles.lastName}>{player.lastName}</Text>
+                            <Text style={styles.firstName}>{player.firstName || player.first_name}</Text>
+                            <Text style={styles.lastName}>{player.lastName || player.last_name}</Text>
                             
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                                <View style={styles.posBadge}>
-                                    <Text style={styles.posText}>{player?.position || 'O\'YINCHI'}</Text>
-                                </View>
-
-                                {instagramUrl ? (
-                                    <TouchableOpacity
-                                        onPress={() => Linking.openURL(instagramUrl)}
-                                        style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            gap: 4,
-                                            backgroundColor: 'rgba(225, 48, 108, 0.15)',
-                                            borderColor: 'rgba(225, 48, 108, 0.4)',
-                                            borderWidth: 1,
-                                            paddingHorizontal: 10,
-                                            paddingVertical: 4,
-                                            borderRadius: 8
-                                        }}
-                                    >
-                                        <FontAwesome5 name="instagram" size={13} color="#E1306C" />
-                                        <Text style={{ color: '#E1306C', fontSize: 11, fontWeight: '800' }}>
-                                            @{instagramUsername}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ) : null}
-                            </View>
+                            {/* INSTAGRAM BADGE UNDER NAME (POSITION BADGE UNDER NAME REMOVED AS REQUESTED) */}
+                            {instagramUrl ? (
+                                <TouchableOpacity
+                                    onPress={() => Linking.openURL(instagramUrl)}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        backgroundColor: 'rgba(225, 48, 108, 0.15)',
+                                        borderColor: 'rgba(225, 48, 108, 0.4)',
+                                        borderWidth: 1,
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 5,
+                                        borderRadius: 10,
+                                        marginTop: 8,
+                                        alignSelf: 'flex-start'
+                                    }}
+                                >
+                                    <FontAwesome5 name="instagram" size={14} color="#E1306C" />
+                                    <Text style={{ color: '#E1306C', fontSize: 12, fontWeight: '800' }}>
+                                        @{instagramUsername}
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : null}
                         </View>
                     </View>
                 </View>
@@ -590,192 +824,308 @@ const MyStatsScreen = ({ navigation }: any) => {
             </ScrollView>
 
             {/* INSTAGRAM MODAL */}
-            <Modal visible={showInstagramModal} transparent animationType="fade">
+            <Modal
+                visible={showInstagramModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowInstagramModal(false)}
+            >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <FontAwesome5 name="instagram" size={24} color="#E1306C" />
-                            <Text style={styles.modalTitle}>INSTAGRAM PROFILINI ULASH</Text>
+                    <View style={styles.modalContentSmall}>
+                        <View style={{ alignItems: 'center', marginBottom: 15 }}>
+                            <View style={{ width: 50, height: 50, borderRadius: 15, backgroundColor: 'rgba(225, 48, 108, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                                <FontAwesome5 name="instagram" size={26} color="#E1306C" />
+                            </View>
+                            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '900' }}>Instagram Username</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+                                Instagram akkauntingiz username'ini kiriting. (Masalan: omankulofff)
+                            </Text>
                         </View>
-
-                        <Text style={styles.modalSubtitle}>
-                            Instagram usernamesini kiriting (masalan: omankulofff)
-                        </Text>
 
                         <TextInput
                             style={styles.modalInput}
                             placeholder="omankulofff"
-                            placeholderTextColor="rgba(255,255,255,0.4)"
+                            placeholderTextColor="rgba(255,255,255,0.3)"
                             value={instagramInput}
                             onChangeText={setInstagramInput}
                             autoCapitalize="none"
+                            autoCorrect={false}
                         />
 
-                        <View style={styles.modalButtons}>
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
                             <TouchableOpacity
                                 onPress={() => setShowInstagramModal(false)}
-                                style={styles.modalCancelBtn}
+                                style={[styles.modalBtn, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
                             >
-                                <Text style={styles.modalCancelText}>BEKOR QILISH</Text>
+                                <Text style={{ color: '#FFF', fontWeight: '800' }}>BEKOR QILISH</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 onPress={handleSaveInstagram}
                                 disabled={savingInstagram}
-                                style={styles.modalSaveBtn}
+                                style={[styles.modalBtn, { backgroundColor: Colors.primary }]}
                             >
-                                {savingInstagram ? (
-                                    <ActivityIndicator size="small" color="#000" />
-                                ) : (
-                                    <Text style={styles.modalSaveText}>SAQLASH</Text>
-                                )}
+                                <Text style={{ color: '#000', fontWeight: '900' }}>
+                                    {savingInstagram ? 'SAQLANMOQDA...' : 'SAQLASH'}
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
 
-            {/* PROFILE UPDATE FORM MODAL */}
-            <Modal visible={showProfileUpdateModal} transparent animationType="slide">
+            {/* PROFILE UPDATE MODAL */}
+            <Modal
+                visible={showProfileUpdateModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowProfileUpdateModal(false)}
+            >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { maxHeight: '85%' }]}>
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            <View style={styles.modalHeader}>
-                                <Ionicons name="create" size={24} color={Colors.primary} />
-                                <Text style={styles.modalTitle}>MA'LUMOTLARNI QAYTA KO'RIB CHIQISH</Text>
+                    <ScrollView contentContainerStyle={{ paddingVertical: 40 }} showsVerticalScrollIndicator={false}>
+                        <View style={styles.modalContentLarge}>
+                            <Text style={styles.modalTitleLarge}>MA'LUMOTLARNI TAHRIRLASH</Text>
+                            <Text style={styles.modalSubLarge}>
+                                O'zgartirmoqchi bo'lgan ma'lumotlaringizni kiriting va tashkilotchiga yuboring.
+                            </Text>
+
+                            <View style={{ alignItems: 'center', marginVertical: 15 }}>
+                                <TouchableOpacity onPress={handlePickImage} disabled={pickerLoading} style={{ position: 'relative', width: 100, height: 100, borderRadius: 20 }}>
+                                    <SmartImage
+                                        uri={updateForm.photoUrl || player?.photo}
+                                        style={{ width: 100, height: 100, borderRadius: 20, borderWidth: 2, borderColor: Colors.primary }}
+                                        contentFit="cover"
+                                    />
+                                    <View style={{ position: 'absolute', bottom: -4, right: -4, backgroundColor: Colors.primary, padding: 6, borderRadius: 10, zIndex: 5 }}>
+                                        <Ionicons name="camera" size={16} color="#000" />
+                                    </View>
+                                    {pickerLoading && (
+                                        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center', borderRadius: 20, zIndex: 10 }}>
+                                            <ActivityIndicator size="medium" color={Colors.primary} />
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
                             </View>
 
-                            <View style={{ gap: 12, marginTop: 15 }}>
-                                <View>
-                                    <Text style={styles.inputLabel}>FOTO RASYM URL</Text>
-                                    <TextInput
-                                        style={styles.modalInput}
-                                        value={updateForm.photoUrl}
-                                        onChangeText={val => setUpdateForm(prev => ({ ...prev, photoUrl: val }))}
-                                        placeholder="https://..."
-                                        placeholderTextColor="rgba(255,255,255,0.4)"
-                                    />
-                                </View>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>ISM</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.firstName}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, firstName: text }))}
+                                />
+                            </View>
 
-                                <View>
-                                    <Text style={styles.inputLabel}>ISMI</Text>
-                                    <TextInput
-                                        style={styles.modalInput}
-                                        value={updateForm.firstName}
-                                        onChangeText={val => setUpdateForm(prev => ({ ...prev, firstName: val }))}
-                                    />
-                                </View>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>FAMILIYA</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.lastName}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, lastName: text }))}
+                                />
+                            </View>
 
-                                <View>
-                                    <Text style={styles.inputLabel}>FAMILIYASI</Text>
-                                    <TextInput
-                                        style={styles.modalInput}
-                                        value={updateForm.lastName}
-                                        onChangeText={val => setUpdateForm(prev => ({ ...prev, lastName: val }))}
-                                    />
-                                </View>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>OTASINING ISMI</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.fatherName}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, fatherName: text }))}
+                                />
+                            </View>
 
-                                <View>
-                                    <Text style={styles.inputLabel}>OTASINING ISMI</Text>
-                                    <TextInput
-                                        style={styles.modalInput}
-                                        value={updateForm.fatherName}
-                                        onChangeText={val => setUpdateForm(prev => ({ ...prev, fatherName: val }))}
-                                    />
-                                </View>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>TELEFON RAQAM</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.phone}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, phone: text }))}
+                                    keyboardType="phone-pad"
+                                />
+                            </View>
 
-                                <View>
-                                    <Text style={styles.inputLabel}>TELEFON RAQAMI</Text>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>PASPORT SERIYA VA RAQAM</Text>
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
                                     <TextInput
-                                        style={styles.modalInput}
-                                        value={updateForm.phone}
-                                        onChangeText={val => setUpdateForm(prev => ({ ...prev, phone: val }))}
-                                        keyboardType="phone-pad"
+                                        style={[styles.modalInput, { width: 70, textAlign: 'center', textTransform: 'uppercase' }]}
+                                        value={updateForm.passportSeries}
+                                        maxLength={2}
+                                        onChangeText={(text) => {
+                                            const cleaned = text.toUpperCase();
+                                            setUpdateForm(prev => ({ ...prev, passportSeries: cleaned }));
+                                            if (cleaned.length === 2) {
+                                                passportNumberRef.current?.focus();
+                                            }
+                                        }}
+                                        placeholder="AA"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
-                                </View>
-
-                                <View>
-                                    <Text style={styles.inputLabel}>POZITSIYA</Text>
                                     <TextInput
-                                        style={styles.modalInput}
-                                        value={updateForm.position}
-                                        onChangeText={val => setUpdateForm(prev => ({ ...prev, position: val }))}
-                                        placeholder="Hujumchi, Yarim himoyachi..."
-                                        placeholderTextColor="rgba(255,255,255,0.4)"
-                                    />
-                                </View>
-
-                                <View>
-                                    <Text style={styles.inputLabel}>FORMA RAQAMI</Text>
-                                    <TextInput
-                                        style={styles.modalInput}
-                                        value={updateForm.playerNumber}
-                                        onChangeText={val => setUpdateForm(prev => ({ ...prev, playerNumber: val }))}
-                                        keyboardType="number-pad"
+                                        ref={passportNumberRef}
+                                        style={[styles.modalInput, { flex: 1 }]}
+                                        value={updateForm.passportNumber}
+                                        keyboardType="numeric"
+                                        maxLength={7}
+                                        onChangeText={(text) => setUpdateForm(prev => ({ ...prev, passportNumber: text }))}
+                                        placeholder="1234567"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
                                 </View>
                             </View>
 
-                            <View style={[styles.modalButtons, { marginTop: 20 }]}>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>TUG'ILGAN SANA (KUN / OY / YIL)</Text>
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden' }}>
+                                        <Picker
+                                            selectedValue={updateForm.birthDay}
+                                            onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthDay: val }))}
+                                            style={{ color: '#FFF' }}
+                                            dropdownIconColor="#FFF"
+                                        >
+                                            {days.map(d => <Picker.Item key={d} label={d} value={d} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}
+                                        </Picker>
+                                    </View>
+
+                                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden' }}>
+                                        <Picker
+                                            selectedValue={updateForm.birthMonth}
+                                            onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthMonth: val }))}
+                                            style={{ color: '#FFF' }}
+                                            dropdownIconColor="#FFF"
+                                        >
+                                            {months.map(m => <Picker.Item key={m} label={m} value={m} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}
+                                        </Picker>
+                                    </View>
+
+                                    <View style={{ flex: 1.2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden' }}>
+                                        <Picker
+                                            selectedValue={updateForm.birthYear}
+                                            onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthYear: val }))}
+                                            style={{ color: '#FFF' }}
+                                            dropdownIconColor="#FFF"
+                                        >
+                                            {years.map(y => <Picker.Item key={y} label={y} value={y} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}
+                                        </Picker>
+                                    </View>
+                                </View>
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>POZITSIYA</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.position}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, position: text }))}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>RAQAM</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.playerNumber}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, playerNumber: text }))}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>MILLATI</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.citizenship}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, citizenship: text }))}
+                                    placeholder="O'zbekiston"
+                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>BO'YI (SM)</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.height}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, height: text }))}
+                                    keyboardType="numeric"
+                                    placeholder="178"
+                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>VAZNI (KG)</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={updateForm.weight}
+                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, weight: text }))}
+                                    keyboardType="numeric"
+                                    placeholder="72"
+                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>INSTAGRAM USERNAME</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: 'rgba(225, 48, 108, 0.4)' }}>
+                                    <FontAwesome5 name="instagram" size={18} color="#E1306C" style={{ marginRight: 8 }} />
+                                    <TextInput
+                                        style={[styles.modalInput, { flex: 1, backgroundColor: 'transparent', borderWidth: 0 }]}
+                                        value={updateForm.instagramUsername}
+                                        onChangeText={(text) => setUpdateForm(prev => ({ ...prev, instagramUsername: text.replace(/^@/, '') }))}
+                                        placeholder="username (masalan: ronaldo)"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
                                 <TouchableOpacity
                                     onPress={() => setShowProfileUpdateModal(false)}
-                                    style={styles.modalCancelBtn}
+                                    style={[styles.modalBtn, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
                                 >
-                                    <Text style={styles.modalCancelText}>BEKOR QILISH</Text>
+                                    <Text style={{ color: '#FFF', fontWeight: '800' }}>BEKOR QILISH</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     onPress={handleSubmitProfileUpdate}
                                     disabled={submittingUpdate}
-                                    style={styles.modalSaveBtn}
+                                    style={[styles.modalBtn, { backgroundColor: Colors.primary }]}
                                 >
-                                    {submittingUpdate ? (
-                                        <ActivityIndicator size="small" color="#000" />
-                                    ) : (
-                                        <Text style={styles.modalSaveText}>YUBORISH</Text>
-                                    )}
+                                    <Text style={{ color: '#000', fontWeight: '900' }}>
+                                        {submittingUpdate ? 'YUBORILMOQDA...' : 'YUBORISH'}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
-                        </ScrollView>
-                    </View>
+                        </View>
+                    </ScrollView>
                 </View>
             </Modal>
 
             {/* SUCCESS CONFIRMATION MODAL */}
-            <Modal visible={showSuccessModal} transparent animationType="fade">
+            <Modal
+                visible={showSuccessModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowSuccessModal(false)}
+            >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { alignItems: 'center', padding: 25 }]}>
-                        <View style={{
-                            width: 60,
-                            height: 60,
-                            borderRadius: 30,
-                            backgroundColor: 'rgba(0, 255, 102, 0.2)',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: 15
-                        }}>
-                            <Ionicons name="checkmark-circle" size={40} color={Colors.primary} />
+                    <View style={styles.modalContentSmall}>
+                        <View style={{ alignItems: 'center', marginBottom: 15 }}>
+                            <Ionicons name="checkmark-circle" size={60} color={Colors.primary} />
+                            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '900', marginTop: 10 }}>ARIZA YUBORILDI!</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 18 }}>
+                                Ma'lumotlaringizni tahrirlash so'rovi tashkilotchiga yuborildi. Tekshiruvdan so'ng ma'lumotlaringiz yangilanadi.
+                            </Text>
                         </View>
-
-                        <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 8 }]}>
-                            ARIZA MUVAFFAQIYATLI YUBORILDI
-                        </Text>
-
-                        <Text style={{
-                            color: 'rgba(255,255,255,0.7)',
-                            fontSize: 13,
-                            textAlign: 'center',
-                            marginBottom: 20,
-                            lineHeight: 18
-                        }}>
-                            Sizning ma'lumotlarni almashtirish bo'yicha arizangiz muvaffaqiyatli yuborildi. Tashkilotchilar ko'rib chiqqach sizga xabar beramiz.
-                        </Text>
 
                         <TouchableOpacity
                             onPress={() => setShowSuccessModal(false)}
-                            style={[styles.modalSaveBtn, { width: '100%' }]}
+                            style={[styles.modalBtn, { backgroundColor: Colors.primary, width: '100%' }]}
                         >
-                            <Text style={styles.modalSaveText}>TUSHUNDIM</Text>
+                            <Text style={{ color: '#000', fontWeight: '900' }}>TUSHUNDIM</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -788,7 +1138,11 @@ const StatBox = ({ label, value, icon, color }: any) => (
     <View style={styles.statBox}>
         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
-            <Ionicons name={icon} size={20} color={color} />
+            {icon === 'shoe-prints' ? (
+                <FontAwesome5 name="shoe-prints" size={16} color={color} />
+            ) : (
+                <Ionicons name={icon} size={20} color={color} />
+            )}
         </View>
         <Text style={styles.statLabelSmall}>{label}</Text>
         <Text style={styles.statValue}>{value}</Text>
@@ -800,37 +1154,35 @@ const InfoRow = ({ label, value, icon }: any) => (
         <View style={styles.infoIconBox}>
             <Ionicons name={icon} size={16} color={Colors.primary} />
         </View>
-        <View>
+        <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>{label}</Text>
             <Text style={styles.infoValue}>{value}</Text>
         </View>
     </View>
 );
 
-const MatchCard = ({ match }: any) => {
-    return (
-        <View style={styles.matchCard}>
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={styles.matchTop}>
-                <Text style={styles.matchLeague}>{match.leagueName || 'Amatora Turniri'}</Text>
-                <Text style={styles.matchDate}>{new Date(match.date).toLocaleDateString('uz-UZ')}</Text>
+const MatchCard = ({ match }: any) => (
+    <View style={styles.matchCard}>
+        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={styles.matchTop}>
+            <Text style={styles.matchLeague}>{match.leagueName || 'Amatora Turniri'}</Text>
+            <Text style={styles.matchDate}>{new Date(match.date || match.match_date || Date.now()).toLocaleDateString('uz-UZ')}</Text>
+        </View>
+        <View style={styles.matchTeams}>
+            <View style={styles.teamInfo}>
+                <SmartImage uri={match.homeTeam?.logo || match.homeTeamLogo} style={styles.matchTeamLogo} contentFit="contain" />
+                <Text style={styles.matchTeamName} numberOfLines={1}>{match.homeTeam?.name || match.homeTeamName}</Text>
             </View>
-            <View style={styles.matchTeams}>
-                <View style={styles.teamInfo}>
-                    <SmartImage uri={match.homeTeam?.logo} style={styles.matchTeamLogo} contentFit="contain" />
-                    <Text style={styles.matchTeamName} numberOfLines={1}>{match.homeTeam?.name}</Text>
-                </View>
-                <View style={styles.matchScore}>
-                    <Text style={styles.scoreText}>{match.score?.home ?? 0}:{match.score?.away ?? 0}</Text>
-                </View>
-                <View style={styles.teamInfo}>
-                    <SmartImage uri={match.awayTeam?.logo} style={styles.matchTeamLogo} contentFit="contain" />
-                    <Text style={styles.matchTeamName} numberOfLines={1}>{match.awayTeam?.name}</Text>
-                </View>
+            <View style={styles.matchScore}>
+                <Text style={styles.scoreText}>{match.score?.home ?? match.home_score ?? 0}:{match.score?.away ?? match.away_score ?? 0}</Text>
+            </View>
+            <View style={styles.teamInfo}>
+                <SmartImage uri={match.awayTeam?.logo || match.awayTeamLogo} style={styles.matchTeamLogo} contentFit="contain" />
+                <Text style={styles.matchTeamName} numberOfLines={1}>{match.awayTeam?.name || match.awayTeamName}</Text>
             </View>
         </View>
-    );
-};
+    </View>
+);
 
 const styles = StyleSheet.create({
     container: {
@@ -847,18 +1199,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     emptyContent: {
+        padding: 30,
         alignItems: 'center',
-        paddingHorizontal: 30,
     },
     emptyTitle: {
         fontSize: 18,
         fontWeight: '900',
         color: '#FFF',
         marginTop: 15,
-        letterSpacing: 1,
     },
     emptySub: {
-        fontSize: 12,
+        fontSize: 13,
         color: 'rgba(255,255,255,0.5)',
         textAlign: 'center',
         marginTop: 8,
@@ -867,25 +1218,24 @@ const styles = StyleSheet.create({
     loginBtn: {
         marginTop: 20,
         backgroundColor: Colors.primary,
-        paddingHorizontal: 25,
+        paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 12,
     },
     loginBtnText: {
         color: '#000',
         fontWeight: '900',
-        fontSize: 12,
+        fontSize: 13,
     },
     heroSection: {
-        paddingTop: StatusBar.currentHeight ? StatusBar.currentHeight + 10 : 40,
+        paddingTop: Platform.OS === 'ios' ? 12 : (StatusBar.currentHeight ? StatusBar.currentHeight + 5 : 20),
         paddingHorizontal: 20,
         paddingBottom: 15,
     },
-    header: {
-        flexDirection: 'row',
+    brandHeaderWrapper: {
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 20,
+        justifyContent: 'center',
+        marginBottom: 8,
     },
     brandText: {
         fontSize: 18,
@@ -893,21 +1243,38 @@ const styles = StyleSheet.create({
         color: '#FFF',
         letterSpacing: 2,
         fontStyle: 'italic',
+        textAlign: 'center',
+    },
+    navHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    backButtonBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+        zIndex: 10,
     },
     profileHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 15,
+        gap: 18,
     },
     photoContainer: {
         position: 'relative',
     },
     mainPhotoWrapper: {
-        width: 90,
-        height: 105,
-        borderRadius: 18,
+        width: 115,
+        height: 115,
+        borderRadius: 22,
         overflow: 'hidden',
-        borderWidth: 1.5,
+        borderWidth: 2,
         borderColor: Colors.primary,
     },
     profilePhoto: {
@@ -916,17 +1283,18 @@ const styles = StyleSheet.create({
     },
     numberOverlay: {
         position: 'absolute',
-        bottom: -5,
-        right: -5,
+        bottom: -4,
+        right: -4,
         backgroundColor: Colors.primary,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 10,
+        transform: [{ rotate: '12deg' }],
     },
     numberText: {
         color: '#000',
         fontWeight: '900',
-        fontSize: 12,
+        fontSize: 13,
     },
     nameContainer: {
         flex: 1,
@@ -935,56 +1303,44 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        marginBottom: 4,
+        marginBottom: 6,
     },
     statusBadge: {
         backgroundColor: 'rgba(0, 255, 102, 0.1)',
         borderColor: 'rgba(0, 255, 102, 0.2)',
         borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 8,
     },
     statusText: {
         color: Colors.primary,
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
     ratingBadge: {
         backgroundColor: 'rgba(250, 204, 21, 0.15)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 8,
     },
     ratingText: {
         color: '#FACC15',
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '900',
     },
     firstName: {
-        fontSize: 20,
+        fontSize: 24,
         fontWeight: '900',
         color: '#FFF',
-        lineHeight: 22,
+        lineHeight: 26,
     },
     lastName: {
-        fontSize: 20,
+        fontSize: 24,
         fontWeight: '900',
         color: Colors.primary,
-        lineHeight: 22,
-    },
-    posBadge: {
-        alignSelf: 'flex-start',
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 6,
-    },
-    posText: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 10,
-        fontWeight: '700',
+        lineHeight: 26,
     },
     switcherWrapper: {
         flexDirection: 'row',
@@ -1056,30 +1412,34 @@ const styles = StyleSheet.create({
         width: (width - 50) / 2,
         backgroundColor: 'rgba(255,255,255,0.04)',
         borderRadius: 16,
-        padding: 12,
+        padding: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.06)',
     },
     statIconContainer: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
+        width: 38,
+        height: 38,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 8,
     },
     statLabelSmall: {
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: '800',
         color: 'rgba(255,255,255,0.5)',
         letterSpacing: 0.5,
+        textAlign: 'center',
     },
     statValue: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '900',
         color: '#FFF',
         marginTop: 2,
+        textAlign: 'center',
     },
     physicalInfoBox: {
         borderRadius: 16,
@@ -1161,16 +1521,10 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#FFF',
     },
-    careerTimelineContainer: {
-        marginTop: 5,
-    },
     yearBlock: {
         marginBottom: 15,
     },
     yearHeaderBadge: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         backgroundColor: 'rgba(0, 255, 102, 0.1)',
         paddingHorizontal: 12,
         paddingVertical: 6,
@@ -1182,21 +1536,10 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         fontSize: 12,
     },
-    yearStatLabels: {
-        flexDirection: 'row',
-        gap: 15,
-    },
-    statColLabel: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 10,
-        fontWeight: '800',
-        width: 15,
-        textAlign: 'center',
-    },
     teamCareerWrapper: {
         backgroundColor: 'rgba(255,255,255,0.03)',
         borderRadius: 12,
-        padding: 10,
+        padding: 12,
         marginBottom: 6,
     },
     teamMainRow: {
@@ -1212,56 +1555,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginRight: 8,
     },
-    teamMiniLogo: {
-        width: 18,
-        height: 18,
-        resizeMode: 'contain',
-    },
-    timelineVerticalLine: {
-        display: 'none',
-    },
     teamNameCareer: {
         flex: 1,
         color: '#FFF',
         fontWeight: '800',
         fontSize: 12,
-    },
-    teamTotalStats: {
-        flexDirection: 'row',
-        gap: 15,
-    },
-    teamStatVal: {
-        color: Colors.primary,
-        fontWeight: '900',
-        fontSize: 12,
-        width: 15,
-        textAlign: 'center',
-    },
-    tournamentRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 6,
-        paddingLeft: 32,
-    },
-    tourIconWrap: {
-        marginRight: 6,
-    },
-    tourNameText: {
-        flex: 1,
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    tourStatsRow: {
-        flexDirection: 'row',
-        gap: 15,
-    },
-    tourStatVal: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 11,
-        fontWeight: '700',
-        width: 15,
-        textAlign: 'center',
     },
     emptyCareer: {
         padding: 20,
@@ -1329,12 +1627,12 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: 'rgba(0,0,0,0.85)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        paddingHorizontal: 20,
     },
-    modalContent: {
+    modalContentSmall: {
         width: '100%',
         backgroundColor: '#0c101c',
         borderRadius: 24,
@@ -1342,69 +1640,54 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
-    modalHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        marginBottom: 8,
+    modalContentLarge: {
+        width: width - 40,
+        backgroundColor: '#0c101c',
+        borderRadius: 24,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
-    modalTitle: {
-        fontSize: 14,
+    modalTitleLarge: {
+        fontSize: 18,
         fontWeight: '900',
         color: '#FFF',
-        letterSpacing: 0.5,
+        textAlign: 'center',
     },
-    modalSubtitle: {
-        fontSize: 11,
-        color: 'rgba(255,255,255,0.6)',
+    modalSubLarge: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.5)',
+        textAlign: 'center',
+        marginTop: 4,
         marginBottom: 15,
     },
-    inputLabel: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: Colors.primary,
-        marginBottom: 4,
-        letterSpacing: 0.5,
-    },
     modalInput: {
-        backgroundColor: 'rgba(255,255,255,0.06)',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
         borderRadius: 12,
         paddingHorizontal: 14,
         paddingVertical: 12,
         color: '#FFF',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '700',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
     },
-    modalButtons: {
-        flexDirection: 'row',
-        gap: 10,
-        marginTop: 15,
+    inputGroup: {
+        marginBottom: 12,
     },
-    modalCancelBtn: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        alignItems: 'center',
-    },
-    modalCancelText: {
-        color: 'rgba(255,255,255,0.7)',
+    inputLabel: {
+        fontSize: 10,
         fontWeight: '800',
-        fontSize: 12,
+        color: 'rgba(255,255,255,0.5)',
+        marginBottom: 6,
+        letterSpacing: 0.5,
     },
-    modalSaveBtn: {
+    modalBtn: {
         flex: 1,
-        paddingVertical: 12,
+        paddingVertical: 14,
         borderRadius: 12,
-        backgroundColor: Colors.primary,
         alignItems: 'center',
-    },
-    modalSaveText: {
-        color: '#000',
-        fontWeight: '900',
-        fontSize: 12,
+        justifyContent: 'center',
     },
 });
 

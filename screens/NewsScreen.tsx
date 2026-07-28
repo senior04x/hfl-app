@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     categoryBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
     categoryText: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
     categoryTextActive: { color: '#000' },
-    listContent: { paddingHorizontal: 15, paddingBottom: 100 },
+    listContent: { paddingHorizontal: 15, paddingBottom: 110 },
     featuredCard: { width: '100%', height: 260, borderRadius: 24, overflow: 'hidden', marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
     featuredImage: { width: '100%', height: '100%' },
     featuredOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, justifyContent: 'flex-end', overflow: 'hidden' },

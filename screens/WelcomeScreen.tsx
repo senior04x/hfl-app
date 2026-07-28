@@ -34,6 +34,7 @@ import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
+import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService } from '../services/apiService';
 import { eskizService } from '../services/eskizService';
 import { Ionicons } from '@expo/vector-icons';
@@ -204,7 +205,9 @@ export default function WelcomeScreen({ navigation }: any) {
                     setAccountOptions(res.accounts);
                     setShowAccountModal(true);
                 } else if (res.user) {
-                    setAuth(res.user);
+                    const orgId = res.user.organization_id || res.user.organizationId || res.user.team?.organization_id || 1;
+                    useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
+                    setAuth({ ...res.user, organizationId: Number(orgId) });
                 }
             } else {
                 Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi. Iltimos, avval ariza topshiring!");
@@ -232,11 +235,18 @@ export default function WelcomeScreen({ navigation }: any) {
                 if (accountOptions.length > 1) {
                     setShowAccountModal(true);
                 } else if (accountOptions.length === 1) {
-                    setAuth(accountOptions[0]);
+                    const targetAcc = accountOptions[0];
+                    const orgId = targetAcc.organization_id || targetAcc.organizationId || targetAcc.team?.organization_id || 1;
+                    useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
+                    setAuth({ ...targetAcc, organizationId: Number(orgId) });
                 } else {
                     const fullPhone = `+998${phone.replace(/\D/g, '')}`;
                     const res = await apiService.findAccountsByPhone(fullPhone);
-                    if (res.user) setAuth(res.user);
+                    if (res.user) {
+                        const orgId = res.user.organization_id || res.user.organizationId || res.user.team?.organization_id || 1;
+                        useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
+                        setAuth({ ...res.user, organizationId: Number(orgId) });
+                    }
                 }
             } else {
                 Alert.alert('Xato', "Tasdiqlash kodi noto'g'ri. Iltimos, qayta kiring.");
@@ -389,9 +399,9 @@ export default function WelcomeScreen({ navigation }: any) {
 
                                 <TouchableOpacity
                                     style={styles.guestButton}
-                                    onPress={() => setGuest(true)}
+                                    onPress={() => navigation.navigate('JoinApplication')}
                                 >
-                                    <Text style={styles.guestButtonText}>MEHMON SIFATIDA DAVOM ETISH</Text>
+                                    <Text style={styles.guestButtonText}>RO'YXATDAN O'TISH</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -426,7 +436,9 @@ export default function WelcomeScreen({ navigation }: any) {
                                         activeOpacity={0.8}
                                         onPress={() => {
                                             setShowAccountModal(false);
-                                            setAuth(acc);
+                                            const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || 1;
+                                            useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
+                                            setAuth({ ...acc, organizationId: Number(orgId) });
                                         }}
                                     >
                                         <View style={styles.accountOptionIcon}>
