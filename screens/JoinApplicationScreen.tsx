@@ -13,6 +13,7 @@ import {
     Modal,
     Animated,
     ActionSheetIOS,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -606,10 +607,15 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 <SafeAreaView style={{ flex: 1 }}>
                     {renderHeader()}
 
-                    <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={{ flex: 1 }}
                     >
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                            contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 }]}
+                        >
                         {!route?.params?.initialType && renderTypeSelector()}
 
                         {/* STEP 1: TASHKILOT TANLASH (EXPANDABLE SELECT WITH LOGO & NAME) */}
@@ -1371,7 +1377,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                         <View style={{ height: 60 }} />
                     </ScrollView>
-                </SafeAreaView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
             </VideoBackground>
 
             {/* ADD SQUAD PLAYER MODAL */}
