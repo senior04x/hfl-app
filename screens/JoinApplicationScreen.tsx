@@ -146,15 +146,6 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             const orgs = await apiService.getOrganizations();
             if (orgs && orgs.length > 0) {
                 setOrganizations(orgs);
-                const firstOrg = orgs[0];
-                setFormData(prev => ({
-                    ...prev,
-                    selectedOrgId: firstOrg.id,
-                    selectedOrgName: firstOrg.name,
-                    selectedOrgLogo: (firstOrg as any).logo_url || (firstOrg as any).logo || ''
-                }));
-                const lData = await apiService.getLeaguesByOrgId(firstOrg.id);
-                setLeagues(lData || []);
             }
         } catch (e) {
             console.warn('Load orgs error:', e);
@@ -834,16 +825,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             </ScrollView>
                                         </Animated.View>
                                     </View>
-                                ) : (
-                                    <View style={styles.card}>
-                                        <View style={styles.validationErrorBox}>
-                                            <Ionicons name="alert-circle" size={20} color="#FF9500" style={{ marginRight: 8 }} />
-                                            <Text style={[styles.validationErrorText, { color: '#FF9500' }]}>
-                                                Ligalarni ko'rish uchun avval Tashkilotni tanlang!
-                                            </Text>
-                                        </View>
-                                    </View>
-                                )}
+                                ) : null}
 
                                 {/* STEP 3: JAMOA TANLASH (SHOWN AFTER LEAGUE IS SELECTED FOR PLAYER APPLICATION) */}
                                 {applicationType === 'player' && (
@@ -954,16 +936,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                 </ScrollView>
                                             </Animated.View>
                                         </View>
-                                    ) : (
-                                        <View style={styles.card}>
-                                            <View style={styles.validationErrorBox}>
-                                                <Ionicons name="alert-circle" size={20} color="#FF9500" style={{ marginRight: 8 }} />
-                                                <Text style={[styles.validationErrorText, { color: '#FF9500' }]}>
-                                                    Jamoalarni ko'rish uchun avval Liganing nomini tanlang!
-                                                </Text>
-                                            </View>
-                                        </View>
-                                    )
+                                    ) : null
                                 )}
                             </>
                         )}
