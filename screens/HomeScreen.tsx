@@ -239,7 +239,17 @@ export default function HomeScreen({ navigation }: any) {
                         {/* Header Section */}
                         {(() => {
                             const avatarUri = userProfile?.photoUrl || userProfile?.photo_url || userProfile?.photo || userProfile?.logoUrl || userProfile?.logo_url || userProfile?.logo || userProfile?.avatar || user?.photoUrl || user?.photo_url || user?.photo || user?.logoUrl || user?.logo_url || user?.logo || user?.avatar;
-                            const displayName = userProfile?.teamName || userProfile?.name || (userProfile?.firstName ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim() : null) || user?.teamName || user?.name || user?.firstName || user?.team_name || 'AMATORA';
+                            
+                            let displayName = 'AMATORA SPORTS';
+                            if (user) {
+                                if (user.role === 'player') {
+                                    const rawName = userProfile?.firstName || userProfile?.first_name || user?.firstName || user?.first_name || userProfile?.full_name || userProfile?.name || user?.name || '';
+                                    const firstNameOnly = rawName.trim().split(' ')[0];
+                                    displayName = firstNameOnly || 'O\'YINCHI';
+                                } else {
+                                    displayName = userProfile?.teamName || userProfile?.name || user?.teamName || user?.name || user?.team_name || 'AMATORA';
+                                }
+                            }
 
                             const hour = new Date().getHours();
                             let greeting = 'Xayrli kun!';
@@ -280,7 +290,7 @@ export default function HomeScreen({ navigation }: any) {
 
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.welcomeText}>{greeting}</Text>
-                                        <Text style={styles.brandText} numberOfLines={1}>{user ? displayName.toUpperCase() : 'AMATORA SPORTS'}</Text>
+                                        <Text style={styles.brandText} numberOfLines={1}>{displayName.toUpperCase()}</Text>
                                     </View>
                                 </View>
                             );
