@@ -191,28 +191,37 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                 <Text style={styles.playerCardLastName} numberOfLines={1}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
                                 <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position || 'O\'yinchi').toUpperCase()}</Text>
 
-                                {/* PHONE BADGE / ADD PHONE BUTTON */}
-                                <View style={{ marginTop: 6, width: '100%' }}>
-                                    {pPhone ? (
-                                        <View style={styles.phoneBadgeContainer}>
-                                            <Ionicons name="call" size={10} color="#00FF87" style={{ marginRight: 4 }} />
-                                            <Text style={styles.phoneBadgeText} numberOfLines={1}>{pPhone}</Text>
-                                        </View>
-                                    ) : (
-                                        <TouchableOpacity
-                                            style={styles.addPhoneBtn}
-                                            activeOpacity={0.7}
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedPlayerForPhone(player);
-                                                setPhoneInputText('');
-                                            }}
-                                        >
-                                            <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
-                                            <Text style={styles.addPhoneBtnText}>+ TEL</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
+                                {/* PHONE BADGE / ADD PHONE BUTTON — ONLY FOR THIS TEAM'S MANAGER */}
+                                {canEdit && (
+                                    <View style={{ marginTop: 6, width: '100%' }}>
+                                        {pPhone ? (
+                                            <TouchableOpacity
+                                                style={styles.phoneBadgeContainer}
+                                                activeOpacity={0.6}
+                                                onPress={(e) => {
+                                                    e?.stopPropagation?.();
+                                                    Linking.openURL(`tel:${pPhone}`);
+                                                }}
+                                            >
+                                                <Ionicons name="call" size={10} color="#00FF87" style={{ marginRight: 4 }} />
+                                                <Text style={styles.phoneBadgeText} numberOfLines={1}>{pPhone}</Text>
+                                            </TouchableOpacity>
+                                        ) : (
+                                            <TouchableOpacity
+                                                style={styles.addPhoneBtn}
+                                                activeOpacity={0.7}
+                                                onPress={(e) => {
+                                                    e?.stopPropagation?.();
+                                                    setSelectedPlayerForPhone(player);
+                                                    setPhoneInputText('');
+                                                }}
+                                            >
+                                                <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
+                                                <Text style={styles.addPhoneBtnText}>+ TEL</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                )}
                             </View>
                         </TouchableOpacity>
                     );

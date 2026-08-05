@@ -429,31 +429,33 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                     <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position || 'O\'yinchi').toUpperCase()}</Text>
                                                 </View>
                                             </TouchableOpacity>
-                                            {/* PHONE — kartadan tashqarida, alohida TouchableOpacity */}
-                                            <View style={{ marginTop: 6 }}>
-                                                {pPhone ? (
-                                                    <TouchableOpacity
-                                                        style={styles.phoneBadgeContainer}
-                                                        activeOpacity={0.6}
-                                                        onPress={() => Linking.openURL(`tel:${pPhone}`)}
-                                                    >
-                                                        <Ionicons name="call" size={12} color="#00FF87" style={{ marginRight: 5 }} />
-                                                        <Text style={styles.phoneBadgeText} numberOfLines={1}>{pPhone}</Text>
-                                                    </TouchableOpacity>
-                                                ) : (
-                                                    <TouchableOpacity
-                                                        style={styles.addPhoneBtn}
-                                                        activeOpacity={0.6}
-                                                        onPress={() => {
-                                                            setSelectedPlayerForPhone(player);
-                                                            setPhoneInputText('');
-                                                        }}
-                                                    >
-                                                        <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
-                                                        <Text style={styles.addPhoneBtnText}>+ TEL</Text>
-                                                    </TouchableOpacity>
-                                                )}
-                                            </View>
+                                            {/* PHONE — ONLY FOR THIS TEAM'S MANAGER */}
+                                            {canEdit && (
+                                                <View style={{ marginTop: 6 }}>
+                                                    {pPhone ? (
+                                                        <TouchableOpacity
+                                                            style={styles.phoneBadgeContainer}
+                                                            activeOpacity={0.6}
+                                                            onPress={() => Linking.openURL(`tel:${pPhone}`)}
+                                                        >
+                                                            <Ionicons name="call" size={12} color="#00FF87" style={{ marginRight: 5 }} />
+                                                            <Text style={styles.phoneBadgeText} numberOfLines={1}>{pPhone}</Text>
+                                                        </TouchableOpacity>
+                                                    ) : (
+                                                        <TouchableOpacity
+                                                            style={styles.addPhoneBtn}
+                                                            activeOpacity={0.6}
+                                                            onPress={() => {
+                                                                setSelectedPlayerForPhone(player);
+                                                                setPhoneInputText('');
+                                                            }}
+                                                        >
+                                                            <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
+                                                            <Text style={styles.addPhoneBtnText}>+ TEL</Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </View>
+                                            )}
                                         </View>
                                     );
                                 })}
@@ -540,6 +542,11 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                 style={styles.savePhoneBtn}
                                 disabled={savingPhone}
                                 onPress={async () => {
+                                    if (!canEdit) {
+                                        Alert.alert('Ruxsat berilmadi', 'Faqat o\'z jamoangiz menejeri o\'yinchilar telefon raqamini tahrirlay oladi!');
+                                        setSelectedPlayerForPhone(null);
+                                        return;
+                                    }
                                     if (phoneInputText.length < 9) {
                                         Alert.alert('Xato', 'Iltimos, 9 xonali telefon raqamini kiriting.');
                                         return;
