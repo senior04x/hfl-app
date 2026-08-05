@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import VideoBackground from '../components/VideoBackground';
 import Colors from '../constants/Colors';
+import SlideButton from '../components/SlideButton';
 
 const TransferRequestScreen = ({ route, navigation }: any) => {
     const { user } = useAuthStore();
@@ -41,6 +42,8 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
     const [loadingTeams, setLoadingTeams] = useState(false);
     const [reason, setReason] = useState('');
     const [loadingSubmit, setLoadingSubmit] = useState(false);
+    const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Modal state
     const [modalVisible, setModalVisible] = useState(false);
@@ -133,11 +136,13 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
     const handleSubmit = async () => {
         if (!selectedTeam) {
             Alert.alert('Xatolik', 'Iltimos, yangi jamoani tanlang');
+            setSubmitStatus('idle');
             return;
         }
 
         try {
             setLoadingSubmit(true);
+            setSubmitStatus('loading');
             const targetPlayerId = playerId || user?.id || user?._id;
             const transferData = {
                 playerId: targetPlayerId,
@@ -146,18 +151,17 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                 reason: reason.trim() || null,
             };
 
-            const response = await apiService.createTransferRequest(transferData);
-            if (response.success) {
-                Alert.alert(
-                    'Muvaffaqiyat! ✅',
-                    "Transfer so'rovi yuborildi. Admin ko'rib chiqqach siz bilan bog'lanadi.",
-                    [{ text: 'TUSHUNDIM', onPress: () => navigation.goBack() }]
-                );
+            const response: any = await apiService.createTransferRequest(transferData);
+            if (response && response.success) {
+                setSubmitStatus('success');
+                setShowSuccessModal(true);
             } else {
-                Alert.alert('Xatolik', response.error || "So'rov yuborib bo'lmadi");
+                setSubmitStatus('error');
+                Alert.alert('Xatolik', response?.error || "So'rov yuborib bo'lmadi");
             }
         } catch (error) {
             console.error('Error submitting transfer request:', error);
+            setSubmitStatus('error');
             Alert.alert('Xatolik', "Server bilan bog'lanishda xatolik yuz berdi");
         } finally {
             setLoadingSubmit(false);
@@ -176,13 +180,15 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <Ionicons name="arrow-back" size={24} color="#00FF66" />
+                        <View style={styles.backIconCenter}>
+                            <Ionicons name="chevron-back" size={22} color="#00FF66" style={{ marginLeft: -2 }} />
+                        </View>
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Transfer So'rovi</Text>
-                    <View style={{ width: 32 }} />
+                    <View style={{ width: 40 }} />
                 </View>
 
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     {/* Transfer Visual Card with Skeleton */}
                     {infoLoading ? (
                         <View style={styles.transferVisualCardSkeleton}>
@@ -294,22 +300,53 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                         onChangeText={setReason}
                     />
 
-                    {/* Submit Button */}
-                    <TouchableOpacity
-                        style={[styles.submitButton, loadingSubmit && styles.disabledButton]}
-                        onPress={handleSubmit}
-                        disabled={loadingSubmit}
-                    >
-                        {loadingSubmit ? (
-                            <ActivityIndicator color="#000" />
-                        ) : (
-                            <>
-                                <Ionicons name="send" size={20} color="#0b0e17" style={{ marginRight: 8 }} />
-                                <Text style={styles.submitButtonText}>Transfer So'rovini Yuborish</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
+                    {/* Slide to Confirm Submit Button */}
+                    <SlideButton
+                        disabled={!selectedLeague || !selectedTeam}
+                        loading={loadingSubmit}
+                        status={submitStatus}
+                        onSwipeSuccess={handleSubmit}
+                        onReset={() => setSubmitStatus('idle')}
+                    />
                 </ScrollView>
+
+                {/* App Style Success Modal */}
+                <Modal
+                    visible={showSuccessModal}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => {
+                        setShowSuccessModal(false);
+                        navigation.goBack();
+                    }}
+                >
+                    <View style={styles.successModalOverlay}>
+                        <View style={styles.successModalCard}>
+                            <View style={styles.successIconBadge}>
+                                <Ionicons name="paper-plane-outline" size={38} color="#00FF66" />
+                            </View>
+
+                            <View style={styles.successTitleRow}>
+                                <Text style={styles.successModalTitle}>Yuborildi</Text>
+                                <Ionicons name="checkmark-circle" size={22} color="#00FF66" style={{ marginLeft: 6 }} />
+                            </View>
+
+                            <Text style={styles.successModalSub}>
+                                Organizatorlar tomonidan ko'rib chiqilmaguncha qayta yubora olmaysiz
+                            </Text>
+
+                            <TouchableOpacity
+                                style={styles.successModalBtn}
+                                onPress={() => {
+                                    setShowSuccessModal(false);
+                                    navigation.goBack();
+                                }}
+                            >
+                                <Text style={styles.successModalBtnText}>TUSHUNDIM</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
 
                 {/* Team Selection Modal */}
                 <Modal
@@ -449,7 +486,21 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(18, 23, 34, 0.65)',
     },
     backBtn: {
-        padding: 4,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.25)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    backIconCenter: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
         color: '#FFFFFF',
@@ -714,6 +765,77 @@ const styles = StyleSheet.create({
         marginTop: 30,
         marginBottom: 30,
         fontSize: 14,
+    },
+    successModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    successModalCard: {
+        width: '100%',
+        maxWidth: 340,
+        backgroundColor: '#0d1117',
+        borderRadius: 24,
+        padding: 28,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.3)',
+        shadowColor: '#00FF66',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 12,
+    },
+    successIconBadge: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        backgroundColor: 'rgba(0, 255, 102, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    successTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    successModalTitle: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    successModalSub: {
+        color: 'rgba(255, 255, 255, 0.65)',
+        fontSize: 14,
+        textAlign: 'center',
+        lineHeight: 21,
+        marginBottom: 24,
+    },
+    successModalBtn: {
+        width: '100%',
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: '#00FF66',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#00FF66',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    successModalBtnText: {
+        color: '#0b0e17',
+        fontSize: 15,
+        fontWeight: '900',
+        letterSpacing: 0.5,
     },
 });
 

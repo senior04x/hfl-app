@@ -7,7 +7,8 @@ import {
     ScrollView,
     Switch,
     Alert,
-    Platform
+    Platform,
+    ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +50,7 @@ export default function AccountScreen({ navigation }: any) {
     const { selectedOrganizationId, setSelectedOrganizationId, organizations } = useOrganizationStore();
 
     const [showPinModal, setShowPinModal] = useState(false);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [pinInput, setPinInput] = useState('');
     const [targetJuniorState, setTargetJuniorState] = useState<boolean>(false);
 
@@ -57,33 +59,63 @@ export default function AccountScreen({ navigation }: any) {
     const [transferWindowOpen, setTransferWindowOpen] = useState(false);
     const currentTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
 
+    // Applications Section State
+    const [appTab, setAppTab] = useState<'transfers' | 'profile'>('transfers');
+    const [userTransfers, setUserTransfers] = useState<any[]>([]);
+    const [userProfileApps, setUserProfileApps] = useState<any[]>([]);
+    const [appsLoading, setAppsLoading] = useState(false);
+
     useEffect(() => {
         if (!isGuest) {
-            if (user?.id) loadDetailedData();
+            if (user?.id) {
+                loadDetailedData();
+                loadUserApplications();
+            }
             checkTransferWindow();
         }
     }, [isGuest, user?.id, selectedOrganizationId]);
 
+    const loadUserApplications = async () => {
+        try {
+            setAppsLoading(true);
+            const targetPlayerId = user?.id || user?._id;
+            if (targetPlayerId) {
+                const transfers = await apiService.getPlayerTransfers(targetPlayerId);
+                setUserTransfers(transfers || []);
+            }
+
+            const userPhone = user?.phone || user?.phoneNumber || user?.phone_number || user?.tel;
+            if (userPhone) {
+                const apps = await apiService.getApplicationsByPhone(userPhone);
+                setUserProfileApps(apps || []);
+            }
+        } catch (err) {
+            console.error('Error loading applications in AccountScreen:', err);
+        } finally {
+            setAppsLoading(false);
+        }
+    };
+
     const checkTransferWindow = async () => {
         try {
             const orgId = selectedOrganizationId || user?.organizationId || user?.organization_id || 1;
-            const isOpen = await apiService.getTransferWindowStatus(orgId);
-            setTransferWindowOpen(isOpen);
-        } catch (e) {
-            console.error('Error checking transfer window status:', e);
+            const open = await apiService.getTransferWindowStatus(orgId);
+            setTransferWindowOpen(open);
+        } catch (err) {
+            console.error('Error checking transfer window:', err);
         }
     };
 
     const loadDetailedData = async () => {
         try {
             setLoading(true);
-            const targetTeamId = currentTeamId;
-            if (user.role === 'player') {
-                const data = await apiService.getPlayerById(user.id);
-                if (data) setDetailedData(data);
-            } else if (user.role === 'manager' && targetTeamId) {
-                const data = await apiService.getTeamById(targetTeamId);
-                if (data) setDetailedData(data);
+            const targetPlayerId = user?.id || user?._id;
+
+            if (targetPlayerId) {
+                const fullPlayerData = await apiService.getPlayerById(targetPlayerId);
+                if (fullPlayerData) {
+                    setDetailedData(fullPlayerData);
+                }
             }
         } catch (error) {
             console.error('Error loading detailed account data:', error);
@@ -93,14 +125,7 @@ export default function AccountScreen({ navigation }: any) {
     };
 
     const handleLogout = () => {
-        Alert.alert(
-            'CHIQISH',
-            'HAQIQATAN HAM HISOBDAN CHIQMOQCHIMISIZ?',
-            [
-                { text: 'BEKOR QILISH', style: 'cancel' },
-                { text: 'CHIQISH', onPress: () => logout(), style: 'destructive' },
-            ]
-        );
+        setShowLogoutModal(true);
     };
 
     const SettingItem = ({ icon, title, value, onPress, type = 'chevron', badgeCount, isMuted }: any) => (
@@ -249,6 +274,12 @@ export default function AccountScreen({ navigation }: any) {
                                         title="Mening statistika"
                                         onPress={() => navigation.navigate('MyStats', { playerId: user?.id })}
                                     />
+                                    <SettingItem
+                                        icon="paper-plane-outline"
+                                        title="Mening arizalarim"
+                                        value={userTransfers.length + userProfileApps.length > 0 ? `${userTransfers.length + userProfileApps.length} ta ariza` : ''}
+                                        onPress={() => navigation.navigate('Applications')}
+                                    />
                                     {transferWindowOpen && (
                                         <SettingItem
                                             icon="swap-horizontal-outline"
@@ -319,33 +350,7 @@ export default function AccountScreen({ navigation }: any) {
                         </View>
                     )}
 
-                    {/* Organization & Junior Mode Section */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>TASHKILOT & REJIMLAR</Text>
-                        
-                        <SettingItem
-                            icon="school-outline"
-                            title="Junior Rejim (U-14)"
-                            type="switch"
-                            value={isJuniorMode}
-                            onPress={(val: boolean) => {
-                                setTargetJuniorState(val);
-                                setPinInput('');
-                                setShowPinModal(true);
-                            }}
-                        />
 
-                        <SettingItem
-                            icon="business-outline"
-                            title="Tashkilot"
-                            value={organizations.find(o => o.id === selectedOrganizationId)?.name || 'Havas Liga'}
-                            onPress={() => {
-                                const nextOrgId = selectedOrganizationId === 1 ? 2 : 1;
-                                setSelectedOrganizationId(nextOrgId);
-                                Alert.alert("Tashkilot Almashtirildi", `Hozirgi tashkilot: ${organizations.find(o => o.id === nextOrgId)?.name}`);
-                            }}
-                        />
-                    </View>
 
                     {/* Logout */}
                     <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -409,6 +414,51 @@ export default function AccountScreen({ navigation }: any) {
                         </View>
                     </View>
                 </Modal>
+
+                {/* Custom Logout Modal */}
+                <Modal
+                    visible={showLogoutModal}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setShowLogoutModal(false)}
+                >
+                    <View style={styles.logoutModalOverlay}>
+                        <View style={styles.logoutModalCard}>
+                            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={{ padding: 24, alignItems: 'center' }}>
+                                <View style={styles.logoutIconBadge}>
+                                    <Ionicons name="log-out" size={28} color={Colors.danger} />
+                                </View>
+
+                                <Text style={styles.logoutModalTitle}>TIZIMDAN CHIQISH</Text>
+
+                                <Text style={styles.logoutModalSubtitle}>
+                                    Haqiqatan ham hisobingizdan chiqmoqchimisiz?
+                                </Text>
+
+                                <TouchableOpacity
+                                    style={styles.logoutConfirmBtn}
+                                    activeOpacity={0.8}
+                                    onPress={() => {
+                                        setShowLogoutModal(false);
+                                        logout();
+                                    }}
+                                >
+                                    <Ionicons name="log-out-outline" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                                    <Text style={styles.logoutConfirmBtnText}>TIZIMDAN CHIQISH</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.logoutCancelBtn}
+                                    activeOpacity={0.7}
+                                    onPress={() => setShowLogoutModal(false)}
+                                >
+                                    <Text style={styles.logoutCancelBtnText}>Bekor qilish</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </SafeAreaView>
         </AnimatedBackground>
     );
@@ -458,5 +508,193 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 11,
         fontWeight: '900',
+    },
+    appCardContainer: {
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        overflow: 'hidden',
+        padding: 12,
+    },
+    segmentedTabContainer: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderRadius: 12,
+        padding: 4,
+        marginBottom: 12,
+    },
+    segmentedTab: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        justify: 'center',
+        borderRadius: 10,
+    },
+    segmentedTabActive: {
+        backgroundColor: Colors.primary,
+    },
+    segmentedTabText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    segmentedTabTextActive: {
+        color: '#0b0e17',
+        fontWeight: '900',
+    },
+    emptyAppContainer: {
+        padding: 24,
+        alignItems: 'center',
+        justify: 'center',
+    },
+    emptyAppText: {
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 13,
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    appCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    appCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justify: 'space-between',
+        marginBottom: 6,
+    },
+    appCardTitleGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: 8,
+    },
+    appCardTitle: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '800',
+        flex: 1,
+    },
+    statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 999,
+        borderWidth: 1,
+    },
+    statusPending: {
+        backgroundColor: 'rgba(255, 204, 0, 0.12)',
+        borderColor: 'rgba(255, 204, 0, 0.4)',
+    },
+    statusApproved: {
+        backgroundColor: 'rgba(0, 255, 102, 0.12)',
+        borderColor: 'rgba(0, 255, 102, 0.4)',
+    },
+    statusRejected: {
+        backgroundColor: 'rgba(255, 59, 48, 0.12)',
+        borderColor: 'rgba(255, 59, 48, 0.4)',
+    },
+    statusBadgeText: {
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
+    appCardReason: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 12,
+        marginBottom: 8,
+        lineHeight: 16,
+    },
+    appCardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.05)',
+        paddingTop: 6,
+        marginTop: 2,
+    },
+    appCardDate: {
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    logoutModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    logoutModalCard: {
+        width: '100%',
+        maxWidth: 340,
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 59, 48, 0.25)',
+        backgroundColor: 'rgba(20, 15, 25, 0.92)',
+    },
+    logoutIconBadge: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: 'rgba(255, 59, 48, 0.12)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255, 59, 48, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+    },
+    logoutModalTitle: {
+        fontSize: 17,
+        fontWeight: '900',
+        color: '#FFF',
+        letterSpacing: 1,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    logoutModalSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.65)',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    logoutConfirmBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.danger,
+        width: '100%',
+        height: 48,
+        borderRadius: 14,
+        marginBottom: 8,
+        shadowColor: Colors.danger,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    logoutConfirmBtnText: {
+        color: '#FFF',
+        fontWeight: '900',
+        fontSize: 13,
+        letterSpacing: 1,
+    },
+    logoutCancelBtn: {
+        paddingVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    logoutCancelBtnText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontWeight: '700',
+        fontSize: 13,
     },
 });

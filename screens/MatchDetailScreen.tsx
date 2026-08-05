@@ -570,7 +570,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     const renderMedia = () => {
-        const videoUrl = match?.youtubeLink || match?.videoUrl;
+        const videoUrl = match?.youtube_link || match?.youtubeLink || match?.youtube_url || match?.youtubeUrl || match?.video_url || match?.videoUrl || match?.video || match?.stream_link || match?.streamUrl;
 
         return (
             <ScrollView 
@@ -586,7 +586,18 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                 }
             >
                 {videoUrl ? (
-                    <YoutubePlayerCard videoUrl={videoUrl} />
+                    <View style={{ width: '100%', alignItems: 'center' }}>
+                        <YoutubePlayerCard videoUrl={videoUrl} />
+                        <TouchableOpacity
+                            style={styles.openYtLinkBtn}
+                            activeOpacity={0.8}
+                            onPress={() => Linking.openURL(videoUrl).catch(() => {})}
+                        >
+                            <Ionicons name="logo-youtube" size={20} color="#FF0000" style={{ marginRight: 8 }} />
+                            <Text style={styles.openYtLinkText}>YouTube'da tomosha qilish</Text>
+                            <Ionicons name="open-outline" size={16} color="rgba(255,255,255,0.6)" style={{ marginLeft: 'auto' }} />
+                        </TouchableOpacity>
+                    </View>
                 ) : (
                     <View style={styles.placeholderContainer}>
                         <Ionicons name="images-outline" size={48} color="rgba(255,255,255,0.1)" />
@@ -711,5 +722,22 @@ const styles = StyleSheet.create({
     staffMemberCard: { borderRadius: 16, overflow: 'hidden', width: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
     staffIconBox: { width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(0,255,102,0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     staffLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900' },
-    staffValue: { color: '#FFF', fontSize: 15, fontWeight: '900', marginTop: 2 }
+    staffValue: { color: '#FFF', fontSize: 15, fontWeight: '900', marginTop: 2 },
+    openYtLinkBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 0, 0, 0.3)',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 14,
+        width: '100%',
+        marginTop: 10,
+    },
+    openYtLinkText: {
+        color: '#FFF',
+        fontWeight: '800',
+        fontSize: 13,
+    },
 });

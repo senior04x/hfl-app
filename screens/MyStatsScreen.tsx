@@ -10,6 +10,7 @@ import {
     Dimensions,
     Image,
     Animated,
+    PanResponder,
     SafeAreaView,
     StatusBar,
     Modal,
@@ -18,6 +19,9 @@ import {
     Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
+import * as Haptics from 'expo-haptics';
+import ViewShot, { captureRef } from 'react-native-view-shot';
 import { Picker } from '@react-native-picker/picker';
 import { apiService, clearApiCache } from '../services/apiService';
 import { supabase } from '../services/supabase';
@@ -28,6 +32,7 @@ import SmartImage from '../components/SmartImage';
 import VideoBackground from '../components/VideoBackground';
 import { useAuthStore } from '../store/useAuthStore';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
+import BiSlideButton from '../components/BiSlideButton';
 
 const { width } = Dimensions.get('window');
 
@@ -147,6 +152,7 @@ const MyStatsScreen = ({ navigation }: any) => {
     const [loading, setLoading] = useState(true);
     const [player, setPlayer] = useState<any>(null);
     const [activeTab, setActiveTab] = useState('profil');
+    const [scrollEnabled, setScrollEnabled] = useState(true);
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
     
@@ -160,7 +166,62 @@ const MyStatsScreen = ({ navigation }: any) => {
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [submittingUpdate, setSubmittingUpdate] = useState(false);
+    const [updateSubmitStatus, setUpdateSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [pickerLoading, setPickerLoading] = useState(false);
+
+    // Export State & ViewShot Ref
+    const [exportState, setExportState] = useState<'idle' | 'loading' | 'complete'>('idle');
+    const [exportProgress, setExportProgress] = useState(0);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const posterShotRef = useRef<any>(null);
+
+    const handleExportPress = () => {
+        if (exportState !== 'idle') return;
+        setExportState('loading');
+        setExportProgress(0);
+
+        let current = 0;
+        const timer = setInterval(() => {
+            current += 10;
+            setExportProgress(current);
+            if (current >= 100) {
+                clearInterval(timer);
+                setExportState('complete');
+                setShowExportModal(true);
+                setTimeout(() => {
+                    setExportState('idle');
+                    setExportProgress(0);
+                }, 3000);
+            }
+        }, 120);
+    };
+
+    const handleSharePoster = async () => {
+        try {
+            if (posterShotRef.current) {
+                const uri = await captureRef(posterShotRef, {
+                    format: 'png',
+                    quality: 1.0,
+                    result: 'tmpfile'
+                });
+                const isAvailable = await Sharing.isAvailableAsync();
+                if (isAvailable) {
+                    await Sharing.shareAsync(uri, {
+                        mimeType: 'image/png',
+                        dialogTitle: 'Matchday Player Card',
+                        UTI: 'public.png'
+                    });
+                } else {
+                    Alert.alert('Tayyor!', `Posteringiz saqlandi: ${uri}`);
+                }
+            } else {
+                Alert.alert('Eslatma', 'Posterni rasmga olib bo\'lmadi. Qayta urinib ko\'ring.');
+            }
+        } catch (err: any) {
+            console.error('Poster capture error:', err);
+            Alert.alert('Xatolik', 'Posterni saqlashda xatolik yuz berdi');
+        }
+    };
 
     const passportNumberRef = useRef<TextInput>(null);
 
@@ -192,26 +253,99 @@ const MyStatsScreen = ({ navigation }: any) => {
         oyinlari: "O'YINLARI"
     };
 
+    const activeTabRef = useRef(activeTab);
+    useEffect(() => {
+        activeTabRef.current = activeTab;
+    }, [activeTab]);
+
     const nextTab = () => {
-        const currentIndex = tabs.indexOf(activeTab);
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+
+        const currentIndex = tabs.indexOf(activeTabRef.current);
         const nextIndex = (currentIndex + 1) % tabs.length;
         const nextTabName = tabs[nextIndex];
         
         Animated.timing(slideAnim, {
-            toValue: -50,
-            duration: 150,
+            toValue: -80,
+            duration: 100,
             useNativeDriver: true,
         }).start(() => {
             setActiveTab(nextTabName);
-            slideAnim.setValue(50);
+            slideAnim.setValue(80);
             Animated.spring(slideAnim, {
                 toValue: 0,
-                friction: 8,
-                tension: 40,
+                friction: 7,
+                tension: 45,
                 useNativeDriver: true,
             }).start();
         });
     };
+
+    const prevTab = () => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+
+        const currentIndex = tabs.indexOf(activeTabRef.current);
+        const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        const prevTabName = tabs[prevIndex];
+        
+        Animated.timing(slideAnim, {
+            toValue: 80,
+            duration: 100,
+            useNativeDriver: true,
+        }).start(() => {
+            setActiveTab(prevTabName);
+            slideAnim.setValue(-80);
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                friction: 7,
+                tension: 45,
+                useNativeDriver: true,
+            }).start();
+        });
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponder: (evt, gestureState) => {
+                const isStrictHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2.2 && Math.abs(gestureState.dx) > 12;
+                return isStrictHorizontal;
+            },
+            onPanResponderGrant: () => {
+                setScrollEnabled(false);
+            },
+            onPanResponderMove: (evt, gestureState) => {
+                slideAnim.setValue(gestureState.dx / 2.2);
+            },
+            onPanResponderRelease: (evt, gestureState) => {
+                setScrollEnabled(true);
+                if (gestureState.dx < -45) {
+                    nextTab();
+                } else if (gestureState.dx > 45) {
+                    prevTab();
+                } else {
+                    Animated.spring(slideAnim, {
+                        toValue: 0,
+                        friction: 7,
+                        tension: 50,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                setScrollEnabled(true);
+                Animated.spring(slideAnim, {
+                    toValue: 0,
+                    friction: 7,
+                    tension: 50,
+                    useNativeDriver: true,
+                }).start();
+            }
+        })
+    ).current;
 
     useEffect(() => {
         if (user && user.id && user.role === 'player') {
@@ -405,6 +539,7 @@ const MyStatsScreen = ({ navigation }: any) => {
     // Submit Profile Update Ticket to Admin
     const handleSubmitProfileUpdate = async () => {
         setSubmittingUpdate(true);
+        setUpdateSubmitStatus('loading');
         try {
             const formattedBirthDate = `${updateForm.birthDay}.${updateForm.birthMonth}.${updateForm.birthYear}`;
             const targetOrgId = player?.organization_id || 1;
@@ -489,14 +624,17 @@ const MyStatsScreen = ({ navigation }: any) => {
             }
 
             if (error) {
+                setUpdateSubmitStatus('error');
                 console.error('Supabase profile update insert error:', error);
                 Alert.alert('Xatolik yuz berdi', error.message);
                 return;
             }
 
+            setUpdateSubmitStatus('success');
             setShowProfileUpdateModal(false);
             setShowSuccessModal(true);
         } catch (err: any) {
+            setUpdateSubmitStatus('error');
             console.error('Error submitting profile update:', err);
             Alert.alert('Xatolik', err.message || 'Arizani yuborib bo\'lmadi');
         } finally {
@@ -601,28 +739,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                 </View>
             </View>
 
-            {/* UPDATE REQUEST BUTTON */}
-            <View style={{ marginTop: 20, gap: 12, marginBottom: 35 }}>
-                <TouchableOpacity
-                    onPress={handleOpenUpdateModal}
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 10,
-                        backgroundColor: 'rgba(0, 255, 102, 0.15)',
-                        borderColor: 'rgba(0, 255, 102, 0.4)',
-                        borderWidth: 1,
-                        paddingVertical: 14,
-                        borderRadius: 16
-                    }}
-                >
-                    <Ionicons name="create-outline" size={20} color={Colors.primary} />
-                    <Text style={{ color: Colors.primary, fontWeight: '900', fontSize: 13, textTransform: 'uppercase' }}>
-                        MA'LUMOTLARNI QAYTA KO'RIB CHIQISH
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            <View style={{ marginBottom: 35 }} />
         </ScrollView>
     );
 
@@ -712,81 +829,168 @@ const MyStatsScreen = ({ navigation }: any) => {
             />
 
             <ScrollView 
+                scrollEnabled={scrollEnabled}
                 contentContainerStyle={styles.scrollContent} 
                 showsVerticalScrollIndicator={false}
                 style={{ flex: 1 }}
             >
                 <View style={styles.heroSection}>
-                    {/* AMATORA BRAND HEADER AT VERY TOP CENTERED */}
-                    <View style={styles.brandHeaderWrapper}>
-                        <Text style={styles.brandText}>AMATORA</Text>
-                    </View>
+                    {/* AMATORA BRAND HEADER (ONLY ON IOS, SIDE-BY-SIDE WITH LOGO) */}
+                    {Platform.OS === 'ios' && (
+                        <View style={styles.brandHeaderWrapper}>
+                            <Image
+                                source={require('../assets/logo.png')}
+                                style={{ width: 18, height: 18, marginRight: 6 }}
+                                resizeMode="contain"
+                            />
+                            <Text style={styles.brandText}>AMATORA</Text>
+                        </View>
+                    )}
 
-                    {/* BACK BUTTON LOWERED BELOW AMATORA HEADER */}
-                    <View style={styles.navHeaderRow}>
+                    {/* ⚽ PARALLEL TOP ROW: BACK BUTTON ALIGNED TO TOP EDGE PARALLEL WITH PLAYER PHOTO */}
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: 30, marginBottom: 20 }}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonBtn}>
                             <Ionicons name="arrow-back" size={22} color="#FFF" />
                         </TouchableOpacity>
-                    </View>
 
-                    <View style={styles.profileHeader}>
-                        <View style={styles.photoContainer}>
-                            <View style={[styles.mainPhotoWrapper, { shadowColor: 'transparent' }]}>
+                        {/* PLAYER PHOTO CREST (BIGGER 1X1 SQUARE CARD) */}
+                        <View style={{ position: 'relative' }}>
+                            <View style={{
+                                width: 118,
+                                height: 118,
+                                borderRadius: 22,
+                                borderWidth: 1.5,
+                                borderColor: 'rgba(0, 255, 135, 0.7)',
+                                padding: 2,
+                                backgroundColor: '#0A1224',
+                                overflow: 'hidden',
+                                shadowColor: '#00FF87',
+                                shadowRadius: 16,
+                                shadowOpacity: 0.35,
+                                elevation: 8
+                            }}>
                                 <SmartImage
                                     uri={player.photo || player.avatar}
-                                    style={styles.profilePhoto}
+                                    style={{ width: '100%', height: '100%', borderRadius: 18 }}
                                     contentFit="cover"
                                     fallbackIcon="person"
-                                    borderRadius={22}
                                 />
                             </View>
-                            {/* TILTED/ROTATED SHIRT NUMBER BADGE */}
-                            <View style={styles.numberOverlay}>
-                                <Text style={styles.numberText}>#{player.number || player.player_number || '0'}</Text>
+
+                            {/* UNIQUE TILTED FOOTBALL CREST SHIRT NUMBER BADGE */}
+                            <View style={{
+                                position: 'absolute',
+                                bottom: -4,
+                                right: -4,
+                                backgroundColor: '#00FF87',
+                                borderWidth: 2,
+                                borderColor: '#050A14',
+                                paddingHorizontal: 9,
+                                paddingVertical: 2.5,
+                                borderRadius: 10,
+                                transform: [{ rotate: '-8deg' }],
+                                shadowColor: '#00FF87',
+                                shadowRadius: 10,
+                                shadowOpacity: 0.6,
+                                elevation: 6
+                            }}>
+                                <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 11, fontStyle: 'italic', letterSpacing: 0.5 }}>
+                                    #{player.number || player.player_number || '0'}
+                                </Text>
                             </View>
                         </View>
 
-                        <View style={styles.nameContainer}>
-                            <View style={styles.badgeRow}>
-                                {/* TOP BADGE SHOWS POSITION INSTEAD OF FAOL O'YINCHI */}
-                                <View style={styles.statusBadge}>
-                                    <Text style={styles.statusText}>
-                                        {(player?.position || 'O\'YINCHI').toUpperCase()}
-                                    </Text>
-                                </View>
-                                <View style={styles.ratingBadge}>
-                                    <Text style={styles.ratingText}>★ {player?.rating || 0}</Text>
-                                </View>
+                        {/* PENCIL EDIT BUTTON PARALLEL TO BACK BUTTON & PLAYER PHOTO */}
+                        <TouchableOpacity onPress={handleOpenUpdateModal} style={styles.backButtonBtn}>
+                            <Ionicons name="create-outline" size={20} color="#00FF87" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* PLAYER DETAILS CENTERED BELOW */}
+                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
+
+                        {/* PLAYER FULL NAME (FIRST NAME NEON GREEN, LAST NAME WHITE) */}
+                        <Text style={{
+                            fontWeight: '900',
+                            fontSize: 22,
+                            letterSpacing: 0.5,
+                            textAlign: 'center',
+                            textTransform: 'uppercase'
+                        }}>
+                            <Text style={{ color: '#00FF87' }}>{(player.firstName || player.first_name || '').toUpperCase()}</Text>{' '}
+                            <Text style={{ color: '#FFFFFF' }}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
+                        </Text>
+
+                        {/* CENTERED BADGES ROW: TEAM LOGO + POSITION & RATING */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                            {/* POSITION BADGE WITH TEAM LOGO */}
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(255, 255, 255, 0.14)',
+                                paddingHorizontal: 12,
+                                paddingVertical: 5,
+                                borderRadius: 20
+                            }}>
+                                {(player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo) ? (
+                                    <Image
+                                        source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }}
+                                        style={{ width: 16, height: 16, borderRadius: 8 }}
+                                        resizeMode="contain"
+                                    />
+                                ) : (
+                                    <Ionicons name="shield-sharp" size={14} color="#00FF87" />
+                                )}
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: '800', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
+                                    {getPositionFullUz(player?.positionUz || player?.position)}
+                                </Text>
                             </View>
 
-                            <Text style={styles.firstName}>{player.firstName || player.first_name}</Text>
-                            <Text style={styles.lastName}>{player.lastName || player.last_name}</Text>
-                            
-                            {/* INSTAGRAM BADGE UNDER NAME (POSITION BADGE UNDER NAME REMOVED AS REQUESTED) */}
-                            {instagramUrl ? (
-                                <TouchableOpacity
-                                    onPress={() => Linking.openURL(instagramUrl)}
-                                    style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 6,
-                                        backgroundColor: 'rgba(225, 48, 108, 0.15)',
-                                        borderColor: 'rgba(225, 48, 108, 0.4)',
-                                        borderWidth: 1,
-                                        paddingHorizontal: 12,
-                                        paddingVertical: 5,
-                                        borderRadius: 10,
-                                        marginTop: 8,
-                                        alignSelf: 'flex-start'
-                                    }}
-                                >
-                                    <FontAwesome5 name="instagram" size={14} color="#E1306C" />
-                                    <Text style={{ color: '#E1306C', fontSize: 12, fontWeight: '800' }}>
-                                        @{instagramUsername}
-                                    </Text>
-                                </TouchableOpacity>
-                            ) : null}
+                            {/* RATING BADGE (GOLD WITH TRENDING-UP ICON) */}
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                backgroundColor: 'rgba(255, 215, 0, 0.15)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(255, 215, 0, 0.4)',
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderRadius: 20
+                            }}>
+                                <Ionicons name="trending-up" size={13} color="#FFD700" />
+                                <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 12, letterSpacing: 0.5 }}>
+                                    {player?.rating !== undefined && player?.rating !== null && player?.rating !== 0 ? player.rating : (stats?.rating || 0)}
+                                </Text>
+                            </View>
                         </View>
+
+                        {/* INSTAGRAM LINK BADGE */}
+                        {instagramUrl ? (
+                            <TouchableOpacity
+                                onPress={() => Linking.openURL(instagramUrl)}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    backgroundColor: 'rgba(225, 48, 108, 0.12)',
+                                    borderColor: 'rgba(225, 48, 108, 0.35)',
+                                    borderWidth: 1,
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 4,
+                                    borderRadius: 14,
+                                    marginTop: 10
+                                }}
+                            >
+                                <FontAwesome5 name="instagram" size={12} color="#E1306C" />
+                                <Text style={{ color: '#E1306C', fontSize: 11, fontWeight: '800' }}>
+                                    @{instagramUsername}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
                 </View>
 
@@ -820,7 +1024,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.mainContent}>
+                <View style={styles.mainContent} {...panResponder.panHandlers}>
                     <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
                         {activeTab === 'profil' && renderProfil()}
                         {activeTab === 'karyerasi' && renderCareer()}
@@ -828,6 +1032,121 @@ const MyStatsScreen = ({ navigation }: any) => {
                     </Animated.View>
                 </View>
             </ScrollView>
+
+            {/* ⚽ MINIMALIST ULTIMATE FOOTBALL PLAYER POSTER MODAL */}
+            <Modal
+                visible={showExportModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowExportModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={{ width: '90%', maxHeight: '85%', backgroundColor: '#050A14', borderRadius: 32, borderWidth: 1.5, borderColor: 'rgba(0, 255, 135, 0.3)', overflow: 'hidden', shadowColor: '#00FF87', shadowRadius: 30, shadowOpacity: 0.3, elevation: 20 }}>
+                        <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+                        
+                        <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={{ flex: 1, backgroundColor: '#050A14' }}>
+                            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 28, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+                                {/* Minimalist Top Header with Original Logo */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.08)', paddingBottom: 16, marginBottom: 24 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Image
+                                            source={require('../assets/logo.png')}
+                                            style={{ width: 24, height: 24 }}
+                                            resizeMode="contain"
+                                        />
+                                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 15, letterSpacing: 2 }}>AMATORA</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: 'rgba(0, 255, 135, 0.12)', borderWidth: 1, borderColor: 'rgba(0, 255, 135, 0.3)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 }}>
+                                        <Text style={{ color: '#00FF87', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>SEASON 2026</Text>
+                                    </View>
+                                </View>
+
+                                {/* Minimalist Player Photo Crest & Rating */}
+                                <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                                    <View style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: '#00FF87', padding: 4, backgroundColor: '#0A1224', shadowColor: '#00FF87', shadowRadius: 20, shadowOpacity: 0.4 }}>
+                                        <Image
+                                            source={{ uri: player?.photo || player?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80' }}
+                                            style={{ width: '100%', height: '100%', borderRadius: 54 }}
+                                            resizeMode="cover"
+                                        />
+                                    </View>
+                                    
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFD700', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20, marginTop: -14, shadowColor: '#FFD700', shadowRadius: 10, shadowOpacity: 0.6 }}>
+                                        <Ionicons name="trending-up" size={14} color="#050A14" />
+                                        <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>
+                                            {player?.rating !== undefined && player?.rating !== null && player?.rating !== 0 ? player.rating : (stats?.rating || 0)} RATING
+                                        </Text>
+                                    </View>
+
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 22, marginTop: 14, letterSpacing: 0.5, textAlign: 'center' }}>
+                                        {(player?.firstName || player?.first_name || 'FUTBOLCHI').toUpperCase()} {(player?.lastName || player?.last_name || '').toUpperCase()}
+                                    </Text>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255, 255, 255, 0.06)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, marginTop: 8 }}>
+                                        {(player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo) ? (
+                                            <Image
+                                                source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }}
+                                                style={{ width: 16, height: 16, borderRadius: 8 }}
+                                                resizeMode="contain"
+                                            />
+                                        ) : (
+                                            <Ionicons name="shield-outline" size={14} color="#00FF87" />
+                                        )}
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontWeight: '700', fontSize: 11, letterSpacing: 1 }}>
+                                            {getPositionFullUz(player?.positionUz || player?.position)}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Minimalist Grid Stats */}
+                                <View style={{ width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 10 }}>
+                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>GOLLAR</Text>
+                                        <Text style={{ color: '#00FF87', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.goals}</Text>
+                                    </View>
+
+                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>ASSISTLAR</Text>
+                                        <Text style={{ color: '#3B82F6', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.assists}</Text>
+                                    </View>
+
+                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>O'YINLAR</Text>
+                                        <Text style={{ color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.matchesPlayed}</Text>
+                                    </View>
+
+                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>SARIQ / QIZIL</Text>
+                                        <Text style={{ color: '#FACC15', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.yellowCards} / {stats.redCards}</Text>
+                                    </View>
+                                </View>
+
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: 10, fontWeight: '600', marginTop: 14, letterSpacing: 1 }}>
+                                    AMATORA LEAGUE • OFFICIAL MATCHDAY CARD
+                                </Text>
+                            </ScrollView>
+                        </ViewShot>
+
+                        {/* Minimalist Action Buttons */}
+                        <View style={{ flexDirection: 'row', gap: 12, padding: 20, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.08)' }}>
+                            <TouchableOpacity
+                                onPress={() => setShowExportModal(false)}
+                                style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', paddingVertical: 15, borderRadius: 18, alignItems: 'center' }}
+                            >
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: '800', fontSize: 13 }}>YOPISH</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleSharePoster}
+                                style={{ flex: 1.5, backgroundColor: '#00FF87', paddingVertical: 15, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                            >
+                                <Ionicons name="share-social" size={18} color="#050A14" />
+                                <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>STORY'GA ULASHISH</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {/* INSTAGRAM MODAL */}
             <Modal
@@ -1087,24 +1406,17 @@ const MyStatsScreen = ({ navigation }: any) => {
                                 </View>
                             </View>
 
-                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                                <TouchableOpacity
-                                    onPress={() => setShowProfileUpdateModal(false)}
-                                    style={[styles.modalBtn, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
-                                >
-                                    <Text style={{ color: '#FFF', fontWeight: '800' }}>BEKOR QILISH</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    onPress={handleSubmitProfileUpdate}
-                                    disabled={submittingUpdate}
-                                    style={[styles.modalBtn, { backgroundColor: Colors.primary }]}
-                                >
-                                    <Text style={{ color: '#000', fontWeight: '900' }}>
-                                        {submittingUpdate ? 'YUBORILMOQDA...' : 'YUBORISH'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
+                            {/* BI-DIRECTIONAL SLIDE BUTTON (CENTER START: LEFT CANCEL | RIGHT SUBMIT) */}
+                            <BiSlideButton
+                                loading={submittingUpdate}
+                                status={updateSubmitStatus}
+                                submitTitle="Yuborish"
+                                cancelTitle="Bekor qilish"
+                                helperText="Bekor qilish uchun chapga, yuborish uchun o'ngga suring"
+                                onSwipeSubmit={handleSubmitProfileUpdate}
+                                onSwipeCancel={() => setShowProfileUpdateModal(false)}
+                                onReset={() => setUpdateSubmitStatus('idle')}
+                            />
                         </View>
                     </ScrollView>
                 </View>
@@ -1239,12 +1551,14 @@ const styles = StyleSheet.create({
         paddingBottom: 15,
     },
     brandHeaderWrapper: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingTop: 2,
         marginBottom: 8,
     },
     brandText: {
-        fontSize: 18,
+        fontSize: 13,
         fontWeight: '900',
         color: '#FFF',
         letterSpacing: 2,

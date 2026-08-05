@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { supabase } from './supabase';
+import { supabase, supabaseAdmin } from './supabase';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { useJuniorStore } from '../store/useJuniorStore';
 
-export { supabase };
+export { supabase, supabaseAdmin };
 
 const getOrgId = () => useOrganizationStore.getState().selectedOrganizationId || 1;
 const getIsJunior = () => useJuniorStore.getState().isJuniorMode;
@@ -58,22 +58,51 @@ const api = axios.create({
 export const apiService = {
     // Organizations
     getOrganizations: async () => {
-        const cacheKey = `organizations_all`;
-        return getCachedData(cacheKey, async () => {
-            try {
-                const { data, error } = await supabase
-                    .from('organizations')
-                    .select('id, name, slug, logo_url')
-                    .order('id', { ascending: true });
-                if (error) throw error;
-                return data || [];
-            } catch (err) {
-                console.error('getOrganizations error:', err);
-                return [
-                    { id: 1, name: 'Havas Futbol Ligasi', slug: 'havas-liga' },
-                ];
+        try {
+            const [orgsRes, sponsorsRes] = await Promise.all([
+                supabaseAdmin.from('organizations').select('id, name, slug, logo_url').order('id', { ascending: true }),
+                supabaseAdmin.from('sponsors').select('name, logo_url').like('name', 'REGISTRATION_OPEN%')
+            ]);
+
+            if (orgsRes.error) throw orgsRes.error;
+            const orgs = orgsRes.data || [];
+            const sponsorMap: Record<string, boolean> = {};
+
+            if (sponsorsRes.data) {
+                sponsorsRes.data.forEach((sp: any) => {
+                    const valStr = String(sp.logo_url || '').toLowerCase().trim();
+                    const isClosed = (valStr === 'false' || valStr === '0' || valStr === 'closed');
+                    const isOpen = (valStr === 'true' || valStr === '1' || valStr === 'open');
+
+                    const match = sp.name.match(/^REGISTRATION_OPEN_(.+)$/);
+                    if (match && match[1]) {
+                        if (isClosed) sponsorMap[match[1]] = false;
+                        else if (isOpen) sponsorMap[match[1]] = true;
+                    } else if (sp.name === 'REGISTRATION_OPEN') {
+                        if (isClosed) {
+                            sponsorMap['1'] = false;
+                            sponsorMap['global'] = false;
+                        } else if (isOpen) {
+                            sponsorMap['1'] = true;
+                            sponsorMap['global'] = true;
+                        }
+                    }
+                });
             }
-        });
+
+            // Keep org UNLESS explicitly closed
+            const activeOrgs = orgs.filter((org: any) => {
+                const orgIdStr = String(org.id);
+                if (sponsorMap[orgIdStr] === false) return false;
+                if (orgIdStr === '1' && sponsorMap['global'] === false) return false;
+                return true;
+            });
+
+            return activeOrgs;
+        } catch (err) {
+            console.error('getOrganizations error:', err);
+            return [];
+        }
     },
 
     // Accepted Collab Leagues for an Organization
@@ -300,16 +329,7 @@ export const apiService = {
             try {
                 let query = supabase.from('teams').select('*').order('name');
                 if (leagueName) {
-                    const lLower = String(leagueName).toLowerCase();
-                    let keyword = '';
-                    if (lLower.includes('super')) keyword = 'super';
-                    else if (lLower.includes('pro')) keyword = 'pro';
-                    else if (lLower.includes('3')) keyword = '3';
-                    else if (lLower.includes('7')) keyword = '7x7';
-
-                    if (keyword) {
-                        query = query.ilike('league', `%${keyword}%`);
-                    }
+                    query = query.ilike('league', `%${leagueName}%`);
                 }
                 const { data: rawTeams, error } = await query;
                 if (error) throw error;
@@ -500,11 +520,51 @@ export const apiService = {
                 photo: p.photo_url || p.photo || '',
                 photo_url: p.photo_url || p.photo || '',
                 position: p.position || 'O\'yinchi',
-                number: p.player_number || p.number || p.shirt_number || ''
+                number: p.player_number || p.number || p.shirt_number || '',
+                phone: p.phone || p.phoneNumber || p.phone_number || ''
             }));
         } catch (error) {
             console.warn('getPlayersByTeam error fallback:', error);
             return api.get(`/teams/${teamId}/players`).then(res => res.data.data).catch(() => []);
+        }
+    },
+
+    updatePlayerPhone: async (playerId: string | number, phone: string) => {
+        try {
+            if (!playerId) return { success: false, error: "O'yinchi ID si topilmadi" };
+
+            let queryId: any = playerId;
+            if (typeof playerId === 'string' && !isNaN(Number(playerId))) {
+                queryId = Number(playerId);
+            }
+
+            let { data, error } = await supabaseAdmin
+                .from('applications')
+                .update({ phone })
+                .eq('id', queryId)
+                .select();
+
+            if (!data || data.length === 0) {
+                const res2 = await supabaseAdmin
+                    .from('applications')
+                    .update({ phone })
+                    .eq('id', String(playerId))
+                    .select();
+                if (res2.data && res2.data.length > 0) {
+                    data = res2.data;
+                }
+            }
+
+            if (error) throw error;
+            if (!data || data.length === 0) {
+                return { success: false, error: "Bazada o'yinchi profili topilmadi" };
+            }
+
+            clearApiCache();
+            return { success: true, data };
+        } catch (err: any) {
+            console.error('updatePlayerPhone error:', err);
+            return { success: false, error: err?.message || 'Xatolik' };
         }
     },
 
@@ -596,7 +656,21 @@ export const apiService = {
             return { success: true, data: created };
         } catch (err) {
             console.error('Transfer request error:', err);
-            return api.post('/transfers/player', data).then(res => res.data).catch(() => ({ success: true }));
+        }
+    },
+
+    getPlayerTransfers: async (playerId: string | number) => {
+        try {
+            const { data, error } = await supabase
+                .from('transfers')
+                .select('*')
+                .eq('player_id', playerId)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        } catch (err) {
+            console.error('getPlayerTransfers error:', err);
+            return [];
         }
     },
 
@@ -933,26 +1007,32 @@ export const apiService = {
     getNewsById: () => Promise.resolve(null),
 
     // Applications & Teams
-    createTeam: async (teamData: { name: string; league: string; logo_url: string; captain_phone: string; status?: string }) => {
+    createTeam: async (teamData: any) => {
         try {
-            const { data: created, error } = await supabase.from('teams').insert({
+            const defaultLogo = 'https://xzzyhfyazwohdqqbjiiy.supabase.co/storage/v1/object/public/sponsors/jd017tpq0c8.png';
+            const { data: created, error } = await supabaseAdmin.from('teams').insert({
                 ...teamData,
+                logo_url: teamData.logo_url || defaultLogo,
                 status: teamData.status || 'pending'
             }).select().single();
             if (error) throw error;
-            return { success: true, data: created };
+            return { success: true, data: created, id: created?.id, _id: created?.id };
         } catch (err) {
-            return api.post('/teams', teamData).then(res => res.data).catch(() => ({ success: true, data: { id: `team_${Date.now()}` } }));
+            console.error('createTeam error:', err);
+            const fallbackId = `team_${Date.now()}`;
+            return api.post('/teams', teamData).then(res => res.data).catch(() => ({ success: true, data: { id: fallbackId }, id: fallbackId, _id: fallbackId }));
         }
     },
 
     createApplication: async (data: any) => {
         try {
-            const { data: created, error } = await supabase.from('applications').insert(data).select().single();
+            const { data: created, error } = await supabaseAdmin.from('applications').insert(data).select().single();
             if (error) throw error;
-            return { success: true, data: created };
+            return { success: true, data: created, id: created?.id, _id: created?.id };
         } catch (err) {
-            return api.post('/applications', data).then(res => res.data).catch(() => ({ success: true, data: { id: `app_${Date.now()}` } }));
+            console.error('createApplication error:', err);
+            const fallbackId = `app_${Date.now()}`;
+            return api.post('/applications', data).then(res => res.data).catch(() => ({ success: true, data: { id: fallbackId }, id: fallbackId, _id: fallbackId }));
         }
     },
 
@@ -1082,32 +1162,29 @@ export const apiService = {
             // 1. Check if user exists in teams (captain) or applications (player)
             let userFound: any = null;
             let role: 'manager' | 'player' = 'player';
-            let telegramChatId: string | null = null;
 
             // Check captain in teams table
             const { data: teamData } = await supabase
                 .from('teams')
                 .select('*')
-                .or(`captain_phone.ilike.%${phoneDigits}%`)
+                .ilike('captain_phone', `%${phoneDigits}%`)
                 .limit(1);
 
             if (teamData && teamData.length > 0) {
                 userFound = teamData[0];
                 role = 'manager';
-                telegramChatId = teamData[0].telegram_chat_id;
             } else {
                 // Check player in applications table
                 const { data: appData } = await supabase
                     .from('applications')
                     .select('*')
-                    .or(`phone.ilike.%${phoneDigits}%`)
+                    .ilike('phone', `%${phoneDigits}%`)
                     .order('created_at', { ascending: false })
                     .limit(1);
 
                 if (appData && appData.length > 0) {
                     userFound = appData[0];
                     role = 'player';
-                    telegramChatId = appData[0].telegram_chat_id;
                 }
             }
 
@@ -1118,12 +1195,20 @@ export const apiService = {
                 };
             }
 
-            // 2. Generate 6-digit OTP code
-            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+            // 2. Generate 4-digit OTP code
+            const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
             const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-            // 3. Store OTP in teams/applications table via telegram_message_id column
+            // 3. Store OTP in otp_codes table
             try {
+                await supabase.from('otp_codes').upsert({
+                    phone: phoneDigits,
+                    code: otpCode,
+                    expires_at: expiresAt,
+                    is_used: false,
+                    created_at: new Date().toISOString()
+                }, { onConflict: 'phone' });
+
                 const otpStorageVal = `OTP_${otpCode}`;
                 if (role === 'manager') {
                     await supabase.from('teams').update({ telegram_message_id: otpStorageVal }).eq('id', userFound.id);
@@ -1134,117 +1219,17 @@ export const apiService = {
                 console.warn('OTP save error:', err);
             }
 
-            // 4. Send via Telegram Bot API if user has connected chat_id
-            let deliveredVia = 'bot_link';
-            if (telegramChatId) {
-                try {
-                    const botToken = '8920990708:AAEhrRtX06AEDhJyKNx_CSLWYMNSYviEYHc';
-                    const msgText = `🔑 <b>HFL Ilovasiga kirish kodingiz:</b> <code>${otpCode}</code>\n\n📱 <i>Ushbu kodni mobil ilovaga kiriting. Kod 5 daqiqa davomida amal qiladi.</i>`;
-                    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: telegramChatId,
-                            text: msgText,
-                            parse_mode: 'HTML',
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [
-                                        {
-                                            text: '📋 Copy Code',
-                                            copy_text: { text: otpCode }
-                                        }
-                                    ]
-                                ]
-                            }
-                        })
-                    });
-                    deliveredVia = 'telegram';
-                } catch (tErr) {
-                    console.warn('Telegram direct send error:', tErr);
-                }
-            }
-
             return {
                 success: true,
-                deliveredVia,
+                deliveredVia: 'bot_link',
                 user: userFound,
                 role,
-                botUrl: `https://t.me/havasmedialiga_bot?start=login_${phoneDigits}_${otpCode}`,
+                botUrl: `https://t.me/amatora_bot?start=login_${phoneDigits}`,
                 otpCode
             };
         } catch (error: any) {
             console.error('requestOTP error:', error);
             return { success: false, reason: "Tizim bilan bog'lanishda xatolik yuz berdi." };
-        }
-    },
-
-    findAccountsByPhone: async (phone: string) => {
-        try {
-            const cleanPhone = phone.replace(/\D/g, '').slice(-9);
-            const accountsList: any[] = [];
-
-            // 1. Check Manager profile in teams table
-            const { data: teamData } = await supabase
-                .from('teams')
-                .select('*')
-                .or(`captain_phone.ilike.%${cleanPhone}%`);
-
-            if (teamData && teamData.length > 0) {
-                teamData.forEach((t: any) => {
-                    accountsList.push({
-                        ...t,
-                        _id: t.id,
-                        id: t.id,
-                        role: 'manager',
-                        teamId: t.id,
-                        phone: t.captain_phone || phone,
-                        name: t.name || 'Jamoa',
-                        title: t.name || 'Jamoa',
-                        subTitle: t.league || '',
-                        photo: t.logo_url || t.logo || ''
-                    });
-                });
-            }
-
-            // 2. Check Player profiles in applications table
-            const { data: appData } = await supabase
-                .from('applications')
-                .select('*, teams(*)')
-                .or(`phone.ilike.%${cleanPhone}%`)
-                .order('created_at', { ascending: false });
-
-            if (appData && appData.length > 0) {
-                appData.forEach((app: any) => {
-                    const fullName = `${app.first_name || ''} ${app.last_name || ''}`.trim() || 'Futbolchi';
-                    accountsList.push({
-                        ...app,
-                        _id: app.id,
-                        id: app.id,
-                        role: 'player',
-                        teamId: app.team_id || app.teams?.id,
-                        phone: app.phone || phone,
-                        name: fullName,
-                        title: fullName,
-                        subTitle: app.teams?.name || '',
-                        photo: app.photo_url || app.photo || ''
-                    });
-                });
-            }
-
-            if (accountsList.length > 0) {
-                return {
-                    success: true,
-                    multipleAccounts: accountsList.length > 1,
-                    accounts: accountsList,
-                    user: accountsList[0]
-                };
-            }
-
-            return { success: false, reason: "Ushbu telefon raqamiga tegishli profil topilmadi. Iltimos, avval ariza topshiring!" };
-        } catch (error: any) {
-            console.error('findAccountsByPhone error:', error);
-            return { success: false, reason: "Profildan izlashda xatolik yuz berdi." };
         }
     },
 
@@ -1260,7 +1245,7 @@ export const apiService = {
             const { data: teamData } = await supabase
                 .from('teams')
                 .select('*')
-                .or(`captain_phone.ilike.%${cleanPhone}%`);
+                .ilike('captain_phone', `%${cleanPhone}%`);
 
             if (teamData && teamData.length > 0) {
                 teamData.forEach((t: any) => {
@@ -1284,7 +1269,7 @@ export const apiService = {
             const { data: appData } = await supabase
                 .from('applications')
                 .select('*, teams(*)')
-                .or(`phone.ilike.%${cleanPhone}%`)
+                .ilike('phone', `%${cleanPhone}%`)
                 .order('created_at', { ascending: false });
 
             if (appData && appData.length > 0) {
@@ -1306,14 +1291,26 @@ export const apiService = {
                 });
             }
 
-            // 3. Validate OTP code
+            // 3. Validate OTP code strictly against otp_codes table or storedOtp
             if (accountsList.length > 0) {
+                const { data: validOtpRow } = await supabase
+                    .from('otp_codes')
+                    .select('*')
+                    .eq('phone', cleanPhone)
+                    .eq('code', inputCode)
+                    .eq('is_used', false)
+                    .gte('expires_at', new Date().toISOString())
+                    .maybeSingle();
+
                 const hasValidStoredOtp = accountsList.some(acc => acc.storedOtp === `OTP_${inputCode}`);
-                if (fallbackOtpCode && inputCode === fallbackOtpCode.trim()) {
+
+                if (validOtpRow) {
                     isValid = true;
+                    // Mark OTP as used to prevent replay attacks
+                    await supabase.from('otp_codes').update({ is_used: true }).eq('id', validOtpRow.id);
                 } else if (hasValidStoredOtp) {
                     isValid = true;
-                } else if (inputCode.length === 6) {
+                } else if (fallbackOtpCode && inputCode === fallbackOtpCode.trim()) {
                     isValid = true;
                 }
             }

@@ -14,6 +14,7 @@ import {
     Animated,
     ActionSheetIOS,
     KeyboardAvoidingView,
+    Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ import VideoBackground from '../components/VideoBackground';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
+import BiSlideButton from '../components/BiSlideButton';
 
 const { width } = Dimensions.get('window');
 
@@ -68,6 +70,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const targetTeamId = route?.params?.teamId || user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
 
     const [loading, setLoading] = useState(false);
+    const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [leagues, setLeagues] = useState<any[]>(LEAGUE_OPTIONS);
     const [tournaments, setTournaments] = useState<any[]>([]);
     const [teams, setTeams] = useState<any[]>([]);
@@ -83,6 +86,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     });
 
     const checkTimerRef = useRef<any>(null);
+    const passportNumberInputRef = useRef<TextInput>(null);
 
     const [organizations, setOrganizations] = useState<any[]>([]);
 
@@ -128,6 +132,44 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
         photo: null as string | null
     });
 
+    // Custom Status Modal State (Replaces Default Alert)
+    const [statusModal, setStatusModal] = useState<{
+        visible: boolean;
+        type: 'success' | 'error' | 'info';
+        title: string;
+        message: string;
+        onClose?: () => void;
+    }>({
+        visible: false,
+        type: 'info',
+        title: '',
+        message: ''
+    });
+
+    const showNotice = (type: 'success' | 'error' | 'info', title: string, message: string, onClose?: () => void) => {
+        setStatusModal({ visible: true, type, title, message, onClose });
+    };
+
+    const openTelegramBot = async (phone?: string) => {
+        try {
+            const cleanDigits = (phone || formData.phone || '').replace(/\D/g, '').slice(-9);
+            const startParam = cleanDigits ? `status_${cleanDigits}` : '';
+            const webUrl = `https://t.me/amatora_bot${startParam ? `?start=${startParam}` : ''}`;
+            const nativeUrl = `tg://resolve?domain=amatora_bot${startParam ? `&start=${startParam}` : ''}`;
+
+            try {
+                await Linking.openURL(nativeUrl);
+            } catch (nativeErr) {
+                await Linking.openURL(webUrl);
+            }
+        } catch (e) {
+            console.warn('Telegram deep link error:', e);
+            try {
+                await Linking.openURL('https://t.me/amatora_bot');
+            } catch (err2) {}
+        }
+    };
+
     // Dropdown animation state
     const [isOrgDropdownOpen, setIsOrgDropdownOpen] = useState(false);
     const orgAnimVal = useRef(new Animated.Value(0)).current;
@@ -145,11 +187,21 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const loadOrganizations = async () => {
         try {
             const orgs = await apiService.getOrganizations();
-            if (orgs && orgs.length > 0) {
-                setOrganizations(orgs);
+            const availableOrgs = orgs || [];
+            setOrganizations(availableOrgs);
+
+            if (availableOrgs.length > 0) {
+                const firstOrg = availableOrgs[0];
+                handleOrgSelect(firstOrg);
+            } else {
+                setFormData(prev => ({ ...prev, selectedOrgId: 1, selectedOrgName: 'Havas Futbol Ligasi' }));
+                const lData = await apiService.getLeaguesByOrgId(1);
+                setLeagues(lData && lData.length > 0 ? lData : LEAGUE_OPTIONS);
             }
         } catch (e) {
             console.warn('Load orgs error:', e);
+            setFormData(prev => ({ ...prev, selectedOrgId: 1, selectedOrgName: 'Havas Futbol Ligasi' }));
+            setLeagues(LEAGUE_OPTIONS);
         }
     };
 
@@ -181,13 +233,15 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
         setValidationResult({ isChecked: false, isValid: false, message: '' });
     };
 
-    const triggerValidation = (type: 'player' | 'team', firstNameVal: string, teamNameVal: string, phoneVal: string) => {
+    const triggerValidation = (type: 'player' | 'team', teamNameVal?: string, phoneVal?: string) => {
         if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
 
-        const cleanPhone = phoneVal.replace(/\D/g, '').slice(-9);
+        const safePhone = phoneVal !== undefined ? phoneVal : (formData.phone || '');
+        const safeTeamName = teamNameVal !== undefined ? teamNameVal : (formData.teamName || '');
+        const cleanPhone = String(safePhone).replace(/\D/g, '').slice(-9);
 
         if (type === 'team') {
-            if (teamNameVal.trim().length < 2 || cleanPhone.length < 9) {
+            if (safeTeamName.trim().length < 2 || cleanPhone.length < 9) {
                 setValidationResult({ isChecked: false, isValid: false, message: '' });
                 return;
             }
@@ -201,8 +255,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
         setIsValidating(true);
         checkTimerRef.current = setTimeout(async () => {
             const res = await apiService.checkTeamOrPhoneExists({
-                teamName: teamNameVal,
-                phone: phoneVal,
+                teamName: safeTeamName,
+                phone: cleanPhone,
                 type: type
             });
             setIsValidating(false);
@@ -261,17 +315,15 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             selectedLeague: '',
             selectedTeam: ''
         }));
-        setLeagues([]);
         setTeams([]);
 
         try {
             setLoadingData(true);
             const lData = await apiService.getLeaguesByOrgId(org.id);
-            setLeagues(lData || []);
-            setIsLeagueDropdownOpen(true);
+            setLeagues(lData && lData.length > 0 ? lData : LEAGUE_OPTIONS);
         } catch (err) {
             console.warn('Error loading org leagues:', err);
-            setLeagues([]);
+            setLeagues(LEAGUE_OPTIONS);
         } finally {
             setLoadingData(false);
         }
@@ -401,24 +453,25 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const handleSubmit = async () => {
         // Validation matching web application
         if (!formData.phone || formData.phone.length < 9) {
-            Alert.alert('Xato', 'Telefon raqamini to\'liq kiriting (masalan: 901234567)');
+            showNotice('error', 'XATO', 'Telefon raqamini to\'liq kiriting');
             return;
         }
 
         if (applicationType === 'player') {
             if (!formData.firstName.trim() || !formData.lastName.trim()) {
-                Alert.alert('Xato', 'Iltimos, Ism va Familiyangizni to\'ldiring');
+                showNotice('error', 'XATO', 'Ism va familiyangizni to\'ldiring');
                 return;
             }
         } else {
             if (!formData.teamName.trim()) {
-                Alert.alert('Xato', 'Iltimos, Jamoa nomini kiriting');
+                showNotice('error', 'XATO', 'Jamoa nomini kiriting');
                 return;
             }
         }
 
         try {
             setLoading(true);
+            setSubmitStatus('loading');
 
             // Upload photos if present
             let photoUrl = formData.photo;
@@ -473,31 +526,35 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 const response = await apiService.createApplication(applicationPayload);
 
                 if (response && response.success) {
-                    Alert.alert(
-                        'Zayavkangiz qabul qilindi!',
-                        'Barcha ma\'lumotlar muvaffaqiyatli saqlandi. Admin ko\'rib chiqqach siz bilan bog\'lanadi.',
-                        [{ text: 'TUSHUNDIM', onPress: () => navigation.goBack() }]
+                    setSubmitStatus('success');
+                    showNotice(
+                        'success',
+                        'ARIZANGIZ QABUL QILINDI',
+                        'Arizangiz qabul qilindi. Tashkilotchilar tomonidan ko\'rib chiqilib sizga xabar beriladi.',
+                        () => {
+                            openTelegramBot(formattedPhone);
+                            navigation.goBack();
+                        }
                     );
                 } else {
-                    throw new Error('Server error');
+                    setSubmitStatus('error');
+                    throw new Error('Player application failed');
                 }
             } else {
-                // Team Mode
-                const teamPayload = {
+                const defaultTeamLogo = 'https://xzzyhfyazwohdqqbjiiy.supabase.co/storage/v1/object/public/sponsors/jd017tpq0c8.png';
+                const teamPayload: any = {
                     organization_id: formData.selectedOrgId || 1,
                     name: formData.teamName.trim(),
-                    league: formData.selectedLeague || 'Super liga',
-                    logo_url: teamLogoUrl || '',
                     captain_phone: formattedPhone,
+                    logo_url: teamLogoUrl || defaultTeamLogo,
+                    league: formData.selectedLeague || 'Super liga',
                     status: 'pending'
                 };
 
-                const teamResponse = await apiService.createTeam(teamPayload);
+                const createdTeam = await apiService.createTeam(teamPayload);
+                const newTeamId = createdTeam?.id || createdTeam?._id || createdTeam?.data?.id || createdTeam?.data?._id;
 
-                if (teamResponse && teamResponse.success) {
-                    const newTeamId = teamResponse.data?.id;
-
-                    // Insert squad players into applications table linked by team_id & organization_id
+                if (newTeamId) {
                     if (uploadedSquad && uploadedSquad.length > 0) {
                         const squadApplications = uploadedSquad.map((p: any) => ({
                             organization_id: formData.selectedOrgId || 1,
@@ -518,18 +575,25 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                         await Promise.all(squadApplications.map((app: any) => apiService.createApplication(app)));
                     }
 
-                    Alert.alert(
-                        'Jamoa zayavkasi qabul qilindi!',
-                        'Jamoangiz muvaffaqiyatli ro\'yxatga olindi. Admin ko\'rib chiqqach tasdiqlaydi.',
-                        [{ text: 'TUSHUNDIM', onPress: () => navigation.goBack() }]
+                    setSubmitStatus('success');
+                    showNotice(
+                        'success',
+                        'ARIZANGIZ QABUL QILINDI',
+                        'Arizangiz qabul qilindi. Tashkilotchilar tomonidan ko\'rib chiqilib sizga xabar beriladi.',
+                        () => {
+                            openTelegramBot(formattedPhone);
+                            navigation.goBack();
+                        }
                     );
                 } else {
+                    setSubmitStatus('error');
                     throw new Error('Team creation failed');
                 }
             }
         } catch (error: any) {
+            setSubmitStatus('error');
             console.error('Submit application error:', error);
-            Alert.alert('Xato', 'Zayavka yuborishda xatolik yuz berdi. Ma\'lumotlarni tekshirib qayta urinib ko\'ring.');
+            showNotice('error', 'XATOLIK', 'Ariza yuborishda xatolik bo\'ldi.');
         } finally {
             setLoading(false);
         }
@@ -724,11 +788,10 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                             </View>
                         )}
 
-                        {/* STEP 2: TURNIR TANLASH (EXPANDABLE SELECT - SHOWN AFTER ORG IS SELECTED) */}
+                        {/* STEP 2: TURNIR TANLASH (EXPANDABLE SELECT) */}
                         {!targetTeamId && (
                             <>
-                                {formData.selectedOrgId ? (
-                                    <View style={styles.card}>
+                                <View style={styles.card}>
                                         <View style={styles.cardTitleRow}>
                                             <Ionicons name="trophy" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
                                             <Text style={styles.cardTitle}>2. TURNIR (LIGA) TANLASH</Text>
@@ -831,16 +894,14 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             </ScrollView>
                                         </Animated.View>
                                     </View>
-                                ) : null}
 
-                                {/* STEP 3: JAMOA TANLASH (SHOWN AFTER LEAGUE IS SELECTED FOR PLAYER APPLICATION) */}
+                                {/* STEP 3: JAMOA TANLASH */}
                                 {applicationType === 'player' && (
-                                    formData.selectedLeague ? (
-                                        <View style={styles.card}>
-                                            <View style={styles.cardTitleRow}>
-                                                <Ionicons name="shield" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                                <Text style={styles.cardTitle}>3. JAMOA TANLASH</Text>
-                                            </View>
+                                    <View style={styles.card}>
+                                        <View style={styles.cardTitleRow}>
+                                            <Ionicons name="shield" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+                                            <Text style={styles.cardTitle}>3. JAMOA TANLASH</Text>
+                                        </View>
                                             
                                             <TouchableOpacity
                                                 style={styles.leagueSelectTrigger}
@@ -942,10 +1003,9 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                 </ScrollView>
                                             </Animated.View>
                                         </View>
-                                    ) : null
-                                )}
-                            </>
-                        )}
+                                     )}
+                             </>
+                         )}
 
                         {/* MODE 1: YAKKAXON OYINCHI FORM */}
                         {applicationType === 'player' ? (
@@ -964,7 +1024,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             value={formData.firstName}
                                             onChangeText={(t) => {
                                                 setFormData({ ...formData, firstName: t });
-                                                triggerValidation('player', t, formData.teamName, formData.phone);
+                                                triggerValidation('player', formData.teamName, formData.phone);
                                             }}
                                             placeholder="Masalan: Alisher"
                                             placeholderTextColor="rgba(255,255,255,0.3)"
@@ -985,7 +1045,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                     if (cleaned.length <= 9) {
                                                         const newPhone = cleaned;
                                                         setFormData({ ...formData, phone: newPhone });
-                                                        triggerValidation('player', formData.firstName, formData.teamName, newPhone);
+                                                        triggerValidation('player', formData.teamName, newPhone);
                                                     }
                                                 }}
                                                 placeholder="90 123 45 67"
@@ -1183,21 +1243,17 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             </View>
                                         </View>
 
-                                        {/* SUBMIT BUTTON */}
-                                        <TouchableOpacity
-                                            style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-                                            onPress={handleSubmit}
-                                            disabled={loading}
-                                        >
-                                            {loading ? (
-                                                <ActivityIndicator color="#000" />
-                                            ) : (
-                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <Ionicons name="checkmark-circle" size={22} color="#000" style={{ marginRight: 8 }} />
-                                                    <Text style={styles.submitBtnText}>ZAYAVKANI YUBORISH</Text>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
+                                        {/* BI-DIRECTIONAL SLIDE BUTTON (CENTER START: LEFT CANCEL | RIGHT SUBMIT) */}
+                                        <BiSlideButton
+                                            loading={loading}
+                                            status={submitStatus}
+                                            submitTitle="Yuborish"
+                                            cancelTitle="Bekor qilish"
+                                            helperText="Bekor qilish uchun chapga, yuborish uchun o'ngga suring"
+                                            onSwipeSubmit={handleSubmit}
+                                            onSwipeCancel={() => navigation.goBack()}
+                                            onReset={() => setSubmitStatus('idle')}
+                                        />
                                     </>
                                 )}
                             </>
@@ -1355,21 +1411,17 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             </TouchableOpacity>
                                         </View>
 
-                                        {/* SUBMIT BUTTON */}
-                                        <TouchableOpacity
-                                            style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-                                            onPress={handleSubmit}
-                                            disabled={loading}
-                                        >
-                                            {loading ? (
-                                                <ActivityIndicator color="#000" />
-                                            ) : (
-                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <Ionicons name="checkmark-circle" size={22} color="#000" style={{ marginRight: 8 }} />
-                                                    <Text style={styles.submitBtnText}>ZAYAVKANI YUBORISH</Text>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
+                                        {/* BI-DIRECTIONAL SLIDE BUTTON (CENTER START: LEFT CANCEL | RIGHT SUBMIT) */}
+                                        <BiSlideButton
+                                            loading={loading}
+                                            status={submitStatus}
+                                            submitTitle="Yuborish"
+                                            cancelTitle="Bekor qilish"
+                                            helperText="Bekor qilish uchun chapga, yuborish uchun o'ngga suring"
+                                            onSwipeSubmit={handleSubmit}
+                                            onSwipeCancel={() => navigation.goBack()}
+                                            onReset={() => setSubmitStatus('idle')}
+                                        />
                                     </>
                                 )}
                             </>
@@ -1518,6 +1570,75 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                 <Text style={styles.saveModalBtnText}>QO'SHISH</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* CUSTOM STATUS NOTICE MODAL (REPLACES DEFAULT ALERT) */}
+            <Modal
+                transparent
+                visible={statusModal.visible}
+                animationType="fade"
+                onRequestClose={() => {
+                    setStatusModal(prev => ({ ...prev, visible: false }));
+                    if (statusModal.onClose) statusModal.onClose();
+                }}
+            >
+                <View style={styles.modalBackdrop}>
+                    <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={[
+                        styles.noticeModalCard,
+                        statusModal.type === 'success' && { borderColor: 'rgba(0,255,102,0.4)' },
+                        statusModal.type === 'error' && { borderColor: 'rgba(255,59,48,0.4)' }
+                    ]}>
+                        <TouchableOpacity
+                            style={styles.noticeCloseBtn}
+                            onPress={() => {
+                                setStatusModal(prev => ({ ...prev, visible: false }));
+                                if (statusModal.onClose) statusModal.onClose();
+                            }}
+                        >
+                            <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
+                        </TouchableOpacity>
+
+                        <View style={styles.noticeHeaderRow}>
+                            <View style={[
+                                styles.noticeIconBox,
+                                statusModal.type === 'success' && { backgroundColor: 'rgba(0,255,102,0.15)' },
+                                statusModal.type === 'error' && { backgroundColor: 'rgba(255,59,48,0.15)' }
+                            ]}>
+                                <Ionicons
+                                    name={statusModal.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                                    size={24}
+                                    color={statusModal.type === 'success' ? '#00FF66' : '#FF3B30'}
+                                />
+                            </View>
+                            <Text style={styles.noticeTitleText}>{statusModal.title}</Text>
+                        </View>
+
+                        <Text style={styles.noticeBodyText}>{statusModal.message}</Text>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.noticeActionBtn,
+                                statusModal.type === 'success' && { backgroundColor: '#0088cc', width: '100%', borderRadius: 14, height: 46, flexDirection: 'row' },
+                                statusModal.type === 'error' && { backgroundColor: '#FF3B30' }
+                            ]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                setStatusModal(prev => ({ ...prev, visible: false }));
+                                if (statusModal.onClose) statusModal.onClose();
+                            }}
+                        >
+                            {statusModal.type === 'success' ? (
+                                <>
+                                    <Ionicons name="paper-plane" size={16} color="#FFF" style={{ marginRight: 8 }} />
+                                    <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 }}>BOTGA O'TISH</Text>
+                                </>
+                            ) : (
+                                <Ionicons name="checkmark" size={18} color="#FFF" />
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -1877,6 +1998,13 @@ const styles = StyleSheet.create({
     submitBtnText: { color: '#000', fontSize: 15, fontWeight: '900', letterSpacing: 1 },
 
     // Modal
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 16,
+    },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.85)',
@@ -1942,5 +2070,68 @@ const styles = StyleSheet.create({
     orgOptionTextActive: {
         color: '#00FF66',
         fontWeight: '900',
+    },
+
+    // Custom Status Notice Modal Styles
+    noticeModalCard: {
+        width: '84%',
+        backgroundColor: '#0E1217',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        padding: 20,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    noticeCloseBtn: {
+        position: 'absolute',
+        top: 14,
+        right: 14,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
+    noticeHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        marginTop: 4,
+    },
+    noticeIconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    noticeTitleText: {
+        color: '#FFF',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+    },
+    noticeBodyText: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 13,
+        fontWeight: '500',
+        textAlign: 'center',
+        lineHeight: 18,
+        marginBottom: 20,
+    },
+    noticeActionBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

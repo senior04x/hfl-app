@@ -12,7 +12,8 @@ import {
     TextInput,
     Alert,
     StatusBar,
-    Platform
+    Platform,
+    Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +37,9 @@ export default function TeamProfileScreen({ route, navigation }: any) {
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(!initialTeam);
+    const [selectedPlayerForPhone, setSelectedPlayerForPhone] = useState<any | null>(null);
+    const [phoneInputText, setPhoneInputText] = useState('');
+    const [savingPhone, setSavingPhone] = useState(false);
     const { user, unreadCount, isChatMuted } = useAuthStore();
     const { socket } = useSocket();
     
@@ -78,7 +82,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             socket.emit('join-team', activeTeamId);
             socket.on('formation-updated', (data: any) => {
                 if (data.teamId === activeTeamId) {
-                    setTeam(prev => prev ? { ...prev, formation: data.formation } : null);
+                    setTeam((prev: any) => prev ? { ...prev, formation: data.formation } : null);
                 }
             });
             return () => {
@@ -167,26 +171,52 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             </View>
 
             <View style={styles.squadGrid}>
-                {players.map((player: any, idx: number) => (
-                    <TouchableOpacity
-                        key={player._id || player.id || idx}
-                        style={styles.playerCard}
-                        onPress={() => navigation.navigate('PlayerStats', { playerId: player._id || player.id, player })}
-                    >
-                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                        <View style={styles.playerPhotoContainer}>
-                            <SmartImage uri={player.photo || player.photo_url || player.avatar} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person" />
-                            <View style={styles.playerNumberBadge}>
-                                <Text style={styles.playerNumberText}>#{player.number || player.player_number || player.shirt_number || '10'}</Text>
+                {players.map((player: any, idx: number) => {
+                    const pPhone = player.phone || player.phoneNumber || player.phone_number || player.tel;
+                    return (
+                        <TouchableOpacity
+                            key={player._id || player.id || idx}
+                            style={styles.playerCard}
+                            onPress={() => navigation.navigate('PlayerStats', { playerId: player._id || player.id, player })}
+                        >
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={styles.playerPhotoContainer}>
+                                <SmartImage uri={player.photo || player.photo_url || player.avatar} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person" />
+                                <View style={styles.playerNumberBadge}>
+                                    <Text style={styles.playerNumberText}>#{player.number || player.player_number || player.shirt_number || '10'}</Text>
+                                </View>
                             </View>
-                        </View>
-                        <View style={styles.playerInfo}>
-                            <Text style={styles.playerCardName} numberOfLines={1}>{(player.firstName || player.name || player.first_name || 'Futbolchi').toUpperCase()}</Text>
-                            <Text style={styles.playerCardLastName} numberOfLines={1}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
-                            <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position || 'O\'yinchi').toUpperCase()}</Text>
-                        </View>
-                    </TouchableOpacity>
-                ))}
+                            <View style={styles.playerInfo}>
+                                <Text style={styles.playerCardName} numberOfLines={1}>{(player.firstName || player.name || player.first_name || 'Futbolchi').toUpperCase()}</Text>
+                                <Text style={styles.playerCardLastName} numberOfLines={1}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
+                                <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position || 'O\'yinchi').toUpperCase()}</Text>
+
+                                {/* PHONE BADGE / ADD PHONE BUTTON */}
+                                <View style={{ marginTop: 6, width: '100%' }}>
+                                    {pPhone ? (
+                                        <View style={styles.phoneBadgeContainer}>
+                                            <Ionicons name="call" size={10} color="#00FF87" style={{ marginRight: 4 }} />
+                                            <Text style={styles.phoneBadgeText} numberOfLines={1}>{pPhone}</Text>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={styles.addPhoneBtn}
+                                            activeOpacity={0.7}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedPlayerForPhone(player);
+                                                setPhoneInputText('');
+                                            }}
+                                        >
+                                            <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
+                                            <Text style={styles.addPhoneBtnText}>+ TEL</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
         </View>
     );
@@ -219,6 +249,86 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                     {/* Matches and Tactics can be added/glassified here */}
                 </View>
             </ScrollView>
+
+            {/* ADD PHONE MODAL */}
+            <Modal
+                visible={!!selectedPlayerForPhone}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSelectedPlayerForPhone(null)}
+            >
+                <View style={styles.phoneModalOverlay}>
+                    <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={styles.phoneModalCard}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                            <Ionicons name="call" size={20} color="#00FF87" style={{ marginRight: 8 }} />
+                            <Text style={styles.phoneModalTitle}>TEL RAQAM QO'SHISH</Text>
+                        </View>
+
+                        <Text style={styles.phoneModalSub}>
+                            {(selectedPlayerForPhone?.firstName || selectedPlayerForPhone?.first_name || selectedPlayerForPhone?.name || 'O\'yinchi')} uchun 9 xonali telefon raqam:
+                        </Text>
+
+                        <View style={styles.phoneInputRow}>
+                            <Text style={styles.phonePrefixText}>+998</Text>
+                            <TextInput
+                                style={styles.phoneInput}
+                                value={phoneInputText}
+                                onChangeText={setPhoneInputText}
+                                keyboardType="phone-pad"
+                                maxLength={9}
+                                placeholder="901234567"
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                autoFocus
+                            />
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 18, width: '100%' }}>
+                            <TouchableOpacity
+                                style={styles.cancelPhoneBtn}
+                                onPress={() => setSelectedPlayerForPhone(null)}
+                            >
+                                <Ionicons name="close" size={18} color="#FF3B30" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.savePhoneBtn}
+                                disabled={savingPhone}
+                                onPress={async () => {
+                                    if (phoneInputText.length < 9) {
+                                        Alert.alert('Xato', 'Iltimos, 9 xonali telefon raqamini kiriting.');
+                                        return;
+                                    }
+                                    try {
+                                        setSavingPhone(true);
+                                        const fullPhone = `+998${phoneInputText.replace(/\D/g, '')}`;
+                                        const pId = selectedPlayerForPhone.id || selectedPlayerForPhone._id;
+                                        const res = await apiService.updatePlayerPhone(pId, fullPhone);
+                                        if (res.success) {
+                                            setPlayers((prev: any[]) => prev.map((p: any) => (p.id === pId || p._id === pId) ? { ...p, phone: fullPhone } : p));
+                                            setSelectedPlayerForPhone(null);
+                                            setPhoneInputText('');
+                                            Alert.alert("Muvaffaqiyatli", "Telefon raqami saqlandi!");
+                                        } else {
+                                            Alert.alert('Xato', res.error || 'Saqlashda xatolik');
+                                        }
+                                    } catch (err: any) {
+                                        Alert.alert('Xato', 'Server bilan bog\'lanishda xatolik');
+                                    } finally {
+                                        setSavingPhone(false);
+                                    }
+                                }}
+                            >
+                                {savingPhone ? (
+                                    <ActivityIndicator size="small" color="#050A14" />
+                                ) : (
+                                    <Ionicons name="checkmark" size={18} color="#050A14" />
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -257,7 +367,7 @@ const styles = StyleSheet.create({
     sectionCount: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
     squadGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
     playerCard: { width: (width - 55) / 2, borderRadius: 30, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-    playerPhotoContainer: { width: '100%', height: 160, position: 'relative', overflow: 'hidden', borderRadius: 20 },
+    playerPhotoContainer: { width: '100%', height: 130, position: 'relative', overflow: 'hidden', borderRadius: 20 },
     playerPhoto: { width: '100%', height: '100%' },
     playerNumberBadge: { position: 'absolute', bottom: 8, right: 8, backgroundColor: Colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
     playerNumberText: { color: '#000', fontSize: 12, fontWeight: '900' },
@@ -285,4 +395,109 @@ const styles = StyleSheet.create({
         fontSize: 9,
         fontWeight: '900',
     },
+    phoneBadgeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 135, 0.3)',
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        borderRadius: 8,
+        alignSelf: 'flex-start'
+    },
+    phoneBadgeText: {
+        color: '#00FF87',
+        fontWeight: '900',
+        fontSize: 10,
+        letterSpacing: 0.3
+    },
+    addPhoneBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 215, 0, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.4)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        alignSelf: 'flex-start'
+    },
+    addPhoneBtnText: {
+        color: '#FFD700',
+        fontWeight: '900',
+        fontSize: 9,
+        letterSpacing: 0.5
+    },
+    phoneModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20
+    },
+    phoneModalCard: {
+        width: '100%',
+        maxWidth: 320,
+        backgroundColor: '#0F1626',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        padding: 20,
+        alignItems: 'center'
+    },
+    phoneModalTitle: {
+        color: '#FFF',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 0.5
+    },
+    phoneModalSub: {
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: 14
+    },
+    phoneInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.07)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        height: 46,
+        paddingHorizontal: 14,
+        width: '100%'
+    },
+    phonePrefixText: {
+        color: '#00FF87',
+        fontSize: 15,
+        fontWeight: '900',
+        marginRight: 8
+    },
+    phoneInput: {
+        flex: 1,
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '800'
+    },
+    cancelPhoneBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 59, 48, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 59, 48, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    savePhoneBtn: {
+        flex: 1,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#00FF87',
+        alignItems: 'center',
+        justifyContent: 'center'
+    }
 });

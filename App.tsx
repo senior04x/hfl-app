@@ -1,6 +1,7 @@
 import 'expo-dev-client';
 import React from 'react';
 import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,6 +9,7 @@ import { useAuthStore } from './store/useAuthStore';
 import { createStackNavigator } from '@react-navigation/stack';
 import AppNavigator from './navigation/AppNavigator';
 import AuthNavigator from './navigation/AuthNavigator';
+import WelcomeScreen from './screens/WelcomeScreen';
 import JoinApplicationScreen from './screens/JoinApplicationScreen';
 import MyStatsScreen from './screens/MyStatsScreen';
 import TransferRequestScreen from './screens/TransferRequestScreen';
@@ -22,6 +24,8 @@ import NewsDetailScreen from './screens/NewsDetailScreen';
 import MatchDetailScreen from './screens/MatchDetailScreen';
 import CalendarMatchesScreen from './screens/CalendarMatchesScreen';
 import TeamProfileScreen from './screens/TeamProfileScreen';
+import MyTeamScreen from './screens/MyTeamScreen';
+import ApplicationsScreen from './screens/ApplicationsScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
 import { notificationService } from './services/notificationService';
@@ -67,55 +71,62 @@ export default function App() {
     }
 
     return (
-        <SafeAreaProvider style={{ backgroundColor: '#000' }}>
-            <SocketProvider>
-                <VideoBackground
-                    source={require('./assets/images/welcomeScreenVideo1.mp4')}
-                    overlayOpacity={0.78}
-                    style={StyleSheet.absoluteFill}
-                >
-                    <NavigationContainer theme={{
-                        ...DarkTheme,
-                        colors: {
-                            ...DarkTheme.colors,
-                            primary: Colors.primary,
-                            background: 'transparent',
-                            card: 'transparent',
-                            text: Colors.text,
-                            border: Colors.border,
-                            notification: Colors.danger,
-                        }
-                    }}>
-                        {isAuthenticated || isGuest ? (
-                            <Stack.Navigator 
-                                screenOptions={{ 
-                                    headerShown: false,
-                                    cardStyle: { backgroundColor: 'transparent' }
-                                }}
-                            >
-                                <Stack.Screen name="MainTabs" component={AppNavigator} />
-                                <Stack.Screen name="JoinApplication" component={JoinApplicationScreen} />
-                                <Stack.Screen name="MyStats" component={MyStatsScreen} />
-                                <Stack.Screen name="TransferRequest" component={TransferRequestScreen} />
-                                <Stack.Screen name="FormationBoard" component={FormationBoard} />
-                                <Stack.Screen name="TeamChat" component={TeamChatScreen} />
-                                <Stack.Screen name="Standings" component={StandingsScreen} />
-                                <Stack.Screen name="TournamentDetail" component={TournamentDetailScreen} />
-                                <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
-                                <Stack.Screen name="MatchDetail" component={MatchDetailScreen} />
-                                <Stack.Screen name="CalendarMatches" component={CalendarMatchesScreen} />
-                                <Stack.Screen name="Teams" component={TeamsScreen} />
-                                <Stack.Screen name="TeamProfile" component={TeamProfileScreen} />
-                                <Stack.Screen name="Players" component={PlayersScreen} />
-                                <Stack.Screen name="PlayerStats" component={PlayerStatsScreen} />
-                            </Stack.Navigator>
-                        ) : (
-                            <AuthNavigator />
-                        )}
-                        <StatusBar style="light" />
-                    </NavigationContainer>
-                </VideoBackground>
-            </SocketProvider>
-        </SafeAreaProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider style={{ backgroundColor: '#000' }}>
+                <SocketProvider>
+                    <VideoBackground
+                        source={require('./assets/images/welcomeScreenVideo1.mp4')}
+                        overlayOpacity={0.78}
+                        style={StyleSheet.absoluteFill}
+                    >
+                        <NavigationContainer 
+                            key={isAuthenticated ? `auth_user_${(user as any)?._id || (user as any)?.id}` : (isGuest ? 'guest' : 'unauth')}
+                            theme={{
+                            ...DarkTheme,
+                            colors: {
+                                ...DarkTheme.colors,
+                                primary: Colors.primary,
+                                background: 'transparent',
+                                card: 'transparent',
+                                text: Colors.text,
+                                border: Colors.border,
+                                notification: Colors.danger,
+                            }
+                        }}>
+                            {isAuthenticated || isGuest ? (
+                                <Stack.Navigator 
+                                    screenOptions={{ 
+                                        headerShown: false,
+                                        cardStyle: { backgroundColor: 'transparent' }
+                                    }}
+                                >
+                                    <Stack.Screen name="MainTabs" component={AppNavigator} />
+                                    <Stack.Screen name="Welcome" component={WelcomeScreen} />
+                                    <Stack.Screen name="JoinApplication" component={JoinApplicationScreen} />
+                                    <Stack.Screen name="MyStats" component={MyStatsScreen} />
+                                    <Stack.Screen name="TransferRequest" component={TransferRequestScreen} />
+                                    <Stack.Screen name="Applications" component={ApplicationsScreen} />
+                                    <Stack.Screen name="FormationBoard" component={FormationBoard} />
+                                    <Stack.Screen name="TeamChat" component={TeamChatScreen} />
+                                    <Stack.Screen name="Standings" component={StandingsScreen} />
+                                    <Stack.Screen name="TournamentDetail" component={TournamentDetailScreen} />
+                                    <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
+                                    <Stack.Screen name="MatchDetail" component={MatchDetailScreen} />
+                                    <Stack.Screen name="CalendarMatches" component={CalendarMatchesScreen} />
+                                    <Stack.Screen name="Teams" component={TeamsScreen} />
+                                    <Stack.Screen name="TeamProfile" component={TeamProfileScreen} />
+                                    <Stack.Screen name="MyTeam" component={MyTeamScreen} />
+                                    <Stack.Screen name="Players" component={PlayersScreen} />
+                                    <Stack.Screen name="PlayerStats" component={PlayerStatsScreen} />
+                                </Stack.Navigator>
+                            ) : (
+                                <AuthNavigator />
+                            )}
+                            <StatusBar style="light" />
+                        </NavigationContainer>
+                    </VideoBackground>
+                </SocketProvider>
+            </SafeAreaProvider>
+        </GestureHandlerRootView>
     );
 }

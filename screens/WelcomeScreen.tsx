@@ -18,6 +18,7 @@ import {
     ImageBackground,
     Linking,
     ScrollView,
+    AppState,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -124,11 +125,33 @@ export default function WelcomeScreen({ navigation }: any) {
     // Account Selection Modal State
     const [accountOptions, setAccountOptions] = useState<any[]>([]);
     const [showAccountModal, setShowAccountModal] = useState(false);
+    const [showBotModal, setShowBotModal] = useState(false);
+    const [showNotFoundModal, setShowNotFoundModal] = useState(false);
+    const [notFoundMessage, setNotFoundMessage] = useState('');
 
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
     const [loading, setLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(60);
     const timerRef = useRef<any>(null);
+    const endTimeRef = useRef<number>(0);
+
+    const updateTimer = () => {
+        if (!endTimeRef.current) return;
+        const diff = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+        setResendTimer(diff);
+        if (diff <= 0 && timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
+    const startTimer = () => {
+        endTimeRef.current = Date.now() + 60 * 1000;
+        setResendTimer(60);
+        if (timerRef.current) clearInterval(timerRef.current);
+        updateTimer();
+        timerRef.current = setInterval(updateTimer, 1000);
+    };
 
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
@@ -140,26 +163,19 @@ export default function WelcomeScreen({ navigation }: any) {
             () => setKeyboardVisible(false)
         );
 
+        const appStateListener = AppState.addEventListener('change', (nextAppState) => {
+            if (nextAppState === 'active') {
+                updateTimer();
+            }
+        });
+
         return () => {
             keyboardDidHideListener.remove();
             keyboardDidShowListener.remove();
+            appStateListener.remove();
             if (timerRef.current) clearInterval(timerRef.current);
         };
     }, []);
-
-    const startTimer = () => {
-        setResendTimer(60);
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-            setResendTimer((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timerRef.current);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-    };
 
     const handleLoginPress = () => {
         setIsLoginMode(true);
@@ -171,85 +187,125 @@ export default function WelcomeScreen({ navigation }: any) {
     const openTelegramDeepLink = async (targetPhone: string, codeToPass: string) => {
         const cleanDigits = targetPhone.replace(/\D/g, '').slice(-9);
         const startParam = codeToPass ? `login_${cleanDigits}_${codeToPass}` : `login_${cleanDigits}`;
-        const nativeUrl = `tg://resolve?domain=havasmedialiga_bot&start=${startParam}`;
-        const webUrl = `https://t.me/havasmedialiga_bot?start=${startParam}`;
+        const nativeUrl = `tg://resolve?domain=amatora_bot&start=${startParam}`;
+        const webUrl = `https://t.me/amatora_bot?start=${startParam}`;
 
         try {
-            const canOpen = await Linking.canOpenURL(nativeUrl).catch(() => false);
-            if (canOpen) {
-                await Linking.openURL(nativeUrl);
-            } else {
-                await Linking.openURL(webUrl);
-            }
+            await Linking.openURL(nativeUrl);
         } catch (err) {
-            console.warn('Linking error, falling back to webUrl:', err);
             await Linking.openURL(webUrl).catch(() => {});
         }
     };
 
+    const performLogin = (acc: any) => {
+        const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || 1;
+        useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
+        setAuth({ ...acc, organizationId: Number(orgId) });
+        setShowAccountModal(false);
+        setShowBotModal(false);
+    };
+
+const formatPhoneInput = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 9);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
+    if (digits.length <= 7) return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;
+    return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 7)} ${digits.slice(7)}`;
+};
+
     const handleSendOTP = async () => {
-        if (phone.length < 9) {
+        const cleanDigits = phone.replace(/\D/g, '');
+        if (cleanDigits.length < 9) {
             Alert.alert('Xato', 'Iltimos, 9 xonali telefon raqamingizni kiriting.');
             return;
         }
 
         try {
             setLoading(true);
-            const fullPhone = `+998${phone.replace(/\D/g, '')}`;
+            const fullPhone = `+998${cleanDigits}`;
             
-            // Check if account exists in database
-            const res = await apiService.findAccountsByPhone(fullPhone);
+            const res = await apiService.requestOTP(fullPhone);
 
-            if (res.success && res.accounts && res.accounts.length > 0) {
-                if (res.accounts.length > 1) {
-                    setAccountOptions(res.accounts);
-                    setShowAccountModal(true);
-                } else if (res.user) {
-                    const orgId = res.user.organization_id || res.user.organizationId || res.user.team?.organization_id || 1;
-                    useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
-                    setAuth({ ...res.user, organizationId: Number(orgId) });
-                }
+            if (res.success) {
+                if (res.otpCode) setServerOtpCode(res.otpCode);
+                setShowBotModal(true);
             } else {
-                Alert.alert('Eslatma', res.reason || "Ushbu telefon raqamiga ariza topilmadi. Iltimos, avval ariza topshiring!");
+                setNotFoundMessage(res.reason || 'Ushbu telefon raqamiga tegishli ariza yoki jamoa topilmadi.');
+                setShowNotFoundModal(true);
             }
         } catch (error: any) {
             console.error('Phone login error:', error);
-            Alert.alert('Xato', 'Server bilan bog\'lanishda xatolik yuz berdi.');
+            Alert.alert('Xato', "Server bilan bog'lanishda xatolik yuz berdi.");
         } finally {
             setLoading(false);
         }
     };
 
+    const handleGoToBot = async () => {
+        setShowBotModal(false);
+        setLoginStep('otp');
+        startTimer();
+        try {
+            const cleanDigits = phone.replace(/\D/g, '').slice(-9);
+            const webUrl = `https://t.me/amatora_bot?start=login_${cleanDigits}`;
+            const nativeUrl = `tg://resolve?domain=amatora_bot&start=login_${cleanDigits}`;
+            await Linking.openURL(nativeUrl).catch(() => Linking.openURL(webUrl));
+        } catch (e) {}
+    };
+
+    const handleSkipBotModal = () => {
+        setShowBotModal(false);
+        setLoginStep('otp');
+        startTimer();
+    };
+
     const handleVerifyOTP = async () => {
-        if (otpCode.length < 6) {
-            Alert.alert('Xato', 'Iltimos, 6 xonali tasdiqlash kodini to\'liq kiriting.');
+        if (otpCode.length < 4) {
+            Alert.alert('Xato', 'Iltimos, 4 xonali tasdiqlash kodini kiriting.');
             return;
         }
 
         try {
             setLoading(true);
+            const fullPhone = `+998${phone.replace(/\D/g, '')}`;
             const inputCode = otpCode.trim();
 
-            if (inputCode === serverOtpCode) {
-                // OTP code matches!
-                if (accountOptions.length > 1) {
-                    setShowAccountModal(true);
-                } else if (accountOptions.length === 1) {
-                    const targetAcc = accountOptions[0];
-                    const orgId = targetAcc.organization_id || targetAcc.organizationId || targetAcc.team?.organization_id || 1;
-                    useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
-                    setAuth({ ...targetAcc, organizationId: Number(orgId) });
-                } else {
-                    const fullPhone = `+998${phone.replace(/\D/g, '')}`;
-                    const res = await apiService.findAccountsByPhone(fullPhone);
-                    if (res.user) {
-                        const orgId = res.user.organization_id || res.user.organizationId || res.user.team?.organization_id || 1;
-                        useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
-                        setAuth({ ...res.user, organizationId: Number(orgId) });
+            // 1. Avval otp_codes jadvalidan tekshirish
+            const cleanDigits = phone.replace(/\D/g, '').slice(-9);
+            let otpValid = false;
+            try {
+                const { data: otpRow } = await apiService.supabase
+                    .from('otp_codes')
+                    .select('*')
+                    .eq('phone', cleanDigits)
+                    .eq('code', inputCode)
+                    .eq('is_used', false)
+                    .maybeSingle();
+                if (otpRow && new Date(otpRow.expires_at) > new Date()) {
+                    otpValid = true;
+                    await apiService.supabase.from('otp_codes').update({ is_used: true }).eq('phone', cleanDigits);
+                }
+            } catch (e) {}
+
+            // 2. Fallback: serverOtpCode bilan solishtirish
+            if (!otpValid && serverOtpCode && inputCode === serverOtpCode) {
+                otpValid = true;
+            }
+
+            if (otpValid) {
+                const res = await apiService.findAccountsByPhone(fullPhone);
+                if (res.success) {
+                    if (res.multipleAccounts && res.accounts) {
+                        setAccountOptions(res.accounts);
+                        setShowAccountModal(true);
+                    } else if (res.user) {
+                        performLogin(res.user);
                     }
+                } else {
+                    Alert.alert('Xato', res.reason || 'Profil topilmadi.');
                 }
             } else {
-                Alert.alert('Xato', "Tasdiqlash kodi noto'g'ri. Iltimos, qayta kiring.");
+                Alert.alert('Xato', "Tasdiqlash kodi noto'g'ri yoki muddati o'tgan.");
             }
         } catch (error: any) {
             console.error('Verify OTP error:', error);
@@ -293,8 +349,8 @@ export default function WelcomeScreen({ navigation }: any) {
                                                         placeholderTextColor={Colors.textMuted}
                                                         keyboardType="number-pad"
                                                         value={phone}
-                                                        onChangeText={(t) => setPhone(t.replace(/\D/g, ''))}
-                                                        maxLength={9}
+                                                        onChangeText={(t) => setPhone(formatPhoneInput(t))}
+                                                        maxLength={12}
                                                     />
                                                 </View>
                                             </View>
@@ -310,10 +366,10 @@ export default function WelcomeScreen({ navigation }: any) {
                                                 <TouchableOpacity
                                                     style={[
                                                         styles.confirmButton,
-                                                        (phone.length < 9 || loading) && styles.confirmButtonDisabled
+                                                        (phone.replace(/\D/g, '').length < 9 || loading) && styles.confirmButtonDisabled
                                                     ]}
                                                     onPress={handleSendOTP}
-                                                    disabled={phone.length < 9 || loading}
+                                                    disabled={phone.replace(/\D/g, '').length < 9 || loading}
                                                 >
                                                     {loading ? (
                                                         <ActivityIndicator color="#000" />
@@ -329,19 +385,19 @@ export default function WelcomeScreen({ navigation }: any) {
                                     ) : (
                                         <>
                                             <Text style={styles.cardSubTitle}>
-                                                +998 {phone} raqamingizga SMS xabarnoma orqali 6 xonali tasdiqlash kodi yuborildi.
+                                                Telegram bot orqali 4 xonali tasdiqlash kodi yuborildi.
                                             </Text>
 
                                             <View style={styles.inputWrapper}>
                                                 <View style={styles.inputContainer}>
                                                     <TextInput
                                                         style={[styles.phoneInput, { textAlign: 'center', letterSpacing: 8, fontSize: 20, fontWeight: '900' }]}
-                                                        placeholder="000000"
+                                                        placeholder="0000"
                                                         placeholderTextColor={Colors.textMuted}
                                                         keyboardType="number-pad"
                                                         value={otpCode}
                                                         onChangeText={setOtpCode}
-                                                        maxLength={6}
+                                                        maxLength={4}
                                                         autoFocus
                                                     />
                                                 </View>
@@ -350,8 +406,9 @@ export default function WelcomeScreen({ navigation }: any) {
                                             {resendTimer > 0 ? (
                                                 <Text style={styles.timerText}>Qayta kod yuborish: {resendTimer}s</Text>
                                             ) : (
-                                                <TouchableOpacity onPress={handleSendOTP} style={{ marginBottom: 14 }}>
-                                                    <Text style={styles.resendBtnText}>🔄 Kodni qayta yuborish</Text>
+                                                <TouchableOpacity onPress={handleSendOTP} style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Ionicons name="refresh" size={16} color="#00FF87" style={{ marginRight: 6 }} />
+                                                    <Text style={styles.resendBtnText}>Kodni qayta yuborish</Text>
                                                 </TouchableOpacity>
                                             )}
 
@@ -366,10 +423,10 @@ export default function WelcomeScreen({ navigation }: any) {
                                                 <TouchableOpacity
                                                     style={[
                                                         styles.confirmButton,
-                                                        (otpCode.length < 6 || loading) && styles.confirmButtonDisabled
+                                                        (otpCode.length < 4 || loading) && styles.confirmButtonDisabled
                                                     ]}
                                                     onPress={handleVerifyOTP}
-                                                    disabled={otpCode.length < 6 || loading}
+                                                    disabled={otpCode.length < 4 || loading}
                                                 >
                                                     {loading ? (
                                                         <ActivityIndicator color="#000" />
@@ -434,12 +491,7 @@ export default function WelcomeScreen({ navigation }: any) {
                                         key={acc.id || acc._id || index}
                                         style={styles.accountOptionCard}
                                         activeOpacity={0.8}
-                                        onPress={() => {
-                                            setShowAccountModal(false);
-                                            const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || 1;
-                                            useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
-                                            setAuth({ ...acc, organizationId: Number(orgId) });
-                                        }}
+                                        onPress={() => performLogin(acc)}
                                     >
                                         <View style={styles.accountOptionIcon}>
                                             {acc.photo ? (
@@ -470,6 +522,107 @@ export default function WelcomeScreen({ navigation }: any) {
                                 onPress={() => setShowAccountModal(false)}
                             >
                                 <Text style={styles.cancelModalBtnText}>BEKOR QILISH</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Telegram Bot Modal */}
+            <Modal
+                visible={showBotModal}
+                transparent
+                animationType="fade"
+                onRequestClose={handleSkipBotModal}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.botModalCard}>
+                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={{ padding: 24, alignItems: 'center' }}>
+                            <View style={styles.botIconBadge}>
+                                <Ionicons name="paper-plane" size={30} color="#00FF87" />
+                            </View>
+
+                            <Text style={styles.botModalTitle}>TELEGRAM BOTGA O'TISH</Text>
+
+                            <Text style={styles.botModalSubtitle}>
+                                <Text style={{ color: '#00FF87', fontWeight: '900' }}>+998 {phone}</Text> raqamingizga 4 xonali tasdiqlash kodini olish uchun Telegram botimizga o'ting.
+                            </Text>
+
+                            <View style={styles.botModalNoticeBox}>
+                                <Ionicons name="information-circle-outline" size={18} color="#FFD700" style={{ marginRight: 8 }} />
+                                <Text style={styles.botModalNoticeText}>
+                                    Botda <Text style={{ fontWeight: 'bold', color: '#FFF' }}>"📱 Telefon raqamni yuborish"</Text> tugmasini bosing.
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity
+                                style={styles.botPrimaryBtn}
+                                activeOpacity={0.8}
+                                onPress={handleGoToBot}
+                            >
+                                <Ionicons name="paper-plane-outline" size={20} color="#050A14" style={{ marginRight: 8 }} />
+                                <Text style={styles.botPrimaryBtnText}>BOTGA O'TISH</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.botSecondaryBtn}
+                                activeOpacity={0.7}
+                                onPress={handleSkipBotModal}
+                            >
+                                <Text style={styles.botSecondaryBtnText}>Kodni kiritish</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Phone Not Found Modal */}
+            <Modal
+                visible={showNotFoundModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowNotFoundModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.notFoundModalCard}>
+                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={{ padding: 24, alignItems: 'center' }}>
+                            <View style={styles.notFoundIconBadge}>
+                                <Ionicons name="alert-circle-outline" size={32} color="#FFD700" />
+                            </View>
+
+                            <Text style={styles.notFoundModalTitle}>ARIZA TOPILMADI</Text>
+
+                            <Text style={styles.notFoundModalSubtitle}>
+                                <Text style={{ color: '#00FF87', fontWeight: '900' }}>+998 {phone}</Text> raqamiga tegishli ariza yoki jamoa topilmadi.
+                            </Text>
+
+                            <View style={styles.notFoundNoticeBox}>
+                                <Ionicons name="information-circle-outline" size={18} color="#FFD700" style={{ marginRight: 8 }} />
+                                <Text style={styles.notFoundNoticeText}>
+                                    Tizimdan foydalanish uchun avval ligamizga ariza topshirishingiz kerak.
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity
+                                style={styles.notFoundPrimaryBtn}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                    setShowNotFoundModal(false);
+                                    navigation.navigate('JoinApplication');
+                                }}
+                            >
+                                <Ionicons name="document-text-outline" size={18} color="#050A14" style={{ marginRight: 8 }} />
+                                <Text style={styles.notFoundPrimaryBtnText}>ARIZA TOPSHIRISH</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.notFoundSecondaryBtn}
+                                activeOpacity={0.7}
+                                onPress={() => setShowNotFoundModal(false)}
+                            >
+                                <Text style={styles.notFoundSecondaryBtnText}>Yopish</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -745,5 +898,171 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         fontSize: 13,
         letterSpacing: 1,
+    },
+    botModalCard: {
+        width: width - 48,
+        maxWidth: 380,
+        borderRadius: 28,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        backgroundColor: 'rgba(15, 20, 32, 0.92)',
+    },
+    botIconBadge: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(0, 255, 135, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    botModalTitle: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#FFF',
+        letterSpacing: 1,
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    botModalSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.7)',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    botModalNoticeBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 215, 0, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.2)',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 14,
+        width: '100%',
+        marginBottom: 20,
+    },
+    botModalNoticeText: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.85)',
+        flex: 1,
+    },
+    botPrimaryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#00FF87',
+        width: '100%',
+        height: 50,
+        borderRadius: 16,
+        marginBottom: 10,
+        shadowColor: '#00FF87',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    botPrimaryBtnText: {
+        color: '#050A14',
+        fontWeight: '900',
+        fontSize: 14,
+        letterSpacing: 1,
+    },
+    botSecondaryBtn: {
+        paddingVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    botSecondaryBtnText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontWeight: '700',
+        fontSize: 13,
+    },
+    notFoundModalCard: {
+        width: width - 48,
+        maxWidth: 380,
+        borderRadius: 28,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.25)',
+        backgroundColor: 'rgba(15, 20, 32, 0.94)',
+    },
+    notFoundIconBadge: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(255, 215, 0, 0.12)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255, 215, 0, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    notFoundModalTitle: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#FFF',
+        letterSpacing: 1,
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    notFoundModalSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.75)',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    notFoundNoticeBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 215, 0, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.2)',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 14,
+        width: '100%',
+        marginBottom: 20,
+    },
+    notFoundNoticeText: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.85)',
+        flex: 1,
+    },
+    notFoundPrimaryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#00FF87',
+        width: '100%',
+        height: 50,
+        borderRadius: 16,
+        marginBottom: 10,
+        shadowColor: '#00FF87',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    notFoundPrimaryBtnText: {
+        color: '#050A14',
+        fontWeight: '900',
+        fontSize: 13,
+        letterSpacing: 1,
+    },
+    notFoundSecondaryBtn: {
+        paddingVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    notFoundSecondaryBtnText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontWeight: '700',
+        fontSize: 13,
     },
 });
