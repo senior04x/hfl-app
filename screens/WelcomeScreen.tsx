@@ -228,7 +228,14 @@ const formatPhoneInput = (val: string) => {
 
             if (res.success) {
                 if (res.otpCode) setServerOtpCode(res.otpCode);
-                setShowBotModal(true);
+
+                if (res.isAutoSentToTelegram) {
+                    setLoginStep('otp');
+                    startTimer();
+                    Alert.alert('Tasdiqlash Kodi', '🔑 Tasdiqlash kodingiz Telegram xabarlaringizga yuborildi!');
+                } else {
+                    setShowBotModal(true);
+                }
             } else {
                 setNotFoundMessage(res.reason || 'Ushbu telefon raqamiga tegishli ariza yoki jamoa topilmadi.');
                 setShowNotFoundModal(true);

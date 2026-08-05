@@ -1197,7 +1197,7 @@ export const apiService = {
 
             // 2. Generate 4-digit OTP code
             const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-            const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+            const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
             // 3. Store OTP in otp_codes table
             try {
@@ -1219,9 +1219,68 @@ export const apiService = {
                 console.warn('OTP save error:', err);
             }
 
+            // 4. Check if user already has a linked Telegram Chat ID
+            let telegramChatId: string | null = null;
+
+            const { data: teamChat } = await supabase
+                .from('teams')
+                .select('telegram_chat_id')
+                .ilike('captain_phone', `%${phoneDigits}%`)
+                .not('telegram_chat_id', 'is', null)
+                .limit(1);
+
+            if (teamChat && teamChat.length > 0 && teamChat[0].telegram_chat_id) {
+                telegramChatId = teamChat[0].telegram_chat_id;
+            } else {
+                const { data: appChat } = await supabase
+                    .from('applications')
+                    .select('telegram_chat_id')
+                    .ilike('phone', `%${phoneDigits}%`)
+                    .not('telegram_chat_id', 'is', null)
+                    .limit(1);
+
+                if (appChat && appChat.length > 0 && appChat[0].telegram_chat_id) {
+                    telegramChatId = appChat[0].telegram_chat_id;
+                }
+            }
+
+            let isAutoSentToTelegram = false;
+
+            if (telegramChatId) {
+                try {
+                    const botToken = '8644740765:AAHHhAvzTpUgfz5kevg5iiDfA9GafA1m6Vs';
+                    const msgText = `🔑 <b>Tasdiqlash kodingiz:</b> <code>${otpCode}</code>\n\n📱 <i>4 xonali kodni ilovaga kiriting. Kod 10 daqiqa amal qiladi.</i>`;
+                    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: telegramChatId,
+                            text: msgText,
+                            parse_mode: 'HTML',
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [
+                                        {
+                                            text: '📋 Nusxalash',
+                                            copy_text: { text: otpCode }
+                                        }
+                                    ]
+                                ]
+                            }
+                        })
+                    });
+                    if (res.ok) {
+                        isAutoSentToTelegram = true;
+                    }
+                } catch (tErr) {
+                    console.warn('Auto Telegram OTP send error:', tErr);
+                }
+            }
+
             return {
                 success: true,
-                deliveredVia: 'bot_link',
+                isAutoSentToTelegram,
+                deliveredVia: isAutoSentToTelegram ? 'telegram' : 'bot_link',
                 user: userFound,
                 role,
                 botUrl: `https://t.me/amatora_bot?start=login_${phoneDigits}`,
