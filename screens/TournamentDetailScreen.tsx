@@ -95,14 +95,21 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         const init = async () => {
             setIsLoading(true);
             try {
+                const navTournament = route?.params?.tournament || tournament;
+                const leagueSearchKey = navTournament?.name || currentTournamentId;
+
                 const [t, teamsData] = await Promise.all([
-                    apiService.getTournamentById(currentTournamentId),
-                    apiService.getTeams(1, 100, currentTournamentId)
+                    apiService.getTournamentById(leagueSearchKey || currentTournamentId),
+                    apiService.getTeams(1, 100, leagueSearchKey)
                 ]);
 
-                setTournamentData(t);
+                const mergedTournament = { ...navTournament, ...t };
+                if (navTournament?.name) {
+                    mergedTournament.name = navTournament.name;
+                }
+                setTournamentData(mergedTournament);
 
-                const resolvedTeams = teamsData && teamsData.length > 0 ? teamsData : (t?.teams || []);
+                const resolvedTeams = teamsData && teamsData.length > 0 ? teamsData : (mergedTournament?.teams || []);
                 setTeams(resolvedTeams);
 
                 // Populate standings sorted by points -> goal difference -> goals for
@@ -124,14 +131,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 setStandings(sortedStandings);
 
                 // Fetch real organizer details from Supabase 'organizations' table using organization_id
-                let orgName = t?.organizer || t?.organizationName || '';
-                let orgLogo = t?.organizerLogo || t?.organizationLogo || '';
-                let orgPhone = t?.organizerPhone || t?.phone || '';
+                let orgName = mergedTournament?.organizations?.name || mergedTournament?.organizer || mergedTournament?.organizationName || '';
+                let orgLogo = mergedTournament?.organizations?.logo_url || mergedTournament?.organizerLogo || mergedTournament?.organizationLogo || '';
+                let orgPhone = mergedTournament?.organizations?.phone || mergedTournament?.organizerPhone || mergedTournament?.phone || '';
 
-                let targetOrgId = t?.organization_id || t?.organizationId || (resolvedTeams.length > 0 ? (resolvedTeams[0].organization_id || resolvedTeams[0].organizationId) : null);
+                let targetOrgId = mergedTournament?.organization_id || mergedTournament?.organizationId || navTournament?.organization_id || (resolvedTeams.length > 0 ? (resolvedTeams[0].organization_id || resolvedTeams[0].organizationId) : null);
 
                 if (targetOrgId) {
-                    const { data: orgData } = await supabase.from('organizations').select('*').eq('id', targetOrgId).single();
+                    const { data: orgData } = await supabase.from('organizations').select('*').eq('id', targetOrgId).maybeSingle();
                     if (orgData) {
                         orgName = orgData.name || orgData.title || orgData.organization_name || orgName;
                         orgLogo = orgData.logo_url || orgData.logo || orgData.photo_url || orgLogo;
@@ -139,15 +146,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     }
                 }
 
-                if (!orgName || orgName === 'HFL SPORT TASHKILOTI' || orgName === 'AMATORA ADMIN') {
-                    const { data: firstOrg } = await supabase.from('organizations').select('*').limit(1).single();
-                    if (firstOrg) {
-                        orgName = firstOrg.name || firstOrg.title || firstOrg.organization_name || 'AMATORA TASHKILOTI';
-                        orgLogo = firstOrg.logo_url || firstOrg.logo || firstOrg.photo_url || orgLogo;
-                        orgPhone = firstOrg.phone || firstOrg.contact_phone || orgPhone;
-                    } else {
-                        orgName = 'AMATORA TASHKILOTI';
-                    }
+                if (!orgName) {
+                    orgName = 'Havas Futbol Ligasi';
                 }
                 setOrganizerInfo({ name: orgName, logo: orgLogo, phone: orgPhone });
 

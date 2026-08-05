@@ -760,9 +760,29 @@ export const apiService = {
 
     // Tournaments & Leagues
     getTournaments: async () => {
+        try {
+            const { data } = await supabase.from('leagues').select('*');
+            if (data && data.length > 0) return data;
+        } catch (e) {}
         return [{ id: 'super', name: 'Super liga' }, { id: 'pro', name: 'Pro liga' }, { id: '3liga', name: '3-liga' }, { id: '7x7', name: '7x7 liga' }];
     },
-    getTournamentById: (id: string) => Promise.resolve({ id, name: `${id} liga` }),
+    getTournamentById: async (idOrName: string) => {
+        try {
+            if (!idOrName) return null;
+            // 1. Query leagues by ID
+            const { data: lById } = await supabase.from('leagues').select('*, organizations(*)').eq('id', idOrName).maybeSingle();
+            if (lById) return lById;
+
+            // 2. Query leagues by Name
+            const { data: lByName } = await supabase.from('leagues').select('*, organizations(*)').ilike('name', `%${idOrName}%`).maybeSingle();
+            if (lByName) return lByName;
+
+            return { id: idOrName, name: idOrName };
+        } catch (err) {
+            console.warn('getTournamentById error:', err);
+            return { id: idOrName, name: idOrName };
+        }
+    },
 
     // Matches (Direct from Supabase 'matches' table)
     getMatches: async (params?: any) => {
