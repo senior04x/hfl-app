@@ -32,7 +32,7 @@ import SmartImage from '../components/SmartImage';
 import VideoBackground from '../components/VideoBackground';
 import { useAuthStore } from '../store/useAuthStore';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
-import BiSlideButton from '../components/BiSlideButton';
+import { SlideButton } from '../components/SlideButton';
 
 const { width } = Dimensions.get('window');
 
@@ -1226,7 +1226,12 @@ const MyStatsScreen = ({ navigation }: any) => {
                 <View style={styles.modalOverlay}>
                     <ScrollView contentContainerStyle={{ paddingVertical: 40 }} showsVerticalScrollIndicator={false}>
                         <View style={styles.modalContentLarge}>
-                            <Text style={styles.modalTitleLarge}>MA'LUMOTLARNI TAHRIRLASH</Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <Text style={styles.modalTitleLarge}>MA'LUMOTLARNI TAHRIRLASH</Text>
+                                <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)} style={{ padding: 4 }}>
+                                    <Ionicons name="close-circle" size={28} color="rgba(255,255,255,0.6)" />
+                                </TouchableOpacity>
+                            </View>
                             <Text style={styles.modalSubLarge}>
                                 O'zgartirmoqchi bo'lgan ma'lumotlaringizni kiriting va tashkilotchiga yuboring.
                             </Text>
@@ -1423,15 +1428,13 @@ const MyStatsScreen = ({ navigation }: any) => {
                                 </View>
                             </View>
 
-                            {/* BI-DIRECTIONAL SLIDE BUTTON (CENTER START: LEFT CANCEL | RIGHT SUBMIT) */}
-                            <BiSlideButton
+                            {/* ONE-DIRECTION SLIDE BUTTON */}
+                            <SlideButton
                                 loading={submittingUpdate}
                                 status={updateSubmitStatus}
-                                submitTitle="Yuborish"
-                                cancelTitle="Bekor qilish"
-                                helperText="Bekor qilish uchun chapga, yuborish uchun o'ngga suring"
-                                onSwipeSubmit={handleSubmitProfileUpdate}
-                                onSwipeCancel={() => setShowProfileUpdateModal(false)}
+                                title="Yuborish uchun suring"
+                                helperText="Arizani yuborish uchun o'ngga suring yoki bosing"
+                                onSwipeSuccess={handleSubmitProfileUpdate}
                                 onReset={() => setUpdateSubmitStatus('idle')}
                             />
                         </View>

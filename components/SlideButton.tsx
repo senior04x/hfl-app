@@ -100,10 +100,21 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
         resetJS();
     };
 
+    const triggerSwipeAction = () => {
+        if (disabled || completed || loading) return;
+        translateX.value = withSpring(MAX_DRAG, springConfig, (finished) => {
+            if (finished) {
+                trackWidthAnim.value = withSpring(165, springConfig);
+                runOnJS(handleCompleteJS)();
+            }
+        });
+    };
+
     // Gesture Handler Definition
     const panGesture = Gesture.Pan()
-        .activeOffsetX([-5, 5])
-        .failOffsetY([-20, 20])
+        .activeOffsetX([-3, 3])
+        .failOffsetY([-30, 30])
+        .shouldCancelWhenOutside(false)
         .onBegin(() => {
             if (disabled || completed || loading) return;
             startX.value = translateX.value;
@@ -119,7 +130,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
             if (disabled || completed || loading) return;
             isDragging.value = false;
 
-            if (translateX.value >= MAX_DRAG * 0.82) {
+            if (translateX.value >= MAX_DRAG * 0.42) {
                 translateX.value = withSpring(MAX_DRAG, springConfig, (finished) => {
                     if (finished) {
                         trackWidthAnim.value = withSpring(165, springConfig);
@@ -223,16 +234,25 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                             />
                         </Animated.View>
 
-                        <Animated.Text
-                            style={[styles.label, labelStyle]}
-                            numberOfLines={1}
-                        >
-                            {title}
-                        </Animated.Text>
+                        <Animated.View style={[styles.label, labelStyle]}>
+                            <TouchableOpacity
+                                style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
+                                onPress={triggerSwipeAction}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.label} numberOfLines={1}>
+                                    {title}
+                                </Text>
+                            </TouchableOpacity>
+                        </Animated.View>
 
                         <GestureDetector gesture={panGesture}>
                             <Animated.View style={[styles.handle, handleStyle]}>
-                                <View style={styles.handleInnerContainer}>
+                                <TouchableOpacity
+                                    style={styles.handleInnerContainer}
+                                    onPress={triggerSwipeAction}
+                                    activeOpacity={0.9}
+                                >
                                     <LinearGradient
                                         colors={['#00FF66', '#00CC52', '#008833']}
                                         locations={[0, 0.65, 1]}
@@ -244,7 +264,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                                     <View style={styles.iconCenterWrapper} pointerEvents="none">
                                         <SendIcon />
                                     </View>
-                                </View>
+                                </TouchableOpacity>
                             </Animated.View>
                         </GestureDetector>
                     </>

@@ -25,7 +25,7 @@ import VideoBackground from '../components/VideoBackground';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
-import BiSlideButton from '../components/BiSlideButton';
+import { SlideButton } from '../components/SlideButton';
 
 const { width } = Dimensions.get('window');
 
@@ -1254,15 +1254,13 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             </View>
                                         </View>
 
-                                        {/* BI-DIRECTIONAL SLIDE BUTTON (CENTER START: LEFT CANCEL | RIGHT SUBMIT) */}
-                                        <BiSlideButton
+                                        {/* ONE-DIRECTION SLIDE BUTTON */}
+                                        <SlideButton
                                             loading={loading}
                                             status={submitStatus}
-                                            submitTitle="Yuborish"
-                                            cancelTitle="Bekor qilish"
-                                            helperText="Bekor qilish uchun chapga, yuborish uchun o'ngga suring"
-                                            onSwipeSubmit={handleSubmit}
-                                            onSwipeCancel={() => navigation.goBack()}
+                                            title="Arizani yuborish uchun suring"
+                                            helperText="Arizani yuborish uchun o'ngga suring yoki bosing"
+                                            onSwipeSuccess={handleSubmit}
                                             onReset={() => setSubmitStatus('idle')}
                                         />
                                     </>
@@ -1422,15 +1420,13 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             </TouchableOpacity>
                                         </View>
 
-                                        {/* BI-DIRECTIONAL SLIDE BUTTON (CENTER START: LEFT CANCEL | RIGHT SUBMIT) */}
-                                        <BiSlideButton
+                                        {/* ONE-DIRECTION SLIDE BUTTON */}
+                                        <SlideButton
                                             loading={loading}
                                             status={submitStatus}
-                                            submitTitle="Yuborish"
-                                            cancelTitle="Bekor qilish"
-                                            helperText="Bekor qilish uchun chapga, yuborish uchun o'ngga suring"
-                                            onSwipeSubmit={handleSubmit}
-                                            onSwipeCancel={() => navigation.goBack()}
+                                            title="Arizani yuborish uchun suring"
+                                            helperText="Arizani yuborish uchun o'ngga suring yoki bosing"
+                                            onSwipeSuccess={handleSubmit}
                                             onReset={() => setSubmitStatus('idle')}
                                         />
                                     </>
