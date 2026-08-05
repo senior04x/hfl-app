@@ -344,14 +344,162 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         );
     };
 
-    const renderPreview = () => (
-        <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 100 }}>
-            <View style={styles.placeholderContainer}>
-                <Ionicons name="stats-chart-outline" size={48} color="rgba(255,255,255,0.1)" />
-                <Text style={styles.placeholderText}>PREVYU MA'LUMOTLARI TEZ ORADA...</Text>
-            </View>
-        </ScrollView>
-    );
+    const renderPreview = () => {
+        const homeName = match?.homeTeamName || match?.homeTeam?.name || 'UY JAMOA';
+        const awayName = match?.awayTeamName || match?.awayTeam?.name || 'MEHMON';
+        const homeLogo = match?.homeTeamLogo || match?.homeTeam?.logo;
+        const awayLogo = match?.awayTeamLogo || match?.awayTeam?.logo;
+        const leagueName = match?.tournamentName || match?.league || "HFL Liga";
+        const venueName = match?.venue || match?.location || 'Amatora Arena';
+
+        const homeForm = match?.homeForm || ['W', 'W', 'D', 'L', 'W'];
+        const awayForm = match?.awayForm || ['W', 'D', 'W', 'W', 'L'];
+
+        const homeKeyPlayer = homePlayers[0];
+        const awayKeyPlayer = awayPlayers[0];
+
+        return (
+            <ScrollView 
+                style={styles.tabContent} 
+                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
+                }
+            >
+                {/* 1. Pre-Match Overview Header */}
+                <View style={styles.previewSectionCard}>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <Ionicons name="information-circle-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
+                            <Text style={styles.previewSectionTitle}>UCHRASHUV HAQIDA</Text>
+                        </View>
+                        <View style={styles.previewInfoRow}>
+                            <Text style={styles.previewInfoLabel}>Turnir / Liga:</Text>
+                            <Text style={styles.previewInfoVal}>{leagueName}</Text>
+                        </View>
+                        <View style={styles.previewInfoRow}>
+                            <Text style={styles.previewInfoLabel}>Bosqich / Tur:</Text>
+                            <Text style={styles.previewInfoVal}>{match?.round ? `${match.round}-TUR` : 'Guruh Bosqichi'}</Text>
+                        </View>
+                        <View style={styles.previewInfoRow}>
+                            <Text style={styles.previewInfoLabel}>Sana va Vaqt:</Text>
+                            <Text style={styles.previewInfoVal}>{formatDate(match?.date)}</Text>
+                        </View>
+                        <View style={styles.previewInfoRow}>
+                            <Text style={styles.previewInfoLabel}>Maydon (Stadion):</Text>
+                            <Text style={styles.previewInfoVal}>{venueName}</Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* 2. Team Form Guide */}
+                <View style={styles.previewSectionCard}>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                            <Ionicons name="analytics-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
+                            <Text style={styles.previewSectionTitle}>SO'NGGI O'YINLAR FORMASI</Text>
+                        </View>
+
+                        {/* Home Team Form */}
+                        <View style={{ marginBottom: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                {homeLogo && <Image source={{ uri: homeLogo }} style={{ width: 20, height: 20, marginRight: 8, resizeMode: 'contain' }} />}
+                                <Text style={styles.teamFormTitle} numberOfLines={1}>{homeName.toUpperCase()}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                                {homeForm.map((res: string, idx: number) => (
+                                    <View 
+                                        key={idx} 
+                                        style={[
+                                            styles.formBadge, 
+                                            res === 'W' && styles.formBadgeWin,
+                                            res === 'D' && styles.formBadgeDraw,
+                                            res === 'L' && styles.formBadgeLoss
+                                        ]}
+                                    >
+                                        <Text style={styles.formBadgeText}>{res}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Away Team Form */}
+                        <View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                {awayLogo && <Image source={{ uri: awayLogo }} style={{ width: 20, height: 20, marginRight: 8, resizeMode: 'contain' }} />}
+                                <Text style={styles.teamFormTitle} numberOfLines={1}>{awayName.toUpperCase()}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                                {awayForm.map((res: string, idx: number) => (
+                                    <View 
+                                        key={idx} 
+                                        style={[
+                                            styles.formBadge, 
+                                            res === 'W' && styles.formBadgeWin,
+                                            res === 'D' && styles.formBadgeDraw,
+                                            res === 'L' && styles.formBadgeLoss
+                                        ]}
+                                    >
+                                        <Text style={styles.formBadgeText}>{res}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                {/* 3. Key Players Spotlight */}
+                {(homeKeyPlayer || awayKeyPlayer) && (
+                    <View style={styles.previewSectionCard}>
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={{ padding: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                                <Ionicons name="star-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
+                                <Text style={styles.previewSectionTitle}>ETAKCHI O'YINCHILAR</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                                {homeKeyPlayer && (
+                                    <TouchableOpacity 
+                                        style={styles.keyPlayerBox}
+                                        onPress={() => navigation.navigate('PlayerStats', { player: homeKeyPlayer, playerId: homeKeyPlayer._id || homeKeyPlayer.id })}
+                                    >
+                                        <Image 
+                                            source={{ uri: homeKeyPlayer.photo || homeKeyPlayer.photo_url || homeKeyPlayer.avatar || 'https://via.placeholder.com/60' }} 
+                                            style={styles.keyPlayerAvatar} 
+                                        />
+                                        <Text style={styles.keyPlayerName} numberOfLines={1}>{`${homeKeyPlayer.firstName || homeKeyPlayer.first_name || ''} ${homeKeyPlayer.lastName || homeKeyPlayer.last_name || ''}`.trim()}</Text>
+                                        <Text style={styles.keyPlayerRole}>{homeName}</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {awayKeyPlayer && (
+                                    <TouchableOpacity 
+                                        style={styles.keyPlayerBox}
+                                        onPress={() => navigation.navigate('PlayerStats', { player: awayKeyPlayer, playerId: awayKeyPlayer._id || awayKeyPlayer.id })}
+                                    >
+                                        <Image 
+                                            source={{ uri: awayKeyPlayer.photo || awayKeyPlayer.photo_url || awayKeyPlayer.avatar || 'https://via.placeholder.com/60' }} 
+                                            style={styles.keyPlayerAvatar} 
+                                        />
+                                        <Text style={styles.keyPlayerName} numberOfLines={1}>{`${awayKeyPlayer.firstName || awayKeyPlayer.first_name || ''} ${awayKeyPlayer.lastName || awayKeyPlayer.last_name || ''}`.trim()}</Text>
+                                        <Text style={styles.keyPlayerRole}>{awayName}</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+                )}
+            </ScrollView>
+        );
+    };
 
     const renderLineups = () => {
         const isHome = selectedTeamId === match?.homeTeamId;
@@ -403,7 +551,6 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             const formPlayer = tacticsPlayers.find((tp: any) => String(tp.id) === pId);
             const displayNum = formPlayer?.number || player.number || player.player_number || player.shirt_number || '-';
 
-            // Filter match events for this player by ID or by Name
             const events = match?.events || [];
             const playerEvents = events.filter((e: any) => {
                 const evPlayerId = String(e.playerId || e.player_id || e.player?.id || e.player?._id || '');
@@ -460,7 +607,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             <Text style={styles.playerNumberCompact}>#{displayNum} • {(player.positionUz || player.position || 'O\'YINCHI').toUpperCase()}</Text>
                         </View>
 
-                        {/* Match Event Badges (Goals, Assists, Yellow & Red Cards) */}
+                        {/* Match Event Badges */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 6 }}>
                             {goalsCount > 0 && (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,255,102,0.12)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(0,255,102,0.3)' }}>
@@ -608,28 +755,128 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         );
     };
 
-    const renderStaff = () => (
-        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-            <View style={styles.placeholderContainer}>
-                {match?.referee ? (
-                    <View style={styles.staffMemberCard}>
-                        <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
-                        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, width: '100%' }}>
-                            <View style={styles.staffIconBox}>
-                                <Ionicons name="person" size={24} color={Colors.primary} />
+    const renderStaff = () => {
+        const refereeName = match?.referee || match?.referee_name || match?.main_referee || "Rasmiy Hakam (HFL)";
+        const assistant1 = match?.assistant_referee_1 || match?.linesman_1 || "Yo'l-yo'riq Hakami 1";
+        const assistant2 = match?.assistant_referee_2 || match?.linesman_2 || "Yo'l-yo'riq Hakami 2";
+        const commissioner = match?.commissioner || match?.inspector || "HFL Maydon Inspektori";
+
+        const homeCaptain = match?.homeTeam?.captain_name || match?.home_team_captain || (homePlayers[0] ? `${homePlayers[0].firstName || homePlayers[0].first_name || ''} ${homePlayers[0].lastName || homePlayers[0].last_name || ''}`.trim() : "Menejer / Sardor");
+        const awayCaptain = match?.awayTeam?.captain_name || match?.away_team_captain || (awayPlayers[0] ? `${awayPlayers[0].firstName || awayPlayers[0].first_name || ''} ${awayPlayers[0].lastName || awayPlayers[0].last_name || ''}`.trim() : "Menejer / Sardor");
+
+        return (
+            <ScrollView 
+                style={styles.tabContent} 
+                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
+                }
+            >
+                {/* 1. Hakamlar Brigadasi */}
+                <View style={styles.staffSectionCard}>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                            <Ionicons name="ribbon-outline" size={22} color={Colors.primary} style={{ marginRight: 8 }} />
+                            <Text style={styles.staffSectionTitle}>HAKAMLAR BRIGADASI</Text>
+                        </View>
+
+                        {/* Main Referee */}
+                        <View style={styles.staffItemRow}>
+                            <View style={[styles.staffIconCircle, { backgroundColor: 'rgba(250, 204, 21, 0.15)' }]}>
+                                <Ionicons name="shirt-outline" size={20} color="#FACC15" />
                             </View>
-                            <View>
-                                <Text style={styles.staffLabel}>BOSH HAKAM</Text>
-                                <Text style={styles.staffValue}>{match.referee.toUpperCase()}</Text>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.staffItemRole}>BOSH HAKAM</Text>
+                                <Text style={styles.staffItemName}>{refereeName.toUpperCase()}</Text>
+                            </View>
+                        </View>
+
+                        {/* Assistant 1 */}
+                        <View style={styles.staffItemRow}>
+                            <View style={styles.staffIconCircle}>
+                                <Ionicons name="flag-outline" size={18} color={Colors.primary} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.staffItemRole}>QANOT HAKAMI 1</Text>
+                                <Text style={styles.staffItemName}>{assistant1.toUpperCase()}</Text>
+                            </View>
+                        </View>
+
+                        {/* Assistant 2 */}
+                        <View style={[styles.staffItemRow, { borderBottomWidth: 0 }]}>
+                            <View style={styles.staffIconCircle}>
+                                <Ionicons name="flag-outline" size={18} color={Colors.primary} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.staffItemRole}>QANOT HAKAMI 2</Text>
+                                <Text style={styles.staffItemName}>{assistant2.toUpperCase()}</Text>
                             </View>
                         </View>
                     </View>
-                ) : (
-                    <Text style={styles.placeholderText}>RASMIY VAKILLAR RO'YXATI BELGILANMAGAN</Text>
-                )}
-            </View>
-        </ScrollView>
-    );
+                </View>
+
+                {/* 2. Jamoa Shtabi va Menejerlar */}
+                <View style={styles.staffSectionCard}>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                            <Ionicons name="people-outline" size={22} color={Colors.primary} style={{ marginRight: 8 }} />
+                            <Text style={styles.staffSectionTitle}>JAMOA MENEJERLARI VA SARDORLARI</Text>
+                        </View>
+
+                        {/* Home Manager */}
+                        <View style={styles.staffItemRow}>
+                            <View style={styles.staffIconCircle}>
+                                <Ionicons name="briefcase-outline" size={18} color="#3B82F6" />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.staffItemRole}>{(match?.homeTeamName || 'UY JAMOA').toUpperCase()} SARDORI</Text>
+                                <Text style={styles.staffItemName}>{homeCaptain.toUpperCase()}</Text>
+                            </View>
+                        </View>
+
+                        {/* Away Manager */}
+                        <View style={[styles.staffItemRow, { borderBottomWidth: 0 }]}>
+                            <View style={styles.staffIconCircle}>
+                                <Ionicons name="briefcase-outline" size={18} color="#EF4444" />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.staffItemRole}>{(match?.awayTeamName || 'MEHMON JAMOA').toUpperCase()} SARDORI</Text>
+                                <Text style={styles.staffItemName}>{awayCaptain.toUpperCase()}</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                {/* 3. Maydon Komissari */}
+                <View style={styles.staffSectionCard}>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                            <Ionicons name="shield-checkmark-outline" size={22} color={Colors.primary} style={{ marginRight: 8 }} />
+                            <Text style={styles.staffSectionTitle}>MAYDON INSPEKTORI</Text>
+                        </View>
+
+                        <View style={[styles.staffItemRow, { borderBottomWidth: 0 }]}>
+                            <View style={styles.staffIconCircle}>
+                                <Ionicons name="person-circle-outline" size={20} color={Colors.primary} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.staffItemRole}>HFL KOMISSARI</Text>
+                                <Text style={styles.staffItemName}>{commissioner.toUpperCase()}</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </ScrollView>
+        );
+    };
 
     if (loading && !match) {
         return <MatchDetailSkeleton />;
@@ -739,5 +986,140 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontWeight: '800',
         fontSize: 13,
+    },
+
+    // Preview Styles
+    previewSectionCard: {
+        borderRadius: 16,
+        marginBottom: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    previewSectionTitle: {
+        color: '#FFF',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    previewInfoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    previewInfoLabel: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    previewInfoVal: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    teamFormTitle: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    formBadge: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    formBadgeWin: {
+        backgroundColor: 'rgba(34, 197, 94, 0.25)',
+        borderWidth: 1,
+        borderColor: '#22C55E',
+    },
+    formBadgeDraw: {
+        backgroundColor: 'rgba(234, 179, 8, 0.25)',
+        borderWidth: 1,
+        borderColor: '#EAB308',
+    },
+    formBadgeLoss: {
+        backgroundColor: 'rgba(239, 68, 68, 0.25)',
+        borderWidth: 1,
+        borderColor: '#EF4444',
+    },
+    formBadgeText: {
+        color: '#FFF',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    keyPlayerBox: {
+        flex: 1,
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    keyPlayerAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        marginBottom: 8,
+    },
+    keyPlayerName: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '800',
+        textAlign: 'center',
+    },
+    keyPlayerRole: {
+        color: Colors.primary,
+        fontSize: 10,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+
+    // Staff Styles
+    staffSectionCard: {
+        borderRadius: 16,
+        marginBottom: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    staffSectionTitle: {
+        color: '#FFF',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    staffItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    staffIconCircle: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    staffItemRole: {
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    staffItemName: {
+        color: '#FFF',
+        fontSize: 13,
+        fontWeight: '800',
+        marginTop: 2,
     },
 });
