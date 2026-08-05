@@ -181,9 +181,19 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     setLatestMatches([]);
                 }
 
-                if (t?.leagueId) {
-                    const allTournaments = await apiService.getTournaments(1, 100, t.leagueId);
-                    setAvailableTournaments(allTournaments || []);
+                const { data: allSeasonsLeagues } = await supabase
+                    .from('leagues')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (allSeasonsLeagues && allSeasonsLeagues.length > 0) {
+                    setAvailableTournaments(allSeasonsLeagues.map((l: any) => ({
+                        ...l,
+                        _id: l.id,
+                        id: l.id,
+                        season: l.season || '2026/2027',
+                        displayName: `${l.name} (${l.season || '2026/2027'})`
+                    })));
                 }
             } catch (error) {
                 console.error('Error fetching tournament details:', error);
