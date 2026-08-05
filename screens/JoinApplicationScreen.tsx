@@ -510,11 +510,15 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             if (applicationType === 'player') {
                 const selectedTeamObj = teams.find(t => String(t.id || t._id) === String(formData.selectedTeam || targetTeamId));
                 const targetOrgId = selectedTeamObj?.organization_id || selectedTeamObj?.org_id || formData.selectedOrgId || 1;
-                const targetLeague = formData.selectedLeague || selectedTeamObj?.league || selectedTeamObj?.league_name || 'Super liga';
+                const targetLeague = formData.selectedLeague || selectedTeamObj?.league || selectedTeamObj?.league_name || '';
 
-                const applicationPayload = {
+                let commentStr = formData.comment || '';
+                if (targetLeague && !commentStr.includes('[LEAGUE:')) {
+                    commentStr = `${commentStr} [LEAGUE:${targetLeague}]`.trim();
+                }
+
+                const applicationPayload: any = {
                     organization_id: targetOrgId,
-                    league: targetLeague,
                     first_name: formData.firstName.trim(),
                     last_name: formData.lastName.trim(),
                     father_name: formData.fatherName ? formData.fatherName.trim() : null,
@@ -525,7 +529,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     birth_date: formData.birthDate || null,
                     position: formData.position || formData.detailedPosition || null,
                     player_number: formData.number || null,
-                    comment: formData.comment || null,
+                    comment: commentStr || null,
                     team_id: formData.selectedTeam || targetTeamId || null,
                     status: 'pending'
                 };
