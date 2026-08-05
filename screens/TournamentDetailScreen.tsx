@@ -181,19 +181,42 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     setLatestMatches([]);
                 }
 
-                const { data: allSeasonsLeagues } = await supabase
+                // Fetch ONLY the seasons belonging to THIS specific league and organization!
+                const baseLeagueName = (mergedTournament?.name || tournamentName || '')
+                    .replace(/\s*\(\d{4}\/\d{4}\)/g, '')
+                    .replace(/\s*\d{4}\/\d{4}/g, '')
+                    .trim();
+
+                let seasonQuery = supabase
                     .from('leagues')
                     .select('*')
                     .order('created_at', { ascending: false });
 
-                if (allSeasonsLeagues && allSeasonsLeagues.length > 0) {
-                    setAvailableTournaments(allSeasonsLeagues.map((l: any) => ({
+                if (targetOrgId) {
+                    seasonQuery = seasonQuery.eq('organization_id', targetOrgId);
+                }
+                if (baseLeagueName) {
+                    const nameKeyword = baseLeagueName.split(' ')[0] || baseLeagueName;
+                    seasonQuery = seasonQuery.ilike('name', `%${nameKeyword}%`);
+                }
+
+                const { data: matchedSeasonsLeagues } = await seasonQuery;
+
+                if (matchedSeasonsLeagues && matchedSeasonsLeagues.length > 0) {
+                    setAvailableTournaments(matchedSeasonsLeagues.map((l: any) => ({
                         ...l,
                         _id: l.id,
                         id: l.id,
                         season: l.season || '2026/2027',
                         displayName: `${l.name} (${l.season || '2026/2027'})`
                     })));
+                } else {
+                    setAvailableTournaments(mergedTournament ? [{
+                        ...mergedTournament,
+                        _id: mergedTournament.id,
+                        season: mergedTournament.season || '2026/2027',
+                        displayName: `${mergedTournament.name || 'Liga'} (${mergedTournament.season || '2026/2027'})`
+                    }] : []);
                 }
             } catch (error) {
                 console.error('Error fetching tournament details:', error);
