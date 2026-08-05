@@ -102,9 +102,30 @@ export const BiSlideButton: React.FC<BiSlideButtonProps> = ({
     };
 
     // Pan Gesture Definition (CENTER to Left/Right)
+    const triggerSubmitAction = () => {
+        if (disabled || completedAction || loading) return;
+        translateX.value = withSpring(MAX_DRAG_SIDE, springConfig, (finished) => {
+            if (finished) {
+                trackWidthAnim.value = withSpring(165, springConfig);
+                runOnJS(handleCompleteSubmitJS)();
+            }
+        });
+    };
+
+    const triggerCancelAction = () => {
+        if (disabled || completedAction || loading) return;
+        translateX.value = withSpring(-MAX_DRAG_SIDE, springConfig, (finished) => {
+            if (finished) {
+                runOnJS(handleCompleteCancelJS)();
+            }
+        });
+    };
+
+    // Pan Gesture Definition (CENTER to Left/Right)
     const panGesture = Gesture.Pan()
-        .activeOffsetX([-5, 5])
-        .failOffsetY([-20, 20])
+        .activeOffsetX([-3, 3])
+        .failOffsetY([-30, 30])
+        .shouldCancelWhenOutside(false)
         .onBegin(() => {
             if (disabled || completedAction || loading) return;
             startX.value = translateX.value;
@@ -120,7 +141,7 @@ export const BiSlideButton: React.FC<BiSlideButtonProps> = ({
             if (disabled || completedAction || loading) return;
             isDragging.value = false;
 
-            if (translateX.value >= MAX_DRAG_SIDE * 0.78) {
+            if (translateX.value >= MAX_DRAG_SIDE * 0.42) {
                 // Submit Right
                 translateX.value = withSpring(MAX_DRAG_SIDE, springConfig, (finished) => {
                     if (finished) {
@@ -128,7 +149,7 @@ export const BiSlideButton: React.FC<BiSlideButtonProps> = ({
                         runOnJS(handleCompleteSubmitJS)();
                     }
                 });
-            } else if (translateX.value <= -MAX_DRAG_SIDE * 0.78) {
+            } else if (translateX.value <= -MAX_DRAG_SIDE * 0.42) {
                 // Cancel Left
                 translateX.value = withSpring(-MAX_DRAG_SIDE, springConfig, (finished) => {
                     if (finished) {
@@ -229,22 +250,38 @@ export const BiSlideButton: React.FC<BiSlideButtonProps> = ({
                             />
                         </Animated.View>
 
-                        {/* Left Label (Close / Cancel) */}
-                        <Animated.View style={[styles.leftLabelContainer, leftLabelStyle]} pointerEvents="none">
-                            <Ionicons name="close" size={18} color="#FF3B30" style={{ marginRight: 4 }} />
-                            <Text style={styles.leftLabelText} numberOfLines={1}>{cancelTitle}</Text>
+                        {/* Left Label (Close / Cancel) - Touchable */}
+                        <Animated.View style={[styles.leftLabelContainer, leftLabelStyle]}>
+                            <TouchableOpacity
+                                style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}
+                                onPress={triggerCancelAction}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="close" size={18} color="#FF3B30" style={{ marginRight: 4 }} />
+                                <Text style={styles.leftLabelText} numberOfLines={1}>{cancelTitle}</Text>
+                            </TouchableOpacity>
                         </Animated.View>
 
-                        {/* Right Label (Submit / Send) */}
-                        <Animated.View style={[styles.rightLabelContainer, rightLabelStyle]} pointerEvents="none">
-                            <Text style={styles.rightLabelText} numberOfLines={1}>{submitTitle}</Text>
-                            <Ionicons name="arrow-forward" size={14} color="#00FF66" style={{ marginLeft: 4 }} />
+                        {/* Right Label (Submit / Send) - Touchable */}
+                        <Animated.View style={[styles.rightLabelContainer, rightLabelStyle]}>
+                            <TouchableOpacity
+                                style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}
+                                onPress={triggerSubmitAction}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.rightLabelText} numberOfLines={1}>{submitTitle}</Text>
+                                <Ionicons name="arrow-forward" size={14} color="#00FF66" style={{ marginLeft: 4 }} />
+                            </TouchableOpacity>
                         </Animated.View>
 
                         {/* Center Handle */}
                         <GestureDetector gesture={panGesture}>
                             <Animated.View style={[styles.handle, handleStyle]}>
-                                <View style={styles.handleInnerContainer}>
+                                <TouchableOpacity
+                                    style={styles.handleInnerContainer}
+                                    onPress={triggerSubmitAction}
+                                    activeOpacity={0.9}
+                                >
                                     <LinearGradient
                                         colors={['#00FF66', '#00CC52', '#008833']}
                                         locations={[0, 0.65, 1]}
@@ -256,7 +293,7 @@ export const BiSlideButton: React.FC<BiSlideButtonProps> = ({
                                     <View style={styles.iconCenterWrapper} pointerEvents="none">
                                         <Ionicons name="swap-horizontal" size={22} color="#0b0e17" />
                                     </View>
-                                </View>
+                                </TouchableOpacity>
                             </Animated.View>
                         </GestureDetector>
                     </>
