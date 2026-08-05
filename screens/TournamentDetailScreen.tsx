@@ -195,20 +195,32 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     }, [currentTournamentId]);
 
     // 2. Fetch Players specifically for this tournament's teams
+    // 2. Fetch Players specifically for this tournament's teams and calculate exact stats
     const fetchTournamentPlayers = async () => {
         setIsLoadingPlayers(true);
         try {
             const teamIds = (teams && teams.length > 0 ? teams : standings).map((t: any) => t.teamId || t.id || t._id).filter(Boolean);
             if (teamIds.length > 0) {
-                const { data: rawPlayers } = await supabase
-                    .from('applications')
-                    .select('*')
-                    .in('team_id', teamIds);
+                const teamIdsSet = new Set(teamIds.map(String));
+
+                const [{ data: rawPlayers }, { data: matchesData }] = await Promise.all([
+                    supabase.from('applications').select('*').in('team_id', teamIds),
+                    supabase.from('matches').select('*').or(`status.eq.finished,status.eq.completed`)
+                ]);
 
                 const playersList = rawPlayers || [];
                 const playerIds = playersList.map((p: any) => p.id);
 
                 let eventsMap: Record<string, any> = {};
+                const playerMatchesMap: Record<string, Set<string>> = {};
+
+                playerIds.forEach((pid: any) => {
+                    const pidStr = String(pid);
+                    eventsMap[pidStr] = { goals: 0, assists: 0, yellowCards: 0, redCards: 0, matchesPlayed: 0 };
+                    playerMatchesMap[pidStr] = new Set();
+                });
+
+                // 1. Process match events (goals, assists, cards)
                 if (playerIds.length > 0) {
                     const { data: eventsData } = await supabase
                         .from('match_events')
@@ -220,6 +232,13 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         if (!eventsMap[pid]) {
                             eventsMap[pid] = { goals: 0, assists: 0, yellowCards: 0, redCards: 0, matchesPlayed: 0 };
                         }
+                        if (!playerMatchesMap[pid]) {
+                            playerMatchesMap[pid] = new Set();
+                        }
+                        if (e.match_id) {
+                            playerMatchesMap[pid].add(String(e.match_id));
+                        }
+
                         const type = String(e.event_type || '').toLowerCase();
                         if (type === 'goal') eventsMap[pid].goals += 1;
                         else if (type === 'assist') eventsMap[pid].assists += 1;
@@ -227,6 +246,47 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         else if (type.includes('red')) eventsMap[pid].redCards += 1;
                     });
                 }
+
+                // 2. Process finished matches lineups (formation) for accurate matchesPlayed count
+                (matchesData || []).forEach((m: any) => {
+                    const homeId = String(m.home_team_id || m.homeTeamId || '');
+                    const awayId = String(m.away_team_id || m.awayTeamId || '');
+
+                    // Only process matches that involve our tournament's teams
+                    if (teamIdsSet.has(homeId) || teamIdsSet.has(awayId)) {
+                        const matchIdStr = String(m.id);
+
+                        const parseLineup = (formStr: any) => {
+                            if (!formStr) return [];
+                            try {
+                                const parsed = typeof formStr === 'string' ? JSON.parse(formStr) : formStr;
+                                const pArr = parsed?.players || parsed?.startingLineup || parsed?.subs || [];
+                                return pArr.map((p: any) => String(p.id || p._id || p.playerId)).filter(Boolean);
+                            } catch (e) {
+                                return [];
+                            }
+                        };
+
+                        const pIds = [
+                            ...parseLineup(m.formation),
+                            ...parseLineup(m.home_formation),
+                            ...parseLineup(m.away_formation)
+                        ];
+
+                        pIds.forEach((pid: string) => {
+                            if (playerMatchesMap[pid]) {
+                                playerMatchesMap[pid].add(matchIdStr);
+                            }
+                        });
+                    }
+                });
+
+                // Calculate final matchesPlayed count per player
+                Object.keys(playerMatchesMap).forEach((pid: string) => {
+                    if (eventsMap[pid]) {
+                        eventsMap[pid].matchesPlayed = playerMatchesMap[pid].size;
+                    }
+                });
 
                 const teamsMap: Record<string, string> = {};
                 (teams || standings || []).forEach((t: any) => {
@@ -249,7 +309,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         assists: st.assists,
                         yellowCards: st.yellowCards,
                         redCards: st.redCards,
-                        matchesPlayed: st.matchesPlayed || (st.goals + st.assists > 0 ? 1 : 0),
+                        matchesPlayed: st.matchesPlayed,
                         stats: st
                     };
                 });
