@@ -211,11 +211,13 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             const teamData = await apiService.getTeamById(tId);
             if (teamData) {
                 const leagueName = teamData.league_name || teamData.league || teamData.leagueName || 'Super liga';
+                const orgId = teamData.organization_id || teamData.org_id || 1;
                 const teamList = await apiService.getTeams(1, 100, leagueName);
                 setTeams(teamList || [teamData]);
 
                 setFormData(prev => ({
                     ...prev,
+                    selectedOrgId: orgId,
                     selectedLeague: leagueName,
                     selectedTeam: teamData.id || teamData._id || tId,
                     teamName: teamData.name || '',
@@ -506,8 +508,13 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             }
 
             if (applicationType === 'player') {
+                const selectedTeamObj = teams.find(t => String(t.id || t._id) === String(formData.selectedTeam || targetTeamId));
+                const targetOrgId = selectedTeamObj?.organization_id || selectedTeamObj?.org_id || formData.selectedOrgId || 1;
+                const targetLeague = formData.selectedLeague || selectedTeamObj?.league || selectedTeamObj?.league_name || 'Super liga';
+
                 const applicationPayload = {
-                    organization_id: formData.selectedOrgId || 1,
+                    organization_id: targetOrgId,
+                    league: targetLeague,
                     first_name: formData.firstName.trim(),
                     last_name: formData.lastName.trim(),
                     father_name: formData.fatherName ? formData.fatherName.trim() : null,
