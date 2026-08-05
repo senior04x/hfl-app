@@ -542,8 +542,19 @@ const MyStatsScreen = ({ navigation }: any) => {
         setUpdateSubmitStatus('loading');
         try {
             const formattedBirthDate = `${updateForm.birthDay}.${updateForm.birthMonth}.${updateForm.birthYear}`;
-            const targetOrgId = player?.organization_id || 1;
+            const targetOrgId = player?.organization_id || player?.org_id || player?.teams?.organization_id || 1;
+            const targetTeamId = player?.team_id || player?.teams?.id || null;
+            const targetLeague = player?.league || player?.teams?.league || '';
             const targetPlayerId = player?.id || user?.id;
+
+            // Ensure photo is uploaded to Supabase Storage if it is a local file URI
+            let finalPhotoUrl = updateForm.photoUrl || player?.photo || player?.avatar || null;
+            if (finalPhotoUrl && (finalPhotoUrl.startsWith('file:') || finalPhotoUrl.startsWith('content:') || finalPhotoUrl.startsWith('ph:'))) {
+                const uRes = await apiService.uploadPhoto(finalPhotoUrl);
+                if (uRes && uRes.url) {
+                    finalPhotoUrl = uRes.url;
+                }
+            }
 
             const pSeries = (updateForm.passportSeries || '').toUpperCase().trim();
             const pNumber = (updateForm.passportNumber || '').trim();
@@ -571,6 +582,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                 },
                 newData: {
                     ...updateForm,
+                    photoUrl: finalPhotoUrl,
                     instagramUsername: cleanInsta,
                     instagramUrl: instaUrl,
                     birthDate: formattedBirthDate,
@@ -580,6 +592,9 @@ const MyStatsScreen = ({ navigation }: any) => {
             };
 
             let commentPayload = '[PROFILE_UPDATE]' + JSON.stringify({ oldData: payload.oldData, newData: payload.newData, playerId: targetPlayerId });
+            if (targetLeague) {
+                commentPayload += ` [LEAGUE:${targetLeague}]`;
+            }
             if (instaUrl) {
                 commentPayload += ` [INSTAGRAM:${instaUrl}]`;
             }
@@ -588,6 +603,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                 .from('applications')
                 .insert([{
                     organization_id: targetOrgId,
+                    team_id: targetTeamId,
                     first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
                     last_name: updateForm.lastName || player?.last_name || '',
                     father_name: updateForm.fatherName || player?.father_name || '',
@@ -596,7 +612,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                     player_number: updateForm.playerNumber ? Number(updateForm.playerNumber) : (player?.player_number || 0),
                     passport_series: pSeries,
                     passport_number: pNumber,
-                    photo_url: updateForm.photoUrl || player?.photo || player?.avatar || null,
+                    photo_url: finalPhotoUrl,
                     birth_date: formattedBirthDate,
                     comment: commentPayload,
                     status: 'pending'
@@ -607,6 +623,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                     .from('applications')
                     .insert([{
                         organization_id: targetOrgId,
+                        team_id: targetTeamId,
                         first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
                         last_name: updateForm.lastName || player?.last_name || '',
                         father_name: updateForm.fatherName || player?.father_name || '',
@@ -615,7 +632,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                         player_number: updateForm.playerNumber ? Number(updateForm.playerNumber) : (player?.player_number || 0),
                         passport_series: pSeries,
                         passport_number: pNumber,
-                        photo_url: updateForm.photoUrl || player?.photo || player?.avatar || null,
+                        photo_url: finalPhotoUrl,
                         birth_date: formattedBirthDate,
                         comment: commentPayload,
                         status: 'PENDING'
