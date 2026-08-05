@@ -11,6 +11,7 @@ import {
     ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import AnimatedBackground from '../components/AnimatedBackground';
@@ -37,10 +38,6 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
     const fetchMatches = async () => {
         try {
             setLoading(true);
-            // Since we need matches for a specific tournament and date, 
-            // we use the same getMatches but with more filters if the backend supported them.
-            // For now, we rely on the matches passed from the previous screen as requested,
-            // but we add this hook for robustness.
             const data = await apiService.getMatches({ tournamentId });
             if (data && Array.isArray(data)) {
                 setMatches(data);
@@ -53,72 +50,112 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
     };
 
     const filteredMatches = matches.filter((match: any) => {
-        const hName = match.homeTeam?.name || match.homeTeamName || '';
-        const aName = match.awayTeam?.name || match.awayTeamName || '';
+        const hName = match.homeTeam?.name || match.homeTeamName || match.home_team?.name || '';
+        const aName = match.awayTeam?.name || match.awayTeamName || match.away_team?.name || '';
         return hName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                aName.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
     const renderMatchItem = ({ item }: { item: any }) => {
-        const matchDate = new Date(item.date || item.scheduledAt);
-        const time = matchDate.toLocaleTimeString('uz-UZ', { 
-            timeZone: 'Asia/Tashkent', 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: false
-        });
-        const dateStr = matchDate.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' });
+        const rawTime = item.match_time || item.time || item.matchTime || item.scheduled_time || item.start_time;
+        let formattedTime = rawTime ? String(rawTime).slice(0, 5) : '';
+
+        if (!formattedTime) {
+            const dateStr = item.date || item.scheduledAt || item.match_date || '';
+            if (dateStr.includes('T') && !dateStr.includes('T00:00:00')) {
+                const matchDate = new Date(dateStr);
+                if (!isNaN(matchDate.getTime())) {
+                    formattedTime = matchDate.toLocaleTimeString('uz-UZ', { 
+                        timeZone: 'Asia/Tashkent', 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                }
+            }
+        }
+        if (!formattedTime) formattedTime = '18:00';
+
+        const isLive = item.status === 'live' || item.status === 'first_half' || item.status === 'second_half' || item.status === 'half_time';
+        const isFinished = item.status === 'finished';
+        const homeName = item.homeTeam?.name || item.homeTeamName || item.home_team?.name || 'Uy jamoasi';
+        const awayName = item.awayTeam?.name || item.awayTeamName || item.away_team?.name || 'Mehmon';
+        const homeLogo = item.homeTeam?.logo || item.homeTeamLogo || item.home_team?.logo_url;
+        const awayLogo = item.awayTeam?.logo || item.awayTeamLogo || item.away_team?.logo_url;
+        const leagueName = item.tournamentName || item.league || tournamentName || "HFL Liga";
+        const venueName = item.venue || item.location || 'AMATORA ARENA';
 
         return (
             <TouchableOpacity
-                style={styles.matchCard}
-                onPress={() => navigation.navigate('MatchDetail', { matchId: item._id })}
+                key={item._id || item.id || Math.random().toString()}
+                style={[
+                    styles.hMatchCard,
+                    isLive && styles.hMatchCardLive
+                ]}
+                onPress={() => navigation.navigate('MatchDetail', { matchId: item._id || item.id })}
             >
-                {/* Top row: Round and Time */}
-                <View style={styles.matchHeader}>
-                    <Text style={styles.matchRound}>{item.round || 'Uchrashuv'}</Text>
-                    <View style={styles.matchTimeContainer}>
-                        <Text style={styles.matchDate}>{dateStr}</Text>
-                    </View>
-                </View>
+                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
 
-                {/* Middle row: Teams and Score */}
-                <View style={styles.matchTeamsRow}>
-                    <View style={[styles.teamContainer, { justifyContent: 'flex-end' }]}>
-                        <Text style={styles.teamName} numberOfLines={1}>{item.homeTeam?.name || item.homeTeamName}</Text>
-                        <View style={styles.logoPlaceholder}>
-                            {item.homeTeam?.logo || item.homeTeamLogo ? (
-                                <Image source={{ uri: item.homeTeam?.logo || item.homeTeamLogo }} style={styles.teamLogo} />
+                <View style={{ padding: 18 }}>
+                    {/* Header */}
+                    <View style={styles.hMatchHeader}>
+                        <Text style={styles.hMatchLeague} numberOfLines={1}>{leagueName}</Text>
+                        {isLive && (
+                            <View style={styles.liveBadgeContainer}>
+                                <View style={styles.liveDot} />
+                                <Text style={styles.liveBadgeText}>LIVE</Text>
+                            </View>
+                        )}
+                        {isFinished && (
+                            <View style={styles.finishBadgeContainer}>
+                                <Text style={styles.finishBadgeText}>YAKUNLANDI</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Teams & Score Row */}
+                    <View style={styles.hMatchTeamsRow}>
+                        {/* Home Team */}
+                        <View style={styles.hTeamColumn}>
+                            <View style={styles.hLogoCircle}>
+                                {homeLogo ? (
+                                    <Image source={{ uri: homeLogo }} style={styles.hTeamLogo} />
+                                ) : (
+                                    <Text style={styles.hLogoText}>{homeName.charAt(0)}</Text>
+                                )}
+                            </View>
+                            <Text style={styles.hTeamName} numberOfLines={1}>{homeName}</Text>
+                        </View>
+
+                        {/* Score or VS Time */}
+                        <View style={styles.hScoreColumn}>
+                            {isLive || isFinished ? (
+                                <Text style={styles.hScoreText}>{item.score?.home ?? item.home_score ?? 0} - {item.score?.away ?? item.away_score ?? 0}</Text>
                             ) : (
-                                <Text style={styles.logoEmoji}>⚽</Text>
+                                <View style={styles.vsContainer}>
+                                    <Text style={styles.hTimeVsText}>{formattedTime}</Text>
+                                    <Text style={styles.vsSubText}>BOSHLANISHI</Text>
+                                </View>
                             )}
+                        </View>
+
+                        {/* Away Team */}
+                        <View style={styles.hTeamColumn}>
+                            <View style={styles.hLogoCircle}>
+                                {awayLogo ? (
+                                    <Image source={{ uri: awayLogo }} style={styles.hTeamLogo} />
+                                ) : (
+                                    <Text style={styles.hLogoText}>{awayName.charAt(0)}</Text>
+                                )}
+                            </View>
+                            <Text style={styles.hTeamName} numberOfLines={1}>{awayName}</Text>
                         </View>
                     </View>
 
-                    <View style={styles.scoreContainer}>
-                        <Text style={item.status === 'scheduled' ? styles.timeVsText : styles.scoreText}>
-                            {item.status === 'finished' || item.status === 'live' 
-                                ? `${item.score?.home || 0}:${item.score?.away || 0}` 
-                                : time}
-                        </Text>
+                    {/* Footer */}
+                    <View style={styles.hMatchFooter}>
+                        <Text style={styles.hMatchDate}>{date} • {venueName}</Text>
                     </View>
-
-                    <View style={[styles.teamContainer, { justifyContent: 'flex-start' }]}>
-                        <View style={styles.logoPlaceholder}>
-                            {item.awayTeam?.logo || item.awayTeamLogo ? (
-                                <Image source={{ uri: item.awayTeam?.logo || item.awayTeamLogo }} style={styles.teamLogo} />
-                            ) : (
-                                <Text style={styles.logoEmoji}>⚽</Text>
-                            )}
-                        </View>
-                        <Text style={styles.teamName} numberOfLines={1}>{item.awayTeam?.name || item.awayTeamName}</Text>
-                    </View>
-                </View>
-
-                {/* Bottom row: Location */}
-                <View style={styles.matchLocationRow}>
-                    <Ionicons name="location-outline" size={14} color="#8A94A6" />
-                    <Text style={styles.locationText}>{item.venue || item.location || 'AMATORA SK'}</Text>
                 </View>
             </TouchableOpacity>
         );
@@ -127,51 +164,51 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
     return (
         <AnimatedBackground overlayOpacity={0.85} backgroundImage={backgroundImage}>
             <SafeAreaView style={{ flex: 1 }}>
-            {/* Custom Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={28} color={Colors.primary} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle} numberOfLines={2} adjustsFontSizeToFit>
-                        {`${tournamentName}, ${date.split(',')[0]}`}
-                    </Text>
+                {/* Custom Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="chevron-back" size={28} color={Colors.primary} />
+                    </TouchableOpacity>
+                    <View style={styles.headerTitleContainer}>
+                        <Text style={styles.headerTitle} numberOfLines={2} adjustsFontSizeToFit>
+                            {`${tournamentName}, ${date.split(',')[0]}`}
+                        </Text>
+                    </View>
+                    <View style={{ width: 40 }} />
                 </View>
-                <View style={{ width: 40 }} />
-            </View>
 
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color={Colors.primary} style={styles.searchIcon} />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Qidiruv"
-                    placeholderTextColor="#8A94A6"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-            </View>
-
-            {/* Matches List */}
-            {loading ? (
-                <View style={[styles.emptyContainer, { flex: 1, justifyContent: 'center' }]}>
-                    <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={[styles.emptyText, { marginTop: 10 }]}>Yuklanmoqda...</Text>
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <Ionicons name="search" size={20} color={Colors.primary} style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Qidiruv"
+                        placeholderTextColor="#8A94A6"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
                 </View>
-            ) : (
-                <FlatList
-                    data={filteredMatches}
-                    keyExtractor={(item) => item._id || item.id}
-                    renderItem={renderMatchItem}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>Topilmadi</Text>
-                        </View>
-                    }
-                />
-            )}
+
+                {/* Matches List */}
+                {loading ? (
+                    <View style={[styles.emptyContainer, { flex: 1, justifyContent: 'center' }]}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={[styles.emptyText, { marginTop: 10 }]}>Yuklanmoqda...</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredMatches}
+                        keyExtractor={(item) => item._id || item.id || Math.random().toString()}
+                        renderItem={renderMatchItem}
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Text style={styles.emptyText}>Topilmadi</Text>
+                            </View>
+                        }
+                    />
+                )}
             </SafeAreaView>
         </AnimatedBackground>
     );
@@ -190,7 +227,7 @@ const styles = StyleSheet.create({
         paddingBottom: 15,
         backgroundColor: 'transparent',
         borderBottomWidth: 1,
-        borderBottomColor: Colors.primary, // Green bottom border for the header
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     },
     backButton: {
         padding: 5,
@@ -210,11 +247,14 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'transparent',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#1A2138',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        marginHorizontal: 16,
+        marginVertical: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     searchIcon: {
         marginRight: 10,
@@ -222,103 +262,153 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 15,
     },
     listContent: {
-        paddingBottom: 20,
+        paddingBottom: 30,
+        paddingTop: 4,
     },
-    matchCard: {
-        backgroundColor: '#0a1020', // Slightly lighter than background but darker than surface
-        borderBottomWidth: 1,
-        borderBottomColor: '#1A2138',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+
+    // Glassmorphic Match Card matching HomeScreen
+    hMatchCard: {
+        marginHorizontal: 16,
+        marginVertical: 8,
+        borderRadius: 18,
+        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+        overflow: 'hidden',
     },
-    matchHeader: {
+    hMatchCardLive: {
+        borderColor: 'rgba(239, 68, 68, 0.45)',
+        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    },
+    hMatchHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 14,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     },
-    matchRound: {
+    hMatchLeague: {
         color: '#8A94A6',
         fontSize: 13,
-    },
-    matchTimeContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    matchDate: {
-        color: '#8A94A6',
-        fontSize: 13,
-    },
-    timeDivider: {
-        width: 1,
-        height: 12,
-        backgroundColor: '#1A2138',
-        marginHorizontal: 8,
-    },
-    matchTime: {
-        color: '#8A94A6',
-        fontSize: 13,
-    },
-    matchTeamsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 12,
-    },
-    teamContainer: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    teamName: {
-        color: '#FFF',
-        fontSize: 18,
         fontWeight: 'bold',
-        marginHorizontal: 10,
+        flex: 1,
+        textTransform: 'uppercase',
     },
-    teamLogo: {
-        width: 20,
-        height: 20,
+    hMatchTeamsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 14,
+    },
+    hTeamColumn: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    hLogoCircle: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    hTeamLogo: {
+        width: 44,
+        height: 44,
         resizeMode: 'contain',
     },
-    logoPlaceholder: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: '#1A2138',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    logoEmoji: {
-        fontSize: 16,
-    },
-    scoreContainer: {
-        paddingHorizontal: 15,
-    },
-    scoreText: {
+    hLogoText: {
         color: '#FFF',
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
     },
-    timeVsText: {
+    hTeamName: {
+        color: '#FFF',
+        fontSize: 13,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginTop: 2,
+    },
+    hScoreColumn: {
+        width: 90,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    hScoreText: {
+        color: '#FFF',
+        fontSize: 26,
+        fontWeight: '900',
+    },
+    vsContainer: {
+        alignItems: 'center',
+    },
+    hTimeVsText: {
         color: Colors.primary,
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '900',
         fontStyle: 'italic',
     },
-    matchLocationRow: {
+    vsSubText: {
+        color: '#8A94A6',
+        fontSize: 9,
+        fontWeight: '700',
+        marginTop: 2,
+        letterSpacing: 0.5,
+    },
+    hMatchFooter: {
+        alignItems: 'center',
+        paddingTop: 6,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    },
+    hMatchDate: {
+        color: '#8A94A6',
+        fontSize: 11,
+        fontWeight: '500',
+    },
+
+    liveBadgeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 4,
     },
-    locationText: {
+    liveDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: Colors.danger,
+        marginRight: 4,
+    },
+    liveBadgeText: {
+        color: Colors.danger,
+        fontSize: 10,
+        fontWeight: 'bold',
+        letterSpacing: 0.5,
+    },
+    finishBadgeContainer: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 4,
+    },
+    finishBadgeText: {
         color: '#8A94A6',
-        fontSize: 12,
-        marginLeft: 6,
+        fontSize: 10,
+        fontWeight: 'bold',
+        letterSpacing: 0.5,
     },
+
     emptyContainer: {
         padding: 40,
         alignItems: 'center',
