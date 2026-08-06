@@ -950,27 +950,83 @@ export const apiService = {
         }
     },
 
+    // --- Voting System ---
+    getVotesForLeague: async (leagueId: string) => {
+        try {
+            const orgId = getOrgId();
+            const { data, error } = await supabase.from('poll_votes')
+                .select('*')
+                .eq('league_id', leagueId)
+                .eq('org_id', orgId);
+            if (error) {
+                // If table doesn't exist yet, just return empty gracefully
+                if (error.code === '42P01') return [];
+                throw error;
+            }
+            return data || [];
+        } catch (err) {
+            console.warn('getVotesForLeague warn:', err);
+            return [];
+        }
+    },
+    
+    castVote: async (playerId: string, leagueId: string, deviceId: string) => {
+        try {
+            const orgId = getOrgId();
+            const { data, error } = await supabase.from('poll_votes').insert({
+                player_id: playerId,
+                league_id: leagueId,
+                device_id: deviceId,
+                org_id: orgId
+            }).select().single();
+            if (error) {
+                if (error.code === '42P01') return { success: false, message: 'Table not created yet' };
+                throw error;
+            }
+            return { success: true, data };
+        } catch (err) {
+            console.warn('castVote warn:', err);
+            return { success: false };
+        }
+    },
+    
+    removeVote: async (playerId: string, leagueId: string, deviceId: string) => {
+        try {
+            const orgId = getOrgId();
+            const { error } = await supabase.from('poll_votes')
+                .delete()
+                .match({ player_id: playerId, league_id: leagueId, device_id: deviceId, org_id: orgId });
+            if (error) {
+                if (error.code === '42P01') return { success: false, message: 'Table not created yet' };
+                throw error;
+            }
+            return { success: true };
+        } catch (err) {
+            console.warn('removeVote warn:', err);
+            return { success: false };
+        }
+    },
+
     // Slider Top Scorers by League
     getSliderItems: async () => {
-        const defaultLeagues = [
-            { id: 'super', leagueName: 'Super liga', theme: ['rgba(215, 30, 20, 0.45)', 'rgba(255, 75, 40, 0.35)', 'rgba(255, 150, 60, 0.25)'], topPlayer: null, round: 1 },
-            { id: 'pro', leagueName: 'Pro liga', theme: ['rgba(0, 80, 200, 0.45)', 'rgba(0, 150, 250, 0.35)', 'rgba(0, 220, 255, 0.25)'], topPlayer: null, round: 1 },
-            { id: '3liga', leagueName: '3-liga', theme: ['rgba(160, 10, 210, 0.45)', 'rgba(210, 40, 250, 0.35)', 'rgba(255, 90, 255, 0.25)'], topPlayer: null, round: 1 },
-            { id: '7x7', leagueName: '7x7 liga', theme: ['rgba(5, 80, 170, 0.45)', 'rgba(30, 140, 240, 0.35)', 'rgba(90, 190, 255, 0.25)'], topPlayer: null, round: 1 },
+        let defaultLeagues: any[] = [
+            { id: 'super', leagueName: 'Super liga', theme: ['rgba(215, 30, 20, 0.45)', 'rgba(255, 75, 40, 0.35)', 'rgba(255, 150, 60, 0.25)'], topPlayer: null, round: 1, bgImage: null },
+            { id: 'pro', leagueName: 'Pro liga', theme: ['rgba(0, 80, 200, 0.45)', 'rgba(0, 150, 250, 0.35)', 'rgba(0, 220, 255, 0.25)'], topPlayer: null, round: 1, bgImage: null },
+            { id: '3liga', leagueName: '3-liga', theme: ['rgba(160, 10, 210, 0.45)', 'rgba(210, 40, 250, 0.35)', 'rgba(255, 90, 255, 0.25)'], topPlayer: null, round: 1, bgImage: null },
+            { id: '7x7', leagueName: '7x7 liga', theme: ['rgba(5, 80, 170, 0.45)', 'rgba(30, 140, 240, 0.35)', 'rgba(90, 190, 255, 0.25)'], topPlayer: null, round: 3, bgImage: null },
         ];
 
         try {
-            const { data: events } = await supabase.from('match_events').select('*').in('event_type', ['goal', 'assist']);
-            if (!events || events.length === 0) return defaultLeagues;
-
-            const { data: players } = await supabase.from('applications').select('*');
+            const { data: dbLeagues } = await supabase.from('leagues').select('*');
+            const { data: dbMatches } = await supabase.from('matches').select('home_team_id, away_team_id, league, round, tour');
             const { data: teams } = await supabase.from('teams').select('*');
-
-            const playersMap: any = {};
-            if (players) players.forEach(p => { playersMap[p.id] = p; });
+            const { data: players } = await supabase.from('applications').select('*');
 
             const teamsMap: any = {};
             if (teams) teams.forEach(t => { teamsMap[t.id] = t; });
+
+            const playersMap: any = {};
+            if (players) players.forEach(p => { playersMap[p.id] = p; });
 
             const getLeagueKey = (lStr: string) => {
                 if (!lStr) return '';
@@ -981,6 +1037,47 @@ export const apiService = {
                 if (l.includes('7')) return '7x7 liga';
                 return l;
             };
+
+            const roundMap: Record<string, number> = {};
+            if (dbMatches) {
+                dbMatches.forEach((m: any) => {
+                    let lStr = m.league;
+                    if (!lStr) {
+                        const hTeam = teamsMap[m.home_team_id];
+                        const aTeam = teamsMap[m.away_team_id];
+                        lStr = hTeam?.league || aTeam?.league || '';
+                    }
+                    const lKey = getLeagueKey(lStr);
+                    const r = Number(m.round || m.tour || 0);
+                    if (lKey && r > (roundMap[lKey] || 0)) {
+                        roundMap[lKey] = r;
+                    }
+                });
+            }
+
+            if (dbLeagues) {
+                const bgMap: any = {};
+                dbLeagues.forEach((l: any) => {
+                    if (l.name) bgMap[l.name.toLowerCase().trim()] = l.export_bg_url;
+                    const lKey = getLeagueKey(l.name);
+                    const r = Number(l.current_round || l.round || 0);
+                    if (lKey && r > (roundMap[lKey] || 0)) {
+                        roundMap[lKey] = r;
+                    }
+                });
+                defaultLeagues = defaultLeagues.map(l => ({
+                    ...l,
+                    bgImage: bgMap[l.leagueName.toLowerCase()] || null,
+                    round: roundMap[l.leagueName] || (l.id === '7x7' ? 3 : 1)
+                }));
+            }
+
+            const { data: events } = await supabase.from('match_events').select('*').in('event_type', ['goal', 'assist']);
+            if (!events || events.length === 0) return defaultLeagues;
+
+
+
+
 
             const statsByLeague: any = {};
             events.forEach(e => {
@@ -1013,6 +1110,7 @@ export const apiService = {
                     .sort((a: any, b: any) => b.goals - a.goals);
                 return {
                     ...l,
+                    round: roundMap[l.leagueName] || (l.id === '7x7' ? 3 : 1),
                     topPlayer: pList.length > 0 ? pList[0] : null
                 };
             });

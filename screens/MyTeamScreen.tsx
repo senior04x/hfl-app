@@ -47,6 +47,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isPlayersLoading, setIsPlayersLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'squad' | 'tactics' | 'matches'>('squad');
     const [scrollEnabled, setScrollEnabled] = useState(true);
 
@@ -69,25 +70,30 @@ export default function MyTeamScreen({ route, navigation }: any) {
 
     const fetchData = async () => {
         try {
-            setIsLoading(true);
+            if (!team) setIsLoading(true);
+            setIsPlayersLoading(true);
             if (!activeTeamId) {
                 setIsLoading(false);
+                setIsPlayersLoading(false);
                 return;
             }
 
-            const [teamData, playersData, matchesData] = await Promise.all([
-                apiService.getTeamById(activeTeamId),
-                apiService.getPlayersByTeam(activeTeamId),
-                apiService.getMatches({ teamId: activeTeamId })
+            const teamData = await apiService.getTeamById(activeTeamId).catch(() => null);
+            if (teamData) setTeam(teamData);
+            setIsLoading(false);
+
+            const [playersData, matchesData] = await Promise.all([
+                apiService.getPlayersByTeam(activeTeamId).catch(() => []),
+                apiService.getMatches({ teamId: activeTeamId }).catch(() => null)
             ]);
 
-            if (teamData) setTeam(teamData);
             setPlayers(playersData || []);
             setMatches(matchesData?.slice(0, 8) || []);
         } catch (error) {
             console.error('MyTeamScreen fetch error:', error);
         } finally {
             setIsLoading(false);
+            setIsPlayersLoading(false);
         }
     };
 
@@ -400,66 +406,85 @@ export default function MyTeamScreen({ route, navigation }: any) {
                 <View style={styles.mainContent} {...panResponder.panHandlers}>
                     <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
                         {activeTab === 'squad' && (
-                            <View style={styles.squadGrid}>
-                                {players.map((player: any, idx: number) => {
-                                    const pPhone = player.phone || player.phoneNumber || player.phone_number || player.tel;
-                                    return (
-                                        <View
-                                            key={player._id || player.id || idx}
-                                            style={styles.playerCard}
-                                        >
-                                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
-                                            <TouchableOpacity
-                                                activeOpacity={0.8}
-                                                onPress={() => navigation.navigate('PlayerStats', { playerId: player._id || player.id, player })}
-                                            >
-                                                <View style={styles.playerPhotoContainer}>
-                                                    <SmartImage uri={player.photo || player.photo_url || player.avatar} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person" />
-                                                    <View style={styles.playerNumberBadge}>
-                                                        <Text style={styles.playerNumberText}>#{player.number || player.player_number || player.shirt_number || '10'}</Text>
-                                                    </View>
-                                                </View>
-                                                <View style={styles.playerInfo}>
-                                                    <Text style={styles.playerCardName} numberOfLines={1}>
-                                                        <Text style={{ color: '#00FF87' }}>{(player.firstName || player.name || player.first_name || 'FUTBOLCHI').toUpperCase()}</Text>
-                                                    </Text>
-                                                    <Text style={styles.playerCardLastName} numberOfLines={1}>
-                                                        {(player.lastName || player.last_name || '').toUpperCase()}
-                                                    </Text>
-                                                    <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position || 'O\'yinchi').toUpperCase()}</Text>
-                                                </View>
-                                            </TouchableOpacity>
-                                            {/* PHONE — ONLY FOR THIS TEAM'S MANAGER */}
-                                            {canEdit && (
-                                                <View style={{ marginTop: 6 }}>
-                                                    {pPhone ? (
-                                                        <TouchableOpacity
-                                                            style={styles.phoneBadgeContainer}
-                                                            activeOpacity={0.6}
-                                                            onPress={() => Linking.openURL(`tel:${pPhone}`)}
-                                                        >
-                                                            <Ionicons name="call" size={12} color="#00FF87" style={{ marginRight: 5 }} />
-                                                            <Text style={styles.phoneBadgeText} numberOfLines={1}>{pPhone}</Text>
-                                                        </TouchableOpacity>
-                                                    ) : (
-                                                        <TouchableOpacity
-                                                            style={styles.addPhoneBtn}
-                                                            activeOpacity={0.6}
-                                                            onPress={() => {
-                                                                setSelectedPlayerForPhone(player);
-                                                                setPhoneInputText('');
-                                                            }}
-                                                        >
-                                                            <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
-                                                            <Text style={styles.addPhoneBtnText}>+ TEL</Text>
-                                                        </TouchableOpacity>
-                                                    )}
-                                                </View>
-                                            )}
+                            isPlayersLoading ? (
+                                <View style={styles.squadGrid}>
+                                    {[1, 2, 3, 4, 5, 6].map((key) => (
+                                        <View key={key} style={[styles.playerCard, { opacity: 0.5, backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                                            <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+                                            <View style={styles.playerPhotoContainer}>
+                                                <View style={[styles.playerPhoto, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
+                                                <View style={[styles.playerNumberBadge, { backgroundColor: 'rgba(0,255,135,0.3)', width: 24, height: 14 }]} />
+                                            </View>
+                                            <View style={styles.playerInfo}>
+                                                <View style={{ width: '80%', height: 12, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 4, marginBottom: 4 }} />
+                                                <View style={{ width: '60%', height: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 4, marginBottom: 6 }} />
+                                                <View style={{ width: '50%', height: 8, backgroundColor: 'rgba(0,255,135,0.2)', borderRadius: 4 }} />
+                                            </View>
                                         </View>
-                                    );
-                                })}
-                            </View>
+                                    ))}
+                                </View>
+                            ) : (
+                                <View style={styles.squadGrid}>
+                                    {players.map((player: any, idx: number) => {
+                                        const pPhone = player.phone || player.phoneNumber || player.phone_number || player.tel;
+                                        return (
+                                            <View
+                                                key={player._id || player.id || idx}
+                                                style={styles.playerCard}
+                                            >
+                                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+                                                <TouchableOpacity
+                                                    activeOpacity={0.8}
+                                                    onPress={() => navigation.navigate('PlayerStats', { playerId: player._id || player.id, player })}
+                                                >
+                                                    <View style={styles.playerPhotoContainer}>
+                                                        <SmartImage uri={player.photo || player.photo_url || player.avatar} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person" />
+                                                        <View style={styles.playerNumberBadge}>
+                                                            <Text style={styles.playerNumberText}>#{player.number || player.player_number || player.shirt_number || '10'}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <View style={styles.playerInfo}>
+                                                        <Text style={styles.playerCardName} numberOfLines={1}>
+                                                            <Text style={{ color: '#00FF87' }}>{(player.firstName || player.name || player.first_name || 'FUTBOLCHI').toUpperCase()}</Text>
+                                                        </Text>
+                                                        <Text style={styles.playerCardLastName} numberOfLines={1}>
+                                                            {(player.lastName || player.last_name || '').toUpperCase()}
+                                                        </Text>
+                                                        <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position || 'O\'yinchi').toUpperCase()}</Text>
+                                                    </View>
+                                                </TouchableOpacity>
+                                                {/* PHONE — ONLY FOR THIS TEAM'S MANAGER */}
+                                                {canEdit && (
+                                                    <View style={{ marginTop: 6 }}>
+                                                        {pPhone ? (
+                                                            <TouchableOpacity
+                                                                style={styles.phoneBadgeContainer}
+                                                                activeOpacity={0.6}
+                                                                onPress={() => Linking.openURL(`tel:${pPhone}`)}
+                                                            >
+                                                                <Ionicons name="call" size={12} color="#00FF87" style={{ marginRight: 5 }} />
+                                                                <Text style={styles.phoneBadgeText} numberOfLines={1}>{pPhone}</Text>
+                                                            </TouchableOpacity>
+                                                        ) : (
+                                                            <TouchableOpacity
+                                                                style={styles.addPhoneBtn}
+                                                                activeOpacity={0.6}
+                                                                onPress={() => {
+                                                                    setSelectedPlayerForPhone(player);
+                                                                    setPhoneInputText('');
+                                                                }}
+                                                            >
+                                                                <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
+                                                                <Text style={styles.addPhoneBtnText}>+ TEL</Text>
+                                                            </TouchableOpacity>
+                                                        )}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            )
                         )}
 
                         {activeTab === 'tactics' && (

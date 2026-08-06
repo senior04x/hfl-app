@@ -107,27 +107,55 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 if (navTournament?.name) {
                     mergedTournament.name = navTournament.name;
                 }
+
+                let startDateVal = mergedTournament?.start_date || mergedTournament?.startDate || navTournament?.start_date || navTournament?.startDate;
+                let endDateVal = mergedTournament?.end_date || mergedTournament?.endDate || navTournament?.end_date || navTournament?.endDate;
+
+                const tId = mergedTournament?.id || mergedTournament?._id || currentTournamentId;
+                if (tId && (!startDateVal || !endDateVal)) {
+                    try {
+                        const { data: dateSponsors } = await supabase.from('sponsors').select('name, logo_url').in('name', [
+                            `LEAGUE_START_DATE_${tId}`,
+                            `LEAGUE_END_DATE_${tId}`
+                        ]);
+                        if (dateSponsors) {
+                            dateSponsors.forEach((s: any) => {
+                                if (s.name === `LEAGUE_START_DATE_${tId}` && !startDateVal) startDateVal = s.logo_url;
+                                if (s.name === `LEAGUE_END_DATE_${tId}` && !endDateVal) endDateVal = s.logo_url;
+                            });
+                        }
+                    } catch (e) {}
+                }
+
+                if (startDateVal) mergedTournament.startDate = startDateVal;
+                if (endDateVal) mergedTournament.endDate = endDateVal;
+
                 setTournamentData(mergedTournament);
 
                 const resolvedTeams = teamsData && teamsData.length > 0 ? teamsData : (mergedTournament?.teams || []);
-                setTeams(resolvedTeams);
 
-                // Populate standings sorted by points -> goal difference -> goals for
+                // Populate standings sorted strictly by points -> goal difference -> goals for -> wins
                 const sortedStandings = [...resolvedTeams].sort((a: any, b: any) => {
-                    const ptsA = a.points ?? a.stats?.points ?? 0;
-                    const ptsB = b.points ?? b.stats?.points ?? 0;
+                    const ptsA = a.points ?? a.stats?.points ?? a.pts ?? 0;
+                    const ptsB = b.points ?? b.stats?.points ?? b.pts ?? 0;
                     if (ptsB !== ptsA) return ptsB - ptsA;
 
-                    const gfA = a.goalsFor ?? a.stats?.goalsFor ?? 0;
-                    const gaA = a.goalsAgainst ?? a.stats?.goalsAgainst ?? 0;
-                    const gfB = b.goalsFor ?? b.stats?.goalsFor ?? 0;
-                    const gaB = b.goalsAgainst ?? b.stats?.goalsAgainst ?? 0;
-                    const gdA = a.goalDifference ?? a.stats?.goalDifference ?? (gfA - gaA);
-                    const gdB = b.goalDifference ?? b.stats?.goalDifference ?? (gfB - gaB);
+                    const gfA = a.goalsFor ?? a.stats?.goalsFor ?? a.gf ?? 0;
+                    const gaA = a.goalsAgainst ?? a.stats?.goalsAgainst ?? a.ga ?? 0;
+                    const gfB = b.goalsFor ?? b.stats?.goalsFor ?? b.gf ?? 0;
+                    const gaB = b.goalsAgainst ?? b.stats?.goalsAgainst ?? b.ga ?? 0;
+                    const gdA = a.goalDifference ?? a.stats?.goalDifference ?? a.gd ?? (gfA - gaA);
+                    const gdB = b.goalDifference ?? b.stats?.goalDifference ?? b.gd ?? (gfB - gaB);
                     if (gdB !== gdA) return gdB - gdA;
 
-                    return gfB - gfA;
+                    if (gfB !== gfA) return gfB - gfA;
+
+                    const winsA = a.won ?? a.wins ?? a.stats?.won ?? a.stats?.wins ?? 0;
+                    const winsB = b.won ?? b.wins ?? b.stats?.won ?? b.stats?.wins ?? 0;
+                    return winsB - winsA;
                 });
+
+                setTeams(sortedStandings);
                 setStandings(sortedStandings);
 
                 // Fetch real organizer details from Supabase 'organizations' table using organization_id
@@ -533,25 +561,29 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         </View>
     );
 
-    const renderOverview = () => (
-        <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 110 }}>
-            {/* Information Card */}
-            <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>MA'LUMOTLAR</Text>
-                </View>
+    const renderOverview = () => {
+        const startDateVal = tournamentData?.start_date || tournamentData?.startDate;
+        const endDateVal = tournamentData?.end_date || tournamentData?.endDate;
 
-                <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Boshlanish sanasi</Text>
-                    <View style={styles.dashedLine} />
-                    <Text style={styles.infoValue}>{formatDate(tournamentData?.startDate)}</Text>
-                </View>
+        return (
+            <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 110 }}>
+                {/* Information Card */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>MA'LUMOTLAR</Text>
+                    </View>
 
-                <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Tugash sanasi</Text>
-                    <View style={styles.dashedLine} />
-                    <Text style={styles.infoValue}>{formatDate(tournamentData?.endDate)}</Text>
-                </View>
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Boshlanish sanasi</Text>
+                        <View style={styles.dashedLine} />
+                        <Text style={styles.infoValue}>{formatDate(startDateVal)}</Text>
+                    </View>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Tugash sanasi</Text>
+                        <View style={styles.dashedLine} />
+                        <Text style={styles.infoValue}>{formatDate(endDateVal)}</Text>
+                    </View>
 
                 <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Holati</Text>
@@ -666,6 +698,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             )}
         </ScrollView>
     );
+};
 
     {/* Standings Table matching the exact screenshot design! */}
     const renderStandings = () => (

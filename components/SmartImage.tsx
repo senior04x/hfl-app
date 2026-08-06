@@ -27,24 +27,25 @@ export default function SmartImage({
     contentFit = 'cover',
     fallbackIcon = 'image-outline',
     fallbackIconSize = 36,
-    borderRadius = 0,
+    borderRadius,
 }: SmartImageProps) {
+    const flattenedStyle = StyleSheet.flatten(style) || {};
+    const effectiveRadius = borderRadius ?? flattenedStyle.borderRadius ?? 0;
 
     if (!uri) {
         return (
-            <View style={[styles.fallback, style, borderRadius > 0 && { borderRadius }]}>
+            <View style={[styles.fallback, style, effectiveRadius > 0 && { borderRadius: effectiveRadius, overflow: 'hidden' }]}>
                 <Ionicons name={fallbackIcon} size={fallbackIconSize} color={Colors.textMuted} />
             </View>
         );
     }
 
-    // Convert null to undefined for compatibility with expo-image
     const imageUri = uri || undefined;
 
     return (
         <Image
             source={{ uri: imageUri }}
-            style={[style, borderRadius > 0 && { borderRadius, overflow: 'hidden' }]}
+            style={[style, effectiveRadius > 0 && { borderRadius: effectiveRadius, overflow: 'hidden' }]}
             contentFit={contentFit}
             cachePolicy="memory-disk"
             placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}

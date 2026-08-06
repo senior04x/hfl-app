@@ -788,36 +788,41 @@ const TeamChatScreen = ({ route, navigation }: any) => {
             <Modal
                 visible={showMembers}
                 animationType="slide"
+                transparent={false}
                 presentationStyle="fullScreen"
                 statusBarTranslucent={true}
                 onRequestClose={() => setShowMembers(false)}
             >
-                <View style={{ flex: 1, backgroundColor: '#0a0f1d' }}>
-                    <AnimatedBackground overlayOpacity={0.85} />
-                    
-                    <SafeAreaView style={{ flex: 1 }}>
-                        <View style={{ paddingBottom: 10 }}>
+                <AnimatedBackground overlayOpacity={0.92}>
+                    <View style={{ flex: 1, paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 28)) }}>
+                        {/* Top Header Section */}
+                        <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', alignItems: 'center', position: 'relative' }}>
                             <TouchableOpacity 
-                                style={styles.closeButton} 
+                                style={{ position: 'absolute', top: 10, right: 20, zIndex: 100, backgroundColor: 'rgba(255,255,255,0.1)', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }} 
                                 onPress={() => setShowMembers(false)}
+                                activeOpacity={0.7}
                             >
-                                <Ionicons name="close" size={28} color="#FFF" />
+                                <Ionicons name="close" size={24} color="#FFF" />
                             </TouchableOpacity>
 
-                            <View style={styles.modalHeader}>
-                                <SmartImage uri={teamInfo?.logo} style={styles.modalTeamLogo} contentFit="contain" />
-                                <Text style={styles.modalTeamName}>{teamInfo?.name?.toUpperCase()}</Text>
-                                <Text style={{ color: Colors.primary, fontSize: 12, fontWeight: '900', marginTop: 5 }}>JAMOADAGI BARCHA ISHTIROKCHILAR</Text>
-                            </View>
+                            <SmartImage uri={teamInfo?.logo} style={{ width: 60, height: 60, marginBottom: 8 }} contentFit="contain" />
+                            <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '900', textAlign: 'center', letterSpacing: 1 }}>{teamInfo?.name?.toUpperCase()}</Text>
+                            <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: '900', marginTop: 4, letterSpacing: 0.5 }}>
+                                JAMOADAGI BARCHA ISHTIROKCHILAR ({teamPlayers.length})
+                            </Text>
                         </View>
 
+                        {/* Full Height Members List */}
                         <FlatList
                             data={teamPlayers}
-                            keyExtractor={(item) => item._id || item.id}
-                            contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+                            keyExtractor={(item, index) => item._id || item.id || String(index)}
+                            style={{ flex: 1 }}
+                            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+                            showsVerticalScrollIndicator={false}
                             renderItem={({ item }) => (
                                 <TouchableOpacity 
                                     style={styles.memberItem}
+                                    activeOpacity={0.8}
                                     onPress={() => {
                                         setShowMembers(false);
                                         navigation.navigate('PlayerStats', { playerId: item._id });
@@ -826,7 +831,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                     <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
                                     <SmartImage 
                                         uri={item.photo || item.avatar} 
-                                        style={{ width: 50, height: 50, borderRadius: 12 }} 
+                                        style={{ width: 48, height: 48, borderRadius: 12 }} 
                                         fallbackIcon="person"
                                     />
                                     <View style={styles.memberInfo}>
@@ -839,8 +844,8 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                 </TouchableOpacity>
                             )}
                         />
-                    </SafeAreaView>
-                </View>
+                    </View>
+                </AnimatedBackground>
             </Modal>
         </AnimatedBackground>
     );

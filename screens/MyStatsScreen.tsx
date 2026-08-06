@@ -161,6 +161,25 @@ const MyStatsScreen = ({ navigation }: any) => {
     const [instagramInput, setInstagramInput] = useState('');
     const [savingInstagram, setSavingInstagram] = useState(false);
     const [instagramUsername, setInstagramUsername] = useState('');
+    const [openingInstagram, setOpeningInstagram] = useState(false);
+
+    const handleOpenInstagram = async (url: string) => {
+        if (!url || openingInstagram) return;
+        try {
+            setOpeningInstagram(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            const canOpen = await Linking.canOpenURL(url);
+            if (canOpen) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert('Xatolik', 'Instagram havolasini ochib bo\'lmadi');
+            }
+        } catch (error) {
+            console.error('Error opening instagram URL:', error);
+        } finally {
+            setTimeout(() => setOpeningInstagram(false), 1200);
+        }
+    };
 
     // Profile Update Request state
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
@@ -852,17 +871,15 @@ const MyStatsScreen = ({ navigation }: any) => {
                 style={{ flex: 1 }}
             >
                 <View style={styles.heroSection}>
-                    {/* AMATORA BRAND HEADER (ONLY ON IOS, SIDE-BY-SIDE WITH LOGO) */}
-                    {Platform.OS === 'ios' && (
-                        <View style={styles.brandHeaderWrapper}>
-                            <Image
-                                source={require('../assets/logo.png')}
-                                style={{ width: 18, height: 18, marginRight: 6 }}
-                                resizeMode="contain"
-                            />
-                            <Text style={styles.brandText}>AMATORA</Text>
-                        </View>
-                    )}
+                    {/* AMATORA BRAND HEADER (SIDE-BY-SIDE WITH LOGO) */}
+                    <View style={styles.brandHeaderWrapper}>
+                        <Image
+                            source={require('../assets/logo.png')}
+                            style={{ width: 18, height: 18, marginRight: 6 }}
+                            resizeMode="contain"
+                        />
+                        <Text style={styles.brandText}>AMATORA</Text>
+                    </View>
 
                     {/* ⚽ PARALLEL TOP ROW: BACK BUTTON ALIGNED TO TOP EDGE PARALLEL WITH PLAYER PHOTO */}
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: 30, marginBottom: 20 }}>
@@ -988,23 +1005,30 @@ const MyStatsScreen = ({ navigation }: any) => {
                         {/* INSTAGRAM LINK BADGE */}
                         {instagramUrl ? (
                             <TouchableOpacity
-                                onPress={() => Linking.openURL(instagramUrl)}
+                                onPress={() => handleOpenInstagram(instagramUrl)}
+                                disabled={openingInstagram}
+                                activeOpacity={0.7}
                                 style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
+                                    justifyContent: 'center',
                                     gap: 6,
-                                    backgroundColor: 'rgba(225, 48, 108, 0.12)',
-                                    borderColor: 'rgba(225, 48, 108, 0.35)',
+                                    backgroundColor: 'rgba(225, 48, 108, 0.14)',
+                                    borderColor: 'rgba(225, 48, 108, 0.4)',
                                     borderWidth: 1,
                                     paddingHorizontal: 12,
-                                    paddingVertical: 4,
-                                    borderRadius: 14,
+                                    height: 26,
+                                    borderRadius: 13,
                                     marginTop: 10
                                 }}
                             >
-                                <FontAwesome5 name="instagram" size={12} color="#E1306C" />
-                                <Text style={{ color: '#E1306C', fontSize: 11, fontWeight: '800' }}>
-                                    @{instagramUsername}
+                                {openingInstagram ? (
+                                    <ActivityIndicator size="small" color="#E1306C" style={{ transform: [{ scale: 0.65 }], width: 14, height: 14 }} />
+                                ) : (
+                                    <FontAwesome5 name="instagram" size={12} color="#E1306C" />
+                                )}
+                                <Text style={{ color: '#E1306C', fontSize: 11, fontWeight: '800', lineHeight: 14 }}>
+                                    {openingInstagram ? 'OCHILMOQDA...' : `@${instagramUsername}`}
                                 </Text>
                             </TouchableOpacity>
                         ) : null}
@@ -1324,33 +1348,36 @@ const MyStatsScreen = ({ navigation }: any) => {
                             <View style={styles.inputGroup}>
                                 <Text style={styles.inputLabel}>TUG'ILGAN SANA (KUN / OY / YIL)</Text>
                                 <View style={{ flexDirection: 'row', gap: 6 }}>
-                                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden' }}>
+                                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden', height: 114, justifyContent: 'center' }}>
                                         <Picker
                                             selectedValue={updateForm.birthDay}
                                             onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthDay: val }))}
-                                            style={{ color: '#FFF' }}
+                                            style={{ color: '#FFF', height: 114 }}
+                                            itemStyle={{ height: 114, color: '#FFF' }}
                                             dropdownIconColor="#FFF"
                                         >
                                             {days.map(d => <Picker.Item key={d} label={d} value={d} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}
                                         </Picker>
                                     </View>
 
-                                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden' }}>
+                                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden', height: 114, justifyContent: 'center' }}>
                                         <Picker
                                             selectedValue={updateForm.birthMonth}
                                             onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthMonth: val }))}
-                                            style={{ color: '#FFF' }}
+                                            style={{ color: '#FFF', height: 114 }}
+                                            itemStyle={{ height: 114, color: '#FFF' }}
                                             dropdownIconColor="#FFF"
                                         >
                                             {months.map(m => <Picker.Item key={m} label={m} value={m} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}
                                         </Picker>
                                     </View>
 
-                                    <View style={{ flex: 1.2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden' }}>
+                                    <View style={{ flex: 1.2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden', height: 114, justifyContent: 'center' }}>
                                         <Picker
                                             selectedValue={updateForm.birthYear}
                                             onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthYear: val }))}
-                                            style={{ color: '#FFF' }}
+                                            style={{ color: '#FFF', height: 114 }}
+                                            itemStyle={{ height: 114, color: '#FFF' }}
                                             dropdownIconColor="#FFF"
                                         >
                                             {years.map(y => <Picker.Item key={y} label={y} value={y} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}

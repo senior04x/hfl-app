@@ -53,22 +53,33 @@ const StandingsScreen = ({ route, navigation }: any) => {
             const tournament = await apiService.getTournamentById(targetId);
             if (tournament) {
                 setCurrentTournament(tournament);
-                if (tournament.standings && tournament.standings.length > 0) {
-                    setStandings(tournament.standings);
-                } else {
-                    // Fallback to fetching teams directly and sorting if standings field is missing
-                    const teamsData = await apiService.getTeams(1, 100, targetId);
-                    const sorted = (teamsData || []).sort((a: any, b: any) => {
-                        const statsA = a.stats || {};
-                        const statsB = b.stats || {};
-                        if ((statsB.points || 0) !== (statsA.points || 0)) return (statsB.points || 0) - (statsA.points || 0);
-                        const gdA = (statsA.goalsFor || 0) - (statsA.goalsAgainst || 0);
-                        const gdB = (statsB.goalsFor || 0) - (statsB.goalsAgainst || 0);
-                        if (gdB !== gdA) return gdB - gdA;
-                        return (statsB.goalsFor || 0) - (statsA.goalsFor || 0);
-                    });
-                    setStandings(sorted);
-                }
+                const rawStandings = (tournament.standings && tournament.standings.length > 0) 
+                    ? tournament.standings 
+                    : (await apiService.getTeams(1, 100, targetId) || []);
+
+                const sorted = [...rawStandings].sort((a: any, b: any) => {
+                    const statsA = a.stats || {};
+                    const statsB = b.stats || {};
+                    const ptsA = a.points ?? statsA.points ?? a.pts ?? 0;
+                    const ptsB = b.points ?? statsB.points ?? b.pts ?? 0;
+                    if (ptsB !== ptsA) return ptsB - ptsA;
+
+                    const gfA = a.goalsFor ?? statsA.goalsFor ?? a.gf ?? 0;
+                    const gaA = a.goalsAgainst ?? statsA.goalsAgainst ?? a.ga ?? 0;
+                    const gfB = b.goalsFor ?? statsB.goalsFor ?? b.gf ?? 0;
+                    const gaB = b.goalsAgainst ?? statsB.goalsAgainst ?? b.ga ?? 0;
+                    const gdA = a.goalDifference ?? statsA.goalDifference ?? a.gd ?? (gfA - gaA);
+                    const gdB = b.goalDifference ?? statsB.goalDifference ?? b.gd ?? (gfB - gaB);
+                    if (gdB !== gdA) return gdB - gdA;
+
+                    if (gfB !== gfA) return gfB - gfA;
+                    
+                    const winsA = a.won ?? a.wins ?? statsA.won ?? statsA.wins ?? 0;
+                    const winsB = b.won ?? b.wins ?? statsB.won ?? statsB.wins ?? 0;
+                    return winsB - winsA;
+                });
+
+                setStandings(sorted);
             }
         } catch (error) {
             console.error('Error loading data:', error);

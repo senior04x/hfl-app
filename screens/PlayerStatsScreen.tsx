@@ -11,8 +11,10 @@ import {
     Image,
     Animated,
     StatusBar,
-    Platform
+    Platform,
+    Alert
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { apiService } from '../services/apiService';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -23,6 +25,27 @@ import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
+
+const getPositionFullUz = (pos: string) => {
+    const map: any = {
+        'GK': 'Darvozabon',
+        'LB': 'Chap qanot himoyachisi',
+        'CB': 'Markaziy himoyachi',
+        'RB': "O'ng qanot himoyachisi",
+        'CDM': 'Tayanch yarim himoyachisi',
+        'CM': 'Markaziy yarim himoyachisi',
+        'CAM': 'Hujumkor yarim himoyachisi',
+        'LW': 'Chap qanot hujumchisi',
+        'RW': "O'ng qanot hujumchisi",
+        'ST': 'Markaziy hujumchi',
+        'CF': 'Ikkinchi hujumchi',
+        'LM': 'Chap qanot yarim himoyachisi',
+        'RM': "O'ng qanot yarim himoyachisi",
+        'LWB': 'Chap qanot qanot himoyachisi',
+        'RWB': "O'ng qanot qanot himoyachisi",
+    };
+    return map[pos?.toUpperCase()] || pos || 'O\'YINCHI';
+};
 
 // Universal Metadata Extractor
 const extractPlayerData = (data: any) => {
@@ -121,6 +144,25 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const [activeTab, setActiveTab] = useState('profil');
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
+    const [openingInstagram, setOpeningInstagram] = useState(false);
+
+    const handleOpenInstagram = async (url: string) => {
+        if (!url || openingInstagram) return;
+        try {
+            setOpeningInstagram(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            const canOpen = await Linking.canOpenURL(url);
+            if (canOpen) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert('Xatolik', 'Instagram havolasini ochib bo\'lmadi');
+            }
+        } catch (error) {
+            console.error('Error opening instagram URL:', error);
+        } finally {
+            setTimeout(() => setOpeningInstagram(false), 1200);
+        }
+    };
     
     const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -360,73 +402,165 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 style={{ flex: 1 }}
             >
                 <View style={styles.heroSection}>
-                    {/* AMATORA BRAND HEADER AT VERY TOP CENTERED */}
+                    {/* AMATORA BRAND HEADER (SIDE-BY-SIDE WITH LOGO) */}
                     <View style={styles.brandHeaderWrapper}>
+                        <Image
+                            source={require('../assets/logo.png')}
+                            style={{ width: 18, height: 18, marginRight: 6 }}
+                            resizeMode="contain"
+                        />
                         <Text style={styles.brandText}>AMATORA</Text>
                     </View>
 
-                    {/* BACK BUTTON LOWERED BELOW AMATORA HEADER */}
-                    <View style={styles.navHeaderRow}>
+                    {/* ⚽ PARALLEL TOP ROW: BACK BUTTON ALIGNED TO TOP EDGE PARALLEL WITH PLAYER PHOTO */}
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: 30, marginBottom: 20 }}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonBtn}>
                             <Ionicons name="arrow-back" size={22} color="#FFF" />
                         </TouchableOpacity>
-                    </View>
 
-                    <View style={styles.profileHeader}>
-                        <View style={styles.photoContainer}>
-                            <View style={[styles.mainPhotoWrapper, { shadowColor: 'transparent' }]}>
+                        {/* PLAYER PHOTO CREST (BIGGER 1X1 SQUARE CARD) */}
+                        <View style={{ position: 'relative' }}>
+                            <View style={{
+                                width: 118,
+                                height: 118,
+                                borderRadius: 22,
+                                borderWidth: 1.5,
+                                borderColor: 'rgba(0, 255, 135, 0.7)',
+                                padding: 2,
+                                backgroundColor: '#0A1224',
+                                overflow: 'hidden',
+                                shadowColor: '#00FF87',
+                                shadowRadius: 16,
+                                shadowOpacity: 0.35,
+                                elevation: 8
+                            }}>
                                 <SmartImage
                                     uri={player.photo || player.avatar || player.photo_url}
-                                    style={styles.profilePhoto}
+                                    style={{ width: '100%', height: '100%', borderRadius: 18 }}
                                     contentFit="cover"
                                     fallbackIcon="person"
-                                    borderRadius={22}
                                 />
                             </View>
-                            {/* TILTED/ROTATED SHIRT NUMBER BADGE */}
-                            <View style={styles.numberOverlay}>
-                                <Text style={styles.numberText}>#{player.number || player.player_number || '0'}</Text>
+
+                            {/* UNIQUE TILTED FOOTBALL CREST SHIRT NUMBER BADGE */}
+                            <View style={{
+                                position: 'absolute',
+                                bottom: -4,
+                                right: -4,
+                                backgroundColor: '#00FF87',
+                                borderWidth: 2,
+                                borderColor: '#050A14',
+                                paddingHorizontal: 9,
+                                paddingVertical: 2.5,
+                                borderRadius: 10,
+                                transform: [{ rotate: '-8deg' }],
+                                shadowColor: '#00FF87',
+                                shadowRadius: 10,
+                                shadowOpacity: 0.6,
+                                elevation: 6
+                            }}>
+                                <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 11, fontStyle: 'italic', letterSpacing: 0.5 }}>
+                                    #{player.number || player.player_number || '0'}
+                                </Text>
                             </View>
                         </View>
 
-                        <View style={styles.nameContainer}>
-                            <View style={styles.badgeRow}>
-                                <View style={styles.statusBadge}>
-                                    <Text style={styles.statusText}>{(player?.position || 'O\'YINCHI').toUpperCase()}</Text>
-                                </View>
-                                <View style={styles.ratingBadge}>
-                                    <Text style={styles.ratingText}>★ {stats.rating || player?.rating || 0}</Text>
-                                </View>
+                        {/* SPACER FOR BALANCED CENTERING */}
+                        <View style={{ width: 40, height: 40 }} />
+                    </View>
+
+                    {/* PLAYER DETAILS CENTERED BELOW */}
+                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
+
+                        {/* PLAYER FULL NAME (FIRST NAME NEON GREEN, LAST NAME WHITE) */}
+                        <Text style={{
+                            fontWeight: '900',
+                            fontSize: 22,
+                            letterSpacing: 0.5,
+                            textAlign: 'center',
+                            textTransform: 'uppercase'
+                        }}>
+                            <Text style={{ color: '#00FF87' }}>{(player.firstName || player.first_name || '').toUpperCase()}</Text>{' '}
+                            <Text style={{ color: '#FFFFFF' }}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
+                        </Text>
+
+                        {/* CENTERED BADGES ROW: TEAM LOGO + POSITION & RATING */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                            {/* POSITION BADGE WITH TEAM LOGO */}
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(255, 255, 255, 0.14)',
+                                paddingHorizontal: 12,
+                                paddingVertical: 5,
+                                borderRadius: 20
+                            }}>
+                                {(player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo) ? (
+                                    <Image
+                                        source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }}
+                                        style={{ width: 16, height: 16, borderRadius: 8 }}
+                                        resizeMode="contain"
+                                    />
+                                ) : (
+                                    <Ionicons name="shield-sharp" size={14} color="#00FF87" />
+                                )}
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: '800', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
+                                    {getPositionFullUz(player?.positionUz || player?.position)}
+                                </Text>
                             </View>
 
-                            <Text style={styles.firstName}>{player.firstName || player.first_name}</Text>
-                            <Text style={styles.lastName}>{player.lastName || player.last_name}</Text>
-                            
-                            {/* INSTAGRAM LINK UNDER NAME (POSITION BADGE REMOVED FROM UNDER NAME) */}
-                            {instagramUrl ? (
-                                <TouchableOpacity
-                                    onPress={() => Linking.openURL(instagramUrl)}
-                                    style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 6,
-                                        backgroundColor: 'rgba(225, 48, 108, 0.15)',
-                                        borderColor: 'rgba(225, 48, 108, 0.4)',
-                                        borderWidth: 1,
-                                        paddingHorizontal: 12,
-                                        paddingVertical: 5,
-                                        borderRadius: 10,
-                                        marginTop: 8,
-                                        alignSelf: 'flex-start'
-                                    }}
-                                >
-                                    <FontAwesome5 name="instagram" size={14} color="#E1306C" />
-                                    <Text style={{ color: '#E1306C', fontSize: 12, fontWeight: '800' }}>
-                                        @{instagramUsername}
-                                    </Text>
-                                </TouchableOpacity>
-                            ) : null}
+                            {/* RATING BADGE (GOLD WITH TRENDING-UP ICON) */}
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                backgroundColor: 'rgba(255, 215, 0, 0.15)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(255, 215, 0, 0.4)',
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderRadius: 20
+                            }}>
+                                <Ionicons name="trending-up" size={13} color="#FFD700" />
+                                <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 12, letterSpacing: 0.5 }}>
+                                    {player?.rating !== undefined && player?.rating !== null && player?.rating !== 0 ? player.rating : (stats?.rating || 0)}
+                                </Text>
+                            </View>
                         </View>
+
+                        {/* INSTAGRAM LINK BADGE */}
+                        {instagramUrl ? (
+                            <TouchableOpacity
+                                onPress={() => handleOpenInstagram(instagramUrl)}
+                                disabled={openingInstagram}
+                                activeOpacity={0.7}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 6,
+                                    backgroundColor: 'rgba(225, 48, 108, 0.14)',
+                                    borderColor: 'rgba(225, 48, 108, 0.4)',
+                                    borderWidth: 1,
+                                    paddingHorizontal: 12,
+                                    height: 26,
+                                    borderRadius: 13,
+                                    marginTop: 10
+                                }}
+                            >
+                                {openingInstagram ? (
+                                    <ActivityIndicator size="small" color="#E1306C" style={{ transform: [{ scale: 0.65 }], width: 14, height: 14 }} />
+                                ) : (
+                                    <FontAwesome5 name="instagram" size={12} color="#E1306C" />
+                                )}
+                                <Text style={{ color: '#E1306C', fontSize: 11, fontWeight: '800', lineHeight: 14 }}>
+                                    {openingInstagram ? 'OCHILMOQDA...' : `@${instagramUsername}`}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
                 </View>
 
@@ -536,12 +670,14 @@ const styles = StyleSheet.create({
         paddingBottom: 15,
     },
     brandHeaderWrapper: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingTop: 2,
         marginBottom: 8,
     },
     brandText: {
-        fontSize: 18,
+        fontSize: 13,
         fontWeight: '900',
         color: '#FFF',
         letterSpacing: 2,

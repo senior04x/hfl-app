@@ -17,7 +17,7 @@ import {
     Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useTournamentStore } from '../store/useTournamentStore';
 import { apiService } from '../services/apiService';
@@ -249,14 +249,6 @@ const TournamentsHeader = ({
             {/* Action Buttons with Glass Effect */}
             <View style={styles.actionsRow}>
                 <TouchableOpacity 
-                    style={styles.participateBtn}
-                    onPress={() => navigation.navigate('JoinApplication')}
-                    activeOpacity={0.8}
-                >
-                    <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
-                    <Text style={styles.participateBtnText}>QATNASHISH</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
                     style={styles.hallOfFameBtn}
                     onPress={() => {
                         if (selectedLeague) {
@@ -271,7 +263,7 @@ const TournamentsHeader = ({
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={styles.hallOfFameBtnText}>TURNIR HAQIDA</Text>
-                        <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
+                        <Ionicons name="arrow-forward" size={18} color={Colors.primary} style={{ marginLeft: 6 }} />
                     </View>
                 </TouchableOpacity>
             </View>
@@ -317,11 +309,36 @@ export default function TournamentsScreen({ navigation }: any) {
         }).start();
     }, [isLeagueSelectorOpen]);
 
+    const sortTeamsByStandingsRank = (arr: any[]) => {
+        return [...arr].sort((a: any, b: any) => {
+            const statsA = a.stats || {};
+            const statsB = b.stats || {};
+            const ptsA = a.points ?? statsA.points ?? a.pts ?? 0;
+            const ptsB = b.points ?? statsB.points ?? b.pts ?? 0;
+            if (ptsB !== ptsA) return ptsB - ptsA;
+
+            const gfA = a.goalsFor ?? statsA.goalsFor ?? a.gf ?? 0;
+            const gaA = a.goalsAgainst ?? statsA.goalsAgainst ?? a.ga ?? 0;
+            const gfB = b.goalsFor ?? statsB.goalsFor ?? b.gf ?? 0;
+            const gaB = b.goalsAgainst ?? statsB.goalsAgainst ?? b.ga ?? 0;
+            const gdA = a.goalDifference ?? statsA.goalDifference ?? a.gd ?? (gfA - gaA);
+            const gdB = b.goalDifference ?? statsB.goalDifference ?? b.gd ?? (gfB - gaB);
+            if (gdB !== gdA) return gdB - gdA;
+
+            if (gfB !== gfA) return gfB - gfA;
+
+            const winsA = a.won ?? a.wins ?? statsA.won ?? statsA.wins ?? 0;
+            const winsB = b.won ?? b.wins ?? statsB.won ?? statsB.wins ?? 0;
+            return winsB - winsA;
+        });
+    };
+
     const fetchLeagueTeams = async (leagueName: string) => {
         try {
             setTeamsLoading(true);
             const teamData = await apiService.getTeams(1, 100, leagueName);
-            setTeams(teamData || []);
+            const sortedTeams = sortTeamsByStandingsRank(teamData || []);
+            setTeams(sortedTeams);
         } catch (error) {
             console.error('Error fetching league teams:', error);
             setTeams([]);
@@ -388,6 +405,8 @@ export default function TournamentsScreen({ navigation }: any) {
             );
         }
 
+        const points = team.points ?? team.stats?.points ?? team.pts ?? 0;
+
         return (
             <TouchableOpacity
                 key={team.id || team._id}
@@ -397,9 +416,24 @@ export default function TournamentsScreen({ navigation }: any) {
             >
                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={styles.teamItemContent}>
+                    {/* RANK POSITION BADGE / MEDAL */}
+                    <View style={{ width: 26, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                        {index === 0 ? (
+                            <FontAwesome5 name="medal" size={16} color="#FFD700" />
+                        ) : index === 1 ? (
+                            <FontAwesome5 name="medal" size={16} color="#C0C0C0" />
+                        ) : index === 2 ? (
+                            <FontAwesome5 name="medal" size={16} color="#CD7F32" />
+                        ) : (
+                            <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '900', fontSize: 13 }}>
+                                {index + 1}
+                            </Text>
+                        )}
+                    </View>
+
                     <View style={styles.teamLogoCircle}>
-                        {team.logo_url ? (
-                            <Image source={{ uri: team.logo_url }} style={styles.teamLogoImage} />
+                        {team.logo_url || team.logo ? (
+                            <Image source={{ uri: team.logo_url || team.logo }} style={styles.teamLogoImage} />
                         ) : (
                             <Ionicons name="shield" size={24} color={Colors.primary} />
                         )}
@@ -414,6 +448,9 @@ export default function TournamentsScreen({ navigation }: any) {
                                     {(team.league || selectedLeague?.name || 'HFL LIGA').toUpperCase()}
                                 </Text>
                             </View>
+                            <Text style={{ color: '#00FF66', fontSize: 11, fontWeight: '900', marginLeft: 8 }}>
+                                {points} OCHKO
+                            </Text>
                         </View>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
@@ -703,22 +740,21 @@ const styles = StyleSheet.create({
         letterSpacing: 1.5,
     },
     hallOfFameBtn: {
-        flex: 1,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        height: 44,
+        width: '100%',
+        backgroundColor: 'rgba(0, 255, 135, 0.08)',
+        height: 48,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: 'rgba(0, 255, 135, 0.3)',
         borderRadius: 12,
         overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center',
     },
     hallOfFameBtnText: {
-        color: '#FFF',
+        color: Colors.primary,
         fontWeight: '900',
-        fontSize: 13,
-        marginRight: 8,
-        letterSpacing: 1,
+        fontSize: 14,
+        letterSpacing: 1.5,
     },
     adBanner: {
         height: 80,
