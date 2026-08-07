@@ -730,8 +730,10 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const renderMedia = () => {
         const videoUrl = match?.youtube_link || match?.youtubeLink || match?.youtube_url || match?.youtubeUrl || match?.video_url || match?.videoUrl || match?.video || match?.stream_link || match?.streamUrl;
         
-        // Filter events that have replay videos (20s clips)
-        const replayEvents = (match?.events || []).filter((e: any) => e.replay_video_url || e.video_url || e.replay_url);
+        // Filter events that have replay videos and sort by minute DESC (latest goal first)
+        const replayEvents = (match?.events || [])
+            .filter((e: any) => e.replay_video_url || e.video_url || e.replay_url)
+            .sort((a: any, b: any) => (Number(b.minute) || 0) - (Number(a.minute) || 0));
 
         return (
             <ScrollView 
@@ -775,7 +777,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             const currentTeamName = ev.team_name || (isHome ? (match?.homeTeamName || match?.home_team?.name) : (match?.awayTeamName || match?.away_team?.name));
                             const currentTeamLogo = isHome ? (match?.homeTeamLogo || match?.home_team?.logo_url) : (match?.awayTeamLogo || match?.away_team?.logo_url);
                             const scorer = ev.player_name || (ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : null);
+                            const scorerPhoto = ev.player?.photo_url || ev.player?.avatar || ev.player_photo || null;
                             const assistant = ev.assist_player_name || (ev.assistant ? `${ev.assistant.first_name || ''} ${ev.assistant.last_name || ''}`.trim() : null);
+                            const assistantPhoto = ev.assistant?.photo_url || ev.assistant?.avatar || ev.assistant_photo || null;
 
                             return (
                                 <ReplayVideoCard
@@ -785,7 +789,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                     teamName={currentTeamName}
                                     teamLogo={currentTeamLogo}
                                     scorerName={scorer}
+                                    scorerPhoto={scorerPhoto}
                                     assistantName={assistant}
+                                    assistantPhoto={assistantPhoto}
                                     eventType={ev.event_type || ev.type || 'goal'}
                                 />
                             );

@@ -11,7 +11,9 @@ interface ReplayVideoCardProps {
   teamName?: string;
   teamLogo?: string;
   scorerName?: string;
+  scorerPhoto?: string;
   assistantName?: string;
+  assistantPhoto?: string;
   eventType?: string;
 }
 
@@ -21,7 +23,9 @@ export default function ReplayVideoCard({
   teamName,
   teamLogo,
   scorerName,
+  scorerPhoto,
   assistantName,
+  assistantPhoto,
   eventType = 'goal'
 }: ReplayVideoCardProps) {
   const videoRef = useRef<Video>(null);
@@ -47,7 +51,7 @@ export default function ReplayVideoCard({
       <View style={styles.headerRow}>
         <View style={styles.badge}>
           <Ionicons name="football" size={14} color="#00FF66" />
-          <Text style={styles.badgeText}>{minute ? `${minute}' DAQIQA GOL` : '20s REPLAY'}</Text>
+          <Text style={styles.badgeText}>{minute ? `${minute}-DAQIQADA GOL` : '20s REPLAY'}</Text>
         </View>
 
         {teamName && (
@@ -87,23 +91,35 @@ export default function ReplayVideoCard({
 
       {/* Detail Description Box */}
       <View style={styles.detailsBox}>
-        {/* Scorer Info */}
+        {/* Scorer Info with Player Avatar */}
         <View style={styles.detailRow}>
-          <View style={styles.iconCircleGoal}>
-            <Ionicons name="football" size={16} color="#00FF66" />
+          <View style={styles.playerPhotoCircle}>
+            {scorerPhoto ? (
+              <Image source={{ uri: scorerPhoto }} style={styles.playerAvatarImage} />
+            ) : (
+              <View style={styles.iconCircleGoal}>
+                <Ionicons name="football" size={16} color="#00FF66" />
+              </View>
+            )}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.detailLabel}>GOL MUALIFI</Text>
+            <Text style={styles.detailLabel}>GOL MUALLIFI</Text>
             <Text style={styles.detailValue}>{scorerName ? scorerName.toUpperCase() : "NOMA'LUM FUTBOLCHI"}</Text>
           </View>
-          <Text style={styles.minuteBadge}>{minute}' daqiqa</Text>
+          <Text style={styles.minuteBadge}>{minute}-daqiqa</Text>
         </View>
 
-        {/* Assistant Info */}
+        {/* Assistant Info with Player Avatar */}
         {assistantName ? (
-          <View style={[styles.detailRow, { marginTop: 8 }]}>
-            <View style={styles.iconCircleAssist}>
-              <Ionicons name="footsteps" size={14} color="#3B82F6" />
+          <View style={[styles.detailRow, { marginTop: 10 }]}>
+            <View style={styles.playerPhotoCircle}>
+              {assistantPhoto ? (
+                <Image source={{ uri: assistantPhoto }} style={styles.playerAvatarImage} />
+              ) : (
+                <View style={styles.iconCircleAssist}>
+                  <Ionicons name="footsteps" size={14} color="#3B82F6" />
+                </View>
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.detailLabel}>ASSISTENT (UZATMALAR)</Text>
@@ -180,7 +196,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
+    justify: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
     zIndex: 2
@@ -193,12 +209,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(124, 58, 237, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 3,
-    shadowColor: '#7c3aed',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 8
+    zIndex: 3
   },
   detailsBox: {
     marginTop: 10,
@@ -213,18 +224,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10
   },
+  playerPhotoCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)'
+  },
+  playerAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    resizeMode: 'cover'
+  },
   iconCircleGoal: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(0, 255, 102, 0.12)',
     justifyContent: 'center',
     alignItems: 'center'
   },
   iconCircleAssist: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(59, 130, 246, 0.12)',
     justifyContent: 'center',
     alignItems: 'center'
