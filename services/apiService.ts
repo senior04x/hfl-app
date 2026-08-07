@@ -877,13 +877,17 @@ export const apiService = {
 
                 return {
                     id: e.id,
+                    team_id: e.team_id,
                     playerId: e.player_id || e.player?.id || e.player?._id,
                     type: normalizedType,
                     rawType: e.event_type,
                     minute: e.minute || 0,
                     time: e.minute || 0,
                     playerName: e.player ? `${e.player.first_name || ''} ${e.player.last_name || ''}`.trim() : 'Futbolchi',
-                    isHomeTeam: String(e.team_id) === String(m.home_team_id)
+                    player_name: e.player ? `${e.player.first_name || ''} ${e.player.last_name || ''}`.trim() : 'Futbolchi',
+                    isHomeTeam: String(e.team_id) === String(m.home_team_id),
+                    replay_video_url: e.replay_video_url || e.video_url || null,
+                    replay_url: e.replay_video_url || e.video_url || null
                 };
             });
 
