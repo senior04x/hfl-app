@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 
+const DEFAULT_AVATAR = require('../shadow-man.png');
+
 interface ReplayVideoCardProps {
   videoUrl: string;
   minute?: number | string;
@@ -41,6 +43,13 @@ export default function ReplayVideoCard({
       await videoRef.current.playAsync();
       setIsPlaying(true);
     }
+  };
+
+  const getPlayerPhotoSource = (photoUrl?: string) => {
+    if (photoUrl && typeof photoUrl === 'string' && photoUrl.trim().length > 0) {
+      return { uri: photoUrl };
+    }
+    return DEFAULT_AVATAR;
   };
 
   return (
@@ -91,16 +100,13 @@ export default function ReplayVideoCard({
 
       {/* Detail Description Box */}
       <View style={styles.detailsBox}>
-        {/* Scorer Info with Player Avatar */}
+        {/* Scorer Info with Player Avatar Photo (No Ball Icon) */}
         <View style={styles.detailRow}>
           <View style={styles.playerPhotoCircle}>
-            {scorerPhoto ? (
-              <Image source={{ uri: scorerPhoto }} style={styles.playerAvatarImage} />
-            ) : (
-              <View style={styles.iconCircleGoal}>
-                <Ionicons name="football" size={16} color="#00FF66" />
-              </View>
-            )}
+            <Image 
+              source={getPlayerPhotoSource(scorerPhoto)} 
+              style={styles.playerAvatarImage} 
+            />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.detailLabel}>GOL MUALLIFI</Text>
@@ -109,17 +115,14 @@ export default function ReplayVideoCard({
           <Text style={styles.minuteBadge}>{minute}-daqiqa</Text>
         </View>
 
-        {/* Assistant Info with Player Avatar */}
+        {/* Assistant Info with Player Avatar Photo (No Ball Icon) */}
         {assistantName ? (
           <View style={[styles.detailRow, { marginTop: 10 }]}>
             <View style={styles.playerPhotoCircle}>
-              {assistantPhoto ? (
-                <Image source={{ uri: assistantPhoto }} style={styles.playerAvatarImage} />
-              ) : (
-                <View style={styles.iconCircleAssist}>
-                  <Ionicons name="footsteps" size={14} color="#3B82F6" />
-                </View>
-              )}
+              <Image 
+                source={getPlayerPhotoSource(assistantPhoto)} 
+                style={styles.playerAvatarImage} 
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.detailLabel}>ASSISTENT (UZATMALAR)</Text>
@@ -186,7 +189,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#000000',
-    justifyContent: 'center',
+    justify.content: 'center',
     alignItems: 'center',
     position: 'relative'
   },
@@ -196,7 +199,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justify: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
     zIndex: 2
@@ -225,37 +228,21 @@ const styles = StyleSheet.create({
     gap: 10
   },
   playerPhotoCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)'
+    borderWidth: 1.5,
+    borderColor: '#00FF66'
   },
   playerAvatarImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     resizeMode: 'cover'
-  },
-  iconCircleGoal: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0, 255, 102, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  iconCircleAssist: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center'
   },
   detailLabel: {
     color: '#94a3b8',
