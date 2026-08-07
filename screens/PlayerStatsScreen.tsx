@@ -17,10 +17,8 @@ import {
 import * as Haptics from 'expo-haptics';
 import { apiService } from '../services/apiService';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import VideoBackground from '../components/VideoBackground';
-import Colors from '../constants/Colors';
-import SmartImage from '../components/SmartImage';
+import { supabase } from '../services/supabase';
+import ReplayVideoCard from '../components/ReplayVideoCard';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -310,6 +308,37 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         </ScrollView>
     );
 
+    const [playerReplays, setPlayerReplays] = useState<any[]>([]);
+    const [replaysLoading, setReplaysLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchPlayerReplays = async () => {
+            const pId = player?.id || player?._id || playerId;
+            if (!pId) return;
+            setReplaysLoading(true);
+            try {
+                const { data: events } = await supabase
+                    .from('match_events')
+                    .select('*, match:match_id(*), player:player_id(*)')
+                    .or(`player_id.eq.${pId}`)
+                    .not('replay_video_url', 'is', null)
+                    .order('created_at', { ascending: false });
+
+                if (events && events.length > 0) {
+                    setPlayerReplays(events);
+                } else {
+                    setPlayerReplays([]);
+                }
+            } catch (e) {
+                console.warn('Error fetching player replays:', e);
+            } finally {
+                setReplaysLoading(false);
+            }
+        };
+
+        fetchPlayerReplays();
+    }, [player?.id, player?._id, playerId]);
+
     const renderKaryera = () => {
         const history = player?.careerHistory || [];
         const currentTeamName = player?.teams?.name || player?.team_name || player?.teamName || 'HFL FK';
@@ -362,6 +391,47 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                         </View>
                     </View>
                 )}
+
+                {/* Player's Personal 20s Goal Replay Clips Feed */}
+                <View style={{ marginTop: 24, marginBottom: 20 }}>
+                    <View style={[styles.sectionHeader, { marginBottom: 12 }]}>
+                        <Ionicons name="videocam" size={20} color={Colors.primary || '#00FF87'} />
+                        <Text style={styles.sectionTitle}>SHAXSIY <Text style={styles.sectionTitleHighlight}>GOL QAYTARIQLARI (REPLAYS)</Text></Text>
+                    </View>
+
+                    {replaysLoading ? (
+                        <ActivityIndicator color={Colors.primary || '#00FF87'} style={{ marginVertical: 15 }} />
+                    ) : playerReplays.length > 0 ? (
+                        playerReplays.map((ev: any, idx: number) => {
+                            const m = ev.match || {};
+                            const isHome = ev.team_id === m.home_team_id;
+                            const cTeamName = isHome ? (m.home_team_name || 'Uy Jamoasi') : (m.away_team_name || 'Mehmon Jamoasi');
+                            const cTeamLogo = isHome ? m.home_team_logo : m.away_team_logo;
+                            const scorerName = ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : `${player?.first_name || ''} ${player?.last_name || ''}`.trim();
+                            const scorerPhoto = ev.player?.photo_url || player?.photo_url || player?.photo || null;
+
+                            return (
+                                <ReplayVideoCard
+                                    key={ev.id || idx}
+                                    videoUrl={ev.replay_video_url}
+                                    minute={ev.minute}
+                                    teamName={cTeamName}
+                                    teamLogo={cTeamLogo}
+                                    scorerName={scorerName}
+                                    scorerPhoto={scorerPhoto}
+                                    eventType={ev.event_type || 'goal'}
+                                />
+                            );
+                        })
+                    ) : (
+                        <View style={styles.teamCareerWrapper}>
+                            <View style={{ padding: 15, alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name="videocam-outline" size={30} color="rgba(255,255,255,0.2)" />
+                                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 }}>Shaxsiy gol qaytariqlari hali mavjud emas</Text>
+                            </View>
+                        </View>
+                    )}
+                </View>
             </ScrollView>
         );
     };
