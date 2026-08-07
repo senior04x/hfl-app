@@ -21,6 +21,7 @@ import MatchDetailSkeleton from '../components/MatchDetailSkeleton';
 import VideoBackground from '../components/VideoBackground';
 import YoutubePlayerCard from '../components/YoutubePlayerCard';
 import TacticsBoard from '../components/TacticsBoard';
+import ReplayVideoCard from '../components/ReplayVideoCard';
 import { apiService } from '../services/apiService';
 import { useSocket } from '../context/SocketContext';
 import { formatShortTeamName } from '../utils/stringUtils';
@@ -718,6 +719,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
     const renderMedia = () => {
         const videoUrl = match?.youtube_link || match?.youtubeLink || match?.youtube_url || match?.youtubeUrl || match?.video_url || match?.videoUrl || match?.video || match?.stream_link || match?.streamUrl;
+        
+        // Filter events that have replay videos (20s clips)
+        const replayEvents = (match?.events || []).filter((e: any) => e.replay_video_url || e.video_url || e.replay_url);
 
         return (
             <ScrollView 
@@ -732,8 +736,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     />
                 }
             >
-                {videoUrl ? (
-                    <View style={{ width: '100%', alignItems: 'center' }}>
+                {/* 1. YouTube Online Stream */}
+                {videoUrl && (
+                    <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
                         <YoutubePlayerCard videoUrl={videoUrl} />
                         <TouchableOpacity
                             style={styles.openYtLinkBtn}
@@ -745,12 +750,32 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             <Ionicons name="open-outline" size={16} color="rgba(255,255,255,0.6)" style={{ marginLeft: 'auto' }} />
                         </TouchableOpacity>
                     </View>
-                ) : (
-                    <View style={styles.placeholderContainer}>
-                        <Ionicons name="images-outline" size={48} color="rgba(255,255,255,0.1)" />
-                        <Text style={styles.placeholderText}>MEDIA MA'LUMOTLARI MAVJUD EMAS</Text>
-                    </View>
                 )}
+
+                {/* 2. 20s Goal & Replay Clips Feed */}
+                <View style={{ marginTop: 10, width: '100%' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                        <Ionicons name="videocam-outline" size={22} color={Colors.primary || '#7c3aed'} />
+                        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>O'YIN XITLARI & GOL QAYTARIQLARI</Text>
+                    </View>
+
+                    {replayEvents.length > 0 ? (
+                        replayEvents.map((ev: any, idx: number) => (
+                            <ReplayVideoCard
+                                key={ev.id || idx}
+                                videoUrl={ev.replay_video_url || ev.video_url || ev.replay_url}
+                                title={ev.player_name ? `⚽ ${ev.minute || 0}' Gol - ${ev.player_name}` : `🎥 ${ev.minute || 0}' Replay Qaytarig'i`}
+                                minute={ev.minute}
+                                teamName={ev.team_name || (ev.isHomeTeam ? match?.homeTeamName : match?.awayTeamName)}
+                            />
+                        ))
+                    ) : (
+                        <View style={styles.placeholderContainer}>
+                            <Ionicons name="film-outline" size={42} color="rgba(255,255,255,0.15)" />
+                            <Text style={styles.placeholderText}>O'YIN DAVOMIDA GOL QAYTARIQLARI SHU YERDA CHIQADI</Text>
+                        </View>
+                    )}
+                </View>
             </ScrollView>
         );
     };
