@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#000000',
-    justify.content: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
     position: 'relative'
   },
