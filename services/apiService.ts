@@ -875,6 +875,13 @@ export const apiService = {
                 else if (eType.includes('assist')) normalizedType = 'assist';
                 else if (eType.includes('goal')) normalizedType = 'goal';
 
+                // Look for assist event recorded for the same team at the same minute
+                const assistEvent = (eventsData || []).find((ae: any) => 
+                    String(ae.event_type || '').toLowerCase().includes('assist') && 
+                    String(ae.team_id) === String(e.team_id) && 
+                    Math.abs((ae.minute || 0) - (e.minute || 0)) <= 1
+                );
+
                 return {
                     id: e.id,
                     team_id: e.team_id,
@@ -883,8 +890,12 @@ export const apiService = {
                     rawType: e.event_type,
                     minute: e.minute || 0,
                     time: e.minute || 0,
+                    player: e.player,
+                    player_photo: e.player?.photo_url || e.player?.photo || e.player?.avatar || null,
                     playerName: e.player ? `${e.player.first_name || ''} ${e.player.last_name || ''}`.trim() : 'Futbolchi',
                     player_name: e.player ? `${e.player.first_name || ''} ${e.player.last_name || ''}`.trim() : 'Futbolchi',
+                    assist_player_name: assistEvent?.player ? `${assistEvent.player.first_name || ''} ${assistEvent.player.last_name || ''}`.trim() : null,
+                    assist_player_photo: assistEvent?.player?.photo_url || assistEvent?.player?.photo || null,
                     isHomeTeam: String(e.team_id) === String(m.home_team_id),
                     replay_video_url: e.replay_video_url || e.video_url || null,
                     replay_url: e.replay_video_url || e.video_url || null

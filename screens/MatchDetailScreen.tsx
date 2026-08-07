@@ -777,9 +777,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             const currentTeamName = ev.team_name || (isHome ? (match?.homeTeamName || match?.home_team?.name) : (match?.awayTeamName || match?.away_team?.name));
                             const currentTeamLogo = isHome ? (match?.homeTeamLogo || match?.home_team?.logo_url) : (match?.awayTeamLogo || match?.away_team?.logo_url);
                             const scorer = ev.player_name || (ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : null);
-                            const scorerPhoto = ev.player?.photo_url || ev.player?.avatar || ev.player_photo || null;
+                            const scorerPhoto = ev.player_photo || ev.player?.photo_url || ev.player?.photo || ev.player?.avatar || null;
                             const assistant = ev.assist_player_name || (ev.assistant ? `${ev.assistant.first_name || ''} ${ev.assistant.last_name || ''}`.trim() : null);
-                            const assistantPhoto = ev.assistant?.photo_url || ev.assistant?.avatar || ev.assistant_photo || null;
+                            const assistantPhoto = ev.assist_player_photo || ev.assistant?.photo_url || ev.assistant?.photo || null;
 
                             return (
                                 <ReplayVideoCard
