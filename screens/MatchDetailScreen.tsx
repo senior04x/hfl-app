@@ -22,7 +22,7 @@ import VideoBackground from '../components/VideoBackground';
 import YoutubePlayerCard from '../components/YoutubePlayerCard';
 import TacticsBoard from '../components/TacticsBoard';
 import ReplayVideoCard from '../components/ReplayVideoCard';
-import { apiService } from '../services/apiService';
+import { apiService, supabase } from '../services/apiService';
 import { useSocket } from '../context/SocketContext';
 import { formatShortTeamName } from '../utils/stringUtils';
 import SmartImage from '../components/SmartImage';
@@ -85,19 +85,29 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     }, [matchId, matchData?._id]);
 
     useEffect(() => {
+        const currentId = matchId || matchData?._id;
+        if (!currentId) return;
+
+        const eventsChannel = supabase
+            .channel(`realtime_events_${currentId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `match_id=eq.${currentId}` }, () => {
+                fetchMatch(true);
+            })
+            .subscribe();
+
         if (socket && isConnected) {
-            const currentId = matchId || matchData?._id;
-            
             socket.on('match-update', (data: any) => {
                 if (data.matchId === currentId) {
                     setMatch(data.match);
+                    fetchMatch(true);
                 }
             });
-
-            return () => {
-                socket.off('match-update');
-            };
         }
+
+        return () => {
+            supabase.removeChannel(eventsChannel);
+            if (socket) socket.off('match-update');
+        };
     }, [socket, isConnected, matchId, matchData?._id]);
 
     const onRefresh = () => {
