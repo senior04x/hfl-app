@@ -16,7 +16,10 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { apiService } from '../services/apiService';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import VideoBackground from '../components/VideoBackground';
+import Colors from '../constants/Colors';
+import SmartImage from '../components/SmartImage';
 import { supabase } from '../services/supabase';
 import ReplayVideoCard from '../components/ReplayVideoCard';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
