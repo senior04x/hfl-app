@@ -760,15 +760,26 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     </View>
 
                     {replayEvents.length > 0 ? (
-                        replayEvents.map((ev: any, idx: number) => (
-                            <ReplayVideoCard
-                                key={ev.id || idx}
-                                videoUrl={ev.replay_video_url || ev.video_url || ev.replay_url}
-                                title={ev.player_name ? `⚽ ${ev.minute || 0}' Gol - ${ev.player_name}` : `🎥 ${ev.minute || 0}' Replay Qaytarig'i`}
-                                minute={ev.minute}
-                                teamName={ev.team_name || (ev.isHomeTeam ? match?.homeTeamName : match?.awayTeamName)}
-                            />
-                        ))
+                        replayEvents.map((ev: any, idx: number) => {
+                            const isHome = ev.team_id ? (ev.team_id === (match?.homeTeamId || match?.home_team_id)) : ev.isHomeTeam;
+                            const currentTeamName = ev.team_name || (isHome ? (match?.homeTeamName || match?.home_team?.name) : (match?.awayTeamName || match?.away_team?.name));
+                            const currentTeamLogo = isHome ? (match?.homeTeamLogo || match?.home_team?.logo_url) : (match?.awayTeamLogo || match?.away_team?.logo_url);
+                            const scorer = ev.player_name || (ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : null);
+                            const assistant = ev.assist_player_name || (ev.assistant ? `${ev.assistant.first_name || ''} ${ev.assistant.last_name || ''}`.trim() : null);
+
+                            return (
+                                <ReplayVideoCard
+                                    key={ev.id || idx}
+                                    videoUrl={ev.replay_video_url || ev.video_url || ev.replay_url}
+                                    minute={ev.minute}
+                                    teamName={currentTeamName}
+                                    teamLogo={currentTeamLogo}
+                                    scorerName={scorer}
+                                    assistantName={assistant}
+                                    eventType={ev.event_type || ev.type || 'goal'}
+                                />
+                            );
+                        })
                     ) : (
                         <View style={styles.placeholderContainer}>
                             <Ionicons name="film-outline" size={42} color="rgba(255,255,255,0.15)" />

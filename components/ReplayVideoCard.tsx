@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -7,17 +7,22 @@ import Colors from '../constants/Colors';
 
 interface ReplayVideoCardProps {
   videoUrl: string;
-  title: string;
   minute?: number | string;
   teamName?: string;
-  playerPhoto?: string;
+  teamLogo?: string;
+  scorerName?: string;
+  assistantName?: string;
+  eventType?: string;
 }
 
 export default function ReplayVideoCard({
   videoUrl,
-  title,
   minute,
-  teamName
+  teamName,
+  teamLogo,
+  scorerName,
+  assistantName,
+  eventType = 'goal'
 }: ReplayVideoCardProps) {
   const videoRef = useRef<Video>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -38,16 +43,22 @@ export default function ReplayVideoCard({
     <View style={styles.card}>
       <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
       
-      {/* Video Header Badge */}
+      {/* Header Badge */}
       <View style={styles.headerRow}>
         <View style={styles.badge}>
-          <Ionicons name="videocam" size={14} color="#00FF66" />
-          <Text style={styles.badgeText}>{minute ? `${minute}' GOL REPLAY` : '20s REPLAY'}</Text>
+          <Ionicons name="football" size={14} color="#00FF66" />
+          <Text style={styles.badgeText}>{minute ? `${minute}' DAQIQA GOL` : '20s REPLAY'}</Text>
         </View>
-        {teamName && <Text style={styles.teamName}>{teamName.toUpperCase()}</Text>}
+
+        {teamName && (
+          <View style={styles.teamGroup}>
+            {teamLogo && <Image source={{ uri: teamLogo }} style={styles.teamLogo} />}
+            <Text style={styles.teamName}>{teamName.toUpperCase()}</Text>
+          </View>
+        )}
       </View>
 
-      {/* Video Player Box */}
+      {/* Video Box */}
       <View style={styles.videoBox}>
         {loading && (
           <View style={styles.loadingOverlay}>
@@ -74,8 +85,33 @@ export default function ReplayVideoCard({
         )}
       </View>
 
-      {/* Title */}
-      <Text style={styles.title}>{title}</Text>
+      {/* Detail Description Box */}
+      <View style={styles.detailsBox}>
+        {/* Scorer Info */}
+        <View style={styles.detailRow}>
+          <View style={styles.iconCircleGoal}>
+            <Ionicons name="football" size={16} color="#00FF66" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.detailLabel}>GOL MUALIFI</Text>
+            <Text style={styles.detailValue}>{scorerName ? scorerName.toUpperCase() : "NOMA'LUM FUTBOLCHI"}</Text>
+          </View>
+          <Text style={styles.minuteBadge}>{minute}' daqiqa</Text>
+        </View>
+
+        {/* Assistant Info */}
+        {assistantName ? (
+          <View style={[styles.detailRow, { marginTop: 8 }]}>
+            <View style={styles.iconCircleAssist}>
+              <Ionicons name="footsteps" size={14} color="#3B82F6" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.detailLabel}>ASSISTENT (UZATMALAR)</Text>
+              <Text style={styles.detailValueAssist}>{assistantName.toUpperCase()}</Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -86,8 +122,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
     marginVertical: 10,
     padding: 12
   },
@@ -95,23 +131,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8
+    marginBottom: 10
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 255, 102, 0.15)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 102, 0.3)',
+    borderColor: 'rgba(0, 255, 102, 0.35)',
     gap: 6
   },
   badgeText: {
     color: '#00FF66',
     fontSize: 12,
     fontWeight: '800'
+  },
+  teamGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  teamLogo: {
+    width: 18,
+    height: 18,
+    resizeMode: 'contain'
   },
   teamName: {
     color: '#cbd5e1',
@@ -120,7 +166,7 @@ const styles = StyleSheet.create({
   },
   videoBox: {
     width: '100%',
-    height: 210,
+    height: 215,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#000000',
@@ -134,7 +180,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justify: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
     zIndex: 2
@@ -148,13 +194,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 3,
-    boxShadow: '0 4px 15px rgba(124, 58, 237, 0.5)'
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8
   },
-  title: {
-    color: '#ffffff',
+  detailsBox: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)'
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  iconCircleGoal: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 255, 102, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  iconCircleAssist: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  detailLabel: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5
+  },
+  detailValue: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  detailValueAssist: {
+    color: '#60A5FA',
     fontSize: 13,
-    fontWeight: '600',
-    marginTop: 8,
-    textAlign: 'left'
+    fontWeight: '700'
+  },
+  minuteBadge: {
+    color: '#FACC15',
+    fontSize: 12,
+    fontWeight: '800',
+    backgroundColor: 'rgba(250, 204, 21, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6
   }
 });
