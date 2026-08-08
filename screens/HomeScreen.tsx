@@ -305,7 +305,7 @@ export default function HomeScreen({ navigation }: any) {
                                     </View>
                                     <TouchableOpacity 
                                         style={styles.profileButton}
-                                        onPress={() => navigation.navigate('AccountTab')}
+                                        onPress={() => navigation.navigate('Profil')}
                                     >
                                         {avatarUri ? (
                                             <SmartImage 
@@ -355,7 +355,7 @@ export default function HomeScreen({ navigation }: any) {
                         <View style={styles.sectionContainer}>
                             <View style={styles.sectionHeader}>
                                 <Text style={styles.sectionTitle}>Markaziy O'yinlar</Text>
-                                <TouchableOpacity onPress={() => navigation.navigate('CalendarTab')}>
+                                <TouchableOpacity onPress={() => navigation.navigate('Taqvim')}>
                                     <Text style={styles.viewAllText}>BATAFSIL TAQVIM →</Text>
                                 </TouchableOpacity>
                             </View>
@@ -380,7 +380,7 @@ export default function HomeScreen({ navigation }: any) {
                         <View style={styles.sectionContainer}>
                             <View style={styles.sectionHeader}>
                                 <Text style={styles.sectionTitle}>So'nggi Natijalar</Text>
-                                <TouchableOpacity onPress={() => navigation.navigate('TournamentsTab')}>
+                                <TouchableOpacity onPress={() => navigation.navigate('Turnirlar')}>
                                     <Text style={styles.viewAllText}>BARCHA NATIJALAR →</Text>
                                 </TouchableOpacity>
                             </View>
