@@ -735,6 +735,13 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             .filter((e: any) => e.replay_video_url || e.video_url || e.replay_url)
             .sort((a: any, b: any) => (Number(b.minute) || 0) - (Number(a.minute) || 0));
 
+        // Additional storage replay clips from storage bucket replays/<org_id>/<match_id>/
+        const extraStorageClips = (match?.storageReplays || []).filter((s: any) => 
+            !replayEvents.some((ev: any) => (ev.replay_video_url || '').includes(s.name))
+        );
+
+        const hasAnyReplays = replayEvents.length > 0 || extraStorageClips.length > 0;
+
         return (
             <ScrollView 
                 style={styles.tabContent} 
@@ -771,31 +778,45 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>O'YIN XITLARI & GOL QAYTARIQLARI</Text>
                     </View>
 
-                    {replayEvents.length > 0 ? (
-                        replayEvents.map((ev: any, idx: number) => {
-                            const isHome = ev.team_id ? (ev.team_id === (match?.homeTeamId || match?.home_team_id)) : ev.isHomeTeam;
-                            const currentTeamName = ev.team_name || (isHome ? (match?.homeTeamName || match?.home_team?.name) : (match?.awayTeamName || match?.away_team?.name));
-                            const currentTeamLogo = isHome ? (match?.homeTeamLogo || match?.home_team?.logo_url) : (match?.awayTeamLogo || match?.away_team?.logo_url);
-                            const scorer = ev.player_name || (ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : null);
-                            const scorerPhoto = ev.player_photo || ev.player?.photo_url || ev.player?.photo || ev.player?.avatar || null;
-                            const assistant = ev.assist_player_name || (ev.assistant ? `${ev.assistant.first_name || ''} ${ev.assistant.last_name || ''}`.trim() : null);
-                            const assistantPhoto = ev.assist_player_photo || ev.assistant?.photo_url || ev.assistant?.photo || null;
+                    {hasAnyReplays ? (
+                        <>
+                            {replayEvents.map((ev: any, idx: number) => {
+                                const isHome = ev.team_id ? (ev.team_id === (match?.homeTeamId || match?.home_team_id)) : ev.isHomeTeam;
+                                const currentTeamName = ev.team_name || (isHome ? (match?.homeTeamName || match?.home_team?.name) : (match?.awayTeamName || match?.away_team?.name));
+                                const currentTeamLogo = isHome ? (match?.homeTeamLogo || match?.home_team?.logo_url) : (match?.awayTeamLogo || match?.away_team?.logo_url);
+                                const scorer = ev.player_name || (ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : null);
+                                const scorerPhoto = ev.player_photo || ev.player?.photo_url || ev.player?.photo || ev.player?.avatar || null;
+                                const assistant = ev.assist_player_name || (ev.assistant ? `${ev.assistant.first_name || ''} ${ev.assistant.last_name || ''}`.trim() : null);
+                                const assistantPhoto = ev.assist_player_photo || ev.assistant?.photo_url || ev.assistant?.photo || null;
 
-                            return (
+                                return (
+                                    <ReplayVideoCard
+                                        key={ev.id || idx}
+                                        videoUrl={ev.replay_video_url || ev.video_url || ev.replay_url}
+                                        minute={ev.minute}
+                                        teamName={currentTeamName}
+                                        teamLogo={currentTeamLogo}
+                                        scorerName={scorer}
+                                        scorerPhoto={scorerPhoto}
+                                        assistantName={assistant}
+                                        assistantPhoto={assistantPhoto}
+                                        eventType={ev.event_type || ev.type || 'goal'}
+                                    />
+                                );
+                            })}
+
+                            {extraStorageClips.map((clip: any, idx: number) => (
                                 <ReplayVideoCard
-                                    key={ev.id || idx}
-                                    videoUrl={ev.replay_video_url || ev.video_url || ev.replay_url}
-                                    minute={ev.minute}
-                                    teamName={currentTeamName}
-                                    teamLogo={currentTeamLogo}
-                                    scorerName={scorer}
-                                    scorerPhoto={scorerPhoto}
-                                    assistantName={assistant}
-                                    assistantPhoto={assistantPhoto}
-                                    eventType={ev.event_type || ev.type || 'goal'}
+                                    key={clip.id || `storage_${idx}`}
+                                    videoUrl={clip.publicUrl}
+                                    minute="HD"
+                                    teamName={match?.homeTeamName || 'O\'YIN REPLAY'}
+                                    teamLogo={match?.homeTeamLogo}
+                                    scorerName="Gol Qaytariq Klipi"
+                                    eventType="goal"
                                 />
-                            );
-                        })
+                            ))}
+                        </>
                     ) : (
                         <View style={styles.placeholderContainer}>
                             <Ionicons name="film-outline" size={42} color="rgba(255,255,255,0.15)" />

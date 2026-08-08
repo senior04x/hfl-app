@@ -863,12 +863,33 @@ export const apiService = {
             const homeTeam = teamsMap[String(m.home_team_id || m.homeTeamId || '')];
             const awayTeam = teamsMap[String(m.away_team_id || m.awayTeamId || '')];
 
+            const orgId = m.organization_id || 1;
+
+            // Fetch storage files for fallback / supplemental media under replays/<org_id>/<match_id>/
+            let storageReplays: any[] = [];
+            try {
+                const { data: files } = await supabase.storage
+                    .from('replays')
+                    .list(`${orgId}/${id}`, { limit: 50, sortBy: { column: 'name', order: 'desc' } });
+
+                if (files && files.length > 0) {
+                    const baseUrl = "https://xzzyhfyazwohdqqbjiiy.supabase.co/storage/v1/object/public/replays";
+                    storageReplays = files
+                        .filter((f: any) => f.name && (f.name.endsWith('.mp4') || f.name.endsWith('.mkv') || f.name.endsWith('.mov')))
+                        .map((f: any) => ({
+                            id: f.id || f.name,
+                            name: f.name,
+                            publicUrl: `${baseUrl}/${orgId}/${id}/${f.name}`
+                        }));
+                }
+            } catch (sErr) {}
+
             const { data: eventsData } = await supabase
                 .from('match_events')
                 .select('*, player:player_id(*)')
                 .eq('match_id', id);
 
-            const events = (eventsData || []).map((e: any) => {
+            const events = (eventsData || []).map((e: any, idx: number) => {
                 const eType = String(e.event_type || e.type || '').toLowerCase();
                 let normalizedType = 'goal';
                 if (eType.includes('yellow')) normalizedType = 'yellowCard';
@@ -882,6 +903,12 @@ export const apiService = {
                     String(ae.team_id) === String(e.team_id) && 
                     Math.abs((ae.minute || 0) - (e.minute || 0)) <= 1
                 );
+
+                let videoUrl = e.replay_video_url || e.video_url || null;
+                // If replay_video_url is missing but storageReplays has a video file, fallback to it
+                if (!videoUrl && normalizedType === 'goal' && storageReplays.length > 0) {
+                    videoUrl = storageReplays[idx % storageReplays.length]?.publicUrl || storageReplays[0]?.publicUrl;
+                }
 
                 return {
                     id: e.id,
@@ -898,8 +925,8 @@ export const apiService = {
                     assist_player_name: assistEvent?.player ? `${assistEvent.player.first_name || ''} ${assistEvent.player.last_name || ''}`.trim() : null,
                     assist_player_photo: assistEvent?.player?.photo_url || assistEvent?.player?.photo || null,
                     isHomeTeam: String(e.team_id) === String(m.home_team_id),
-                    replay_video_url: e.replay_video_url || e.video_url || null,
-                    replay_url: e.replay_video_url || e.video_url || null
+                    replay_video_url: videoUrl,
+                    replay_url: videoUrl
                 };
             });
 
@@ -958,7 +985,8 @@ export const apiService = {
                 time: m.match_time || m.time || '',
                 tournamentName: m.league || 'HFL Liga',
                 venue: m.venue || m.location || m.stadium || '',
-                events
+                events,
+                storageReplays
             };
         } catch (err) {
             console.warn('getMatchById fallback:', err);
