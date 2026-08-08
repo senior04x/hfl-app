@@ -14,6 +14,7 @@ import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 import { formatShortTeamName } from '../utils/stringUtils';
+import { LinearGradient } from 'expo-linear-gradient';
 
 
 const { width } = Dimensions.get('window');
@@ -170,89 +171,119 @@ export default function HomeScreen({ navigation }: any) {
 
         const formattedFullDate = isValidDate ? `${day}-${month}, ${year}` : (match.date_str || "Bo'lajak o'yin");
 
-        // Importance Flame Glow Backdrop Aura
+        // Importance Flame Gradient Border
         const importance = match.importance || 'oddiy';
+        const cardWidthStyle = isVertical ? styles.vMatchCardWrapper : styles.hMatchCardWrapper;
 
-        return (
-            <View key={match._id || Math.random().toString()} style={{ position: 'relative', marginBottom: isVertical ? 14 : 0 }}>
-                {importance === 'markaziy' && <View style={styles.markaziyFlameAura} />}
-                {importance === 'ortacha' && <View style={styles.ortachaFlameAura} />}
-
-                <TouchableOpacity
-                    style={[
-                        isVertical ? styles.vMatchCard : styles.hMatchCard, 
-                        styles.glassmorphicCardBorder,
-                        isLive && styles.hMatchCardLive
-                    ]}
-                    onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
-                    activeOpacity={0.85}
-                >
-                    <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                    
-                    <View style={{ padding: 18 }}>
-                        <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader]}>
-                            <Text style={styles.hMatchLeague} numberOfLines={1}>{match.tournamentName || "O'rtoqlik uchrashuvi"}</Text>
-                            
-                            {/* Priority Badge */}
-                            {importance === 'markaziy' ? (
-                                <View style={styles.markaziyBadgeTag}>
-                                    <Text style={styles.markaziyBadgeText}>⭐ MARKAZIY</Text>
-                                </View>
-                            ) : importance === 'ortacha' ? (
-                                <View style={styles.ortachaBadgeTag}>
-                                    <Text style={styles.ortachaBadgeText}>⚡ SHIDDATLI</Text>
-                                </View>
-                            ) : isLive ? (
-                                <View style={styles.liveBadgeContainer}>
-                                    <View style={styles.liveDot} />
-                                    <Text style={styles.liveBadgeText}>LIVE</Text>
-                                </View>
-                            ) : null}
-                        </View>
-
-                        <View style={styles.hMatchTeamsRow}>
-                            {/* Home Team */}
-                            <View style={styles.hTeamColumn}>
-                                <View style={styles.hLogoCircle}>
-                                    {match.homeTeamLogo || match.homeTeam?.logo ? (
-                                        <Image source={{ uri: match.homeTeamLogo || match.homeTeam?.logo }} style={styles.hTeamLogo} />
-                                    ) : (
-                                        <Text style={styles.hLogoText}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
-                                    )}
-                                </View>
-                                <Text style={styles.hTeamName} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi', 12)}</Text>
+        const cardContent = (
+            <TouchableOpacity
+                style={[
+                    isVertical ? styles.vMatchCardInner : styles.hMatchCardInner,
+                    importance === 'oddiy' && styles.glassmorphicCardBorder,
+                    isLive && styles.hMatchCardLive
+                ]}
+                onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
+                activeOpacity={0.85}
+            >
+                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                
+                <View style={{ padding: 18 }}>
+                    <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader]}>
+                        <Text style={styles.hMatchLeague} numberOfLines={1}>{match.tournamentName || "O'rtoqlik uchrashuvi"}</Text>
+                        
+                        {/* Priority Badge */}
+                        {importance === 'markaziy' ? (
+                            <View style={styles.markaziyBadgeTag}>
+                                <Text style={styles.markaziyBadgeText}>⭐ MARKAZIY</Text>
                             </View>
+                        ) : importance === 'ortacha' ? (
+                            <View style={styles.ortachaBadgeTag}>
+                                <Text style={styles.ortachaBadgeText}>⚡ SHIDDATLI</Text>
+                            </View>
+                        ) : isLive ? (
+                            <View style={styles.liveBadgeContainer}>
+                                <View style={styles.liveDot} />
+                                <Text style={styles.liveBadgeText}>LIVE</Text>
+                            </View>
+                        ) : null}
+                    </View>
 
-                            {/* Score or VS */}
-                            <View style={styles.hScoreColumn}>
-                                {isLive || match.status === 'finished' ? (
-                                    <Text style={styles.hScoreText}>{match.score?.home || 0} - {match.score?.away || 0}</Text>
+                    <View style={styles.hMatchTeamsRow}>
+                        {/* Home Team */}
+                        <View style={styles.hTeamColumn}>
+                            <View style={styles.hLogoCircle}>
+                                {match.homeTeamLogo || match.homeTeam?.logo ? (
+                                    <Image source={{ uri: match.homeTeamLogo || match.homeTeam?.logo }} style={styles.hTeamLogo} />
                                 ) : (
-                                    <View style={styles.vsContainer}>
-                                        <Text style={styles.hTimeVsText}>{formattedTime}</Text>
-                                        <Text style={styles.vsSubText}>BOSHLANISHI</Text>
-                                    </View>
+                                    <Text style={styles.hLogoText}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
                                 )}
                             </View>
-
-                            {/* Away Team */}
-                            <View style={styles.hTeamColumn}>
-                                <View style={styles.hLogoCircle}>
-                                    {match.awayTeamLogo || match.awayTeam?.logo ? (
-                                        <Image source={{ uri: match.awayTeamLogo || match.awayTeam?.logo }} style={styles.hTeamLogo} />
-                                    ) : (
-                                        <Text style={styles.hLogoText}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
-                                    )}
-                                </View>
-                                <Text style={styles.hTeamName} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12)}</Text>
-                            </View>
+                            <Text style={styles.hTeamName} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi', 12)}</Text>
                         </View>
 
-                        <View style={styles.hMatchFooter}>
-                            <Text style={styles.hMatchDate}>{formattedFullDate} • {match.venue || "Amatora Arena"}</Text>
+                        {/* Score or VS */}
+                        <View style={styles.hScoreColumn}>
+                            {isLive || match.status === 'finished' ? (
+                                <Text style={styles.hScoreText}>{match.score?.home || 0} - {match.score?.away || 0}</Text>
+                            ) : (
+                                <View style={styles.vsContainer}>
+                                    <Text style={styles.hTimeVsText}>{formattedTime}</Text>
+                                    <Text style={styles.vsSubText}>BOSHLANISHI</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Away Team */}
+                        <View style={styles.hTeamColumn}>
+                            <View style={styles.hLogoCircle}>
+                                {match.awayTeamLogo || match.awayTeam?.logo ? (
+                                    <Image source={{ uri: match.awayTeamLogo || match.awayTeam?.logo }} style={styles.hTeamLogo} />
+                                ) : (
+                                    <Text style={styles.hLogoText}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
+                                )}
+                            </View>
+                            <Text style={styles.hTeamName} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12)}</Text>
                         </View>
                     </View>
-                </TouchableOpacity>
+
+                    <View style={styles.hMatchFooter}>
+                        <Text style={styles.hMatchDate}>{formattedFullDate} • {match.venue || "Amatora Arena"}</Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+
+        if (importance === 'markaziy') {
+            return (
+                <LinearGradient
+                    key={match._id || Math.random().toString()}
+                    colors={['#FF2A00', '#FF8800', '#FFE600', '#FF3B00']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[cardWidthStyle, styles.fieryBorderGlowMarkaziy, { marginBottom: isVertical ? 14 : 0 }]}
+                >
+                    {cardContent}
+                </LinearGradient>
+            );
+        }
+
+        if (importance === 'ortacha') {
+            return (
+                <LinearGradient
+                    key={match._id || Math.random().toString()}
+                    colors={['#00F0FF', '#0EA5E9', '#38BDF8', '#0072FF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[cardWidthStyle, styles.cyanBorderGlowOrtacha, { marginBottom: isVertical ? 14 : 0 }]}
+                >
+                    {cardContent}
+                </LinearGradient>
+            );
+        }
+
+        return (
+            <View key={match._id || Math.random().toString()} style={[cardWidthStyle, { marginBottom: isVertical ? 14 : 0 }]}>
+                {cardContent}
             </View>
         );
     };
@@ -406,94 +437,123 @@ export default function HomeScreen({ navigation }: any) {
                                     const roundText = match.round ? `${match.round}-TUR` : (match.tour ? `${match.tour}-TUR` : "TUGAGAN O'YIN");
                                     const importance = match.importance || 'oddiy';
 
-                                    return (
-                                        <View key={match._id || match.id || idx} style={{ position: 'relative', marginBottom: 12 }}>
-                                            {importance === 'markaziy' && <View style={styles.markaziyFlameAura} />}
-                                            {importance === 'ortacha' && <View style={styles.ortachaFlameAura} />}
+                                     const finishedCardContent = (
+                                         <TouchableOpacity
+                                             style={[styles.finishedMatchCardInner, importance === 'oddiy' && styles.glassmorphicCardBorder]}
+                                             onPress={() => navigation.navigate('MatchDetail', { matchId: match._id || match.id })}
+                                             activeOpacity={0.85}
+                                         >
+                                             <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                                             <View style={styles.finishedCardInner}>
+                                                 {/* Header Row: League Name + Priority Badge / Round Badge */}
+                                                 <View style={styles.finishedHeaderRow}>
+                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                         <View style={styles.finishedLeagueBadge}>
+                                                             <Ionicons name="trophy-outline" size={12} color={Colors.primary} style={{ marginRight: 4 }} />
+                                                             <Text style={styles.finishedLeagueText} numberOfLines={1}>{leagueName.toUpperCase()}</Text>
+                                                         </View>
+                                                         {importance === 'markaziy' && (
+                                                             <View style={styles.markaziyBadgeTag}>
+                                                                 <Text style={styles.markaziyBadgeText}>⭐ MARKAZIY</Text>
+                                                             </View>
+                                                         )}
+                                                         {importance === 'ortacha' && (
+                                                             <View style={styles.ortachaBadgeTag}>
+                                                                 <Text style={styles.ortachaBadgeText}>⚡ SHIDDATLI</Text>
+                                                             </View>
+                                                         )}
+                                                     </View>
+                                                     <View style={styles.finishedRoundBadge}>
+                                                         <Text style={styles.finishedRoundText}>{roundText}</Text>
+                                                     </View>
+                                                 </View>
 
-                                            <TouchableOpacity
-                                                style={[styles.finishedMatchCard, styles.glassmorphicCardBorder]}
-                                                onPress={() => navigation.navigate('MatchDetail', { matchId: match._id || match.id })}
-                                                activeOpacity={0.85}
-                                            >
-                                                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                                                <View style={styles.finishedCardInner}>
-                                                    {/* Header Row: League Name + Priority Badge / Round Badge */}
-                                                    <View style={styles.finishedHeaderRow}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <View style={styles.finishedLeagueBadge}>
-                                                                <Ionicons name="trophy-outline" size={12} color={Colors.primary} style={{ marginRight: 4 }} />
-                                                                <Text style={styles.finishedLeagueText} numberOfLines={1}>{leagueName.toUpperCase()}</Text>
-                                                            </View>
-                                                            {importance === 'markaziy' && (
-                                                                <View style={styles.markaziyBadgeTag}>
-                                                                    <Text style={styles.markaziyBadgeText}>⭐ MARKAZIY</Text>
-                                                                </View>
-                                                            )}
-                                                            {importance === 'ortacha' && (
-                                                                <View style={styles.ortachaBadgeTag}>
-                                                                    <Text style={styles.ortachaBadgeText}>⚡ SHIDDATLI</Text>
-                                                                </View>
-                                                            )}
-                                                        </View>
-                                                        <View style={styles.finishedRoundBadge}>
-                                                            <Text style={styles.finishedRoundText}>{roundText}</Text>
-                                                        </View>
-                                                    </View>
+                                                 {/* Center Row: Team Logos & Final Score */}
+                                                 <View style={styles.finishedScoreRow}>
+                                                     {/* Home Team */}
+                                                     <View style={styles.finishedTeamCol}>
+                                                         <View style={styles.finishedLogoCircle}>
+                                                             {homeLogo ? (
+                                                                 <Image source={{ uri: homeLogo }} style={styles.finishedTeamLogo} resizeMode="contain" />
+                                                             ) : (
+                                                                 <Text style={styles.finishedLogoFallback}>{homeName.charAt(0)}</Text>
+                                                             )}
+                                                         </View>
+                                                         <Text style={styles.finishedTeamName} numberOfLines={1}>{homeName}</Text>
+                                                     </View>
 
-                                                    {/* Center Row: Team Logos & Final Score */}
-                                                    <View style={styles.finishedScoreRow}>
-                                                        {/* Home Team */}
-                                                        <View style={styles.finishedTeamCol}>
-                                                            <View style={styles.finishedLogoCircle}>
-                                                                {homeLogo ? (
-                                                                    <Image source={{ uri: homeLogo }} style={styles.finishedTeamLogo} resizeMode="contain" />
-                                                                ) : (
-                                                                    <Text style={styles.finishedLogoFallback}>{homeName.charAt(0)}</Text>
-                                                                )}
-                                                            </View>
-                                                            <Text style={styles.finishedTeamName} numberOfLines={1}>{homeName}</Text>
-                                                        </View>
+                                                     {/* Final Score Box */}
+                                                     <View style={styles.finishedScoreBox}>
+                                                         <Text style={styles.finishedScoreText}>
+                                                             {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
+                                                         </Text>
+                                                         <View style={styles.finishedBadgeTag}>
+                                                             <Text style={styles.finishedBadgeTagText}>TUGADI</Text>
+                                                         </View>
+                                                     </View>
 
-                                                        {/* Final Score Box */}
-                                                        <View style={styles.finishedScoreBox}>
-                                                            <Text style={styles.finishedScoreText}>
-                                                                {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
-                                                            </Text>
-                                                            <View style={styles.finishedBadgeTag}>
-                                                                <Text style={styles.finishedBadgeTagText}>TUGADI</Text>
-                                                            </View>
-                                                        </View>
+                                                     {/* Away Team */}
+                                                     <View style={styles.finishedTeamCol}>
+                                                         <View style={styles.finishedLogoCircle}>
+                                                             {awayLogo ? (
+                                                                 <Image source={{ uri: awayLogo }} style={styles.finishedTeamLogo} resizeMode="contain" />
+                                                             ) : (
+                                                                 <Text style={styles.finishedLogoFallback}>{awayName.charAt(0)}</Text>
+                                                             )}
+                                                         </View>
+                                                         <Text style={styles.finishedTeamName} numberOfLines={1}>{awayName}</Text>
+                                                     </View>
+                                                 </View>
 
-                                                        {/* Away Team */}
-                                                        <View style={styles.finishedTeamCol}>
-                                                            <View style={styles.finishedLogoCircle}>
-                                                                {awayLogo ? (
-                                                                    <Image source={{ uri: awayLogo }} style={styles.finishedTeamLogo} resizeMode="contain" />
-                                                                ) : (
-                                                                    <Text style={styles.finishedLogoFallback}>{awayName.charAt(0)}</Text>
-                                                                )}
-                                                            </View>
-                                                            <Text style={styles.finishedTeamName} numberOfLines={1}>{awayName}</Text>
-                                                        </View>
-                                                    </View>
+                                                 {/* Footer Row: Date Finished + Venue/Stadium */}
+                                                 <View style={styles.finishedFooterRow}>
+                                                     <View style={styles.finishedFooterItem}>
+                                                         <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 4 }} />
+                                                         <Text style={styles.finishedFooterText}>{formattedDate}</Text>
+                                                     </View>
+                                                     <Text style={styles.finishedDotSeparator}>•</Text>
+                                                     <View style={styles.finishedFooterItem}>
+                                                         <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 4 }} />
+                                                         <Text style={styles.finishedFooterText} numberOfLines={1}>{venue}</Text>
+                                                     </View>
+                                                 </View>
+                                             </View>
+                                         </TouchableOpacity>
+                                     );
 
-                                                    {/* Footer Row: Date Finished + Venue/Stadium */}
-                                                    <View style={styles.finishedFooterRow}>
-                                                        <View style={styles.finishedFooterItem}>
-                                                            <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 4 }} />
-                                                            <Text style={styles.finishedFooterText}>{formattedDate}</Text>
-                                                        </View>
-                                                        <Text style={styles.finishedDotSeparator}>•</Text>
-                                                        <View style={styles.finishedFooterItem}>
-                                                            <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 4 }} />
-                                                            <Text style={styles.finishedFooterText} numberOfLines={1}>{venue}</Text>
-                                                        </View>
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
-                                        </View>
-                                    );
+                                     if (importance === 'markaziy') {
+                                         return (
+                                             <LinearGradient
+                                                 key={match._id || match.id || idx}
+                                                 colors={['#FF2A00', '#FF8800', '#FFE600', '#FF3B00']}
+                                                 start={{ x: 0, y: 0 }}
+                                                 end={{ x: 1, y: 1 }}
+                                                 style={[styles.fieryBorderGlowMarkaziy, styles.finishedCardMargin]}
+                                             >
+                                                 {finishedCardContent}
+                                             </LinearGradient>
+                                         );
+                                     }
+
+                                     if (importance === 'ortacha') {
+                                         return (
+                                             <LinearGradient
+                                                 key={match._id || match.id || idx}
+                                                 colors={['#00F0FF', '#0EA5E9', '#38BDF8', '#0072FF']}
+                                                 start={{ x: 0, y: 0 }}
+                                                 end={{ x: 1, y: 1 }}
+                                                 style={[styles.cyanBorderGlowOrtacha, styles.finishedCardMargin]}
+                                             >
+                                                 {finishedCardContent}
+                                             </LinearGradient>
+                                         );
+                                     }
+
+                                     return (
+                                         <View key={match._id || match.id || idx} style={styles.finishedCardMargin}>
+                                             {finishedCardContent}
+                                         </View>
+                                     );
                                 })
                             ) : (
                                 <View style={styles.emptyCard}>
@@ -545,26 +605,6 @@ const styles = StyleSheet.create({
     },
     sliderContainer: {
         marginBottom: 20,
-    },
-    hMatchCard: {
-        width: CARD_WIDTH,
-        borderRadius: 20,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    vMatchCard: {
-        width: width - 40,
-        borderRadius: 20,
-        overflow: 'hidden',
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     vMatchHeader: {
         borderBottomColor: 'rgba(255,255,255,0.05)',
@@ -698,34 +738,55 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
 
-    // Flame Glow Backdrop Aura
-    markaziyFlameAura: {
-        position: 'absolute',
-        top: 2,
-        bottom: 2,
-        left: 2,
-        right: 2,
+    // Fiery & Cyan Radiant Gradient Border Styles
+    fieryBorderGlowMarkaziy: {
         borderRadius: 22,
-        backgroundColor: 'rgba(255, 185, 0, 0.16)',
-        shadowColor: '#FFD700',
+        padding: 1.8,
+        shadowColor: '#FF4500',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.95,
-        shadowRadius: 18,
+        shadowRadius: 14,
         elevation: 10,
     },
-    ortachaFlameAura: {
-        position: 'absolute',
-        top: 2,
-        bottom: 2,
-        left: 2,
-        right: 2,
+    cyanBorderGlowOrtacha: {
         borderRadius: 22,
-        backgroundColor: 'rgba(14, 165, 233, 0.12)',
+        padding: 1.5,
         shadowColor: '#0EA5E9',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.85,
-        shadowRadius: 14,
+        shadowRadius: 10,
         elevation: 8,
+    },
+    hMatchCardWrapper: {
+        width: CARD_WIDTH,
+    },
+    vMatchCardWrapper: {
+        width: width - 40,
+    },
+    hMatchCardInner: {
+        width: '100%',
+        borderRadius: 20.2,
+        overflow: 'hidden',
+        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    },
+    vMatchCardInner: {
+        width: '100%',
+        borderRadius: 20.2,
+        overflow: 'hidden',
+        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    },
+    finishedCardMargin: {
+        marginHorizontal: 20,
+        marginBottom: 12,
+    },
+    finishedCardInner: {
+        padding: 14,
+    },
+    finishedMatchCardInner: {
+        width: '100%',
+        borderRadius: 20.2,
+        overflow: 'hidden',
+        backgroundColor: 'rgba(15, 23, 42, 0.75)',
     },
     glassmorphicCardBorder: {
         borderWidth: 1,
