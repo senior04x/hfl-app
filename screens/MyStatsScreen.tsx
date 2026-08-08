@@ -156,6 +156,8 @@ const MyStatsScreen = ({ navigation }: any) => {
     const [scrollEnabled, setScrollEnabled] = useState(true);
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
+    const [playerReplays, setPlayerReplays] = useState<any[]>([]);
+    const [replaysLoading, setReplaysLoading] = useState(false);
     
     // Instagram state
     const [showInstagramModal, setShowInstagramModal] = useState(false);
@@ -408,6 +410,34 @@ const MyStatsScreen = ({ navigation }: any) => {
         }
     };
 
+    useEffect(() => {
+        const fetchPlayerReplays = async () => {
+            const pId = player?.id || player?._id;
+            if (!pId) return;
+            setReplaysLoading(true);
+            try {
+                const { data: events } = await supabase
+                    .from('match_events')
+                    .select('*, match:match_id(*), player:player_id(*)')
+                    .or(`player_id.eq.${pId}`)
+                    .not('replay_video_url', 'is', null)
+                    .order('created_at', { ascending: false });
+
+                if (events && events.length > 0) {
+                    setPlayerReplays(events);
+                } else {
+                    setPlayerReplays([]);
+                }
+            } catch (e) {
+                console.warn('Error fetching player replays:', e);
+            } finally {
+                setReplaysLoading(false);
+            }
+        };
+
+        fetchPlayerReplays();
+    }, [player?.id, player?._id]);
+
     // Save Instagram Username & URL Permanently in DB
     const handleSaveInstagram = async () => {
         if (!instagramInput.trim()) return;
@@ -570,7 +600,7 @@ const MyStatsScreen = ({ navigation }: any) => {
             // Ensure photo is uploaded to Supabase Storage if it is a local file URI
             let finalPhotoUrl = updateForm.photoUrl || player?.photo || player?.avatar || null;
             if (finalPhotoUrl && (finalPhotoUrl.startsWith('file:') || finalPhotoUrl.startsWith('content:') || finalPhotoUrl.startsWith('ph:'))) {
-                const uRes = await apiService.uploadPhoto(finalPhotoUrl);
+                const uRes: any = await apiService.uploadPhoto(finalPhotoUrl);
                 if (uRes && uRes.url) {
                     finalPhotoUrl = uRes.url;
                 }
@@ -780,37 +810,6 @@ const MyStatsScreen = ({ navigation }: any) => {
         </ScrollView>
     );
 
-    const [playerReplays, setPlayerReplays] = useState<any[]>([]);
-    const [replaysLoading, setReplaysLoading] = useState(false);
-
-    useEffect(() => {
-        const fetchPlayerReplays = async () => {
-            const pId = player?.id || player?._id;
-            if (!pId) return;
-            setReplaysLoading(true);
-            try {
-                const { data: events } = await supabase
-                    .from('match_events')
-                    .select('*, match:match_id(*), player:player_id(*)')
-                    .or(`player_id.eq.${pId}`)
-                    .not('replay_video_url', 'is', null)
-                    .order('created_at', { ascending: false });
-
-                if (events && events.length > 0) {
-                    setPlayerReplays(events);
-                } else {
-                    setPlayerReplays([]);
-                }
-            } catch (e) {
-                console.warn('Error fetching player replays:', e);
-            } finally {
-                setReplaysLoading(false);
-            }
-        };
-
-        fetchPlayerReplays();
-    }, [player?.id, player?._id]);
-
     const renderCareer = () => {
         const history = player?.careerHistory || [];
 
@@ -851,13 +850,13 @@ const MyStatsScreen = ({ navigation }: any) => {
                         <View style={styles.teamCareerWrapper}>
                             <View style={styles.teamMainRow}>
                                 <View style={styles.teamIconBox}>
-                                    {player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo || detailedData?.logo_url ? (
-                                        <Image source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo || detailedData?.logo_url }} style={styles.teamMiniLogo} resizeMode="contain" />
+                                    {player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo ? (
+                                        <Image source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }} style={styles.teamMiniLogo} resizeMode="contain" />
                                     ) : (
                                         <Ionicons name="shield" size={14} color={Colors.primary} />
                                     )}
                                 </View>
-                                <Text style={styles.teamNameCareer} numberOfLines={1}>{(player?.teams?.name || detailedData?.name || 'HFL FK').toUpperCase()}</Text>
+                                <Text style={styles.teamNameCareer} numberOfLines={1}>{(player?.teams?.name || 'HFL FK').toUpperCase()}</Text>
                             </View>
                         </View>
                     )}
@@ -1343,7 +1342,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                     </View>
                                     {pickerLoading && (
                                         <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center', borderRadius: 20, zIndex: 10 }}>
-                                            <ActivityIndicator size="medium" color={Colors.primary} />
+                                            <ActivityIndicator size="small" color={Colors.primary} />
                                         </View>
                                     )}
                                 </TouchableOpacity>
@@ -2006,6 +2005,14 @@ const styles = StyleSheet.create({
     emptyCareerText: {
         color: 'rgba(255,255,255,0.4)',
         fontSize: 12,
+    },
+    careerTimelineContainer: {
+        marginVertical: 10,
+    },
+    teamMiniLogo: {
+        width: 18,
+        height: 18,
+        borderRadius: 4,
     },
     matchCard: {
         borderRadius: 16,
