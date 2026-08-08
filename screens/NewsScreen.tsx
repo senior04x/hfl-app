@@ -33,42 +33,7 @@ export default function NewsScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const navigation = useNavigation<any>();
 
-    // Add News Modal State
-    const [isAddNewsModalVisible, setIsAddNewsModalVisible] = useState(false);
-    const [newTitle, setNewTitle] = useState('');
-    const [newCategory, setNewCategory] = useState("O'yinlar");
-    const [newImageUrl, setNewImageUrl] = useState('');
-    const [newContent, setNewContent] = useState('');
-    const [isSubmittingNews, setIsSubmittingNews] = useState(false);
-
     const categories = ['Barchasi', 'Turnirlar', 'Jamoalar', 'Transferlar', "O'yinlar"];
-
-    const handleCreateNews = async () => {
-        if (!newTitle.trim()) {
-            return;
-        }
-        try {
-            setIsSubmittingNews(true);
-            const payload = {
-                title: newTitle.trim(),
-                category: newCategory,
-                imageUrl: newImageUrl.trim() || 'https://images.unsplash.com/photo-1574629810360-7efbb6b6973f?q=80&w=1000',
-                content: newContent.trim()
-            };
-            const res = await apiService.createNews(payload);
-            if (res?.success) {
-                setIsAddNewsModalVisible(false);
-                setNewTitle('');
-                setNewContent('');
-                setNewImageUrl('');
-                fetchNews();
-            }
-        } catch (e) {
-            console.error('Error creating news:', e);
-        } finally {
-            setIsSubmittingNews(false);
-        }
-    };
 
     const fetchNews = async () => {
         try {
@@ -97,15 +62,9 @@ export default function NewsScreen() {
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
                 <Text style={styles.headerTitle}>YANGILIKLAR</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <TouchableOpacity style={styles.addNewsBtn} onPress={() => setIsAddNewsModalVisible(true)}>
-                        <Ionicons name="add-circle" size={18} color="#000" style={{ marginRight: 4 }} />
-                        <Text style={styles.addNewsBtnText}>QO'SHISH</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.searchBtn} onPress={() => setIsSearchVisible(true)}>
-                        <Ionicons name="search" size={22} color="#000" />
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity style={styles.searchBtn} onPress={() => setIsSearchVisible(true)}>
+                    <Ionicons name="search" size={22} color="#000" />
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -343,93 +302,6 @@ export default function NewsScreen() {
                             <Text style={styles.searchConfirmText}>NATIJALARNI KO'RISH</Text>
                         </TouchableOpacity>
                     </SafeAreaView>
-                </View>
-            </Modal>
-
-            {/* Admin Add News Modal */}
-            <Modal
-                visible={isAddNewsModalVisible}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setIsAddNewsModalVisible(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
-                    <View style={styles.addNewsModalContent}>
-                        <View style={styles.addNewsHeader}>
-                            <Text style={styles.addNewsTitle}>YANGI YANGILIK QO'SHISH</Text>
-                            <TouchableOpacity onPress={() => setIsAddNewsModalVisible(false)} style={styles.modalCloseBtn}>
-                                <Ionicons name="close" size={24} color="#FFF" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            {/* Title Field */}
-                            <Text style={styles.inputLabel}>YANGILIK SARLAVHASI *</Text>
-                            <TextInput
-                                style={styles.formInput}
-                                placeholder="Masalan: 4-tur natijalari e'lon qilindi..."
-                                placeholderTextColor="rgba(255,255,255,0.3)"
-                                value={newTitle}
-                                onChangeText={setNewTitle}
-                            />
-
-                            {/* Category Select Buttons */}
-                            <Text style={styles.inputLabel}>KATEGORIYA TANLANG *</Text>
-                            <View style={styles.categorySelectRow}>
-                                {['Turnirlar', 'Jamoalar', 'Transferlar', "O'yinlar"].map((cat) => (
-                                    <TouchableOpacity
-                                        key={cat}
-                                        style={[
-                                            styles.catSelectChip,
-                                            newCategory === cat && styles.catSelectChipActive
-                                        ]}
-                                        onPress={() => setNewCategory(cat)}
-                                    >
-                                        <Text style={[
-                                            styles.catSelectChipText,
-                                            newCategory === cat && styles.catSelectChipTextActive
-                                        ]}>
-                                            {cat}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-
-                            {/* Image URL Field */}
-                            <Text style={styles.inputLabel}>RASM HAVOLA (URL)</Text>
-                            <TextInput
-                                style={styles.formInput}
-                                placeholder="https://..."
-                                placeholderTextColor="rgba(255,255,255,0.3)"
-                                value={newImageUrl}
-                                onChangeText={setNewImageUrl}
-                            />
-
-                            {/* Content / Matn Field */}
-                            <Text style={styles.inputLabel}>YANGILIK MATNI</Text>
-                            <TextInput
-                                style={[styles.formInput, { height: 100, textAlignVertical: 'top', paddingTop: 12 }]}
-                                placeholder="Batafsil matnni yozing..."
-                                placeholderTextColor="rgba(255,255,255,0.3)"
-                                multiline
-                                numberOfLines={4}
-                                value={newContent}
-                                onChangeText={setNewContent}
-                            />
-
-                            {/* Submit Button */}
-                            <TouchableOpacity 
-                                style={[styles.submitNewsBtn, isSubmittingNews && { opacity: 0.6 }]}
-                                onPress={handleCreateNews}
-                                disabled={isSubmittingNews}
-                            >
-                                <Text style={styles.submitNewsBtnText}>
-                                    {isSubmittingNews ? "CHOP ETILMOQDA..." : "YANGILIKNI CHOP ETISH"}
-                                </Text>
-                            </TouchableOpacity>
-                        </ScrollView>
-                    </View>
                 </View>
             </Modal>
         </AnimatedBackground>
