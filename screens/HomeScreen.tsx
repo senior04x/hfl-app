@@ -452,9 +452,6 @@ export default function HomeScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-        flex: 1,
-        backgroundColor: 'transparent',
-    },
     container: {
         flex: 1,
         backgroundColor: 'transparent',
