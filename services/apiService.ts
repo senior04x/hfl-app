@@ -816,6 +816,7 @@ export const apiService = {
                 return {
                     ...m,
                     _id: m.id,
+                    importance: m.importance || 'oddiy',
                     date: m.match_date || m.date || new Date().toISOString(),
                     status: (m.status === 'upcoming' || m.status === 'scheduled') ? 'scheduled' : m.status,
                     homeTeamName: homeTeam?.name || m.home_team_name || 'Uy jamoasi',

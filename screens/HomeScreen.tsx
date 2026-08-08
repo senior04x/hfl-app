@@ -111,14 +111,12 @@ export default function HomeScreen({ navigation }: any) {
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const upcomingMatches = matches
-        .filter(m => m.status === 'scheduled' && m.importance !== 'oddiy')
+        .filter(m => m.status === 'scheduled' && (m.importance === 'markaziy' || m.importance === 'ortacha'))
         .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
         .slice(0, 5);
 
-    // Fallback: If no markaziy/ortacha matches are set yet, display top 3 scheduled matches
-    const displayUpcomingMatches = upcomingMatches.length > 0 
-        ? upcomingMatches 
-        : matches.filter(m => m.status === 'scheduled').slice(0, 3);
+    // Strictly display ONLY markaziy or ortacha matches on Home Screen. Oddiy matches show in Calendar only.
+    const displayUpcomingMatches = upcomingMatches;
 
     const finishedMatches = matches
         .filter(m => m.status === 'finished')
@@ -161,9 +159,27 @@ export default function HomeScreen({ navigation }: any) {
         const importance = match.importance || 'oddiy';
         let borderStyle: any = { borderColor: 'rgba(255, 255, 255, 0.15)', borderWidth: 1 };
         if (importance === 'markaziy') {
-            borderStyle = { borderColor: '#FFE600', borderWidth: 1.8, shadowColor: '#FFE600' };
+            borderStyle = { 
+                borderColor: '#FFE600', 
+                borderWidth: 2, 
+                shadowColor: '#FFE600',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.9,
+                shadowRadius: 12,
+                elevation: 10,
+                backgroundColor: 'rgba(255, 230, 0, 0.08)'
+            };
         } else if (importance === 'ortacha') {
-            borderStyle = { borderColor: '#0EA5E9', borderWidth: 1.5 };
+            borderStyle = { 
+                borderColor: '#0EA5E9', 
+                borderWidth: 1.8, 
+                shadowColor: '#0EA5E9',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.7,
+                shadowRadius: 8,
+                elevation: 6,
+                backgroundColor: 'rgba(14, 165, 233, 0.06)'
+            };
         }
 
         return (
