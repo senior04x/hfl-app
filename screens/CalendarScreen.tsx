@@ -82,8 +82,8 @@ export default function CalendarScreen({ navigation }: any) {
                         };
                     }
 
-                    const tId = match.tournamentId || match.tournament?._id || 'unassigned';
-                    const tName = match.tournamentName || match.tournament?.name || "No'malum Turnir";
+                    const tName = match.league || match.tournamentName || match.tournament?.name || "No'malum Liga";
+                    const tId = match.league || match.tournamentId || match.tournament?._id || tName;
 
                     if (!groups[dateKey].tournaments[tId]) {
                         groups[dateKey].tournaments[tId] = {
