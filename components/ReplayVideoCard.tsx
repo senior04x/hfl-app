@@ -1,9 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
+import { getCachedVideoUri } from '../utils/videoCache';
 
 const DEFAULT_AVATAR = require('../shadow-man.png');
 
@@ -33,6 +34,17 @@ export default function ReplayVideoCard({
   const videoRef = useRef<Video>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sourceUri, setSourceUri] = useState<string>(videoUrl);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (videoUrl) {
+      getCachedVideoUri(videoUrl).then((cached) => {
+        if (isMounted) setSourceUri(cached);
+      });
+    }
+    return () => { isMounted = false; };
+  }, [videoUrl]);
 
   const togglePlay = async () => {
     if (!videoRef.current) return;
@@ -81,7 +93,7 @@ export default function ReplayVideoCard({
 
         <Video
           ref={videoRef}
-          source={{ uri: videoUrl }}
+          source={{ uri: sourceUri }}
           style={styles.video}
           resizeMode={ResizeMode.CONTAIN}
           shouldPlay={false}

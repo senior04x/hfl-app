@@ -17,6 +17,8 @@ import { apiService } from '../services/apiService';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 
+import CustomRefreshControl from '../components/CustomRefreshControl';
+
 export default function CalendarMatchesScreen({ route, navigation }: any) {
     const { 
         tournamentId,
@@ -27,6 +29,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
     
     const [matches, setMatches] = useState<any[]>(initialMatches);
     const [loading, setLoading] = useState(initialMatches.length === 0);
+    const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -46,7 +49,13 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
             console.error('Error fetching tournament matches:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchMatches();
     };
 
     const filteredMatches = matches.filter((match: any) => {
@@ -190,7 +199,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                 </View>
 
                 {/* Matches List */}
-                {loading ? (
+                {loading && !refreshing ? (
                     <View style={[styles.emptyContainer, { flex: 1, justifyContent: 'center' }]}>
                         <ActivityIndicator size="large" color={Colors.primary} />
                         <Text style={[styles.emptyText, { marginTop: 10 }]}>Yuklanmoqda...</Text>
@@ -202,6 +211,12 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                         renderItem={renderMatchItem}
                         contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
+                        refreshControl={
+                            <CustomRefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                            />
+                        }
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
                                 <Text style={styles.emptyText}>Topilmadi</Text>

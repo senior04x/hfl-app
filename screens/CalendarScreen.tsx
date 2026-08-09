@@ -20,11 +20,14 @@ import CalendarSkeleton from '../components/CalendarSkeleton';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 
+import CustomRefreshControl from '../components/CustomRefreshControl';
+
 export default function CalendarScreen({ navigation }: any) {
     const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
     const [calendarData, setCalendarData] = useState<any[]>([]);
     const [displayData, setDisplayData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     // Date Picker State
     const [isDatePickerVisible, setDatePickerVisible] = useState(false);
@@ -82,33 +85,39 @@ export default function CalendarScreen({ navigation }: any) {
                         };
                     }
 
-                    const tName = match.league || match.tournamentName || match.tournament?.name || "No'malum Liga";
-                    const tId = match.league || match.tournamentId || match.tournament?._id || tName;
-
-                    if (!groups[dateKey].tournaments[tId]) {
-                        groups[dateKey].tournaments[tId] = {
-                            id: tId,
-                            name: tName,
+                    const tourneyName = match.tournamentName || match.league || 'Boshqa';
+                    if (!groups[dateKey].tournaments[tourneyName]) {
+                        groups[dateKey].tournaments[tourneyName] = {
+                            id: `${dateKey}_${tourneyName}`,
+                            name: tourneyName,
                             matches: []
                         };
                     }
-                    groups[dateKey].tournaments[tId].matches.push(match);
+
+                    groups[dateKey].tournaments[tourneyName].matches.push(match);
                 });
 
-                const formattedData = Object.values(groups).map((day: any) => ({
-                    ...day,
-                    id: day.date,
-                    tournaments: Object.values(day.tournaments)
-                })).sort((a, b) => a.timestamp - b.timestamp);
+                const formatted = Object.values(groups)
+                    .sort((a: any, b: any) => a.timestamp - b.timestamp)
+                    .map((group: any) => ({
+                        date: group.date,
+                        tournaments: Object.values(group.tournaments)
+                    }));
 
-                setCalendarData(formattedData);
-                setDisplayData(formattedData);
+                setCalendarData(formatted);
+                setDisplayData(formatted);
             }
         } catch (error) {
             console.error('Error fetching calendar matches:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchMatches();
     };
 
     const openDatePicker = () => {
@@ -258,9 +267,15 @@ export default function CalendarScreen({ navigation }: any) {
                 <FlatList
                     style={styles.listContainer}
                     data={displayData}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item, index) => item.id || item.date || String(index)}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 110 }}
+                    refreshControl={
+                        <CustomRefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                        />
+                    }
                     ListEmptyComponent={
                         !loading ? (
                             <View style={{ padding: 40, alignItems: 'center' }}>
