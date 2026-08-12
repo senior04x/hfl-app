@@ -832,7 +832,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                             onPress={() => copyToClipboard(selectedMessage.text)}
                                             activeOpacity={0.75}
                                         >
-                                            <Ionicons name="copy-outline" size={19} color="#FFFFFF" />
+                                            <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
                                             <Text style={styles.menuActionText}>Nusxalash</Text>
                                         </TouchableOpacity>
 
@@ -845,7 +845,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                                     onPress={() => handleEdit(selectedMessage)}
                                                     activeOpacity={0.75}
                                                 >
-                                                    <Ionicons name="create-outline" size={19} color="#00FF87" />
+                                                    <Ionicons name="create-outline" size={16} color="#00FF87" />
                                                     <Text style={[styles.menuActionText, { color: '#00FF87' }]}>Tahrirlash</Text>
                                                 </TouchableOpacity>
                                             </>
@@ -860,7 +860,7 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                                     onPress={() => handleDelete(selectedMessage._id || selectedMessage.id)}
                                                     activeOpacity={0.75}
                                                 >
-                                                    <Ionicons name="trash-outline" size={19} color="#FF3B30" />
+                                                    <Ionicons name="trash-outline" size={16} color="#FF3B30" />
                                                     <Text style={[styles.menuActionText, { color: '#FF3B30' }]}>O'chirish</Text>
                                                 </TouchableOpacity>
                                             </>
@@ -1060,28 +1060,28 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     actionMenuGlassCard: {
-        width: 210,
-        borderRadius: 20,
+        width: 165,
+        borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.16)',
-        backgroundColor: 'rgba(20, 24, 36, 0.55)',
+        backgroundColor: 'rgba(20, 24, 36, 0.65)',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.45,
-        shadowRadius: 20,
-        elevation: 10,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+        elevation: 8,
     },
     menuActionItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
-        gap: 14,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        gap: 10,
     },
     menuActionText: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 14,
+        fontWeight: '600',
         color: '#FFFFFF',
     },
     menuDivider: {
