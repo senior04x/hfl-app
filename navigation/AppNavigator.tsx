@@ -249,91 +249,88 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                 </View>
             </View>
 
-            {/* Quick Account Switcher Modal */}
+            {/* Bottom Sheet Quick Account Switcher Modal */}
             <Modal
                 visible={showSwitcherModal}
                 transparent
-                animationType="fade"
+                animationType="slide"
                 onRequestClose={() => setShowSwitcherModal(false)}
             >
                 <View style={styles.modalOverlay}>
+                    <TouchableOpacity
+                        style={{ flex: 1, width: '100%' }}
+                        activeOpacity={1}
+                        onPress={() => setShowSwitcherModal(false)}
+                    />
                     <View style={styles.switcherModalCard}>
-                        <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
-                        <View style={{ padding: 22 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <Ionicons name="repeat" size={22} color="#00FF87" />
-                                    <Text style={styles.switcherTitle}>AKKOUNTLARNI ALMASHTIRISH</Text>
-                                </View>
-                                <TouchableOpacity onPress={() => setShowSwitcherModal(false)}>
-                                    <Ionicons name="close-circle" size={24} color="rgba(255,255,255,0.5)" />
+                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                        
+                        {/* Grabber Bar */}
+                        <View style={styles.grabberBar} />
+
+                        <View style={{ paddingHorizontal: 22, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
+                            <View style={styles.modalHeaderRow}>
+                                <Text style={styles.switcherTitle}>Akkountni Almashtirish</Text>
+                                <TouchableOpacity onPress={() => setShowSwitcherModal(false)} style={styles.closeBtn}>
+                                    <Ionicons name="close" size={20} color="rgba(255,255,255,0.7)" />
                                 </TouchableOpacity>
                             </View>
-                            <Text style={styles.switcherSubtitle}>
-                                Tizimdan chiqmasdan boshqa akkountingizga tezkor o'ting:
-                            </Text>
 
                             {loadingAccounts ? (
-                                <View style={{ paddingVertical: 30, alignItems: 'center' }}>
-                                    <ActivityIndicator size="large" color="#00FF87" />
-                                    <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 10, fontSize: 12 }}>Akkountlaringiz yuklanmoqda...</Text>
+                                <View style={{ paddingVertical: 36, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                    <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 12, fontSize: 13 }}>
+                                        Yuklanmoqda...
+                                    </Text>
                                 </View>
                             ) : (
-                                <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                                <ScrollView style={{ maxHeight: 320, marginTop: 8 }} showsVerticalScrollIndicator={false}>
                                     {accountOptions.map((acc, idx) => {
                                         const isCurrent = (acc.id === user?.id || acc._id === user?._id) && (acc.organizationId === user?.organizationId || acc.organization_id === user?.organization_id);
                                         const orgName = acc.orgName || acc.organizations?.name || 'Amatora Liga';
+                                        const avatarUri = acc.photo || acc.photo_url || acc.avatar || acc.logo || acc.logo_url;
 
                                         return (
                                             <TouchableOpacity
                                                 key={idx}
                                                 style={[styles.accountOptionCard, isCurrent && styles.accountOptionCardActive]}
-                                                activeOpacity={0.8}
+                                                activeOpacity={0.75}
                                                 onPress={() => handleSwitchAccount(acc)}
                                             >
-                                                <View style={styles.accountOptionIcon}>
-                                                    {acc.photo ? (
+                                                {/* Avatar */}
+                                                <View style={styles.accountOptionAvatarContainer}>
+                                                    {avatarUri ? (
                                                         <Image
-                                                            source={{ uri: acc.photo }}
-                                                            style={{ width: 44, height: 44, borderRadius: 22 }}
+                                                            source={{ uri: avatarUri }}
+                                                            style={styles.accountOptionAvatar}
                                                             resizeMode="cover"
                                                         />
                                                     ) : (
-                                                        <Ionicons
-                                                            name={acc.role === 'manager' ? 'shield-half' : 'football'}
-                                                            size={24}
-                                                            color="#00FF87"
-                                                        />
+                                                        <View style={styles.accountOptionAvatarFallback}>
+                                                            <Text style={styles.avatarInitial}>
+                                                                {(acc.name || 'F').charAt(0).toUpperCase()}
+                                                            </Text>
+                                                        </View>
                                                     )}
                                                 </View>
-                                                <View style={{ flex: 1, marginLeft: 12, justifyContent: 'center' }}>
+
+                                                {/* Name and Organization */}
+                                                <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
                                                     <Text style={styles.accountOptionName}>{acc.name}</Text>
-                                                    <Text style={{ color: '#00FF87', fontSize: 11, fontWeight: '700', marginTop: 2 }}>
-                                                        🏛️ {orgName}
-                                                    </Text>
-                                                    {!!acc.subTitle && (
-                                                        <Text style={styles.accountOptionSubtitle} numberOfLines={1}>
-                                                            {acc.subTitle}
-                                                        </Text>
-                                                    )}
+                                                    <Text style={styles.accountOptionOrg}>{orgName}</Text>
                                                 </View>
-                                                {isCurrent ? (
-                                                    <Ionicons name="checkmark-circle" size={24} color="#00FF87" />
-                                                ) : (
-                                                    <Ionicons name="swap-horizontal" size={20} color="rgba(255,255,255,0.4)" />
+
+                                                {/* Active Indicator */}
+                                                {isCurrent && (
+                                                    <View style={styles.activeCheckBadge}>
+                                                        <View style={styles.activeCheckDot} />
+                                                    </View>
                                                 )}
                                             </TouchableOpacity>
                                         );
                                     })}
                                 </ScrollView>
                             )}
-
-                            <TouchableOpacity
-                                style={styles.cancelModalBtn}
-                                onPress={() => setShowSwitcherModal(false)}
-                            >
-                                <Text style={styles.cancelModalBtnText}>YOPISH</Text>
-                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
@@ -416,78 +413,120 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.82)',
-        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        justifyContent: 'flex-end',
         alignItems: 'center',
-        padding: 20,
     },
     switcherModalCard: {
         width: '100%',
-        maxWidth: 400,
-        borderRadius: 24,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        backgroundColor: '#121212',
+        borderTopWidth: 1,
+        borderLeftWidth: 1,
+        borderRightWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+        backgroundColor: 'transparent',
+    },
+    grabberBar: {
+        width: 38,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        alignSelf: 'center',
+        marginTop: 12,
+        marginBottom: 8,
+    },
+    modalHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+        marginTop: 4,
     },
     switcherTitle: {
-        fontSize: 15,
-        fontWeight: '900',
-        color: '#FFF',
-        letterSpacing: 0.5,
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        letterSpacing: -0.2,
     },
-    switcherSubtitle: {
-        fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.6)',
-        marginBottom: 16,
+    closeBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     accountOptionCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        padding: 14,
-        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 18,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
     },
     accountOptionCardActive: {
-        borderColor: 'rgba(0, 255, 135, 0.5)',
-        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        borderColor: 'rgba(255, 255, 255, 0.28)',
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
     },
-    accountOptionIcon: {
+    accountOptionAvatarContainer: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
         overflow: 'hidden',
+    },
+    accountOptionAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+    },
+    accountOptionAvatarFallback: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarInitial: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '800',
     },
     accountOptionName: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#FFF',
+        color: '#FFFFFF',
     },
-    accountOptionSubtitle: {
-        fontSize: 11,
-        color: 'rgba(255, 255, 255, 0.5)',
+    accountOptionOrg: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: 'rgba(255, 255, 255, 0.55)',
         marginTop: 2,
     },
-    cancelModalBtn: {
-        height: 44,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        justifyContent: 'center',
+    activeCheckBadge: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        borderColor: '#FFFFFF',
         alignItems: 'center',
-        marginTop: 10,
+        justifyContent: 'center',
+        padding: 3,
     },
-    cancelModalBtnText: {
-        color: '#FFF',
-        fontWeight: '800',
-        fontSize: 13,
-        letterSpacing: 1,
+    activeCheckDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#FFFFFF',
     },
+});,
 });
