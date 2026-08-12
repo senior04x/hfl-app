@@ -60,7 +60,7 @@ export const apiService = {
     getOrganizations: async () => {
         try {
             const [orgsRes, sponsorsRes] = await Promise.all([
-                supabaseAdmin.from('organizations').select('id, name, slug, logo_url').order('id', { ascending: true }),
+                supabaseAdmin.from('organizations').select('id, name, slug, logo_url, is_registration_open, transfer_window_open').order('id', { ascending: true }),
                 supabaseAdmin.from('sponsors').select('name, logo_url').like('name', 'REGISTRATION_OPEN%')
             ]);
 
@@ -90,9 +90,10 @@ export const apiService = {
                 });
             }
 
-            // Keep org UNLESS explicitly closed
+            // Keep org UNLESS explicitly closed in organizations.is_registration_open OR sponsors fallback
             const activeOrgs = orgs.filter((org: any) => {
                 const orgIdStr = String(org.id);
+                if (org.is_registration_open === false) return false;
                 if (sponsorMap[orgIdStr] === false) return false;
                 if (orgIdStr === '1' && sponsorMap['global'] === false) return false;
                 return true;
@@ -102,6 +103,26 @@ export const apiService = {
         } catch (err) {
             console.error('getOrganizations error:', err);
             return [];
+        }
+    },
+
+    getRegistrationStatus: async (orgId?: number): Promise<boolean> => {
+        try {
+            const targetOrgId = orgId || getOrgId();
+            const { data, error } = await supabaseAdmin
+                .from('organizations')
+                .select('is_registration_open')
+                .eq('id', targetOrgId)
+                .maybeSingle();
+
+            if (!error && data && data.is_registration_open !== null && data.is_registration_open !== undefined) {
+                return !!data.is_registration_open;
+            }
+
+            return true;
+        } catch (e) {
+            console.error('getRegistrationStatus error:', e);
+            return true;
         }
     },
 
