@@ -1,3 +1,11 @@
+if (typeof global !== 'undefined' && (global as any).ErrorUtils) {
+  const defaultHandler = (global as any).ErrorUtils.getGlobalHandler();
+  (global as any).ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+    console.error('=== EXPLICIT ERROR STACK TRACE ===\n', error, '\nSTACK:\n', error?.stack);
+    if (defaultHandler) defaultHandler(error, isFatal);
+  });
+}
+
 import 'expo-dev-client';
 import React from 'react';
 import { StyleSheet } from 'react-native';
