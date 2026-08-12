@@ -1,12 +1,6 @@
 import 'expo-dev-client';
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import * as Sentry from '@sentry/react-native';
-
-Sentry.init({
-  dsn: 'https://dummy@sentry.io/1234567',
-  tracesSampleRate: 1.0,
-});
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
