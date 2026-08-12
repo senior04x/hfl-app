@@ -197,13 +197,18 @@ export default function WelcomeScreen({ navigation }: any) {
         }
     };
 
-    const performLogin = (acc: any) => {
+    const performLogin = (acc: any, accountsList?: any[]) => {
         try {
             clearApiCache();
         } catch (e) {}
         const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || acc.organizations?.id || 1;
         useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
-        setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) });
+        
+        const finalAccounts = (accountsList && accountsList.length > 0) 
+            ? accountsList 
+            : (accountOptions.length > 0 ? accountOptions : [acc]);
+            
+        setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) }, finalAccounts);
         setShowAccountModal(false);
         setShowBotModal(false);
     };
@@ -305,11 +310,14 @@ const formatPhoneInput = (val: string) => {
             if (otpValid) {
                 const res = await apiService.findAccountsByPhone(fullPhone);
                 if (res.success) {
+                    const accList = res.accounts || (res.user ? [res.user] : []);
+                    setAccountOptions(accList);
+                    useAuthStore.getState().setUserAccounts(accList);
+
                     if (res.multipleAccounts && res.accounts) {
-                        setAccountOptions(res.accounts);
                         setShowAccountModal(true);
                     } else if (res.user) {
-                        performLogin(res.user);
+                        performLogin(res.user, accList);
                     }
                 } else {
                     Alert.alert('Xato', res.reason || 'Profil topilmadi.');

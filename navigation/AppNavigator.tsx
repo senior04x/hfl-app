@@ -62,25 +62,34 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
         }
 
         const userPhone = user?.phone || user?.phoneNumber || user?.phone_number || user?.tel;
-        if (!userPhone) {
-            Alert.alert('Akkountlar', 'Akkount ro\'yxatini olish uchun ilovaga kiring.');
-            return;
-        }
+        const cachedAccounts = useAuthStore.getState().userAccounts;
 
-        try {
+        // 1. Instant 0-second display from persistent local cache
+        if (cachedAccounts && cachedAccounts.length > 0) {
+            setAccountOptions(cachedAccounts);
+            setLoadingAccounts(false);
+            setShowSwitcherModal(true);
+        } else {
+            setAccountOptions(user ? [user] : []);
             setLoadingAccounts(true);
             setShowSwitcherModal(true);
-            const fullPhone = `+998${userPhone.replace(/\D/g, '').slice(-9)}`;
-            const res = await apiService.findAccountsByPhone(fullPhone);
-            if (res.success && res.accounts && res.accounts.length > 0) {
-                setAccountOptions(res.accounts);
-            } else {
-                setAccountOptions([user]);
+        }
+
+        // 2. Background silent refresh
+        if (userPhone) {
+            try {
+                const fullPhone = `+998${userPhone.replace(/\D/g, '').slice(-9)}`;
+                const res = await apiService.findAccountsByPhone(fullPhone);
+                if (res.success && res.accounts && res.accounts.length > 0) {
+                    setAccountOptions(res.accounts);
+                    useAuthStore.getState().setUserAccounts(res.accounts);
+                }
+            } catch (e) {
+                console.warn('Background account refresh error:', e);
+            } finally {
+                setLoadingAccounts(false);
             }
-        } catch (e) {
-            console.error('Account switch fetch error:', e);
-            setAccountOptions([user]);
-        } finally {
+        } else {
             setLoadingAccounts(false);
         }
     };
