@@ -270,22 +270,42 @@ export default function HomeScreen({ navigation }: any) {
 
                                 return (
                                     <View style={styles.header}>
+                                        {/* Left Side: Avatar + Greeting & Name */}
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                             <TouchableOpacity 
                                                 style={styles.profileButton}
-                                                onPress={() => navigation.navigate('Notifications')}
-                                                activeOpacity={0.75}
+                                                onPress={() => navigation.navigate('Profil')}
+                                                activeOpacity={0.8}
                                             >
-                                                <View style={styles.bellButton}>
-                                                    <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
-                                                    <View style={styles.unreadBadgeDot} />
-                                                </View>
+                                                {avatarUri ? (
+                                                    <SmartImage 
+                                                        uri={avatarUri}
+                                                        style={styles.squircleAvatar}
+                                                        fallbackIcon="person"
+                                                    />
+                                                ) : (
+                                                    <View style={styles.squircleAvatarFallback}>
+                                                        <Ionicons name="person" size={22} color="#FFFFFF" />
+                                                    </View>
+                                                )}
                                             </TouchableOpacity>
                                             <View>
                                                 <Text style={styles.welcomeText}>{getGreetingText()}</Text>
                                                 <Text style={styles.brandText}>{displayName.toUpperCase()}</Text>
                                             </View>
                                         </View>
+
+                                        {/* Right Side: Notification Bell button */}
+                                        <TouchableOpacity 
+                                            style={styles.profileButton}
+                                            onPress={() => navigation.navigate('Notifications')}
+                                            activeOpacity={0.75}
+                                        >
+                                            <View style={styles.bellButton}>
+                                                <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
+                                                <View style={styles.unreadBadgeDot} />
+                                            </View>
+                                        </TouchableOpacity>
                                     </View>
                                 );
                             })()}
