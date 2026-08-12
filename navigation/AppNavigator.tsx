@@ -33,20 +33,22 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
     const [accountOptions, setAccountOptions] = useState<any[]>([]);
     const [loadingAccounts, setLoadingAccounts] = useState(false);
 
-    // Modal Y displacement for swipe down gesture from anywhere on the card
+    // Modal Y displacement for swipe down gesture from anywhere on the screen, header text, margins or card
     const modalY = useRef(new Animated.Value(0)).current;
 
     const modalPanResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => false,
-            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 6 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
             onPanResponderMove: (_, gestureState) => {
                 if (gestureState.dy > 0) {
                     modalY.setValue(gestureState.dy);
                 }
             },
             onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dy > 45 || gestureState.vy > 0.25) {
+                if (gestureState.dy > 40 || gestureState.vy > 0.2) {
                     setShowSwitcherModal(false);
                 } else {
                     Animated.spring(modalY, {
@@ -310,6 +312,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                             styles.switcherModalCard,
                             { transform: [{ translateY: modalY }] }
                         ]}
+                        {...modalPanResponder.panHandlers}
                     >
                         <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
                         
