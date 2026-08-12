@@ -261,28 +261,38 @@ export default function HomeScreen({ navigation }: any) {
                                 const avatarUri = userProfile?.photo || userProfile?.photo_url || userProfile?.avatar || userProfile?.logo || userProfile?.logo_url || user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url;
                                 const displayName = userProfile?.name || userProfile?.team_name || user?.name || user?.team_name || 'AMATORA';
 
+                                const getGreetingText = () => {
+                                    const hour = new Date().getHours();
+                                    if (hour >= 5 && hour < 12) return 'XAYRLI TONG ☀️';
+                                    if (hour >= 12 && hour < 18) return 'XAYRLI KUN 🌤️';
+                                    return 'XAYRLI KECH 🌙';
+                                };
+
                                 return (
                                     <View style={styles.header}>
-                                        <View>
-                                            <Text style={styles.welcomeText}>XUSH KELIBSIZ 👋</Text>
-                                            <Text style={styles.brandText}>{displayName.toUpperCase()}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                            <TouchableOpacity 
+                                                style={styles.profileButton}
+                                                onPress={() => navigation.navigate('Profil')}
+                                                activeOpacity={0.8}
+                                            >
+                                                {avatarUri ? (
+                                                    <SmartImage 
+                                                        uri={avatarUri}
+                                                        style={styles.squircleAvatar}
+                                                        fallbackIcon="person"
+                                                    />
+                                                ) : (
+                                                    <View style={styles.squircleAvatarFallback}>
+                                                        <Ionicons name="person" size={22} color="#FFFFFF" />
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                            <View>
+                                                <Text style={styles.welcomeText}>{getGreetingText()}</Text>
+                                                <Text style={styles.brandText}>{displayName.toUpperCase()}</Text>
+                                            </View>
                                         </View>
-                                        <TouchableOpacity 
-                                            style={styles.profileButton}
-                                            onPress={() => navigation.navigate('Profil')}
-                                        >
-                                            {avatarUri ? (
-                                                <SmartImage 
-                                                    uri={avatarUri}
-                                                    style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: Colors.primary }}
-                                                    fallbackIcon="person"
-                                                />
-                                            ) : (
-                                                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: Colors.primary }}>
-                                                    <Ionicons name="person" size={22} color={Colors.primary} />
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
                                     </View>
                                 );
                             })()}
@@ -465,19 +475,35 @@ const styles = StyleSheet.create({
         marginTop: 15,
     },
     welcomeText: {
-        color: Colors.textMuted,
-        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.65)',
+        fontSize: 12,
+        fontWeight: '700',
         marginBottom: 2,
+        letterSpacing: 0.5,
     },
     brandText: {
         color: Colors.text,
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '900',
-        letterSpacing: 1,
-        fontStyle: 'italic',
+        letterSpacing: 0.8,
     },
     profileButton: {
-        padding: 4,
+        padding: 0,
+    },
+    squircleAvatar: {
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        borderWidth: 0,
+    },
+    squircleAvatarFallback: {
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 0,
     },
     sliderContainer: {
         marginBottom: 20,
