@@ -38,23 +38,16 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
     const modalPanResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => false,
-            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 8,
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
             onPanResponderMove: (_, gestureState) => {
                 if (gestureState.dy > 0) {
                     modalY.setValue(gestureState.dy);
                 }
             },
             onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dy > 70 || gestureState.vy > 0.4) {
-                    Animated.timing(modalY, {
-                        toValue: 400,
-                        duration: 180,
-                        useNativeDriver: true,
-                    }).start(() => {
-                        setShowSwitcherModal(false);
-                        modalY.setValue(0);
-                    });
+                if (gestureState.dy > 50 || gestureState.vy > 0.3) {
+                    setShowSwitcherModal(false);
                 } else {
                     Animated.spring(modalY, {
                         toValue: 0,
@@ -94,6 +87,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
             return;
         }
 
+        modalY.setValue(0);
         const userPhone = user?.phone || user?.phoneNumber || user?.phone_number || user?.tel;
         const cachedAccounts = useAuthStore.getState().userAccounts;
 
@@ -309,17 +303,18 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                             styles.switcherModalCard,
                             { transform: [{ translateY: modalY }] }
                         ]}
-                        {...modalPanResponder.panHandlers}
                     >
                         <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
                         
-                        {/* Grabber Bar */}
-                        <View style={styles.grabberBar} />
-
-                        <View style={{ paddingHorizontal: 22, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
+                        {/* Header Drag Zone for Swipe-down to close */}
+                        <View style={styles.headerDragZone} {...modalPanResponder.panHandlers}>
+                            <View style={styles.grabberBar} />
                             <View style={styles.modalHeaderRow}>
                                 <Text style={styles.switcherTitle}>Akkountni Almashtirish</Text>
                             </View>
+                        </View>
+
+                        <View style={{ paddingHorizontal: 22, paddingTop: 2, paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
 
                             {loadingAccounts ? (
                                 <View style={{ paddingVertical: 36, alignItems: 'center' }}>
@@ -475,13 +470,18 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 255, 255, 0.12)',
         backgroundColor: 'transparent',
     },
+    headerDragZone: {
+        paddingTop: 12,
+        paddingHorizontal: 22,
+        width: '100%',
+        alignItems: 'center',
+    },
     grabberBar: {
         width: 38,
         height: 4,
         borderRadius: 2,
         backgroundColor: 'rgba(255, 255, 255, 0.3)',
         alignSelf: 'center',
-        marginTop: 12,
         marginBottom: 8,
     },
     modalHeaderRow: {
