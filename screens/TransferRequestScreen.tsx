@@ -45,9 +45,9 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
     const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-    // Modal state
     const [modalVisible, setModalVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isTransferWindowOpen, setIsTransferWindowOpen] = useState<boolean>(true);
 
     // Player & current team info loading state
     const [infoLoading, setInfoLoading] = useState(true);
@@ -79,6 +79,11 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
     }, [shimmerAnim]);
 
     useEffect(() => {
+        const checkWindow = async () => {
+            const isOpen = await apiService.getTransferWindowStatus();
+            setIsTransferWindowOpen(isOpen);
+        };
+        checkWindow();
         fetchPlayerInfo();
     }, [playerId]);
 
@@ -249,30 +254,43 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                         </View>
                     )}
 
-                    <View style={styles.infoBox}>
-                        <Ionicons name="information-circle" size={22} color="#00FF66" />
-                        <Text style={styles.infoText}>
-                            Boshqa jamoaga o'tish uchun liga va yangi jamoani tanlab so'rov yuboring. So'rov adminlar tomonidan ko'rib chiqiladi.
+                    <View style={[styles.infoBox, !isTransferWindowOpen && { borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                        <Ionicons name={!isTransferWindowOpen ? "warning" : "information-circle"} size={22} color={!isTransferWindowOpen ? "#EF4444" : "#00FF66"} />
+                        <Text style={[styles.infoText, !isTransferWindowOpen && { color: '#EF4444', fontWeight: '700' }]}>
+                            {!isTransferWindowOpen
+                                ? "Tashkilotingizda transfer oynasi hozirda yopilgan. Ariza va o'tishlar vaqtincha to'xtatilgan."
+                                : "Boshqa jamoaga o'tish uchun liga va yangi jamoani tanlab so'rov yuboring. So'rov adminlar tomonidan ko'rib chiqiladi."}
                         </Text>
                     </View>
 
                     {/* Step 1: Select League */}
                     <Text style={styles.label}>1. LIGANI TANLANG</Text>
                     <TouchableOpacity
-                        style={styles.selectButton}
-                        onPress={() => setLeagueModalVisible(true)}
+                        style={[styles.selectButton, !isTransferWindowOpen && styles.disabledButton]}
+                        onPress={() => {
+                            if (!isTransferWindowOpen) {
+                                Alert.alert('Yopilgan', 'Tashkilotingizda transfer oynasi hozirda yopilgan');
+                                return;
+                            }
+                            setLeagueModalVisible(true);
+                        }}
+                        disabled={!isTransferWindowOpen}
                     >
                         <Text style={[styles.selectButtonText, !selectedLeague && styles.placeholderText]}>
                             {selectedLeague || 'Liganing nomini tanlang...'}
                         </Text>
-                        <Ionicons name="chevron-down" size={20} color="#00FF66" />
+                        <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
                     </TouchableOpacity>
 
                     {/* Step 2: Select Team */}
                     <Text style={styles.label}>2. YANGI JAMOANI TANLANG</Text>
                     <TouchableOpacity
-                        style={[styles.selectButton, !selectedLeague && styles.disabledButton]}
+                        style={[styles.selectButton, (!selectedLeague || !isTransferWindowOpen) && styles.disabledButton]}
                         onPress={() => {
+                            if (!isTransferWindowOpen) {
+                                Alert.alert('Yopilgan', 'Tashkilotingizda transfer oynasi hozirda yopilgan');
+                                return;
+                            }
                             if (!selectedLeague) {
                                 Alert.alert('Eslatma', 'Iltimos, avval ligani tanlang');
                                 return;
@@ -280,29 +298,30 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                             setSearchQuery('');
                             setModalVisible(true);
                         }}
-                        disabled={!selectedLeague}
+                        disabled={!selectedLeague || !isTransferWindowOpen}
                     >
                         <Text style={[styles.selectButtonText, !selectedTeam && styles.placeholderText]}>
                             {loadingTeams ? "Jamoalar yuklanmoqda..." : (!selectedLeague ? "Avval ligani tanlang..." : (selectedTeamObj?.name || 'Jamoani tanlang...'))}
                         </Text>
-                        <Ionicons name="chevron-down" size={20} color="#00FF66" />
+                        <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
                     </TouchableOpacity>
 
                     {/* Step 3: Reason */}
                     <Text style={styles.label}>3. O'TISH SABABI (IXTIYORIY)</Text>
                     <TextInput
-                        style={styles.textArea}
+                        style={[styles.textArea, !isTransferWindowOpen && { opacity: 0.5 }]}
                         placeholder="Nima uchun jamoani almashtirmoqchisiz? (ixtiyoriy)..."
                         placeholderTextColor="rgba(255,255,255,0.4)"
                         multiline
                         numberOfLines={5}
                         value={reason}
                         onChangeText={setReason}
+                        editable={isTransferWindowOpen}
                     />
 
                     {/* Slide to Confirm Submit Button */}
                     <SlideButton
-                        disabled={!selectedLeague || !selectedTeam}
+                        disabled={!isTransferWindowOpen || !selectedLeague || !selectedTeam}
                         loading={loadingSubmit}
                         status={submitStatus}
                         onSwipeSuccess={handleSubmit}

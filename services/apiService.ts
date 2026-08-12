@@ -105,6 +105,31 @@ export const apiService = {
         }
     },
 
+    getTransferWindowStatus: async (orgId?: number): Promise<boolean> => {
+        try {
+            const targetOrgId = orgId || getOrgId();
+            const { data, error } = await supabaseAdmin
+                .from('organizations')
+                .select('transfer_window_open')
+                .eq('id', targetOrgId)
+                .maybeSingle();
+
+            if (error) {
+                console.warn('getTransferWindowStatus error:', error);
+                return true;
+            }
+
+            if (data && data.transfer_window_open !== null && data.transfer_window_open !== undefined) {
+                return !!data.transfer_window_open;
+            }
+
+            return true;
+        } catch (e) {
+            console.error('getTransferWindowStatus error:', e);
+            return true;
+        }
+    },
+
     // Accepted Collab Leagues for an Organization
     getOrgCollabLeagues: async (orgId: number) => {
         const cacheKey = `org_collab_leagues_${orgId}`;
