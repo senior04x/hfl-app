@@ -33,20 +33,20 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
     const [accountOptions, setAccountOptions] = useState<any[]>([]);
     const [loadingAccounts, setLoadingAccounts] = useState(false);
 
-    // Modal Y displacement for swipe down gesture
+    // Modal Y displacement for swipe down gesture from anywhere on the card
     const modalY = useRef(new Animated.Value(0)).current;
 
     const modalPanResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
+            onStartShouldSetPanResponder: () => false,
+            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 6 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
             onPanResponderMove: (_, gestureState) => {
                 if (gestureState.dy > 0) {
                     modalY.setValue(gestureState.dy);
                 }
             },
             onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dy > 50 || gestureState.vy > 0.3) {
+                if (gestureState.dy > 45 || gestureState.vy > 0.25) {
                     setShowSwitcherModal(false);
                 } else {
                     Animated.spring(modalY, {
@@ -55,6 +55,13 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                         bounciness: 4,
                     }).start();
                 }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(modalY, {
+                    toValue: 0,
+                    useNativeDriver: true,
+                    bounciness: 4,
+                }).start();
             },
         })
     ).current;
@@ -303,11 +310,11 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                             styles.switcherModalCard,
                             { transform: [{ translateY: modalY }] }
                         ]}
+                        {...modalPanResponder.panHandlers}
                     >
                         <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
                         
-                        {/* Header Drag Zone for Swipe-down to close */}
-                        <View style={styles.headerDragZone} {...modalPanResponder.panHandlers}>
+                        <View style={styles.headerDragZone}>
                             <View style={styles.grabberBar} />
                             <View style={styles.modalHeaderRow}>
                                 <Text style={styles.switcherTitle}>Akkountni Almashtirish</Text>
