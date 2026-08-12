@@ -45,6 +45,8 @@ SplashScreenExpo.preventAutoHideAsync().catch(() => {
     /* reloading the app might cause this error, safe to ignore */
 });
 
+import NotificationsScreen from './screens/NotificationsScreen';
+
 const Stack = createStackNavigator();
 
 function App() {
@@ -124,6 +126,7 @@ function App() {
                                     <Stack.Screen name="MyTeam" component={MyTeamScreen} />
                                     <Stack.Screen name="Players" component={PlayersScreen} />
                                     <Stack.Screen name="PlayerStats" component={PlayerStatsScreen} />
+                                    <Stack.Screen name="Notifications" component={NotificationsScreen} />
                                 </Stack.Navigator>
                             ) : (
                                 <AuthNavigator />

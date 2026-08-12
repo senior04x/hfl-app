@@ -273,20 +273,13 @@ export default function HomeScreen({ navigation }: any) {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                             <TouchableOpacity 
                                                 style={styles.profileButton}
-                                                onPress={() => navigation.navigate('Profil')}
-                                                activeOpacity={0.8}
+                                                onPress={() => navigation.navigate('Notifications')}
+                                                activeOpacity={0.75}
                                             >
-                                                {avatarUri ? (
-                                                    <SmartImage 
-                                                        uri={avatarUri}
-                                                        style={styles.squircleAvatar}
-                                                        fallbackIcon="person"
-                                                    />
-                                                ) : (
-                                                    <View style={styles.squircleAvatarFallback}>
-                                                        <Ionicons name="person" size={22} color="#FFFFFF" />
-                                                    </View>
-                                                )}
+                                                <View style={styles.bellButton}>
+                                                    <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
+                                                    <View style={styles.unreadBadgeDot} />
+                                                </View>
                                             </TouchableOpacity>
                                             <View>
                                                 <Text style={styles.welcomeText}>{getGreetingText()}</Text>
@@ -489,6 +482,27 @@ const styles = StyleSheet.create({
     },
     profileButton: {
         padding: 0,
+    },
+    bellButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 0,
+        position: 'relative',
+    },
+    unreadBadgeDot: {
+        position: 'absolute',
+        top: 9,
+        right: 10,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#FF3B30',
+        borderWidth: 1.5,
+        borderColor: '#121212',
     },
     squircleAvatar: {
         width: 46,
