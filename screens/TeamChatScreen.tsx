@@ -744,73 +744,83 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                         onPress={closeMenu}
                     />
 
-                    {selectedMessage && (
-                        <Animated.View
-                            style={[
-                                styles.menuCardWrapper,
-                                {
-                                    opacity: menuFadeAnim,
-                                    transform: [{ scale: menuScaleAnim }]
-                                }
-                            ]}
-                        >
-                            {/* Scaled Message Bubble Preview */}
-                            <View style={[
-                                styles.messageBubblePreview,
-                                String(selectedMessage.senderId) === String(user?._id || user?.id) ? styles.myBubble : styles.otherBubble,
-                            ]}>
-                                <Text style={[
-                                    styles.messageText,
-                                    String(selectedMessage.senderId) === String(user?._id || user?.id) ? styles.myText : styles.otherText
+                    {selectedMessage && (() => {
+                        const isMe = String(selectedMessage.senderId) === String(user?._id || user?.id);
+
+                        return (
+                            <Animated.View
+                                style={[
+                                    styles.menuCardWrapper,
+                                    {
+                                        alignItems: isMe ? 'flex-end' : 'flex-start',
+                                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                                        opacity: menuFadeAnim,
+                                        transform: [{ scale: menuScaleAnim }]
+                                    }
+                                ]}
+                            >
+                                {/* Scaled Message Bubble Preview with Larger Font */}
+                                <View style={[
+                                    styles.messageBubblePreview,
+                                    isMe ? styles.myBubble : styles.otherBubble,
                                 ]}>
-                                    {selectedMessage.text}
-                                </Text>
-                            </View>
+                                    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+                                    <Text style={[
+                                        styles.messageTextPreview,
+                                        isMe ? styles.myText : styles.otherText
+                                    ]}>
+                                        {selectedMessage.text}
+                                    </Text>
+                                </View>
 
-                            {/* Action Menu (Nusxalash, Tahrirlash, O'chirish) */}
-                            <View style={styles.actionMenuCard}>
-                                {/* Copy Action */}
-                                <TouchableOpacity
-                                    style={styles.menuActionItem}
-                                    onPress={() => copyToClipboard(selectedMessage.text)}
-                                    activeOpacity={0.75}
-                                >
-                                    <Ionicons name="copy-outline" size={20} color="#FFFFFF" />
-                                    <Text style={styles.menuActionText}>Nusxalash</Text>
-                                </TouchableOpacity>
-
-                                {/* Edit Action (Only for User's own messages) */}
-                                {String(selectedMessage.senderId) === String(user?._id || user?.id) && (
-                                    <>
-                                        <View style={styles.menuDivider} />
+                                {/* Glassmorphic Action Menu Card */}
+                                <View style={styles.actionMenuGlassCard}>
+                                    <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
+                                    <View style={{ paddingVertical: 4 }}>
+                                        {/* Copy Action */}
                                         <TouchableOpacity
                                             style={styles.menuActionItem}
-                                            onPress={() => handleEdit(selectedMessage)}
+                                            onPress={() => copyToClipboard(selectedMessage.text)}
                                             activeOpacity={0.75}
                                         >
-                                            <Ionicons name="create-outline" size={20} color="#00FF87" />
-                                            <Text style={[styles.menuActionText, { color: '#00FF87' }]}>Tahrirlash</Text>
+                                            <Ionicons name="copy-outline" size={19} color="#FFFFFF" />
+                                            <Text style={styles.menuActionText}>Nusxalash</Text>
                                         </TouchableOpacity>
-                                    </>
-                                )}
 
-                                {/* Delete Action (Only for User's own messages or Manager/Admin) */}
-                                {(String(selectedMessage.senderId) === String(user?._id || user?.id) || user?.role === 'manager' || user?.role === 'admin') && (
-                                    <>
-                                        <View style={styles.menuDivider} />
-                                        <TouchableOpacity
-                                            style={styles.menuActionItem}
-                                            onPress={() => handleDelete(selectedMessage._id || selectedMessage.id)}
-                                            activeOpacity={0.75}
-                                        >
-                                            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                                            <Text style={[styles.menuActionText, { color: '#FF3B30' }]}>O'chirish</Text>
-                                        </TouchableOpacity>
-                                    </>
-                                )}
-                            </View>
-                        </Animated.View>
-                    )}
+                                        {/* Edit Action (Only for User's own messages) */}
+                                        {isMe && (
+                                            <>
+                                                <View style={styles.menuDivider} />
+                                                <TouchableOpacity
+                                                    style={styles.menuActionItem}
+                                                    onPress={() => handleEdit(selectedMessage)}
+                                                    activeOpacity={0.75}
+                                                >
+                                                    <Ionicons name="create-outline" size={19} color="#00FF87" />
+                                                    <Text style={[styles.menuActionText, { color: '#00FF87' }]}>Tahrirlash</Text>
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
+
+                                        {/* Delete Action (Only for User's own messages or Manager/Admin) */}
+                                        {(isMe || user?.role === 'manager' || user?.role === 'admin') && (
+                                            <>
+                                                <View style={styles.menuDivider} />
+                                                <TouchableOpacity
+                                                    style={styles.menuActionItem}
+                                                    onPress={() => handleDelete(selectedMessage._id || selectedMessage.id)}
+                                                    activeOpacity={0.75}
+                                                >
+                                                    <Ionicons name="trash-outline" size={19} color="#FF3B30" />
+                                                    <Text style={[styles.menuActionText, { color: '#FF3B30' }]}>O'chirish</Text>
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
+                                    </View>
+                                </View>
+                            </Animated.View>
+                        );
+                    })()}
                 </View>
             </Modal>
 
@@ -932,36 +942,39 @@ const styles = StyleSheet.create({
     menuOverlay: { 
         flex: 1, 
         justifyContent: 'center', 
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.65)',
-        paddingHorizontal: 24,
+        paddingHorizontal: 22,
     },
     menuCardWrapper: {
         width: '100%',
-        maxWidth: 320,
-        alignItems: 'center',
+        maxWidth: 290,
     },
     messageBubblePreview: {
         paddingVertical: 14,
-        paddingHorizontal: 20,
+        paddingHorizontal: 18,
         borderRadius: 20,
         maxWidth: '100%',
-        marginBottom: 20,
+        marginBottom: 14,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.2)',
+        overflow: 'hidden',
     },
-    actionMenuCard: {
-        width: '100%',
-        backgroundColor: 'rgba(24, 28, 38, 0.95)',
-        borderRadius: 22,
+    messageTextPreview: {
+        fontSize: 20,
+        lineHeight: 28,
+        fontWeight: '600',
+    },
+    actionMenuGlassCard: {
+        width: 210,
+        borderRadius: 20,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.16)',
+        backgroundColor: 'rgba(20, 24, 36, 0.55)',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.5,
-        shadowRadius: 24,
-        elevation: 12,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.45,
+        shadowRadius: 20,
+        elevation: 10,
     },
     menuActionItem: {
         flexDirection: 'row',
