@@ -1768,25 +1768,44 @@ export const apiService = {
         }
     },
 
-    // Photo Upload (Supabase Storage + Base64 Fallback for Web Admin)
+    // Photo Upload (Supabase Storage: converts base64/file URIs into permanent HTTP public URLs)
     uploadPhoto: async (uri: string) => {
         try {
             if (!uri) return { url: '' };
-            if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:image')) {
+
+            // If ALREADY a clean HTTP/HTTPS public URL (and NOT a data URI), return it
+            if ((uri.startsWith('http://') || uri.startsWith('https://')) && !uri.startsWith('data:image')) {
                 return { url: uri };
             }
 
-            const response = await fetch(uri);
-            const blob = await response.blob();
-            
-            const fileExt = uri.split('.').pop()?.split('?')[0] || 'jpg';
+            const fileExt = 'jpg';
             const fileName = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             const filePath = `uploads/${fileName}`;
 
-            // Try uploading to Supabase Storage bucket 'photos'
+            const response = await fetch(uri);
+            const blob = await response.blob();
+
+            // Try uploading to 'player-photos' bucket first
+            try {
+                const { data, error } = await supabase.storage.from('player-photos').upload(filePath, blob, {
+                    contentType: 'image/jpeg',
+                    upsert: true
+                });
+
+                if (!error && data) {
+                    const { data: publicUrlData } = supabase.storage.from('player-photos').getPublicUrl(filePath);
+                    if (publicUrlData?.publicUrl) {
+                        return { url: publicUrlData.publicUrl };
+                    }
+                }
+            } catch (sErr) {
+                console.warn('Storage upload player-photos error:', sErr);
+            }
+
+            // Try uploading to 'photos' bucket
             try {
                 const { data, error } = await supabase.storage.from('photos').upload(filePath, blob, {
-                    contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+                    contentType: 'image/jpeg',
                     upsert: true
                 });
 
@@ -1796,21 +1815,11 @@ export const apiService = {
                         return { url: publicUrlData.publicUrl };
                     }
                 }
-            } catch (sErr) {
-                console.warn('Storage upload error:', sErr);
+            } catch (sErr2) {
+                console.warn('Storage upload photos error:', sErr2);
             }
 
-            // Fallback to Base64 (100% visible on web admin panel & mobile app)
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    resolve({ url: reader.result as string });
-                };
-                reader.onerror = () => {
-                    resolve({ url: uri });
-                };
-                reader.readAsDataURL(blob);
-            });
+            return { url: uri };
         } catch (err) {
             console.error('uploadPhoto error:', err);
             return { url: uri };
