@@ -43,12 +43,37 @@ export default function NotificationsScreen({ navigation }: any) {
 
             const generatedList: any[] = [];
 
+            // Fetch user profile team ID if available
+            let myTeamIdStr: string | null = null;
+            if (user?.teamId || user?.team_id || user?.team?._id || user?.team?.id) {
+                myTeamIdStr = String(user.teamId || user.team_id || user.team?._id || user.team?.id);
+            } else if (user?.id) {
+                try {
+                    const pData = await apiService.getPlayerById(user.id);
+                    if (pData && (pData.team_id || pData.teamId)) {
+                        myTeamIdStr = String(pData.team_id || pData.teamId);
+                    }
+                } catch (e) {}
+            }
+
             // 1. Process Real Matches (Live, Scheduled, Finished)
             if (Array.isArray(matchesData)) {
                 matchesData.forEach((m: any) => {
                     const homeName = m.homeTeamName || m.homeTeam?.name || 'Uy jamoasi';
                     const awayName = m.awayTeamName || m.awayTeam?.name || 'Mehmon jamoasi';
                     const mId = m._id || m.id;
+
+                    const isCentralMatch = m.importance === 'markaziy';
+
+                    const homeTeamId = String(m.homeTeamId || m.home_team_id || m.homeTeam?._id || m.homeTeam?.id || m.home_team?.id || '');
+                    const awayTeamId = String(m.awayTeamId || m.away_team_id || m.awayTeam?._id || m.awayTeam?.id || m.away_team?.id || '');
+
+                    const isMyTeamMatch = myTeamIdStr && (homeTeamId === myTeamIdStr || awayTeamId === myTeamIdStr);
+
+                    // Strict Business Rule: Central matches show to EVERYONE; Non-central matches show ONLY if user's team is playing!
+                    if (!isCentralMatch && !isMyTeamMatch) {
+                        return;
+                    }
 
                     if (m.status === 'live') {
                         generatedList.push({
