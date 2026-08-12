@@ -499,33 +499,31 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                 <TouchableOpacity 
                     activeOpacity={0.9}
                     onLongPress={() => {
-                        const msgId = item._id || item.id;
-                        const ref = messageRefs.current[msgId];
-                        if (ref) {
-                            Keyboard.dismiss();
+                        Keyboard.dismiss();
+                        try {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            setSelectedMessage(item);
-                            setIsMenuVisible(true);
-                            
-                            // Trigger smooth animation
-                            menuScaleAnim.setValue(0.9);
-                            menuFadeAnim.setValue(0);
-                            Animated.parallel([
-                                Animated.spring(menuScaleAnim, {
-                                    toValue: 1,
-                                    tension: 50,
-                                    friction: 8,
-                                    useNativeDriver: true
-                                }),
-                                Animated.timing(menuFadeAnim, {
-                                    toValue: 1,
-                                    duration: 300,
-                                    useNativeDriver: true
-                                })
-                            ]).start();
-                        }
+                        } catch (e) {}
+                        setSelectedMessage(item);
+                        setIsMenuVisible(true);
+                        
+                        // Trigger smooth animation
+                        menuScaleAnim.setValue(0.85);
+                        menuFadeAnim.setValue(0);
+                        Animated.parallel([
+                            Animated.spring(menuScaleAnim, {
+                                toValue: 1,
+                                tension: 60,
+                                friction: 8,
+                                useNativeDriver: true
+                            }),
+                            Animated.timing(menuFadeAnim, {
+                                toValue: 1,
+                                duration: 200,
+                                useNativeDriver: true
+                            })
+                        ]).start();
                     }}
-                    delayLongPress={300}
+                    delayLongPress={250}
                     style={{ width: '100%', flexDirection: isMe ? 'row-reverse' : 'row' }}
                 >
                     <View 
@@ -736,52 +734,84 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                 animationType="fade"
                 onRequestClose={closeMenu}
             >
-                <TouchableOpacity 
-                    style={styles.menuOverlay} 
-                    activeOpacity={1} 
-                    onPress={closeMenu}
-                >
+                <View style={styles.menuOverlay}>
+                    {/* Deep Blur Backdrop */}
+                    <BlurView intensity={95} tint="dark" style={StyleSheet.absoluteFill} />
+
+                    <TouchableOpacity 
+                        style={StyleSheet.absoluteFill} 
+                        activeOpacity={1} 
+                        onPress={closeMenu}
+                    />
+
                     {selectedMessage && (
                         <Animated.View
                             style={[
-                                styles.menuContainer,
+                                styles.menuCardWrapper,
                                 {
-                                    top: Math.min(menuPosition.y, height - 200),
-                                    paddingHorizontal: 20,
                                     opacity: menuFadeAnim,
                                     transform: [{ scale: menuScaleAnim }]
                                 }
                             ]}
                         >
-                            {/* Scaled Message Bubble */}
+                            {/* Scaled Message Bubble Preview */}
                             <View style={[
-                                styles.messageBubble, 
+                                styles.messageBubblePreview,
                                 String(selectedMessage.senderId) === String(user?._id || user?.id) ? styles.myBubble : styles.otherBubble,
-                                { 
-                                    transform: [{ scale: 1.1 }], 
-                                    marginBottom: 30, 
-                                    paddingVertical: 14, 
-                                    paddingHorizontal: 20,
-                                    backgroundColor: String(selectedMessage.senderId) === String(user?._id || user?.id) 
-                                        ? 'rgba(0, 80, 45, 0.95)' 
-                                        : 'rgba(30, 30, 30, 0.95)', 
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(255,255,255,0.15)'
-                                }
                             ]}>
-                                <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
                                 <Text style={[
-                                    styles.messageText, 
-                                    { fontSize: 20, lineHeight: 28 }, 
+                                    styles.messageText,
                                     String(selectedMessage.senderId) === String(user?._id || user?.id) ? styles.myText : styles.otherText
                                 ]}>
                                     {selectedMessage.text}
                                 </Text>
                             </View>
-                            {/* Action Menu (Remaining implementation assumed to exist in styles.menuContainer/children) */}
+
+                            {/* Action Menu (Nusxalash, Tahrirlash, O'chirish) */}
+                            <View style={styles.actionMenuCard}>
+                                {/* Copy Action */}
+                                <TouchableOpacity
+                                    style={styles.menuActionItem}
+                                    onPress={() => copyToClipboard(selectedMessage.text)}
+                                    activeOpacity={0.75}
+                                >
+                                    <Ionicons name="copy-outline" size={20} color="#FFFFFF" />
+                                    <Text style={styles.menuActionText}>Nusxalash</Text>
+                                </TouchableOpacity>
+
+                                {/* Edit Action (Only for User's own messages) */}
+                                {String(selectedMessage.senderId) === String(user?._id || user?.id) && (
+                                    <>
+                                        <View style={styles.menuDivider} />
+                                        <TouchableOpacity
+                                            style={styles.menuActionItem}
+                                            onPress={() => handleEdit(selectedMessage)}
+                                            activeOpacity={0.75}
+                                        >
+                                            <Ionicons name="create-outline" size={20} color="#00FF87" />
+                                            <Text style={[styles.menuActionText, { color: '#00FF87' }]}>Tahrirlash</Text>
+                                        </TouchableOpacity>
+                                    </>
+                                )}
+
+                                {/* Delete Action (Only for User's own messages or Manager/Admin) */}
+                                {(String(selectedMessage.senderId) === String(user?._id || user?.id) || user?.role === 'manager' || user?.role === 'admin') && (
+                                    <>
+                                        <View style={styles.menuDivider} />
+                                        <TouchableOpacity
+                                            style={styles.menuActionItem}
+                                            onPress={() => handleDelete(selectedMessage._id || selectedMessage.id)}
+                                            activeOpacity={0.75}
+                                        >
+                                            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                                            <Text style={[styles.menuActionText, { color: '#FF3B30' }]}>O'chirish</Text>
+                                        </TouchableOpacity>
+                                    </>
+                                )}
+                            </View>
                         </Animated.View>
                     )}
-                </TouchableOpacity>
+                </View>
             </Modal>
 
             {/* Members List Modal */}
@@ -899,24 +929,57 @@ const styles = StyleSheet.create({
     closeButton: { position: 'absolute', top: 10, right: 15, zIndex: 100, backgroundColor: 'rgba(255,255,255,0.1)', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
     dragHandleContainer: { width: '100%', height: 40, alignItems: 'center', justifyContent: 'center' },
     dragHandle: { width: 40, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.2)' },
-    menuOverlay: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' },
-    menuContent: { width: '100%' },
-    menuCard: { 
-        backgroundColor: 'rgba(255,255,255,0.1)', 
-        borderRadius: 20, 
-        width: 180, 
-        overflow: 'hidden', 
-        borderWidth: 1, 
-        borderColor: 'rgba(255,255,255,0.15)', 
-        shadowColor: '#000', 
-        shadowOffset: { width: 0, height: 10 }, 
-        shadowOpacity: 0.3, 
-        shadowRadius: 20,
-        elevation: 10 // Added for Android support
+    menuOverlay: { 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.65)',
+        paddingHorizontal: 24,
     },
-    menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16 },
-    menuItemText: { color: '#FFF', fontSize: 15, fontWeight: '600' },
-    menuBorder: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },
+    menuCardWrapper: {
+        width: '100%',
+        maxWidth: 320,
+        alignItems: 'center',
+    },
+    messageBubblePreview: {
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 20,
+        maxWidth: '100%',
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    actionMenuCard: {
+        width: '100%',
+        backgroundColor: 'rgba(24, 28, 38, 0.95)',
+        borderRadius: 22,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.16)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.5,
+        shadowRadius: 24,
+        elevation: 12,
+    },
+    menuActionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 15,
+        paddingHorizontal: 20,
+        gap: 14,
+    },
+    menuActionText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    menuDivider: {
+        height: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        width: '100%',
+    },
     editingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 15, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
     editingInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
     editingText: { color: '#FFF', fontSize: 12, marginLeft: 8, opacity: 0.8 },
