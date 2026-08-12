@@ -1,6 +1,12 @@
 import 'expo-dev-client';
 import React from 'react';
 import { StyleSheet } from 'react-native';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://dummy@sentry.io/1234567',
+  tracesSampleRate: 1.0,
+});
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
@@ -41,7 +47,7 @@ SplashScreenExpo.preventAutoHideAsync().catch(() => {
 
 const Stack = createStackNavigator();
 
-export default function App() {
+function App() {
     const { isAuthenticated, isGuest, user } = useAuthStore();
     const [isSplashVisible, setIsSplashVisible] = React.useState(true);
 
@@ -130,3 +136,5 @@ export default function App() {
         </GestureHandlerRootView>
     );
 }
+
+export default Sentry.wrap(App);

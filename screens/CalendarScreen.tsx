@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,18 +9,60 @@ import {
     Modal,
     Pressable,
     ActivityIndicator,
-    Image
+    Image,
+    Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
-import CalendarSkeleton from '../components/CalendarSkeleton';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
-
 import CustomRefreshControl from '../components/CustomRefreshControl';
+
+// ─── Skeleton Components ────────────────────────────────────────────────────
+const SkeletonBox: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({
+    width = '100%', height = 14, borderRadius = 6, style
+}) => {
+    const anim = useRef(new Animated.Value(0.3)).current;
+    useEffect(() => {
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(anim, { toValue: 0.65, duration: 750, useNativeDriver: true }),
+                Animated.timing(anim, { toValue: 0.3, duration: 750, useNativeDriver: true }),
+            ])
+        );
+        loop.start();
+        return () => loop.stop();
+    }, []);
+    return (
+        <Animated.View style={[{ width, height, borderRadius, backgroundColor: 'rgba(255,255,255,0.18)', opacity: anim }, style]} />
+    );
+};
+
+const CalendarSkeletonLoader = () => (
+    <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 12 }}>
+        {[1, 2, 3].map((g) => (
+            <View key={g} style={{ gap: 8 }}>
+                {/* Date header */}
+                <View style={{ borderRadius: 10, overflow: 'hidden', padding: 12, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+                    <SkeletonBox width={180} height={13} borderRadius={5} />
+                </View>
+                {/* Match rows */}
+                {[1, 2].map((r) => (
+                    <View key={r} style={{ borderRadius: 12, overflow: 'hidden', padding: 16, backgroundColor: 'rgba(255,255,255,0.04)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ gap: 6, flex: 1 }}>
+                            <SkeletonBox width={'70%'} height={14} borderRadius={5} />
+                            <SkeletonBox width={80} height={11} borderRadius={4} />
+                        </View>
+                        <SkeletonBox width={36} height={24} borderRadius={8} />
+                    </View>
+                ))}
+            </View>
+        ))}
+    </View>
+);
 
 export default function CalendarScreen({ navigation }: any) {
     const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
@@ -277,11 +319,13 @@ export default function CalendarScreen({ navigation }: any) {
                         />
                     }
                     ListEmptyComponent={
-                        !loading ? (
+                        loading ? (
+                            <CalendarSkeletonLoader />
+                        ) : (
                             <View style={{ padding: 40, alignItems: 'center' }}>
                                 <Text style={{ color: Colors.textMuted }}>O'yinlar topilmadi</Text>
                             </View>
-                        ) : null
+                        )
                     }
                     renderItem={({ item: dayGroup }) => (
                         <View style={styles.dayGroup}>

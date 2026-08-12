@@ -8,7 +8,8 @@ import {
     Dimensions,
     Share,
     StatusBar,
-    Platform
+    Platform,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +17,7 @@ import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 import Colors from '../constants/Colors';
-import { apiService } from '../services/apiService';
+import { apiService, supabase, supabaseAdmin } from '../services/apiService';
 import { News } from '../types';
 import SmartImage from '../components/SmartImage';
 
@@ -26,12 +27,61 @@ export default function NewsDetailScreen({ route, navigation }: any) {
     const { newsId, news: initialNews } = route.params || {};
     const [news, setNews] = useState<News | null>(initialNews || null);
     const [isLoading, setIsLoading] = useState(!initialNews);
+    const [orgInfo, setOrgInfo] = useState<{ name?: string; logo_url?: string } | null>(null);
 
     useEffect(() => {
         if (!initialNews && newsId) {
             fetchNewsDetail();
         }
     }, [newsId]);
+
+    useEffect(() => {
+        const fetchOrgInfo = async () => {
+            try {
+                const dbClient = supabaseAdmin || supabase;
+                const targetOrgId = (news as any)?.organization_id || (news as any)?.org_id;
+
+                if (targetOrgId) {
+                    const { data } = await dbClient
+                        .from('organizations')
+                        .select('id, name, logo_url')
+                        .eq('id', targetOrgId)
+                        .maybeSingle();
+                    if (data) {
+                        setOrgInfo(data);
+                        return;
+                    }
+                }
+
+                if (news?.author) {
+                    const { data } = await dbClient
+                        .from('organizations')
+                        .select('id, name, logo_url')
+                        .ilike('name', `%${news.author}%`)
+                        .maybeSingle();
+                    if (data) {
+                        setOrgInfo(data);
+                        return;
+                    }
+                }
+
+                // Fallback: fetch primary organization
+                const { data: defaultOrg } = await dbClient
+                    .from('organizations')
+                    .select('id, name, logo_url')
+                    .order('id', { ascending: true })
+                    .limit(1)
+                    .maybeSingle();
+                if (defaultOrg) setOrgInfo(defaultOrg);
+            } catch (e) {
+                console.warn('Error loading org info in NewsDetailScreen:', e);
+            }
+        };
+
+        if (news) {
+            fetchOrgInfo();
+        }
+    }, [news]);
 
     const fetchNewsDetail = async () => {
         try {
@@ -124,9 +174,17 @@ export default function NewsDetailScreen({ route, navigation }: any) {
                         <View style={styles.metaRow}>
                             <View style={styles.authorBox}>
                                 <View style={styles.authorAvatar}>
-                                    <Ionicons name="person" size={14} color="#000" />
+                                    {orgInfo?.logo_url ? (
+                                        <Image
+                                            source={{ uri: orgInfo.logo_url }}
+                                            style={{ width: 28, height: 28, borderRadius: 14 }}
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <Ionicons name="shield-checkmark" size={14} color="#000" />
+                                    )}
                                 </View>
-                                <Text style={styles.authorName}>{news.author?.toUpperCase() || 'AMATORA ADMIN'}</Text>
+                                <Text style={styles.authorName}>{(orgInfo?.name || news.author || 'AMATORA ADMIN').toUpperCase()}</Text>
                             </View>
                             <View style={styles.viewsBox}>
                                 <Ionicons name="eye-outline" size={16} color="rgba(255,255,255,0.5)" />

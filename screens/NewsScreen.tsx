@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
     ScrollView,
     Modal,
     TextInput,
+    Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +23,95 @@ import { News } from '../types';
 import SmartImage from '../components/SmartImage';
 import { useNavigation } from '@react-navigation/native';
 
+// ─── Skeleton Shimmer ────────────────────────────────────────────────────────
+const SkeletonBox: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({
+    width = '100%', height = 14, borderRadius = 6, style
+}) => {
+    const anim = useRef(new Animated.Value(0.3)).current;
+    useEffect(() => {
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(anim, { toValue: 0.65, duration: 750, useNativeDriver: true }),
+                Animated.timing(anim, { toValue: 0.3, duration: 750, useNativeDriver: true }),
+            ])
+        );
+        loop.start();
+        return () => loop.stop();
+    }, []);
+    return (
+        <Animated.View style={[{ width, height, borderRadius, backgroundColor: 'rgba(255,255,255,0.18)', opacity: anim }, style]} />
+    );
+};
+
+const NewsSkeletonFeatured = () => (
+    <View style={{ height: 260, borderRadius: 16, overflow: 'hidden', marginBottom: 12 }}>
+        <SkeletonBox height={260} borderRadius={16} />
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, gap: 8 }}>
+            <SkeletonBox width={80} height={12} borderRadius={4} />
+            <SkeletonBox width={'90%'} height={18} borderRadius={5} />
+            <SkeletonBox width={'60%'} height={14} borderRadius={5} />
+            <SkeletonBox width={120} height={12} borderRadius={4} />
+        </View>
+    </View>
+);
+
+const NewsSkeletonCard = () => (
+    <View style={{ flexDirection: 'row', padding: 12, marginBottom: 8, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.04)', gap: 12 }}>
+        <SkeletonBox width={90} height={80} borderRadius={10} />
+        <View style={{ flex: 1, gap: 8, justifyContent: 'center' }}>
+            <SkeletonBox width={60} height={10} borderRadius={4} />
+            <SkeletonBox width={'85%'} height={14} borderRadius={5} />
+            <SkeletonBox width={'60%'} height={14} borderRadius={5} />
+            <SkeletonBox width={100} height={10} borderRadius={4} />
+        </View>
+    </View>
+);
+
 const { width, height } = Dimensions.get('window');
+
+const getRelativeTime = (dateString?: string | number | Date): string => {
+    if (!dateString) return 'Hozir';
+    const now = Date.now();
+    const past = new Date(dateString).getTime();
+    if (isNaN(past)) return 'Hozir';
+
+    const diffInSeconds = Math.floor((now - past) / 1000);
+
+    if (diffInSeconds < 10) {
+        return 'Hozir';
+    }
+    if (diffInSeconds < 60) {
+        return `${diffInSeconds} soniya oldin`;
+    }
+
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) {
+        return `${diffInMinutes} daqiqa oldin`;
+    }
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+        return `${diffInHours} soat oldin`;
+    }
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) {
+        return `${diffInDays} kun oldin`;
+    }
+
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    if (diffInDays < 30) {
+        return `${diffInWeeks} hafta oldin`;
+    }
+
+    const diffInMonths = Math.floor(diffInDays / 30);
+    if (diffInDays < 365) {
+        return `${diffInMonths} oy oldin`;
+    }
+
+    const diffInYears = Math.floor(diffInDays / 365);
+    return `${diffInYears} yil oldin`;
+};
 
 export default function NewsScreen() {
     const [news, setNews] = useState<News[]>([]);
@@ -99,6 +188,7 @@ export default function NewsScreen() {
 
     const renderNewsItem = ({ item, index }: { item: News, index: number }) => {
         const isFeatured = index === 0 && selectedCategory === 'Barchasi' && !searchQuery;
+        const timeAgoText = getRelativeTime(item.createdAt);
 
         if (isFeatured) {
             return (
@@ -119,7 +209,7 @@ export default function NewsScreen() {
                             <Text style={styles.featuredTitle} numberOfLines={2}>{item.title.toUpperCase()}</Text>
                             <View style={styles.newsMeta}>
                                 <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.7)" />
-                                <Text style={styles.metaText}>{new Date(item.createdAt).toLocaleDateString('uz-UZ')}</Text>
+                                <Text style={styles.metaText}>{timeAgoText.toUpperCase()}</Text>
                                 <View style={styles.metaDivider} />
                                 <Ionicons name="eye-outline" size={14} color="rgba(255,255,255,0.7)" />
                                 <Text style={styles.metaText}>{item.views || 0}</Text>
@@ -145,7 +235,7 @@ export default function NewsScreen() {
                         <Text style={styles.newsCategory}>{item.category?.toUpperCase() || 'YANGILIK'}</Text>
                         <Text style={styles.newsTitle} numberOfLines={2}>{item.title.toUpperCase()}</Text>
                         <View style={styles.newsMeta}>
-                            <Text style={styles.metaTextSmall}>{new Date(item.createdAt).toLocaleDateString('uz-UZ')}</Text>
+                            <Text style={styles.metaTextSmall}>{timeAgoText.toUpperCase()}</Text>
                             <View style={[styles.metaDivider, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
                             <Ionicons name="eye-outline" size={12} color={Colors.textMuted} />
                             <Text style={styles.metaTextSmall}>{item.views || 0}</Text>
@@ -182,12 +272,17 @@ export default function NewsScreen() {
                         <RefreshControl refreshing={isLoading} onRefresh={fetchNews} tintColor={Colors.primary} />
                     }
                     ListEmptyComponent={
-                        !isLoading ? (
+                        isLoading ? (
+                            <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+                                <NewsSkeletonFeatured />
+                                {[1, 2, 3, 4, 5].map(i => <NewsSkeletonCard key={i} />)}
+                            </View>
+                        ) : (
                             <View style={styles.emptyContainer}>
                                 <Ionicons name="newspaper-outline" size={64} color="rgba(255,255,255,0.1)" />
                                 <Text style={styles.emptyText}>Hozircha yangiliklar yo'q</Text>
                             </View>
-                        ) : null
+                        )
                     }
                 />
             </SafeAreaView>
@@ -256,14 +351,14 @@ const styles = StyleSheet.create({
     categoryBadgeText: { color: '#000', fontSize: 10, fontWeight: '900' },
     featuredTitle: { color: '#FFF', fontSize: 20, fontWeight: '900', marginBottom: 8, letterSpacing: 0.5 },
     newsMeta: { flexDirection: 'row', alignItems: 'center' },
-    metaText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 4, fontWeight: '700' },
+    metaText: { color: 'rgba(255,255,255,0.5)', fontSize: 10, marginLeft: 4, fontWeight: '600', opacity: 0.65 },
     metaDivider: { width: 1, height: 12, backgroundColor: 'rgba(255,255,255,0.3)', marginHorizontal: 10 },
     newsCard: { borderRadius: 20, marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
     newsImage: { width: 90, height: 90, borderRadius: 14 },
     newsContent: { flex: 1, marginLeft: 15, justifyContent: 'center' },
     newsCategory: { color: Colors.primary, fontSize: 10, fontWeight: '900', marginBottom: 4, letterSpacing: 0.5 },
     newsTitle: { color: '#FFF', fontSize: 15, fontWeight: '800', marginBottom: 8, letterSpacing: 0.2 },
-    metaTextSmall: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700' },
+    metaTextSmall: { color: 'rgba(255,255,255,0.45)', fontSize: 9.5, fontWeight: '600', opacity: 0.65 },
     emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
     emptyText: { color: 'rgba(255,255,255,0.2)', fontSize: 16, fontWeight: '900', marginTop: 15 },
     searchResultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 5, marginBottom: 20 },
