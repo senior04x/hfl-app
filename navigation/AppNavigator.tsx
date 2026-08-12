@@ -299,7 +299,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                 animationType="slide"
                 onRequestClose={() => setShowSwitcherModal(false)}
             >
-                <View style={styles.modalOverlay}>
+                <View style={styles.modalOverlay} {...modalPanResponder.panHandlers}>
                     <TouchableOpacity
                         style={{ flex: 1, width: '100%' }}
                         activeOpacity={1}
@@ -310,7 +310,6 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                             styles.switcherModalCard,
                             { transform: [{ translateY: modalY }] }
                         ]}
-                        {...modalPanResponder.panHandlers}
                     >
                         <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
                         
