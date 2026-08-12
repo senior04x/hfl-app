@@ -33,6 +33,39 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
     const [accountOptions, setAccountOptions] = useState<any[]>([]);
     const [loadingAccounts, setLoadingAccounts] = useState(false);
 
+    // Modal Y displacement for swipe down gesture
+    const modalY = useRef(new Animated.Value(0)).current;
+
+    const modalPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => false,
+            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 8,
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dy > 0) {
+                    modalY.setValue(gestureState.dy);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                if (gestureState.dy > 70 || gestureState.vy > 0.4) {
+                    Animated.timing(modalY, {
+                        toValue: 400,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        setShowSwitcherModal(false);
+                        modalY.setValue(0);
+                    });
+                } else {
+                    Animated.spring(modalY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
     // Animated position for sliding pill highlight
     const translateX = useRef(new Animated.Value(state.index * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4)).current;
 
@@ -271,18 +304,21 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                         activeOpacity={1}
                         onPress={() => setShowSwitcherModal(false)}
                     />
-                    <View style={styles.switcherModalCard}>
+                    <Animated.View
+                        style={[
+                            styles.switcherModalCard,
+                            { transform: [{ translateY: modalY }] }
+                        ]}
+                        {...modalPanResponder.panHandlers}
+                    >
                         <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
                         
                         {/* Grabber Bar */}
                         <View style={styles.grabberBar} />
 
-                        <View style={{ paddingHorizontal: 22, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
+                        <View style={{ paddingHorizontal: 22, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
                             <View style={styles.modalHeaderRow}>
                                 <Text style={styles.switcherTitle}>Akkountni Almashtirish</Text>
-                                <TouchableOpacity onPress={() => setShowSwitcherModal(false)} style={styles.closeBtn}>
-                                    <Ionicons name="close" size={20} color="rgba(255,255,255,0.7)" />
-                                </TouchableOpacity>
                             </View>
 
                             {loadingAccounts ? (
@@ -341,7 +377,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                                 </ScrollView>
                             )}
                         </View>
-                    </View>
+                    </Animated.View>
                 </View>
             </Modal>
         </View>
