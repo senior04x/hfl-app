@@ -1,18 +1,6 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
-import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
-
-const secureStorage: StateStorage = {
-    getItem: async (name: string): Promise<string | null> => {
-        return (await SecureStore.getItemAsync(name)) || null;
-    },
-    setItem: async (name: string, value: string): Promise<void> => {
-        await SecureStore.setItemAsync(name, value);
-    },
-    removeItem: async (name: string): Promise<void> => {
-        await SecureStore.deleteItemAsync(name);
-    },
-};
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface AuthState {
     isGuest: boolean;
@@ -53,8 +41,8 @@ export const useAuthStore = create<AuthState>()(
             toggleChatMute: () => set((state) => ({ isChatMuted: !state.isChatMuted })),
         }),
         {
-            name: 'secure-auth-storage',
-            storage: createJSONStorage(() => secureStorage),
+            name: 'amatora-auth-storage',
+            storage: createJSONStorage(() => AsyncStorage),
         }
     )
 );
