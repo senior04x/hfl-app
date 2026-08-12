@@ -36,7 +36,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
-import { apiService } from '../services/apiService';
+import { apiService, clearApiCache } from '../services/apiService';
 import { eskizService } from '../services/eskizService';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -198,9 +198,12 @@ export default function WelcomeScreen({ navigation }: any) {
     };
 
     const performLogin = (acc: any) => {
-        const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || 1;
+        try {
+            clearApiCache();
+        } catch (e) {}
+        const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || acc.organizations?.id || 1;
         useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
-        setAuth({ ...acc, organizationId: Number(orgId) });
+        setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) });
         setShowAccountModal(false);
         setShowBotModal(false);
     };

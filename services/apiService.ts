@@ -2,10 +2,20 @@ import axios from 'axios';
 import { supabase, supabaseAdmin } from './supabase';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { useJuniorStore } from '../store/useJuniorStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 export { supabase, supabaseAdmin };
 
-const getOrgId = () => useOrganizationStore.getState().selectedOrganizationId || 1;
+const getOrgId = () => {
+    const user = useAuthStore.getState().user;
+    if (user) {
+        const uOrgId = user.organizationId || user.organization_id || user.organization?.id;
+        if (uOrgId && !isNaN(Number(uOrgId))) {
+            return Number(uOrgId);
+        }
+    }
+    return useOrganizationStore.getState().selectedOrganizationId || 1;
+};
 const getIsJunior = () => useJuniorStore.getState().isJuniorMode;
 
 // Memory Cache Engine for High Performance & 90% Database Load Reduction
@@ -1580,23 +1590,28 @@ export const apiService = {
             // 1. Check Manager profile in teams table
             const { data: teamData, error: teamErr } = await supabase
                 .from('teams')
-                .select('*')
+                .select('*, organizations(id, name)')
                 .ilike('captain_phone', `%${cleanPhone}%`);
 
             if (teamErr) {
                 console.warn('findAccountsByPhone teams query error:', teamErr);
             } else if (teamData && teamData.length > 0) {
                 teamData.forEach((t: any) => {
+                    const orgId = t.organization_id || t.organizations?.id || 1;
+                    const orgName = t.organizations?.name || 'Tashkilot';
                     accountsList.push({
                         ...t,
                         _id: t.id,
                         id: t.id,
+                        organizationId: orgId,
+                        organization_id: orgId,
+                        orgName: orgName,
                         role: 'manager',
                         teamId: t.id,
                         phone: t.captain_phone || phone,
                         name: t.name || 'Jamoa Sardori',
                         title: t.name ? `${t.name} (Sardor)` : 'Jamoa Sardori',
-                        subTitle: t.league || 'HFL Liga',
+                        subTitle: `🏛️ ${orgName} • ${t.league || 'Liga'}`,
                         photo: t.logo_url || t.logo || ''
                     });
                 });
@@ -1605,7 +1620,7 @@ export const apiService = {
             // 2. Check Player profiles in applications table
             const { data: appData, error: appErr } = await supabase
                 .from('applications')
-                .select('*, teams(*)')
+                .select('*, teams(*), organizations(id, name)')
                 .ilike('phone', `%${cleanPhone}%`)
                 .order('created_at', { ascending: false });
 
@@ -1615,16 +1630,21 @@ export const apiService = {
                 appData.forEach((app: any) => {
                     const fullName = `${app.first_name || ''} ${app.last_name || ''}`.trim() || 'Futbolchi';
                     const teamName = app.teams?.name || 'Yakkaxon';
+                    const orgId = app.organization_id || app.organizations?.id || app.teams?.organization_id || 1;
+                    const orgName = app.organizations?.name || 'Tashkilot';
                     accountsList.push({
                         ...app,
                         _id: app.id,
                         id: app.id,
+                        organizationId: orgId,
+                        organization_id: orgId,
+                        orgName: orgName,
                         role: 'player',
                         teamId: app.team_id || app.teams?.id,
                         phone: app.phone || phone,
                         name: fullName,
                         title: `${fullName} (${teamName})`,
-                        subTitle: `${app.position || 'O\'yinchi'} • ${teamName}`,
+                        subTitle: `🏛️ ${orgName} • ${teamName}`,
                         photo: app.photo_url || app.photo || ''
                     });
                 });
