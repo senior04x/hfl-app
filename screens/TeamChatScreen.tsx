@@ -749,16 +749,20 @@ const TeamChatScreen = ({ route, navigation }: any) => {
                                 onChangeText={setInputText}
                                 multiline
                             />
-                            {!inputText && (
-                                <View style={styles.animatedPlaceholderContainer} pointerEvents="none">
-                                    <Text style={styles.placeholderText}>Xabar yozing</Text>
-                                    <View style={styles.dotsRow}>
-                                        <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot1Y }] }]}>.</Animated.Text>
-                                        <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot2Y }] }]}>.</Animated.Text>
-                                        <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot3Y }] }]}>.</Animated.Text>
-                                    </View>
+                            <View 
+                                style={[
+                                    styles.animatedPlaceholderContainer,
+                                    { opacity: inputText.length > 0 ? 0 : 1 }
+                                ]} 
+                                pointerEvents="none"
+                            >
+                                <Text style={styles.placeholderText}>Xabar yozing</Text>
+                                <View style={styles.dotsRow}>
+                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot1Y }] }]}>.</Animated.Text>
+                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot2Y }] }]}>.</Animated.Text>
+                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot3Y }] }]}>.</Animated.Text>
                                 </View>
-                            )}
+                            </View>
                         </View>
 
                         <TouchableOpacity 
