@@ -40,6 +40,7 @@ const getPositionFullUz = (pos: string) => {
     return map[pos?.toUpperCase()] || pos || 'O\'YINCHI';
 };
 
+import { useFocusEffect } from '@react-navigation/native';
 import { useJuniorStore } from '../store/useJuniorStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { Modal, TextInput } from 'react-native';
@@ -74,6 +75,14 @@ export default function AccountScreen({ navigation }: any) {
             checkTransferWindow();
         }
     }, [isGuest, user?.id, selectedOrganizationId]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            if (!isGuest) {
+                checkTransferWindow();
+            }
+        }, [isGuest, selectedOrganizationId])
+    );
 
     const loadUserApplications = async () => {
         try {
