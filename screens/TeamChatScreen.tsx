@@ -68,6 +68,39 @@ const TeamChatScreen = ({ route, navigation }: any) => {
 
     const { height } = Dimensions.get('window');
     const pan = useRef(new Animated.ValueXY()).current;
+
+    // Bouncing Dots Animation for Placeholder ("Xabar yozing . . .")
+    const dot1Y = useRef(new Animated.Value(0)).current;
+    const dot2Y = useRef(new Animated.Value(0)).current;
+    const dot3Y = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        const createBounce = (animVal: Animated.Value, delay: number) => {
+            return Animated.loop(
+                Animated.sequence([
+                    Animated.delay(delay),
+                    Animated.timing(animVal, { toValue: -5, duration: 240, useNativeDriver: true }),
+                    Animated.timing(animVal, { toValue: 0, duration: 240, useNativeDriver: true }),
+                    Animated.delay(480),
+                ])
+            );
+        };
+
+        const b1 = createBounce(dot1Y, 0);
+        const b2 = createBounce(dot2Y, 150);
+        const b3 = createBounce(dot3Y, 300);
+
+        b1.start();
+        b2.start();
+        b3.start();
+
+        return () => {
+            b1.stop();
+            b2.stop();
+            b3.stop();
+        };
+    }, []);
+
     const openMembersModal = () => {
         pan.setValue({ x: 0, y: 0 });
         setShowMembers(true);
@@ -705,17 +738,29 @@ const TeamChatScreen = ({ route, navigation }: any) => {
 
                     <View style={[
                         styles.inputContainer,
-                        { paddingBottom: Platform.OS === 'ios' ? 30 : Math.max(insets.bottom, 12) }
+                        { paddingBottom: Platform.OS === 'ios' ? 12 : Math.max(insets.bottom ? 6 : 8, 8) }
                     ]}>
                         <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Xabar yozing..."
-                            placeholderTextColor="rgba(255,255,255,0.3)"
-                            value={inputText}
-                            onChangeText={setInputText}
-                            multiline
-                        />
+                        
+                        <View style={styles.inputWrapper}>
+                            <TextInput
+                                style={styles.input}
+                                value={inputText}
+                                onChangeText={setInputText}
+                                multiline
+                            />
+                            {!inputText && (
+                                <View style={styles.animatedPlaceholderContainer} pointerEvents="none">
+                                    <Text style={styles.placeholderText}>Xabar yozing</Text>
+                                    <View style={styles.dotsRow}>
+                                        <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot1Y }] }]}>.</Animated.Text>
+                                        <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot2Y }] }]}>.</Animated.Text>
+                                        <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot3Y }] }]}>.</Animated.Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+
                         <TouchableOpacity 
                             style={[styles.sendButton, { backgroundColor: Colors.primary }, (!inputText.trim() || isRateLimited) && { opacity: 0.5 }]} 
                             onPress={sendMessage}
@@ -922,8 +967,55 @@ const styles = StyleSheet.create({
     timestamp: { fontSize: 10, marginTop: 0, fontWeight: '600' },
     myTimestamp: { color: 'rgba(255,255,255,0.5)', textAlign: 'right' },
     otherTimestamp: { color: 'rgba(255,255,255,0.3)', textAlign: 'left' },
-    inputContainer: { flexDirection: 'row', padding: 12, paddingBottom: Platform.OS === 'ios' ? 30 : 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' },
-    input: { flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, paddingHorizontal: 20, paddingVertical: 10, color: '#FFF', fontSize: 17, marginRight: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    inputContainer: { 
+        flexDirection: 'row', 
+        paddingHorizontal: 14, 
+        paddingTop: 10,
+        alignItems: 'center', 
+        borderTopWidth: 1, 
+        borderTopColor: 'rgba(255,255,255,0.08)', 
+        overflow: 'hidden' 
+    },
+    inputWrapper: {
+        flex: 1,
+        marginRight: 10,
+        position: 'relative',
+        justifyContent: 'center',
+    },
+    input: { 
+        minHeight: 44, 
+        maxHeight: 120, 
+        backgroundColor: 'rgba(255,255,255,0.06)', 
+        borderRadius: 22, 
+        paddingHorizontal: 18, 
+        paddingVertical: 10, 
+        color: '#FFF', 
+        fontSize: 16, 
+        borderWidth: 1, 
+        borderColor: 'rgba(255,255,255,0.12)' 
+    },
+    animatedPlaceholderContainer: {
+        position: 'absolute',
+        left: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    placeholderText: {
+        color: 'rgba(255, 255, 255, 0.35)',
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    dotsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 2,
+    },
+    dotText: {
+        color: 'rgba(255, 255, 255, 0.55)',
+        fontSize: 16,
+        fontWeight: '900',
+        marginLeft: 1.5,
+    },
     sendButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
     errorText: { color: 'rgba(255,255,255,0.6)', marginTop: 20, fontSize: 16, textAlign: 'center' },
     headerLogoContainer: { width: 34, height: 34, borderRadius: 10, overflow: 'hidden', marginLeft: 10, justifyContent: 'center', alignItems: 'center' },
