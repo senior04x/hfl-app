@@ -7,7 +7,7 @@ import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
-import { apiService } from '../services/apiService';
+import { apiService, supabase } from '../services/apiService';
 import { useAuthStore } from '../store/useAuthStore';
 import * as Haptics from 'expo-haptics';
 
@@ -38,7 +38,7 @@ export default function NotificationsScreen({ navigation }: any) {
             // Fetch real matches, news, and org data in parallel
             const [matchesData, newsData] = await Promise.all([
                 apiService.getMatches().catch(() => []),
-                apiService.supabase.from('news').select('*').order('created_at', { ascending: false }).limit(10).then(res => res.data || []).catch(() => [])
+                supabase.from('news').select('*').order('created_at', { ascending: false }).limit(10).then(res => res.data || []).catch(() => [])
             ]);
 
             const generatedList: any[] = [];
