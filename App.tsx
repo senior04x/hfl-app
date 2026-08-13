@@ -8,7 +8,7 @@ if (typeof global !== 'undefined' && (global as any).ErrorUtils) {
 
 import 'expo-dev-client';
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
@@ -43,10 +43,10 @@ import VideoBackground from './components/VideoBackground';
 import * as SplashScreenExpo from 'expo-splash-screen';
 import SplashScreen from './screens/SplashScreen';
 
-// Keep the splash screen visible while we fetch resources
-SplashScreenExpo.preventAutoHideAsync().catch(() => {
-    /* reloading the app might cause this error, safe to ignore */
-});
+// Keep the splash screen visible while we fetch resources on native devices
+if (Platform.OS !== 'web') {
+    SplashScreenExpo.preventAutoHideAsync().catch(() => {});
+}
 
 import NotificationsScreen from './screens/NotificationsScreen';
 
@@ -55,9 +55,11 @@ export const navigationRef = createNavigationContainerRef();
 
 function App() {
     const { isAuthenticated, isGuest, user } = useAuthStore();
-    const [isSplashVisible, setIsSplashVisible] = React.useState(true);
+    const [isSplashVisible, setIsSplashVisible] = React.useState(Platform.OS !== 'web');
 
     React.useEffect(() => {
+        if (Platform.OS === 'web') return;
+
         const setupNotifications = async () => {
             try {
                 const userId = user ? ((user as any)._id || (user as any).id) : 'guest';

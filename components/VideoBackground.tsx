@@ -29,15 +29,17 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
     useEffect(() => {
         const setupAudioAndPlay = async () => {
             try {
-                await Audio.setAudioModeAsync({
-                    allowsRecordingIOS: false,
-                    staysActiveInBackground: false,
-                    interruptionModeIOS: 1, // DoNotMix
-                    playsInSilentModeIOS: true,
-                    shouldDuckAndroid: true,
-                    interruptionModeAndroid: 1, // DoNotMix
-                    playThroughEarpieceAndroid: false,
-                });
+                if (Platform.OS !== 'web') {
+                    await Audio.setAudioModeAsync({
+                        allowsRecordingIOS: false,
+                        staysActiveInBackground: false,
+                        interruptionModeIOS: 1, // DoNotMix
+                        playsInSilentModeIOS: true,
+                        shouldDuckAndroid: true,
+                        interruptionModeAndroid: 1, // DoNotMix
+                        playThroughEarpieceAndroid: false,
+                    });
+                }
             } catch (error) {
                 console.log('Audio mode setup error:', error);
             }
