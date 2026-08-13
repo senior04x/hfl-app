@@ -193,21 +193,23 @@ export const apiService = {
         const cacheKey = `players_${orgId}_${isJunior}_${page}_${limit}_${teamId || 'all'}`;
         return getCachedData(cacheKey, async () => {
             try {
-                let query = supabase.from('applications').select('*, teams(*)');
+                let query = supabase.from('applications').select('*, teams(*)').eq('status', 'approved');
                 if (teamId) {
                     query = query.eq('team_id', teamId);
                 }
                 const { data, error } = await query;
                 if (error) throw error;
-                return (data || []).map((p: any) => ({
-                    ...p,
-                    _id: p.id,
-                    firstName: p.first_name || '',
-                    lastName: p.last_name || '',
-                    photo: p.photo_url || '',
-                    position: p.position || 'O\'yinchi',
-                    number: p.number || p.shirt_number || p.player_number || ''
-                }));
+                return (data || [])
+                    .filter((p: any) => !p.comment || !p.comment.includes('[PROFILE_UPDATE]'))
+                    .map((p: any) => ({
+                        ...p,
+                        _id: p.id,
+                        firstName: p.first_name || '',
+                        lastName: p.last_name || '',
+                        photo: p.photo_url || '',
+                        position: p.position || 'O\'yinchi',
+                        number: p.number || p.shirt_number || p.player_number || ''
+                    }));
             } catch (err) {
                 console.warn('Supabase getPlayers fallback:', err);
                 return api.get('/players', { params: { page, limit, teamId } }).then(res => res.data.data).catch(() => []);

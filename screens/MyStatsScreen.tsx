@@ -663,7 +663,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                 .from('applications')
                 .insert([{
                     organization_id: targetOrgId,
-                    team_id: targetTeamId,
+                    team_id: null,
                     first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
                     last_name: updateForm.lastName || player?.last_name || '',
                     father_name: updateForm.fatherName || player?.father_name || '',
@@ -683,7 +683,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                     .from('applications')
                     .insert([{
                         organization_id: targetOrgId,
-                        team_id: targetTeamId,
+                        team_id: null,
                         first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
                         last_name: updateForm.lastName || player?.last_name || '',
                         father_name: updateForm.fatherName || player?.father_name || '',
