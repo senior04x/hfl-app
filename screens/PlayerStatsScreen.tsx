@@ -326,15 +326,31 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             if (!pId) return;
             setReplaysLoading(true);
             try {
-                const { data: events } = await supabase
+                // Find all application IDs associated with this player
+                const playerPhone = player?.phone;
+                let targetPlayerIds = [pId];
+                if (playerPhone) {
+                    const cleanPhone = String(playerPhone).replace(/\D/g, '').slice(-9);
+                    const { data: siblings } = await supabase
+                        .from('applications')
+                        .select('id')
+                        .ilike('phone', `%${cleanPhone}%`);
+                    if (siblings && siblings.length > 0) {
+                        targetPlayerIds = [...new Set([pId, ...siblings.map(s => s.id)])];
+                    }
+                }
+
+                const { data: events, error } = await supabase
                     .from('match_events')
-                    .select('*, match:match_id(*), player:player_id(*)')
-                    .or(`player_id.eq.${pId}`)
-                    .not('replay_video_url', 'is', null)
+                    .select('*, match:match_id(*, home_team:home_team_id(id, name, logo_url), away_team:away_team_id(id, name, logo_url)), player:player_id(*)')
+                    .in('player_id', targetPlayerIds)
                     .order('created_at', { ascending: false });
 
                 if (events && events.length > 0) {
-                    setPlayerReplays(events);
+                    const validReplays = events.filter((e: any) =>
+                        Boolean(e.replay_video_url || e.video_url || e.replay_url || e.video)
+                    );
+                    setPlayerReplays(validReplays);
                 } else {
                     setPlayerReplays([]);
                 }
@@ -346,7 +362,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         };
 
         fetchPlayerReplays();
-    }, [player?.id, player?._id, playerId]);
+    }, [player?.id, player?._id, playerId, player?.phone]);
 
     const formatTransferDate = (dateStr: string) => {
         if (!dateStr) return '';
@@ -450,15 +466,18 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                         playerReplays.map((ev: any, idx: number) => {
                             const m = ev.match || {};
                             const isHome = ev.team_id === m.home_team_id;
-                            const cTeamName = isHome ? (m.home_team_name || 'Uy Jamoasi') : (m.away_team_name || 'Mehmon Jamoasi');
-                            const cTeamLogo = isHome ? m.home_team_logo : m.away_team_logo;
+                            const homeName = m.home_team?.name || m.home_team_name || 'Uy Jamoasi';
+                            const awayName = m.away_team?.name || m.away_team_name || 'Mehmon Jamoasi';
+                            const cTeamName = isHome ? homeName : awayName;
+                            const cTeamLogo = isHome ? (m.home_team?.logo_url || m.home_team_logo) : (m.away_team?.logo_url || m.away_team_logo);
                             const scorerName = ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : `${player?.first_name || ''} ${player?.last_name || ''}`.trim();
                             const scorerPhoto = ev.player?.photo_url || player?.photo_url || player?.photo || null;
+                            const vUrl = ev.replay_video_url || ev.video_url || ev.replay_url || ev.video;
 
                             return (
                                 <ReplayVideoCard
                                     key={ev.id || idx}
-                                    videoUrl={ev.replay_video_url}
+                                    videoUrl={vUrl}
                                     minute={ev.minute}
                                     teamName={cTeamName}
                                     teamLogo={cTeamLogo}
