@@ -1542,25 +1542,30 @@ const MyStatsScreen = ({ navigation }: any) => {
             {/* SUCCESS CONFIRMATION MODAL */}
             <Modal
                 visible={showSuccessModal}
-                transparent
+                transparent={true}
                 animationType="fade"
                 onRequestClose={() => setShowSuccessModal(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContentSmall}>
-                        <View style={{ alignItems: 'center', marginBottom: 15 }}>
-                            <Ionicons name="checkmark-circle" size={60} color={Colors.primary} />
-                            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '900', marginTop: 10 }}>ARIZA YUBORILDI!</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 18 }}>
-                                Ma'lumotlaringizni tahrirlash so'rovi tashkilotchiga yuborildi. Tekshiruvdan so'ng ma'lumotlaringiz yangilanadi.
-                            </Text>
+                <View style={styles.successModalOverlay}>
+                    <View style={styles.successModalCard}>
+                        <View style={styles.successIconBadge}>
+                            <Ionicons name="checkmark-circle" size={42} color="#00FF66" />
                         </View>
 
+                        <View style={styles.successTitleRow}>
+                            <Text style={styles.successModalTitle}>Ariza Yuborildi</Text>
+                        </View>
+
+                        <Text style={styles.successModalSub}>
+                            Ma'lumotlaringizni tahrirlash so'rovi tashkilotchiga yuborildi. Tekshiruvdan so'ng profilingiz yangilanadi.
+                        </Text>
+
                         <TouchableOpacity
+                            style={styles.successModalBtn}
                             onPress={() => setShowSuccessModal(false)}
-                            style={[styles.modalBtn, { backgroundColor: Colors.primary, width: '100%' }]}
+                            activeOpacity={0.8}
                         >
-                            <Text style={{ color: '#000', fontWeight: '900' }}>RAHMAT</Text>
+                            <Text style={styles.successModalBtnText}>RAHMAT</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -2133,6 +2138,77 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    successModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    successModalCard: {
+        width: '100%',
+        maxWidth: 340,
+        backgroundColor: '#0d1117',
+        borderRadius: 24,
+        padding: 28,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.3)',
+        shadowColor: '#00FF66',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 12,
+    },
+    successIconBadge: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        backgroundColor: 'rgba(0, 255, 102, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    successTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    successModalTitle: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    successModalSub: {
+        color: 'rgba(255, 255, 255, 0.65)',
+        fontSize: 14,
+        textAlign: 'center',
+        lineHeight: 21,
+        marginBottom: 24,
+    },
+    successModalBtn: {
+        width: '100%',
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: '#00FF66',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#00FF66',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    successModalBtnText: {
+        color: '#0b0e17',
+        fontSize: 15,
+        fontWeight: '900',
+        letterSpacing: 0.5,
     },
 });
 
