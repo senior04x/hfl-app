@@ -143,6 +143,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const { playerId, player: initialPlayer } = route.params || {};
     const [loading, setLoading] = useState(true);
     const [player, setPlayer] = useState<any>(initialPlayer ? extractPlayerData(initialPlayer) : null);
+    const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState('profil');
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
@@ -207,9 +208,10 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const fetchPlayer = async () => {
         try {
             setLoading(true);
-            const [playerData, statsData] = await Promise.all([
+            const [playerData, statsData, transfersData] = await Promise.all([
                 apiService.getPlayerById(playerId),
-                apiService.getPlayerStats(playerId).catch(() => null)
+                apiService.getPlayerStats(playerId).catch(() => null),
+                apiService.getPlayerTransfers(playerId).catch(() => [])
             ]);
 
             if (playerData) {
@@ -219,6 +221,9 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 });
                 setPlayer(parsed);
                 if (activeTab === 'oyinlari') fetchPlayerMatches();
+            }
+            if (transfersData) {
+                setPlayerTransfers(transfersData);
             }
         } catch (error) {
             console.error('Error fetching player stats:', error);
@@ -343,10 +348,25 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         fetchPlayerReplays();
     }, [player?.id, player?._id, playerId]);
 
+    const formatTransferDate = (dateStr: string) => {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            const day = String(d.getDate()).padStart(2, '0');
+            const months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+            const monthName = months[d.getMonth()];
+            const year = d.getFullYear();
+            return `${day}-${monthName}, ${year}`;
+        } catch (e) {
+            return dateStr.slice(0, 10);
+        }
+    };
+
     const renderKaryera = () => {
-        const history = player?.careerHistory || [];
-        const currentTeamName = player?.teams?.name || player?.team_name || player?.teamName || 'HFL FK';
-        const currentTeamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo || player?.logo_url || '';
+        const approvedTransfers = playerTransfers.filter((t: any) => t.status === 'approved');
+        const currentTeamName = player?.teams?.name || (approvedTransfers[0]?.new_team_name) || player?.team_name || player?.teamName || 'Jamoa';
+        const currentTeamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || (approvedTransfers[0]?.new_team_logo) || '';
 
         return (
             <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
@@ -355,46 +375,67 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     <Text style={styles.sectionTitle}>KARYERA <Text style={styles.sectionTitleHighlight}>TARIXI</Text></Text>
                 </View>
 
-                {history.length > 0 ? (
-                    history.map((yearGroup: any) => (
-                        <View key={yearGroup.year} style={styles.yearBlock}>
-                            <View style={styles.yearHeaderBadge}>
-                                <Text style={styles.yearHeaderText}>{yearGroup.year}</Text>
-                            </View>
-
-                            {yearGroup.teams.map((team: any) => {
-                                const tLogo = team.teamLogo || team.logo || team.logo_url || team.team_logo || team.teamLogoUrl;
-                                return (
-                                    <View key={team.teamId || team.name} style={styles.teamCareerWrapper}>
-                                        <View style={styles.teamMainRow}>
-                                            <View style={styles.teamIconBox}>
-                                                {tLogo ? (
-                                                    <Image source={{ uri: tLogo }} style={styles.teamMiniLogo} resizeMode="contain" />
-                                                ) : (
-                                                    <Ionicons name="shield" size={14} color={Colors.primary} />
-                                                )}
-                                            </View>
-                                            <Text style={styles.teamNameCareer} numberOfLines={1}>{(team.teamName || team.name || 'Jamoa').toUpperCase()}</Text>
-                                        </View>
-                                    </View>
-                                );
-                            })}
-                        </View>
-                    ))
-                ) : (
-                    <View style={styles.teamCareerWrapper}>
+                <View style={styles.careerTimelineContainer}>
+                    {/* 1. HOZIRGI JAMOASI (CURRENT ACTIVE TEAM) */}
+                    <View style={[styles.teamCareerWrapper, styles.teamCareerCurrent]}>
                         <View style={styles.teamMainRow}>
-                            <View style={styles.teamIconBox}>
+                            <View style={[styles.teamIconBox, { borderColor: '#00FF66', borderWidth: 1.5, width: 36, height: 36, borderRadius: 10 }]}>
                                 {currentTeamLogo ? (
-                                    <Image source={{ uri: currentTeamLogo }} style={styles.teamMiniLogo} resizeMode="contain" />
+                                    <Image source={{ uri: currentTeamLogo }} style={{ width: 26, height: 26 }} contentFit="contain" />
                                 ) : (
-                                    <Ionicons name="shield" size={14} color={Colors.primary} />
+                                    <Ionicons name="shield" size={18} color="#00FF66" />
                                 )}
                             </View>
-                            <Text style={styles.teamNameCareer} numberOfLines={1}>{currentTeamName.toUpperCase()}</Text>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Text style={[styles.teamNameCareer, { color: '#00FF66', fontSize: 14 }]} numberOfLines={1}>
+                                        {(currentTeamName || 'AMALDAGI JAMOA').toUpperCase()}
+                                    </Text>
+                                    <View style={styles.currentTeamBadge}>
+                                        <View style={styles.pulsingDot} />
+                                        <Text style={styles.currentTeamBadgeText}>HOZIRGI JAMOA</Text>
+                                    </View>
+                                </View>
+                                <Text style={styles.careerDateSub}>Amaldagi jamoasi • Hozirga qadar</Text>
+                            </View>
                         </View>
                     </View>
-                )}
+
+                    {/* 2. TRANSFER BO'LGAN AVVALGI JAMOALARI (PAST TEAMS WITH EXACT TRANSFER DATE) */}
+                    {approvedTransfers.map((tr: any, idx: number) => {
+                        const trDate = formatTransferDate(tr.created_at);
+                        const oldLogo = tr.old_team_logo;
+                        const oldName = tr.old_team_name || 'Eski jamoasi';
+
+                        return (
+                            <View key={tr.id || idx} style={[styles.teamCareerWrapper, { borderLeftWidth: 3, borderLeftColor: 'rgba(255,255,255,0.25)', marginTop: 8 }]}>
+                                <View style={styles.teamMainRow}>
+                                    <View style={[styles.teamIconBox, { width: 34, height: 34, borderRadius: 10 }]}>
+                                        {oldLogo ? (
+                                            <Image source={{ uri: oldLogo }} style={{ width: 24, height: 24 }} contentFit="contain" />
+                                        ) : (
+                                            <Ionicons name="shield-outline" size={16} color="rgba(255,255,255,0.6)" />
+                                        )}
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Text style={styles.teamNameCareer} numberOfLines={1}>
+                                                {oldName.toUpperCase()}
+                                            </Text>
+                                            <View style={styles.transferredBadge}>
+                                                <Ionicons name="arrow-forward" size={10} color="#94A3B8" />
+                                                <Text style={styles.transferredBadgeText}>ESKI JAMOA</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={styles.careerDateSub}>
+                                            🗓️ Transfer sanasi: {trDate}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        );
+                    })}
+                </View>
 
                 {/* Player's Personal 20s Goal Replay Clips Feed */}
                 <View style={{ marginTop: 24, marginBottom: 20 }}>
@@ -1051,26 +1092,82 @@ const styles = StyleSheet.create({
     },
     teamCareerWrapper: {
         backgroundColor: 'rgba(255,255,255,0.03)',
-        borderRadius: 12,
+        borderRadius: 14,
         padding: 12,
-        marginBottom: 6,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    teamCareerCurrent: {
+        backgroundColor: 'rgba(0, 255, 102, 0.05)',
+        borderColor: 'rgba(0, 255, 102, 0.35)',
+        borderLeftWidth: 4,
+        borderLeftColor: '#00FF66',
+    },
+    currentTeamBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 255, 102, 0.15)',
+        borderColor: 'rgba(0, 255, 102, 0.4)',
+        borderWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        gap: 5,
+    },
+    currentTeamBadgeText: {
+        color: '#00FF66',
+        fontSize: 9.5,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    pulsingDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#00FF66',
+    },
+    transferredBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        gap: 4,
+    },
+    transferredBadgeText: {
+        color: '#94A3B8',
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    careerDateSub: {
+        color: '#94A3B8',
+        fontSize: 11.5,
+        fontWeight: '600',
+        marginTop: 4,
+    },
+    careerTimelineContainer: {
+        marginVertical: 10,
     },
     teamMainRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     teamIconBox: {
-        width: 24,
-        height: 24,
-        borderRadius: 6,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255,255,255,0.06)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 8,
     },
     teamMiniLogo: {
-        width: 18,
-        height: 18,
+        width: 24,
+        height: 24,
         resizeMode: 'contain',
     },
     teamNameCareer: {
