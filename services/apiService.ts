@@ -709,6 +709,23 @@ export const apiService = {
 
             const { data: created, error } = await supabase.from('transfers').insert(transferPayload).select().single();
             if (error) throw error;
+
+            // Notify Admin
+            try {
+                const { API_BASE_URL } = require('../constants/ApiConfig');
+                fetch(`${API_BASE_URL}/api/notifications/notify-admin-transfer`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerName: playerName || 'O\'yinchi',
+                        oldTeamName: oldTeamName || '',
+                        newTeamName: newTeamName || '',
+                        playerId: playerId,
+                        organizationId: (transferPayload as any).organization_id || 1,
+                    }),
+                }).catch(() => {});
+            } catch (notifErr) {}
+
             return { success: true, data: created };
         } catch (err) {
             console.error('Transfer request error:', err);
@@ -1315,6 +1332,28 @@ export const apiService = {
         try {
             const { data: created, error } = await supabase.from('applications').insert(data).select().single();
             if (error) throw error;
+
+            // Notify Admin
+            try {
+                const { API_BASE_URL } = require('../constants/ApiConfig');
+                const isTeam = data.type === 'team' || !data.team_id;
+                const name = isTeam
+                    ? (data.name || data.team_name || `${data.first_name || ''} ${data.last_name || ''}`)
+                    : `${data.first_name || ''} ${data.last_name || ''}`;
+
+                fetch(`${API_BASE_URL}/api/notifications/notify-admin-application`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: data.type || (isTeam ? 'team' : 'player'),
+                        name: name.trim() || 'Yangi ariza',
+                        teamName: data.team_name || data.league,
+                        phone: data.phone,
+                        organizationId: data.organization_id || 1,
+                    }),
+                }).catch(() => {});
+            } catch (notifErr) {}
+
             return { success: true, data: created, id: created?.id, _id: created?.id };
         } catch (err) {
             console.error('createApplication error:', err);

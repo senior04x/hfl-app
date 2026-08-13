@@ -681,6 +681,22 @@ const MyStatsScreen = ({ navigation }: any) => {
                 return;
             }
 
+            // Trigger Admin Push Notification
+            try {
+                const { API_BASE_URL } = require('../constants/ApiConfig');
+                const fullName = `${updateForm.firstName || player?.first_name || ''} ${updateForm.lastName || player?.last_name || ''}`.trim() || 'Futbolchi';
+                fetch(`${API_BASE_URL}/api/notifications/notify-admin-profile-update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerName: fullName,
+                        playerId: targetPlayerId,
+                        phone: updateForm.phone || player?.phone,
+                        organizationId: targetOrgId || 1,
+                    }),
+                }).catch(() => {});
+            } catch (e) {}
+
             setUpdateSubmitStatus('success');
             setShowProfileUpdateModal(false);
             setShowSuccessModal(true);
