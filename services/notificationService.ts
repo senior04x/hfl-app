@@ -75,11 +75,19 @@ export const notificationService = {
       // Register with our backend
       // Register Expo Token with our backend
       if (userId) {
+        const { useAuthStore } = require('../store/useAuthStore');
+        const { useOrganizationStore } = require('../store/useOrganizationStore');
+        const currentUser = useAuthStore.getState().user;
+        const orgId = useOrganizationStore.getState().selectedOrganizationId || 1;
+        const teamId = currentUser?.teamId || (currentUser as any)?.team_id;
+
         const registrationData = {
           token,
           userId: userId || 'anonymous',
           platform: Platform.OS,
-          deviceId: Constants.installationId || Device.osBuildId || 'unknown'
+          deviceId: Constants.installationId || Device.osBuildId || 'unknown',
+          teamId,
+          organizationId: orgId
         };
         
         await apiService.registerPushToken(registrationData);

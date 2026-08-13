@@ -361,7 +361,7 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                                     navigation.goBack();
                                 }}
                             >
-                                <Text style={styles.successModalBtnText}>TUSHUNDIM</Text>
+                                <Text style={styles.successModalBtnText}>RAHMAT</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

@@ -36,9 +36,11 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
-import { apiService, clearApiCache } from '../services/apiService';
+import { apiService, clearApiCache, supabase } from '../services/apiService';
 import { eskizService } from '../services/eskizService';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Skeleton from '../components/Skeleton';
 
 const { width } = Dimensions.get('window');
 
@@ -110,6 +112,8 @@ const ShimmerLogo = ({ visible }: { visible: boolean }) => {
     );
 };
 
+
+
 export default function WelcomeScreen({ navigation }: any) {
     const setAuth = useAuthStore((state) => state.setAuth);
     const setGuest = useAuthStore((state) => state.setGuest);
@@ -119,7 +123,8 @@ export default function WelcomeScreen({ navigation }: any) {
     const [loginStep, setLoginStep] = useState<'phone' | 'otp'>('phone');
     const [phone, setPhone] = useState('');
     const [otpCode, setOtpCode] = useState('');
-    const [serverOtpCode, setServerOtpCode] = useState('');
+
+    const [isKeyboardVisible, setKeyboardVisible] = useState(false);
     const [deliveredVia, setDeliveredVia] = useState<'telegram' | 'bot_link'>('bot_link');
     
     // Account Selection Modal State
@@ -129,7 +134,10 @@ export default function WelcomeScreen({ navigation }: any) {
     const [showNotFoundModal, setShowNotFoundModal] = useState(false);
     const [notFoundMessage, setNotFoundMessage] = useState('');
 
-    const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+    // Organization Selection Modal State
+    const [showOrgModal, setShowOrgModal] = useState(false);
+    const [organizationsList, setOrganizationsList] = useState<any[]>([]);
+    const [loadingOrgs, setLoadingOrgs] = useState(true);
     const [loading, setLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(60);
     const timerRef = useRef<any>(null);
@@ -235,8 +243,6 @@ const formatPhoneInput = (val: string) => {
             const res = await apiService.requestOTP(fullPhone);
 
             if (res.success) {
-                if (res.otpCode) setServerOtpCode(res.otpCode);
-
                 if (res.isAutoSentToTelegram) {
                     setLoginStep('otp');
                     startTimer();
@@ -285,45 +291,27 @@ const formatPhoneInput = (val: string) => {
             const fullPhone = `+998${phone.replace(/\D/g, '')}`;
             const inputCode = otpCode.trim();
 
-            // 1. Avval otp_codes jadvalidan tekshirish
-            const cleanDigits = phone.replace(/\D/g, '').slice(-9);
-            let otpValid = false;
-            try {
-                const { data: otpRow } = await apiService.supabase
-                    .from('otp_codes')
-                    .select('*')
-                    .eq('phone', cleanDigits)
-                    .eq('code', inputCode)
-                    .eq('is_used', false)
-                    .maybeSingle();
-                if (otpRow && new Date(otpRow.expires_at) > new Date()) {
-                    otpValid = true;
-                    await apiService.supabase.from('otp_codes').update({ is_used: true }).eq('phone', cleanDigits);
-                }
-            } catch (e) {}
+            // Backend API orqali OTP tekshirish
+            const { AUTH_API } = require('../constants/ApiConfig');
+            const verifyRes = await fetch(AUTH_API.VERIFY_OTP, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: fullPhone, code: inputCode }),
+            });
+            const verifyData = await verifyRes.json();
 
-            // 2. Fallback: serverOtpCode bilan solishtirish
-            if (!otpValid && serverOtpCode && inputCode === serverOtpCode) {
-                otpValid = true;
-            }
+            if (verifyData.success) {
+                const accList = verifyData.accounts || (verifyData.user ? [verifyData.user] : []);
+                setAccountOptions(accList);
+                useAuthStore.getState().setUserAccounts(accList);
 
-            if (otpValid) {
-                const res = await apiService.findAccountsByPhone(fullPhone);
-                if (res.success) {
-                    const accList = res.accounts || (res.user ? [res.user] : []);
-                    setAccountOptions(accList);
-                    useAuthStore.getState().setUserAccounts(accList);
-
-                    if (res.multipleAccounts && res.accounts) {
-                        setShowAccountModal(true);
-                    } else if (res.user) {
-                        performLogin(res.user, accList);
-                    }
-                } else {
-                    Alert.alert('Xato', res.reason || 'Profil topilmadi.');
+                if (verifyData.multipleAccounts && verifyData.accounts) {
+                    setShowAccountModal(true);
+                } else if (verifyData.user) {
+                    performLogin(verifyData.user, accList);
                 }
             } else {
-                Alert.alert('Xato', "Tasdiqlash kodi noto'g'ri yoki muddati o'tgan.");
+                Alert.alert('Xato', verifyData.reason || "Tasdiqlash kodi noto'g'ri yoki muddati o'tgan.");
             }
         } catch (error: any) {
             console.error('Verify OTP error:', error);
@@ -334,7 +322,58 @@ const formatPhoneInput = (val: string) => {
     };
 
     const handleOpenBot = () => {
-        openTelegramDeepLink(phone, serverOtpCode);
+        openTelegramDeepLink(phone, '');
+    };
+
+    const ORG_CACHE_KEY = 'cached_organizations_list_v1';
+
+    const fetchOrganizations = async () => {
+        try {
+            const cachedData = await AsyncStorage.getItem(ORG_CACHE_KEY);
+            if (cachedData) {
+                const parsed = JSON.parse(cachedData);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setOrganizationsList(parsed);
+                    setLoadingOrgs(false);
+                }
+            } else {
+                setLoadingOrgs(true);
+            }
+
+            const { data, error } = await supabase
+                .from('organizations')
+                .select('*')
+                .order('created_at', { ascending: false });
+                
+            if (data && data.length > 0) {
+                setOrganizationsList(data);
+                await AsyncStorage.setItem(ORG_CACHE_KEY, JSON.stringify(data));
+            } else if (!cachedData) {
+                const fallback = [{ id: 1, name: 'HFL SPORT TASHKILOTI', slug: 'hfl', logo_url: '' }];
+                setOrganizationsList(fallback);
+            }
+        } catch (e) {
+            console.error('Error fetching organizations:', e);
+        } finally {
+            setLoadingOrgs(false);
+        }
+    };
+
+    const handleRegisterPress = () => {
+        setShowOrgModal(true);
+        fetchOrganizations();
+    };
+
+    const handleSelectOrganization = async (org: any) => {
+        const rawSlug = org.slug || org.name || org.title || org.id || 'hfl';
+        const cleanSlug = String(rawSlug).toLowerCase().trim().replace(/\s+/g, '-');
+        const targetUrl = `https://amatora.uz/${cleanSlug}`;
+
+        try {
+            await Linking.openURL(targetUrl);
+        } catch (err) {
+            Alert.alert('Xato', `Havola ochib bo'lmadi: ${targetUrl}`);
+        }
     };
 
     return (
@@ -474,7 +513,7 @@ const formatPhoneInput = (val: string) => {
 
                                 <TouchableOpacity
                                     style={styles.guestButton}
-                                    onPress={() => navigation.navigate('JoinApplication')}
+                                    onPress={handleRegisterPress}
                                 >
                                     <Text style={styles.guestButtonText}>RO'YXATDAN O'TISH</Text>
                                 </TouchableOpacity>
@@ -540,6 +579,98 @@ const formatPhoneInput = (val: string) => {
                                 onPress={() => setShowAccountModal(false)}
                             >
                                 <Text style={styles.cancelModalBtnText}>BEKOR QILISH</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Organization Selection Modal */}
+            <Modal
+                visible={showOrgModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowOrgModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.glassModalCard}>
+                        <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={{ padding: 20 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="business" size={24} color={Colors.primary} style={{ marginRight: 8 }} />
+                                    <Text style={styles.accountModalTitle}>TASHKILOTNI TANLANG</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setShowOrgModal(false)} style={{ padding: 4 }}>
+                                    <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={styles.accountModalSubtitle}>
+                                Ro'yxatdan o'tish uchun mas'ul ligangiz va tashkilotingizni tanlang:
+                            </Text>
+
+                            <ScrollView style={{ maxHeight: 320, marginVertical: 14 }} showsVerticalScrollIndicator={false}>
+                                {loadingOrgs && organizationsList.length === 0 ? (
+                                    <>
+                                        {[1, 2, 3].map((_, i) => (
+                                            <View key={i} style={styles.glassOrgCard}>
+                                                <Skeleton width={44} height={44} borderRadius={22} style={{ marginRight: 12 }} />
+                                                <View style={{ flex: 1, gap: 6 }}>
+                                                    <Skeleton width="70%" height={16} borderRadius={6} />
+                                                    <Skeleton width={110} height={12} borderRadius={4} />
+                                                </View>
+                                                <Skeleton width={20} height={20} borderRadius={10} />
+                                            </View>
+                                        ))}
+                                    </>
+                                ) : organizationsList.length === 0 ? (
+                                    <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                                        <Ionicons name="information-circle-outline" size={32} color="rgba(255,255,255,0.4)" />
+                                        <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8, fontSize: 13 }}>
+                                            Hozircha faol tashkilotlar mavjud emas
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    organizationsList.map((org, index) => {
+                                        const orgName = org.name || org.title || 'HFL Tashkiloti';
+                                        const orgLogo = org.logo_url || org.logo || org.photo_url;
+                                        const orgSlug = org.slug || String(orgName).toLowerCase().replace(/\s+/g, '-');
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={org.id || org._id || index}
+                                                style={styles.glassOrgCard}
+                                                activeOpacity={0.75}
+                                                onPress={() => handleSelectOrganization(org)}
+                                            >
+                                                <View style={styles.accountOptionIcon}>
+                                                    {orgLogo ? (
+                                                        <Image
+                                                            source={{ uri: orgLogo }}
+                                                            style={{ width: 44, height: 44, borderRadius: 22 }}
+                                                            resizeMode="cover"
+                                                        />
+                                                    ) : (
+                                                        <Ionicons name="business" size={24} color={Colors.primary} />
+                                                    )}
+                                                </View>
+                                                <View style={{ flex: 1, marginLeft: 12, justifyContent: 'center' }}>
+                                                    <Text style={styles.accountOptionName}>{orgName.toUpperCase()}</Text>
+                                                    <Text style={styles.accountOptionSubtitle}>amatora.uz/{orgSlug}</Text>
+                                                </View>
+                                                <Ionicons name="globe-outline" size={20} color={Colors.primary} />
+                                            </TouchableOpacity>
+                                        );
+                                    })
+                                )}
+                            </ScrollView>
+
+                            <TouchableOpacity
+                                style={styles.glassCancelBtn}
+                                onPress={() => setShowOrgModal(false)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.cancelModalBtnText}>YOPISH</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -820,6 +951,41 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 18,
         marginBottom: 12,
+    },
+    cancelModalBtnText: {
+        color: Colors.textMuted,
+        fontSize: 13,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+
+    // Glassmorphism Modal Styles
+    glassModalCard: {
+        width: width * 0.9,
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.18)',
+        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    },
+    glassOrgCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        borderRadius: 16,
+        marginBottom: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    glassCancelBtn: {
+        paddingVertical: 12,
+        borderRadius: 14,
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        marginTop: 8,
     },
     mainButtonText: {
         color: Colors.primary,

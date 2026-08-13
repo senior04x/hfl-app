@@ -1,10 +1,10 @@
 import axios from 'axios';
-import { supabase, supabaseAdmin } from './supabase';
+import { supabase } from './supabase';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { useJuniorStore } from '../store/useJuniorStore';
 import { useAuthStore } from '../store/useAuthStore';
 
-export { supabase, supabaseAdmin };
+export { supabase };
 
 const getOrgId = () => {
     const user = useAuthStore.getState().user;
@@ -70,8 +70,8 @@ export const apiService = {
     getOrganizations: async () => {
         try {
             const [orgsRes, sponsorsRes] = await Promise.all([
-                supabaseAdmin.from('organizations').select('id, name, slug, logo_url, is_registration_open, transfer_window_open').order('id', { ascending: true }),
-                supabaseAdmin.from('sponsors').select('name, logo_url').like('name', 'REGISTRATION_OPEN%')
+                supabase.from('organizations').select('id, name, slug, logo_url, is_registration_open, transfer_window_open').order('id', { ascending: true }),
+                supabase.from('sponsors').select('name, logo_url').like('name', 'REGISTRATION_OPEN%')
             ]);
 
             if (orgsRes.error) throw orgsRes.error;
@@ -119,7 +119,7 @@ export const apiService = {
     getRegistrationStatus: async (orgId?: number): Promise<boolean> => {
         try {
             const targetOrgId = orgId || getOrgId();
-            const { data, error } = await supabaseAdmin
+            const { data, error } = await supabase
                 .from('organizations')
                 .select('is_registration_open')
                 .eq('id', targetOrgId)
@@ -139,7 +139,7 @@ export const apiService = {
     getTransferWindowStatus: async (orgId?: number): Promise<boolean> => {
         try {
             const targetOrgId = orgId || getOrgId();
-            const { data, error } = await supabaseAdmin
+            const { data, error } = await supabase
                 .from('organizations')
                 .select('transfer_window_open')
                 .eq('id', targetOrgId)
@@ -594,14 +594,14 @@ export const apiService = {
                 queryId = Number(playerId);
             }
 
-            let { data, error } = await supabaseAdmin
+            let { data, error } = await supabase
                 .from('applications')
                 .update({ phone })
                 .eq('id', queryId)
                 .select();
 
             if (!data || data.length === 0) {
-                const res2 = await supabaseAdmin
+                const res2 = await supabase
                     .from('applications')
                     .update({ phone })
                     .eq('id', String(playerId))
@@ -1272,7 +1272,7 @@ export const apiService = {
 
     createNews: async (newsData: any) => {
         try {
-            const { data, error } = await supabaseAdmin.from('news').insert({
+            const { data, error } = await supabase.from('news').insert({
                 title: newsData.title,
                 content: newsData.content || '',
                 category: newsData.category || "O'yinlar",
@@ -1297,7 +1297,7 @@ export const apiService = {
     createTeam: async (teamData: any) => {
         try {
             const defaultLogo = 'https://xzzyhfyazwohdqqbjiiy.supabase.co/storage/v1/object/public/sponsors/jd017tpq0c8.png';
-            const { data: created, error } = await supabaseAdmin.from('teams').insert({
+            const { data: created, error } = await supabase.from('teams').insert({
                 ...teamData,
                 logo_url: teamData.logo_url || defaultLogo,
                 status: teamData.status || 'pending'
@@ -1313,7 +1313,7 @@ export const apiService = {
 
     createApplication: async (data: any) => {
         try {
-            const { data: created, error } = await supabaseAdmin.from('applications').insert(data).select().single();
+            const { data: created, error } = await supabase.from('applications').insert(data).select().single();
             if (error) throw error;
             return { success: true, data: created, id: created?.id, _id: created?.id };
         } catch (err) {
@@ -1443,325 +1443,46 @@ export const apiService = {
 
     requestOTP: async (phone: string) => {
         try {
-            const cleanPhone = phone.replace(/\D/g, '');
-            const phoneDigits = cleanPhone.slice(-9);
-
-            // 1. Check if user exists in teams (captain) or applications (player)
-            let userFound: any = null;
-            let role: 'manager' | 'player' = 'player';
-
-            // Check captain in teams table
-            const { data: teamData } = await supabase
-                .from('teams')
-                .select('*')
-                .ilike('captain_phone', `%${phoneDigits}%`)
-                .limit(1);
-
-            if (teamData && teamData.length > 0) {
-                userFound = teamData[0];
-                role = 'manager';
-            } else {
-                // Check player in applications table
-                const { data: appData } = await supabase
-                    .from('applications')
-                    .select('*')
-                    .ilike('phone', `%${phoneDigits}%`)
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (appData && appData.length > 0) {
-                    userFound = appData[0];
-                    role = 'player';
-                }
-            }
-
-            if (!userFound) {
-                return {
-                    success: false,
-                    reason: "Ushbu telefon raqamiga tegishli ariza yoki jamoa topilmadi. Iltimos, avval ariza topshiring!"
-                };
-            }
-
-            // 2. Generate 4-digit OTP code
-            const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-            const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-            // 3. Store OTP in otp_codes table
-            try {
-                await supabase.from('otp_codes').upsert({
-                    phone: phoneDigits,
-                    code: otpCode,
-                    expires_at: expiresAt,
-                    is_used: false,
-                    created_at: new Date().toISOString()
-                }, { onConflict: 'phone' });
-
-                const otpStorageVal = `OTP_${otpCode}`;
-                if (role === 'manager') {
-                    await supabase.from('teams').update({ telegram_message_id: otpStorageVal }).eq('id', userFound.id);
-                } else {
-                    await supabase.from('applications').update({ telegram_message_id: otpStorageVal }).eq('id', userFound.id);
-                }
-            } catch (err) {
-                console.warn('OTP save error:', err);
-            }
-
-            // 4. Check if user already has a linked Telegram Chat ID
-            let telegramChatId: string | null = null;
-
-            const { data: teamChat } = await supabase
-                .from('teams')
-                .select('telegram_chat_id')
-                .ilike('captain_phone', `%${phoneDigits}%`)
-                .not('telegram_chat_id', 'is', null)
-                .limit(1);
-
-            if (teamChat && teamChat.length > 0 && teamChat[0].telegram_chat_id) {
-                telegramChatId = teamChat[0].telegram_chat_id;
-            } else {
-                const { data: appChat } = await supabase
-                    .from('applications')
-                    .select('telegram_chat_id')
-                    .ilike('phone', `%${phoneDigits}%`)
-                    .not('telegram_chat_id', 'is', null)
-                    .limit(1);
-
-                if (appChat && appChat.length > 0 && appChat[0].telegram_chat_id) {
-                    telegramChatId = appChat[0].telegram_chat_id;
-                }
-            }
-
-            let isAutoSentToTelegram = false;
-
-            if (telegramChatId) {
-                try {
-                    const botToken = '8644740765:AAHHhAvzTpUgfz5kevg5iiDfA9GafA1m6Vs';
-                    const msgText = `🔑 <b>Tasdiqlash kodingiz:</b> <code>${otpCode}</code>\n\n📱 <i>4 xonali kodni ilovaga kiriting. Kod 10 daqiqa amal qiladi.</i>`;
-                    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: telegramChatId,
-                            text: msgText,
-                            parse_mode: 'HTML',
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [
-                                        {
-                                            text: '📋 Nusxalash',
-                                            copy_text: { text: otpCode }
-                                        }
-                                    ]
-                                ]
-                            }
-                        })
-                    });
-                    if (res.ok) {
-                        isAutoSentToTelegram = true;
-                    }
-                } catch (tErr) {
-                    console.warn('Auto Telegram OTP send error:', tErr);
-                }
-            }
-
-            return {
-                success: true,
-                isAutoSentToTelegram,
-                deliveredVia: isAutoSentToTelegram ? 'telegram' : 'bot_link',
-                user: userFound,
-                role,
-                botUrl: `https://t.me/amatora_bot?start=login_${phoneDigits}`,
-                otpCode
-            };
+            const { AUTH_API } = require('../constants/ApiConfig');
+            const res = await fetch(AUTH_API.REQUEST_OTP, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone }),
+            });
+            const data = await res.json();
+            return data;
         } catch (error: any) {
             console.error('requestOTP error:', error);
-            return { success: false, reason: "Tizim bilan bog'lanishda xatolik yuz berdi." };
+            return { success: false, reason: "Server bilan bog'lanishda xatolik yuz berdi." };
         }
     },
 
     findAccountsByPhone: async (phone: string) => {
         try {
-            const cleanPhone = phone.replace(/\D/g, '').slice(-9);
-            if (!cleanPhone || cleanPhone.length < 7) {
-                return { success: false, reason: "Iltimos, telefon raqamingizni to'g'ri kiriting." };
-            }
-            const accountsList: any[] = [];
-
-            // 1. Check Manager profile in teams table
-            const { data: teamData, error: teamErr } = await supabase
-                .from('teams')
-                .select('*, organizations(id, name)')
-                .ilike('captain_phone', `%${cleanPhone}%`);
-
-            if (teamErr) {
-                console.warn('findAccountsByPhone teams query error:', teamErr);
-            } else if (teamData && teamData.length > 0) {
-                teamData.forEach((t: any) => {
-                    const orgId = t.organization_id || t.organizations?.id || 1;
-                    const orgName = t.organizations?.name || 'Tashkilot';
-                    accountsList.push({
-                        ...t,
-                        _id: t.id,
-                        id: t.id,
-                        organizationId: orgId,
-                        organization_id: orgId,
-                        orgName: orgName,
-                        role: 'manager',
-                        teamId: t.id,
-                        phone: t.captain_phone || phone,
-                        name: t.name || 'Jamoa Sardori',
-                        title: t.name ? `${t.name} (Sardor)` : 'Jamoa Sardori',
-                        subTitle: `🏛️ ${orgName} • ${t.league || 'Liga'}`,
-                        photo: t.logo_url || t.logo || ''
-                    });
-                });
-            }
-
-            // 2. Check Player profiles in applications table
-            const { data: appData, error: appErr } = await supabase
-                .from('applications')
-                .select('*, teams(*), organizations(id, name)')
-                .ilike('phone', `%${cleanPhone}%`)
-                .order('created_at', { ascending: false });
-
-            if (appErr) {
-                console.warn('findAccountsByPhone applications query error:', appErr);
-            } else if (appData && appData.length > 0) {
-                appData.forEach((app: any) => {
-                    const fullName = `${app.first_name || ''} ${app.last_name || ''}`.trim() || 'Futbolchi';
-                    const teamName = app.teams?.name || 'Yakkaxon';
-                    const orgId = app.organization_id || app.organizations?.id || app.teams?.organization_id || 1;
-                    const orgName = app.organizations?.name || 'Tashkilot';
-                    accountsList.push({
-                        ...app,
-                        _id: app.id,
-                        id: app.id,
-                        organizationId: orgId,
-                        organization_id: orgId,
-                        orgName: orgName,
-                        role: 'player',
-                        teamId: app.team_id || app.teams?.id,
-                        phone: app.phone || phone,
-                        name: fullName,
-                        title: `${fullName} (${teamName})`,
-                        subTitle: `🏛️ ${orgName} • ${teamName}`,
-                        photo: app.photo_url || app.photo || ''
-                    });
-                });
-            }
-
-            if (accountsList.length > 0) {
-                return {
-                    success: true,
-                    multipleAccounts: accountsList.length > 1,
-                    accounts: accountsList,
-                    user: accountsList[0]
-                };
-            }
-
-            return { success: false, reason: "Ushbu telefon raqamiga tegishli profil topilmadi. Iltimos, avval ariza topshiring!" };
+            const { AUTH_API } = require('../constants/ApiConfig');
+            const res = await fetch(AUTH_API.FIND_ACCOUNTS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone }),
+            });
+            const data = await res.json();
+            return data;
         } catch (error: any) {
             console.error('findAccountsByPhone error:', error);
-            return { success: false, reason: "Profildan izlashda xatolik yuz berdi: " + (error.message || '') };
+            return { success: false, reason: "Profildan izlashda xatolik yuz berdi." };
         }
     },
 
     verifyOTP: async (phone: string, code: string, fallbackOtpCode?: string) => {
         try {
-            const cleanPhone = phone.replace(/\D/g, '').slice(-9);
-            const inputCode = code.trim();
-
-            let isValid = false;
-            const accountsList: any[] = [];
-
-            // 1. Check Manager profile in teams table
-            const { data: teamData } = await supabase
-                .from('teams')
-                .select('*')
-                .ilike('captain_phone', `%${cleanPhone}%`);
-
-            if (teamData && teamData.length > 0) {
-                teamData.forEach((t: any) => {
-                    accountsList.push({
-                        ...t,
-                        _id: t.id,
-                        id: t.id,
-                        role: 'manager',
-                        teamId: t.id,
-                        phone: t.captain_phone || phone,
-                        name: t.name ? `${t.name} (Sardor)` : 'Jamoa Sardori',
-                        title: 'Jamoa Sardori / Menejer',
-                        subTitle: t.league || 'HFL Liga',
-                        photo: t.logo_url || t.logo || '',
-                        storedOtp: t.telegram_message_id
-                    });
-                });
-            }
-
-            // 2. Check Player profiles in applications table
-            const { data: appData } = await supabase
-                .from('applications')
-                .select('*, teams(*)')
-                .ilike('phone', `%${cleanPhone}%`)
-                .order('created_at', { ascending: false });
-
-            if (appData && appData.length > 0) {
-                appData.forEach((app: any) => {
-                    const teamName = app.teams?.name || 'Yakkaxon o\'yinchi';
-                    accountsList.push({
-                        ...app,
-                        _id: app.id,
-                        id: app.id,
-                        role: 'player',
-                        teamId: app.team_id || app.teams?.id,
-                        phone: app.phone || phone,
-                        name: `${app.first_name || ''} ${app.last_name || ''}`.trim() || 'Futbolchi',
-                        title: `Futbolchi (${teamName})`,
-                        subTitle: `${app.position || 'O\'yinchi'} • ${teamName}`,
-                        photo: app.photo_url || app.photo || '',
-                        storedOtp: app.telegram_message_id
-                    });
-                });
-            }
-
-            // 3. Validate OTP code strictly against otp_codes table or storedOtp
-            if (accountsList.length > 0) {
-                const { data: validOtpRow } = await supabase
-                    .from('otp_codes')
-                    .select('*')
-                    .eq('phone', cleanPhone)
-                    .eq('code', inputCode)
-                    .eq('is_used', false)
-                    .gte('expires_at', new Date().toISOString())
-                    .maybeSingle();
-
-                const hasValidStoredOtp = accountsList.some(acc => acc.storedOtp === `OTP_${inputCode}`);
-
-                if (validOtpRow) {
-                    isValid = true;
-                    // Mark OTP as used to prevent replay attacks
-                    await supabase.from('otp_codes').update({ is_used: true }).eq('id', validOtpRow.id);
-                } else if (hasValidStoredOtp) {
-                    isValid = true;
-                } else if (fallbackOtpCode && inputCode === fallbackOtpCode.trim()) {
-                    isValid = true;
-                }
-            }
-
-            if (isValid && accountsList.length > 0) {
-                return {
-                    success: true,
-                    multipleAccounts: accountsList.length > 1,
-                    accounts: accountsList,
-                    user: accountsList[0]
-                };
-            }
-
-            if (!isValid) {
-                return { success: false, reason: "Kiritilgan tasdiqlash kodi noto'g'ri yoki muddati o'tgan!" };
-            }
-
-            return { success: false, reason: "Ushbu raqamga tegishli profil topilmadi." };
+            const { AUTH_API } = require('../constants/ApiConfig');
+            const res = await fetch(AUTH_API.VERIFY_OTP, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, code }),
+            });
+            const data = await res.json();
+            return data;
         } catch (error: any) {
             console.error('verifyOTP error:', error);
             return { success: false, reason: "Kodni tekshirishda xatolik yuz berdi." };
@@ -1778,45 +1499,64 @@ export const apiService = {
                 return { url: uri };
             }
 
-            const fileExt = 'jpg';
-            const fileName = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+            const cleanExt = ['png', 'jpg', 'jpeg', 'webp'].includes(fileExt) ? fileExt : 'jpg';
+            const fileName = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}.${cleanExt}`;
             const filePath = `uploads/${fileName}`;
 
-            const response = await fetch(uri);
-            const blob = await response.blob();
-
-            // Try uploading to 'player-photos' bucket first
-            try {
-                const { data, error } = await supabase.storage.from('player-photos').upload(filePath, blob, {
-                    contentType: 'image/jpeg',
-                    upsert: true
-                });
-
-                if (!error && data) {
-                    const { data: publicUrlData } = supabase.storage.from('player-photos').getPublicUrl(filePath);
-                    if (publicUrlData?.publicUrl) {
-                        return { url: publicUrlData.publicUrl };
-                    }
+            let arrayBuffer: ArrayBuffer;
+            if (uri.startsWith('data:image')) {
+                const base64Data = uri.split(',')[1];
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
                 }
-            } catch (sErr) {
-                console.warn('Storage upload player-photos error:', sErr);
+                arrayBuffer = bytes.buffer;
+            } else {
+                const response = await fetch(uri);
+                arrayBuffer = await response.arrayBuffer();
             }
 
-            // Try uploading to 'photos' bucket
-            try {
-                const { data, error } = await supabase.storage.from('photos').upload(filePath, blob, {
-                    contentType: 'image/jpeg',
-                    upsert: true
-                });
+            const contentType = `image/${cleanExt === 'png' ? 'png' : 'jpeg'}`;
+            const bucketsToTry = ['hfl-images', 'sponsors', 'player-photos', 'photos'];
 
-                if (!error && data) {
-                    const { data: publicUrlData } = supabase.storage.from('photos').getPublicUrl(filePath);
-                    if (publicUrlData?.publicUrl) {
-                        return { url: publicUrlData.publicUrl };
+            // 1. Try public supabase client
+            for (const bucket of bucketsToTry) {
+                try {
+                    const { data, error } = await supabase.storage.from(bucket).upload(filePath, arrayBuffer, {
+                        contentType,
+                        upsert: true
+                    });
+
+                    if (!error && data) {
+                        const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+                        if (publicUrlData?.publicUrl) {
+                            return { url: publicUrlData.publicUrl };
+                        }
                     }
+                } catch (sErr) {
+                    console.warn(`Storage upload to ${bucket} error:`, sErr);
                 }
-            } catch (sErr2) {
-                console.warn('Storage upload photos error:', sErr2);
+            }
+
+            // 2. Try admin supabase client (bypasses RLS)
+            for (const bucket of bucketsToTry) {
+                try {
+                    const { data, error } = await supabase.storage.from(bucket).upload(filePath, arrayBuffer, {
+                        contentType,
+                        upsert: true
+                    });
+
+                    if (!error && data) {
+                        const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+                        if (publicUrlData?.publicUrl) {
+                            return { url: publicUrlData.publicUrl };
+                        }
+                    }
+                } catch (sErrAdmin) {
+                    console.warn(`Admin storage upload to ${bucket} error:`, sErrAdmin);
+                }
             }
 
             return { url: uri };
@@ -1827,8 +1567,20 @@ export const apiService = {
     },
 
     // Notifications
-    registerPushToken: (data: { token: string, userId: string, platform: string, deviceId?: string }) =>
-        api.post('/notifications/register', data).then(res => res.data).catch(() => ({ success: true })),
+    registerPushToken: async (data: { token: string; userId: string; platform: string; deviceId?: string; teamId?: string; organizationId?: number }) => {
+        try {
+            const { API_BASE_URL } = require('../constants/ApiConfig');
+            const res = await fetch(`${API_BASE_URL}/api/notifications/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            return await res.json();
+        } catch (e) {
+            console.warn('registerPushToken error:', e);
+            return { success: true };
+        }
+    },
 
     async updatePlayerInstagram(playerId: string | number, username: string, url: string) {
         try {

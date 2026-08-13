@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Dimensions } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Dimensions, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,7 +11,81 @@ import { apiService, supabase } from '../services/apiService';
 import { useAuthStore } from '../store/useAuthStore';
 import * as Haptics from 'expo-haptics';
 
+const NOTIFICATIONS_CACHE_KEY = 'cached_notifications_v2';
 const READ_STORAGE_KEY = 'read_notification_ids_v1';
+
+const mergeNotifications = (existing: any[], fetched: any[]) => {
+    const existingMap = new Map<string, any>();
+    (existing || []).forEach(item => {
+        if (item && item.id) existingMap.set(item.id, item);
+    });
+
+    const result: any[] = [];
+    const fetchedIds = new Set<string>();
+
+    (fetched || []).forEach(item => {
+        if (!item || !item.id) return;
+        fetchedIds.add(item.id);
+        const oldItem = existingMap.get(item.id);
+        if (oldItem) {
+            result.push({ ...oldItem, ...item });
+        } else {
+            result.push(item);
+        }
+    });
+
+    (existing || []).forEach(item => {
+        if (item && item.id && !fetchedIds.has(item.id)) {
+            result.push(item);
+        }
+    });
+
+    result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return result;
+};
+
+const NotificationSkeletonItem = () => {
+    const opacity = useRef(new Animated.Value(0.35)).current;
+
+    useEffect(() => {
+        const pulse = Animated.loop(
+            Animated.sequence([
+                Animated.timing(opacity, {
+                    toValue: 0.75,
+                    duration: 700,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacity, {
+                    toValue: 0.35,
+                    duration: 700,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+        pulse.start();
+        return () => pulse.stop();
+    }, [opacity]);
+
+    return (
+        <Animated.View style={[styles.notifCard, { opacity, padding: 16, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.08)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255, 255, 255, 0.12)' }} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <View style={{ width: '65%', height: 14, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.15)' }} />
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(0, 255, 135, 0.3)' }} />
+                    </View>
+                    <View style={{ width: '92%', height: 12, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)', marginBottom: 6 }} />
+                    <View style={{ width: '60%', height: 12, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)', marginBottom: 12 }} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ width: 80, height: 10, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
+                        <View style={{ width: 45, height: 10, borderRadius: 4, backgroundColor: 'rgba(0, 255, 135, 0.25)' }} />
+                    </View>
+                </View>
+            </View>
+        </Animated.View>
+    );
+};
 
 export default function NotificationsScreen({ navigation }: any) {
     const [notifications, setNotifications] = useState<any[]>([]);
@@ -22,28 +96,51 @@ export default function NotificationsScreen({ navigation }: any) {
     const { user } = useAuthStore();
 
     useEffect(() => {
-        loadNotificationsData();
+        initNotifications();
     }, []);
 
-    const loadNotificationsData = async (isRefreshing = false) => {
-        if (isRefreshing) setRefreshing(true);
-        else setLoading(true);
-
+    const initNotifications = async () => {
         try {
-            // Load saved read notification IDs
+            // 1. Load saved read notification IDs
             const savedReadJson = await AsyncStorage.getItem(READ_STORAGE_KEY);
             const savedReadIds: string[] = savedReadJson ? JSON.parse(savedReadJson) : [];
             setReadIds(savedReadIds);
 
-            // Fetch real matches, news, and org data in parallel
+            // 2. Load device cache for INSTANT 0-second display
+            const cachedJson = await AsyncStorage.getItem(NOTIFICATIONS_CACHE_KEY);
+            let cachedItems: any[] = [];
+            if (cachedJson) {
+                try {
+                    cachedItems = JSON.parse(cachedJson);
+                } catch (e) {}
+            }
+
+            if (cachedItems && cachedItems.length > 0) {
+                setNotifications(cachedItems);
+                setLoading(false); // Instant display from cache!
+            } else {
+                setLoading(true); // Show skeleton pulse only if no cache exists
+            }
+
+            // 3. Silent background fetch & merge
+            await fetchAndMergeNotifications(cachedItems, false);
+        } catch (e) {
+            console.error('Error initializing notifications:', e);
+            setLoading(false);
+        }
+    };
+
+    const fetchAndMergeNotifications = async (currentList: any[], isRefreshing = false) => {
+        if (isRefreshing) setRefreshing(true);
+
+        try {
             const [matchesData, newsData] = await Promise.all([
                 apiService.getMatches().catch(() => []),
                 supabase.from('news').select('*').order('created_at', { ascending: false }).limit(10).then(res => res.data || []).catch(() => [])
             ]);
 
-            const generatedList: any[] = [];
+            const fetchedList: any[] = [];
 
-            // Fetch user profile team ID if available
             let myTeamIdStr: string | null = null;
             if (user?.teamId || user?.team_id || user?.team?._id || user?.team?.id) {
                 myTeamIdStr = String(user.teamId || user.team_id || user.team?._id || user.team?.id);
@@ -62,21 +159,17 @@ export default function NotificationsScreen({ navigation }: any) {
                     const homeName = m.homeTeamName || m.homeTeam?.name || 'Uy jamoasi';
                     const awayName = m.awayTeamName || m.awayTeam?.name || 'Mehmon jamoasi';
                     const mId = m._id || m.id;
-
                     const isCentralMatch = m.importance === 'markaziy';
-
                     const homeTeamId = String(m.homeTeamId || m.home_team_id || m.homeTeam?._id || m.homeTeam?.id || m.home_team?.id || '');
                     const awayTeamId = String(m.awayTeamId || m.away_team_id || m.awayTeam?._id || m.awayTeam?.id || m.away_team?.id || '');
-
                     const isMyTeamMatch = myTeamIdStr && (homeTeamId === myTeamIdStr || awayTeamId === myTeamIdStr);
 
-                    // Strict Business Rule: Central matches show to EVERYONE; Non-central matches show ONLY if user's team is playing!
                     if (!isCentralMatch && !isMyTeamMatch) {
                         return;
                     }
 
                     if (m.status === 'live') {
-                        generatedList.push({
+                        fetchedList.push({
                             id: `notif_match_live_${mId}`,
                             targetId: mId,
                             category: 'match',
@@ -95,7 +188,7 @@ export default function NotificationsScreen({ navigation }: any) {
                         const isValidDate = !isNaN(matchDate.getTime());
                         const dateStr = isValidDate ? matchDate.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short' }) : "Yaqin orada";
 
-                        generatedList.push({
+                        fetchedList.push({
                             id: `notif_match_sched_${mId}`,
                             targetId: mId,
                             category: 'match',
@@ -109,7 +202,7 @@ export default function NotificationsScreen({ navigation }: any) {
                             params: { matchId: mId }
                         });
                     } else if (m.status === 'finished') {
-                        generatedList.push({
+                        fetchedList.push({
                             id: `notif_match_fin_${mId}`,
                             targetId: mId,
                             category: 'match',
@@ -130,7 +223,7 @@ export default function NotificationsScreen({ navigation }: any) {
             if (Array.isArray(newsData)) {
                 newsData.forEach((n: any) => {
                     const nId = n.id || n._id;
-                    generatedList.push({
+                    fetchedList.push({
                         id: `notif_news_${nId}`,
                         targetId: nId,
                         category: 'news',
@@ -147,7 +240,7 @@ export default function NotificationsScreen({ navigation }: any) {
             }
 
             // 3. System Announcement
-            generatedList.push({
+            fetchedList.push({
                 id: 'notif_system_welcome',
                 category: 'system',
                 type: 'system_welcome',
@@ -158,11 +251,12 @@ export default function NotificationsScreen({ navigation }: any) {
                 iconColor: '#00FF87',
             });
 
-            // Sort newest first
-            generatedList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            setNotifications(generatedList);
+            // Merge with current list and save to device cache
+            const mergedList = mergeNotifications(currentList, fetchedList);
+            setNotifications(mergedList);
+            await AsyncStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(mergedList));
         } catch (e) {
-            console.error('Error loading notifications:', e);
+            console.error('Error fetching and merging notifications:', e);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -271,17 +365,16 @@ export default function NotificationsScreen({ navigation }: any) {
                     refreshControl={
                         <RefreshControl 
                             refreshing={refreshing} 
-                            onRefresh={() => loadNotificationsData(true)} 
+                            onRefresh={() => fetchAndMergeNotifications(notifications, true)} 
                             tintColor={Colors.primary} 
                         />
                     }
                 >
                     {loading ? (
-                        <View style={{ paddingVertical: 50, alignItems: 'center' }}>
-                            <ActivityIndicator size="large" color="#00FF87" />
-                            <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 12, fontSize: 13 }}>
-                                Bildirishnomalar yuklanmoqda...
-                            </Text>
+                        <View style={{ gap: 12, paddingTop: 4 }}>
+                            {[1, 2, 3, 4, 5].map((key) => (
+                                <NotificationSkeletonItem key={key} />
+                            ))}
                         </View>
                     ) : filteredNotifications.length === 0 ? (
                         <View style={styles.emptyContainer}>

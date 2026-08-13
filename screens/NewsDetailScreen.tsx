@@ -17,7 +17,7 @@ import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 import Colors from '../constants/Colors';
-import { apiService, supabase, supabaseAdmin } from '../services/apiService';
+import { apiService, supabase } from '../services/apiService';
 import { News } from '../types';
 import SmartImage from '../components/SmartImage';
 
@@ -38,7 +38,7 @@ export default function NewsDetailScreen({ route, navigation }: any) {
     useEffect(() => {
         const fetchOrgInfo = async () => {
             try {
-                const dbClient = supabaseAdmin || supabase;
+                const dbClient = supabase;
                 const targetOrgId = (news as any)?.organization_id || (news as any)?.org_id;
 
                 if (targetOrgId) {

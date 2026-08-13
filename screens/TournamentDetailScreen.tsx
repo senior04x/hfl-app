@@ -29,6 +29,8 @@ import MatchesListSkeleton from '../components/MatchesListSkeleton';
 import GenericListSkeleton from '../components/GenericListSkeleton';
 import SmartImage from '../components/SmartImage';
 import { getTeamAbbreviation } from '../utils/stringUtils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSocket } from '../context/SocketContext';
 
 export default function TournamentDetailScreen({ route, navigation }: any) {
     const { tournamentId, tournamentName, tournament } = route?.params || {};
@@ -90,170 +92,253 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         setIsStatSelectorOpen(false);
     }, []);
 
-    // 1. Initial Load: Fetch tournament info, standings teams, organizer & matches
-    useEffect(() => {
-        const init = async () => {
-            setIsLoading(true);
-            try {
-                const navTournament = route?.params?.tournament || tournament;
-                const leagueSearchKey = navTournament?.name || currentTournamentId;
+    const { socket, isConnected } = useSocket();
+    const CACHE_KEY = `tournament_detail_v2_${currentTournamentId}`;
 
-                const [t, teamsData] = await Promise.all([
-                    apiService.getTournamentById(leagueSearchKey || currentTournamentId),
-                    apiService.getTeams(1, 100, leagueSearchKey)
-                ]);
-
-                const mergedTournament = { ...navTournament, ...t };
-                if (navTournament?.name) {
-                    mergedTournament.name = navTournament.name;
+    const loadCachedData = async () => {
+        try {
+            const cached = await AsyncStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed.tournamentData) setTournamentData(parsed.tournamentData);
+                if (parsed.standings) {
+                    setStandings(parsed.standings);
+                    setTeams(parsed.standings);
                 }
-
-                let startDateVal = mergedTournament?.start_date || mergedTournament?.startDate || navTournament?.start_date || navTournament?.startDate;
-                let endDateVal = mergedTournament?.end_date || mergedTournament?.endDate || navTournament?.end_date || navTournament?.endDate;
-
-                const tId = mergedTournament?.id || mergedTournament?._id || currentTournamentId;
-                if (tId && (!startDateVal || !endDateVal)) {
-                    try {
-                        const { data: dateSponsors } = await supabase.from('sponsors').select('name, logo_url').in('name', [
-                            `LEAGUE_START_DATE_${tId}`,
-                            `LEAGUE_END_DATE_${tId}`
-                        ]);
-                        if (dateSponsors) {
-                            dateSponsors.forEach((s: any) => {
-                                if (s.name === `LEAGUE_START_DATE_${tId}` && !startDateVal) startDateVal = s.logo_url;
-                                if (s.name === `LEAGUE_END_DATE_${tId}` && !endDateVal) endDateVal = s.logo_url;
-                            });
-                        }
-                    } catch (e) {}
-                }
-
-                if (startDateVal) mergedTournament.startDate = startDateVal;
-                if (endDateVal) mergedTournament.endDate = endDateVal;
-
-                setTournamentData(mergedTournament);
-
-                const resolvedTeams = teamsData && teamsData.length > 0 ? teamsData : (mergedTournament?.teams || []);
-
-                // Populate standings sorted strictly by points -> goal difference -> goals for -> wins
-                const sortedStandings = [...resolvedTeams].sort((a: any, b: any) => {
-                    const ptsA = a.points ?? a.stats?.points ?? a.pts ?? 0;
-                    const ptsB = b.points ?? b.stats?.points ?? b.pts ?? 0;
-                    if (ptsB !== ptsA) return ptsB - ptsA;
-
-                    const gfA = a.goalsFor ?? a.stats?.goalsFor ?? a.gf ?? 0;
-                    const gaA = a.goalsAgainst ?? a.stats?.goalsAgainst ?? a.ga ?? 0;
-                    const gfB = b.goalsFor ?? b.stats?.goalsFor ?? b.gf ?? 0;
-                    const gaB = b.goalsAgainst ?? b.stats?.goalsAgainst ?? b.ga ?? 0;
-                    const gdA = a.goalDifference ?? a.stats?.goalDifference ?? a.gd ?? (gfA - gaA);
-                    const gdB = b.goalDifference ?? b.stats?.goalDifference ?? b.gd ?? (gfB - gaB);
-                    if (gdB !== gdA) return gdB - gdA;
-
-                    if (gfB !== gfA) return gfB - gfA;
-
-                    const winsA = a.won ?? a.wins ?? a.stats?.won ?? a.stats?.wins ?? 0;
-                    const winsB = b.won ?? b.wins ?? b.stats?.won ?? b.stats?.wins ?? 0;
-                    return winsB - winsA;
-                });
-
-                setTeams(sortedStandings);
-                setStandings(sortedStandings);
-
-                // Fetch real organizer details from Supabase 'organizations' table using organization_id
-                let orgName = mergedTournament?.organizations?.name || mergedTournament?.organizer || mergedTournament?.organizationName || '';
-                let orgLogo = mergedTournament?.organizations?.logo_url || mergedTournament?.organizerLogo || mergedTournament?.organizationLogo || '';
-                let orgPhone = mergedTournament?.organizations?.phone || mergedTournament?.organizerPhone || mergedTournament?.phone || '';
-
-                let targetOrgId = mergedTournament?.organization_id || mergedTournament?.organizationId || navTournament?.organization_id || (resolvedTeams.length > 0 ? (resolvedTeams[0].organization_id || resolvedTeams[0].organizationId) : null);
-
-                if (targetOrgId) {
-                    const { data: orgData } = await supabase.from('organizations').select('*').eq('id', targetOrgId).maybeSingle();
-                    if (orgData) {
-                        orgName = orgData.name || orgData.title || orgData.organization_name || orgName;
-                        orgLogo = orgData.logo_url || orgData.logo || orgData.photo_url || orgLogo;
-                        orgPhone = orgData.phone || orgData.contact_phone || orgPhone;
-                    }
-                }
-
-                if (!orgName) {
-                    orgName = 'Havas Futbol Ligasi';
-                }
-                setOrganizerInfo({ name: orgName, logo: orgLogo, phone: orgPhone });
-
-                // Calculate total player count & matches count for this tournament
-                const teamIds = resolvedTeams.map((tm: any) => tm.teamId || tm.id || tm._id).filter(Boolean);
-                if (teamIds.length > 0) {
-                    const [{ count: pCount }, allMatchesData] = await Promise.all([
-                        supabase.from('applications').select('id', { count: 'exact', head: true }).in('team_id', teamIds),
-                        apiService.getMatches({ tournamentId: currentTournamentId })
-                    ]);
-
-                    setTotalPlayersCount(pCount || 0);
-
-                    const teamIdsSet = new Set(teamIds.map(String));
-                    const filteredLeagueMatches = (allMatchesData || []).filter((m: any) => {
-                        if (m.tournament_id && String(m.tournament_id) === String(currentTournamentId)) return true;
-                        if (m.league_id && String(m.league_id) === String(currentTournamentId)) return true;
-                        const homeId = String(m.home_team_id || m.homeTeam?.id || m.homeTeamId);
-                        const awayId = String(m.away_team_id || m.awayTeam?.id || m.awayTeamId);
-                        return teamIdsSet.has(homeId) || teamIdsSet.has(awayId);
-                    });
-
-                    setMatches(filteredLeagueMatches);
-
-                    // Set 2 latest matches specifically belonging to THIS tournament league!
-                    const finishedLeagueMatches = filteredLeagueMatches.filter((m: any) => m.status === 'finished' || m.status === 'completed');
-                    setLatestMatches(finishedLeagueMatches.length > 0 ? finishedLeagueMatches.slice(0, 2) : filteredLeagueMatches.slice(0, 2));
-                } else {
-                    setTotalPlayersCount(0);
-                    setMatches([]);
-                    setLatestMatches([]);
-                }
-
-                // Fetch ONLY the seasons belonging to THIS specific league and organization!
-                const baseLeagueName = (mergedTournament?.name || tournamentName || '')
-                    .replace(/\s*\(\d{4}\/\d{4}\)/g, '')
-                    .replace(/\s*\d{4}\/\d{4}/g, '')
-                    .trim();
-
-                let seasonQuery = supabase
-                    .from('leagues')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                if (targetOrgId) {
-                    seasonQuery = seasonQuery.eq('organization_id', targetOrgId);
-                }
-                if (baseLeagueName) {
-                    const nameKeyword = baseLeagueName.split(' ')[0] || baseLeagueName;
-                    seasonQuery = seasonQuery.ilike('name', `%${nameKeyword}%`);
-                }
-
-                const { data: matchedSeasonsLeagues } = await seasonQuery;
-
-                if (matchedSeasonsLeagues && matchedSeasonsLeagues.length > 0) {
-                    setAvailableTournaments(matchedSeasonsLeagues.map((l: any) => ({
-                        ...l,
-                        _id: l.id,
-                        id: l.id,
-                        season: l.season || '2026/2027',
-                        displayName: `${l.name} (${l.season || '2026/2027'})`
-                    })));
-                } else {
-                    setAvailableTournaments(mergedTournament ? [{
-                        ...mergedTournament,
-                        _id: mergedTournament.id,
-                        season: mergedTournament.season || '2026/2027',
-                        displayName: `${mergedTournament.name || 'Liga'} (${mergedTournament.season || '2026/2027'})`
-                    }] : []);
-                }
-            } catch (error) {
-                console.error('Error fetching tournament details:', error);
-            } finally {
+                if (parsed.organizerInfo) setOrganizerInfo(parsed.organizerInfo);
+                if (parsed.totalPlayersCount !== undefined) setTotalPlayersCount(parsed.totalPlayersCount);
+                if (parsed.matches) setMatches(parsed.matches);
+                if (parsed.latestMatches) setLatestMatches(parsed.latestMatches);
+                if (parsed.availableTournaments) setAvailableTournaments(parsed.availableTournaments);
                 setIsLoading(false);
             }
+        } catch (e) {
+            console.error('Error loading cached tournament details:', e);
+        }
+    };
+
+    const fetchTournamentData = async (isSilent = false) => {
+        if (!isSilent && !tournamentData) setIsLoading(true);
+        try {
+            const navTournament = route?.params?.tournament || tournament;
+            const leagueSearchKey = navTournament?.name || currentTournamentId;
+
+            const [t, teamsData] = await Promise.all([
+                apiService.getTournamentById(leagueSearchKey || currentTournamentId),
+                apiService.getTeams(1, 100, leagueSearchKey)
+            ]);
+
+            const mergedTournament = { ...navTournament, ...t };
+            if (navTournament?.name) {
+                mergedTournament.name = navTournament.name;
+            }
+
+            let startDateVal = mergedTournament?.start_date || mergedTournament?.startDate || navTournament?.start_date || navTournament?.startDate;
+            let endDateVal = mergedTournament?.end_date || mergedTournament?.endDate || navTournament?.end_date || navTournament?.endDate;
+
+            const tId = mergedTournament?.id || mergedTournament?._id || currentTournamentId;
+            if (tId && (!startDateVal || !endDateVal)) {
+                try {
+                    const { data: dateSponsors } = await supabase.from('sponsors').select('name, logo_url').in('name', [
+                        `LEAGUE_START_DATE_${tId}`,
+                        `LEAGUE_END_DATE_${tId}`
+                    ]);
+                    if (dateSponsors) {
+                        dateSponsors.forEach((s: any) => {
+                            if (s.name === `LEAGUE_START_DATE_${tId}` && !startDateVal) startDateVal = s.logo_url;
+                            if (s.name === `LEAGUE_END_DATE_${tId}` && !endDateVal) endDateVal = s.logo_url;
+                        });
+                    }
+                } catch (e) {}
+            }
+
+            if (startDateVal) mergedTournament.startDate = startDateVal;
+            if (endDateVal) mergedTournament.endDate = endDateVal;
+
+            setTournamentData(mergedTournament);
+
+            const resolvedTeams = teamsData && teamsData.length > 0 ? teamsData : (mergedTournament?.teams || []);
+
+            const sortedStandings = [...resolvedTeams].sort((a: any, b: any) => {
+                const ptsA = a.points ?? a.stats?.points ?? a.pts ?? 0;
+                const ptsB = b.points ?? b.stats?.points ?? b.pts ?? 0;
+                if (ptsB !== ptsA) return ptsB - ptsA;
+
+                const gfA = a.goalsFor ?? a.stats?.goalsFor ?? a.gf ?? 0;
+                const gaA = a.goalsAgainst ?? a.stats?.goalsAgainst ?? a.ga ?? 0;
+                const gfB = b.goalsFor ?? b.stats?.goalsFor ?? b.gf ?? 0;
+                const gaB = b.goalsAgainst ?? b.stats?.goalsAgainst ?? b.ga ?? 0;
+                const gdA = a.goalDifference ?? a.stats?.goalDifference ?? a.gd ?? (gfA - gaA);
+                const gdB = b.goalDifference ?? b.stats?.goalDifference ?? b.gd ?? (gfB - gaB);
+                if (gdB !== gdA) return gdB - gdA;
+
+                if (gfB !== gfA) return gfB - gfA;
+
+                const winsA = a.won ?? a.wins ?? a.stats?.won ?? a.stats?.wins ?? 0;
+                const winsB = b.won ?? b.wins ?? b.stats?.won ?? b.stats?.wins ?? 0;
+                return winsB - winsA;
+            });
+
+            setTeams(sortedStandings);
+            setStandings(sortedStandings);
+
+            let orgName = mergedTournament?.organizations?.name || mergedTournament?.organizer || mergedTournament?.organizationName || '';
+            let orgLogo = mergedTournament?.organizations?.logo_url || mergedTournament?.organizerLogo || mergedTournament?.organizationLogo || '';
+            let orgPhone = mergedTournament?.organizations?.phone || mergedTournament?.organizerPhone || mergedTournament?.phone || '';
+
+            let targetOrgId = mergedTournament?.organization_id || mergedTournament?.organizationId || navTournament?.organization_id || (resolvedTeams.length > 0 ? (resolvedTeams[0].organization_id || resolvedTeams[0].organizationId) : null);
+
+            if (targetOrgId) {
+                const { data: orgData } = await supabase.from('organizations').select('*').eq('id', targetOrgId).maybeSingle();
+                if (orgData) {
+                    orgName = orgData.name || orgData.title || orgData.organization_name || orgName;
+                    orgLogo = orgData.logo_url || orgData.logo || orgData.photo_url || orgLogo;
+                    orgPhone = orgData.phone || orgData.contact_phone || orgPhone;
+                }
+            }
+
+            if (!orgName) {
+                orgName = 'Havas Futbol Ligasi';
+            }
+            const computedOrgInfo = { name: orgName, logo: orgLogo, phone: orgPhone };
+            setOrganizerInfo(computedOrgInfo);
+
+            const teamIds = resolvedTeams.map((tm: any) => tm.teamId || tm.id || tm._id).filter(Boolean);
+            let finalCount = 0;
+            let finalMatches: any[] = [];
+            let finalLatestMatches: any[] = [];
+
+            if (teamIds.length > 0) {
+                const [{ count: pCount }, allMatchesData] = await Promise.all([
+                    supabase.from('applications').select('id', { count: 'exact', head: true }).in('team_id', teamIds),
+                    apiService.getMatches({ tournamentId: currentTournamentId })
+                ]);
+
+                finalCount = pCount || 0;
+                setTotalPlayersCount(finalCount);
+
+                const teamIdsSet = new Set(teamIds.map(String));
+                finalMatches = (allMatchesData || []).filter((m: any) => {
+                    if (m.tournament_id && String(m.tournament_id) === String(currentTournamentId)) return true;
+                    if (m.league_id && String(m.league_id) === String(currentTournamentId)) return true;
+                    const homeId = String(m.home_team_id || m.homeTeam?.id || m.homeTeamId);
+                    const awayId = String(m.away_team_id || m.awayTeam?.id || m.awayTeamId);
+                    return teamIdsSet.has(homeId) || teamIdsSet.has(awayId);
+                });
+
+                setMatches(finalMatches);
+
+                const finishedLeagueMatches = finalMatches.filter((m: any) => m.status === 'finished' || m.status === 'completed');
+                finalLatestMatches = finishedLeagueMatches.length > 0 ? finishedLeagueMatches.slice(0, 2) : finalMatches.slice(0, 2);
+                setLatestMatches(finalLatestMatches);
+            } else {
+                setTotalPlayersCount(0);
+                setMatches([]);
+                setLatestMatches([]);
+            }
+
+            const baseLeagueName = (mergedTournament?.name || tournamentName || '')
+                .replace(/\s*\(\d{4}\/\d{4}\)/g, '')
+                .replace(/\s*\d{4}\/\d{4}/g, '')
+                .trim();
+
+            let seasonQuery = supabase
+                .from('leagues')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (targetOrgId) {
+                seasonQuery = seasonQuery.eq('organization_id', targetOrgId);
+            }
+            if (baseLeagueName) {
+                const nameKeyword = baseLeagueName.split(' ')[0] || baseLeagueName;
+                seasonQuery = seasonQuery.ilike('name', `%${nameKeyword}%`);
+            }
+
+            const { data: matchedSeasonsLeagues } = await seasonQuery;
+            let finalTournaments: any[] = [];
+
+            if (matchedSeasonsLeagues && matchedSeasonsLeagues.length > 0) {
+                finalTournaments = matchedSeasonsLeagues.map((l: any) => ({
+                    ...l,
+                    _id: l.id,
+                    id: l.id,
+                    season: l.season || '2026/2027',
+                    displayName: `${l.name} (${l.season || '2026/2027'})`
+                }));
+                setAvailableTournaments(finalTournaments);
+            } else {
+                finalTournaments = mergedTournament ? [{
+                    ...mergedTournament,
+                    _id: mergedTournament.id,
+                    season: mergedTournament.season || '2026/2027',
+                    displayName: `${mergedTournament.name || 'Liga'} (${mergedTournament.season || '2026/2027'})`
+                }] : [];
+                setAvailableTournaments(finalTournaments);
+            }
+
+            // Save to persistent AsyncStorage cache
+            await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+                tournamentData: mergedTournament,
+                standings: sortedStandings,
+                organizerInfo: computedOrgInfo,
+                totalPlayersCount: finalCount,
+                matches: finalMatches,
+                latestMatches: finalLatestMatches,
+                availableTournaments: finalTournaments,
+                timestamp: Date.now()
+            }));
+        } catch (error) {
+            console.error('Error fetching tournament details:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Initial Load + Caching + Supabase Realtime Listener
+    useEffect(() => {
+        if (!currentTournamentId) return;
+
+        loadCachedData();
+        fetchTournamentData(false);
+
+        // Supabase Realtime multi-table subscription for instant score/team updates
+        const realtimeChannel = supabase
+            .channel(`tournament_detail_realtime_${currentTournamentId}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'matches' },
+                () => {
+                    fetchTournamentData(true);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'teams' },
+                () => {
+                    fetchTournamentData(true);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'leagues' },
+                () => {
+                    fetchTournamentData(true);
+                }
+            )
+            .subscribe();
+
+        if (socket && isConnected) {
+            socket.on('match-update', () => {
+                fetchTournamentData(true);
+            });
+        }
+
+        return () => {
+            supabase.removeChannel(realtimeChannel);
+            if (socket) socket.off('match-update');
         };
-        init();
-    }, [currentTournamentId]);
+    }, [currentTournamentId, socket, isConnected]);
 
     // 2. Fetch Players specifically for this tournament's teams
     // 2. Fetch Players specifically for this tournament's teams and calculate exact stats
@@ -551,7 +636,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         activeOpacity={0.8}
                     >
                         <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]} numberOfLines={1}>
-                            {tab === 'overview' ? 'OBZOR' :
+                            {tab === 'overview' ? 'HAQIDA' :
                                 tab === 'standings' ? 'JADVAL' :
                                     tab === 'players' ? 'O\'YINCHILAR' : 'O\'YINLAR'}
                         </Text>
@@ -604,16 +689,16 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 </View>
 
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>O'yinchilar count</Text>
+                    <Text style={styles.infoLabel}>O'yinchilar</Text>
                     <View style={styles.dashedLine} />
                     <Text style={styles.infoValue}>{totalPlayersCount || (topPlayers.length > 0 ? topPlayers.length : 0)} ta</Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>O'yinlar count</Text>
+                    <Text style={styles.infoLabel}>O'yin vaqti</Text>
                     <View style={styles.dashedLine} />
                     <Text style={styles.infoValue}>
-                        {matches.filter(m => m.status === 'finished').length} / {matches.length || 0}
+                        {tournamentData?.match_duration || tournamentData?.duration || "50 daqiqa (25x25)"}
                     </Text>
                 </View>
             </View>
@@ -651,48 +736,79 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             {latestMatches.length > 0 && (
                 <View style={styles.sectionCard}>
                     <View style={{ paddingTop: 12 }}>
-                        {latestMatches.slice(0, 2).map((match) => (
-                            <TouchableOpacity
-                                key={match._id}
-                                style={styles.matchCardFull}
-                                onPress={() => navigation.navigate('MatchDetail', { matchData: match })}
-                            >
-                                <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
-                                <View style={{ padding: 16 }}>
-                                    <View style={styles.matchMetaRowFull}>
-                                        <Text style={styles.matchMetaText}>{(match.tourNumber || 'O\'YIN').toUpperCase()}</Text>
-                                        <Text style={styles.matchMetaText}>{match.date || match.scheduledAt}</Text>
-                                    </View>
+                        {latestMatches.slice(0, 2).map((match) => {
+                            const isLive = match.status === 'live';
+                            const isScheduled = match.status === 'scheduled';
 
-                                    <View style={styles.matchTeamsRowFull}>
-                                        <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.homeTeam?.name || 'HME')}</Text>
-                                        <View style={styles.logoCircleSmall}>
-                                            {match.homeTeam?.logo ? (
-                                                <Image source={{ uri: match.homeTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                                            ) : (
-                                                <Ionicons name="shield" size={24} color={Colors.primary} />
-                                            )}
-                                        </View>
-                                        <Text style={styles.scoreTextFull}>
-                                            {match.status === 'scheduled' ? '- : -' : `${match.score?.home ?? 0} : ${match.score?.away ?? 0}`}
-                                        </Text>
-                                        <View style={styles.logoCircleSmall}>
-                                            {match.awayTeam?.logo ? (
-                                                <Image source={{ uri: match.awayTeam.logo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                                            ) : (
-                                                <Ionicons name="shield" size={24} color={Colors.primary} />
-                                            )}
-                                        </View>
-                                        <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.awayTeam?.name || 'AWY')}</Text>
-                                    </View>
+                            let timeStr = String(match.match_time || match.time || '').trim();
+                            if (timeStr && timeStr.includes(':')) {
+                                const parts = timeStr.split(':');
+                                timeStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+                            }
 
-                                    <View style={styles.stadiumRowFull}>
-                                        <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
-                                        <Text style={styles.stadiumTextFull}>{match.location || 'Amatora Arena'}</Text>
+                            return (
+                                <TouchableOpacity
+                                    key={match._id || match.id}
+                                    style={[styles.matchCardFull, isLive && styles.liveMatchCardFull]}
+                                    onPress={() => setActiveTab('matches')}
+                                    activeOpacity={0.85}
+                                >
+                                    <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+                                    <View style={{ padding: 16 }}>
+                                        <View style={styles.matchMetaRowFull}>
+                                            <Text style={styles.matchMetaText}>{(match.tourNumber || (match.round ? `${match.round}-TUR` : 'O\'YIN')).toUpperCase()}</Text>
+                                            <Text style={styles.matchMetaText}>{match.date || match.scheduledAt || match.date_str}</Text>
+                                        </View>
+
+                                        <View style={styles.matchTeamsRowFull}>
+                                            <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.homeTeam?.name || match.homeTeamName || 'HME')}</Text>
+                                            <View style={styles.logoCircleSmall}>
+                                                {match.homeTeam?.logo || match.homeTeamLogo ? (
+                                                    <Image source={{ uri: match.homeTeam?.logo || match.homeTeamLogo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                                                ) : (
+                                                    <Ionicons name="shield" size={24} color={Colors.primary} />
+                                                )}
+                                            </View>
+
+                                            {isLive ? (
+                                                <View style={{ alignItems: 'center', marginHorizontal: 8 }}>
+                                                    <Text style={[styles.scoreTextFull, { color: '#FF3B30' }]}>
+                                                        {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
+                                                    </Text>
+                                                    <View style={styles.liveTagBadge}>
+                                                        <View style={styles.liveRedDot} />
+                                                        <Text style={styles.liveTagText}>JONLI (LIVE)</Text>
+                                                    </View>
+                                                </View>
+                                            ) : isScheduled ? (
+                                                <View style={{ alignItems: 'center', marginHorizontal: 12 }}>
+                                                    <Text style={styles.scoreTextFullVs}>VS</Text>
+                                                    {timeStr ? <Text style={styles.vsTimeText}>{timeStr}</Text> : null}
+                                                </View>
+                                            ) : (
+                                                <Text style={styles.scoreTextFull}>
+                                                    {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
+                                                </Text>
+                                            )}
+
+                                            <View style={styles.logoCircleSmall}>
+                                                {match.awayTeam?.logo || match.awayTeamLogo ? (
+                                                    <Image source={{ uri: match.awayTeam?.logo || match.awayTeamLogo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                                                ) : (
+                                                    <Ionicons name="shield" size={24} color={Colors.primary} />
+                                                )}
+                                            </View>
+                                            <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.awayTeam?.name || match.awayTeamName || 'AWY')}</Text>
+                                        </View>
+
+                                        <View style={styles.stadiumRowFull}>
+                                            <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
+                                            <Text style={styles.stadiumTextFull}>{match.location || match.venue || 'Amatora Arena'}</Text>
+                                        </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 </View>
             )}
@@ -948,46 +1064,79 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             <Text style={styles.emptyText}>Hozircha o'yinlar belgilanmagan</Text>
                         </View>
                     ) : (
-                        filteredMatches.map((match) => (
-                            <TouchableOpacity
-                                key={match._id || match.id}
-                                style={styles.matchCardFull}
-                                onPress={() => navigation.navigate('MatchDetail', { matchData: match })}
-                            >
-                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                                <View style={{ padding: 16 }}>
-                                    <View style={styles.matchMetaRowFull}>
-                                        <Text style={styles.matchMetaText}>{(match.tourNumber || 'O\'YIN').toUpperCase()}</Text>
-                                        <Text style={styles.matchMetaText}>{match.date || match.scheduledAt}</Text>
-                                    </View>
+                        filteredMatches.map((match) => {
+                            const isLive = match.status === 'live';
+                            const isScheduled = match.status === 'scheduled';
 
-                                    <View style={styles.matchTeamsRowFull}>
-                                        <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.homeTeam?.name || match.homeTeamName || 'HME')}</Text>
-                                        <View style={styles.logoCircleSmall}>
-                                            {match.homeTeam?.logo || match.homeTeamLogo ? (
-                                                <Image source={{ uri: match.homeTeam?.logo || match.homeTeamLogo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                                            ) : (
-                                                <Ionicons name="shield" size={24} color={Colors.primary} />
-                                            )}
-                                        </View>
-                                        <Text style={styles.scoreTextFull}>{match.score?.home ?? 0} : {match.score?.away ?? 0}</Text>
-                                        <View style={styles.logoCircleSmall}>
-                                            {match.awayTeam?.logo || match.awayTeamLogo ? (
-                                                <Image source={{ uri: match.awayTeam?.logo || match.awayTeamLogo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                                            ) : (
-                                                <Ionicons name="shield" size={24} color={Colors.primary} />
-                                            )}
-                                        </View>
-                                        <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.awayTeam?.name || match.awayTeamName || 'AWY')}</Text>
-                                    </View>
+                            let timeStr = String(match.match_time || match.time || '').trim();
+                            if (timeStr && timeStr.includes(':')) {
+                                const parts = timeStr.split(':');
+                                timeStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+                            }
 
-                                    <View style={styles.stadiumRowFull}>
-                                        <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
-                                        <Text style={styles.stadiumTextFull}>{match.location || match.venue || 'Amatora Arena'}</Text>
+                            return (
+                                <TouchableOpacity
+                                    key={match._id || match.id}
+                                    style={[styles.matchCardFull, isLive && styles.liveMatchCardFull]}
+                                    onPress={() => navigation.navigate('MatchDetail', { matchData: match, matchId: match._id || match.id })}
+                                    activeOpacity={0.85}
+                                >
+                                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                                    <View style={{ padding: 16 }}>
+                                        <View style={styles.matchMetaRowFull}>
+                                            <Text style={styles.matchMetaText}>{(match.tourNumber || (match.round ? `${match.round}-TUR` : 'O\'YIN')).toUpperCase()}</Text>
+                                            <Text style={styles.matchMetaText}>{match.date || match.scheduledAt || match.date_str}</Text>
+                                        </View>
+
+                                        <View style={styles.matchTeamsRowFull}>
+                                            <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.homeTeam?.name || match.homeTeamName || 'HME')}</Text>
+                                            <View style={styles.logoCircleSmall}>
+                                                {match.homeTeam?.logo || match.homeTeamLogo ? (
+                                                    <Image source={{ uri: match.homeTeam?.logo || match.homeTeamLogo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                                                ) : (
+                                                    <Ionicons name="shield" size={24} color={Colors.primary} />
+                                                )}
+                                            </View>
+
+                                            {isLive ? (
+                                                <View style={{ alignItems: 'center', marginHorizontal: 8 }}>
+                                                    <Text style={[styles.scoreTextFull, { color: '#FF3B30' }]}>
+                                                        {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
+                                                    </Text>
+                                                    <View style={styles.liveTagBadge}>
+                                                        <View style={styles.liveRedDot} />
+                                                        <Text style={styles.liveTagText}>JONLI (LIVE)</Text>
+                                                    </View>
+                                                </View>
+                                            ) : isScheduled ? (
+                                                <View style={{ alignItems: 'center', marginHorizontal: 12 }}>
+                                                    <Text style={styles.scoreTextFullVs}>VS</Text>
+                                                    {timeStr ? <Text style={styles.vsTimeText}>{timeStr}</Text> : null}
+                                                </View>
+                                            ) : (
+                                                <Text style={styles.scoreTextFull}>
+                                                    {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
+                                                </Text>
+                                            )}
+
+                                            <View style={styles.logoCircleSmall}>
+                                                {match.awayTeam?.logo || match.awayTeamLogo ? (
+                                                    <Image source={{ uri: match.awayTeam?.logo || match.awayTeamLogo }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                                                ) : (
+                                                    <Ionicons name="shield" size={24} color={Colors.primary} />
+                                                )}
+                                            </View>
+                                            <Text style={styles.teamShortFull}>{getTeamAbbreviation(match.awayTeam?.name || match.awayTeamName || 'AWY')}</Text>
+                                        </View>
+
+                                        <View style={styles.stadiumRowFull}>
+                                            <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
+                                            <Text style={styles.stadiumTextFull}>{match.location || match.venue || 'Amatora Arena'}</Text>
+                                        </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))
+                                </TouchableOpacity>
+                            );
+                        })
                     )}
                 </ScrollView>
             )}
@@ -1194,6 +1343,47 @@ const styles = StyleSheet.create({
 
     // Matches List
     matchCardFull: { marginHorizontal: 16, marginBottom: 12, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)' },
+    liveMatchCardFull: {
+        borderColor: '#FF3B30',
+        borderWidth: 1.5,
+        backgroundColor: 'rgba(255, 59, 48, 0.12)',
+    },
+    liveTagBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 59, 48, 0.25)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        marginTop: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 59, 48, 0.5)',
+    },
+    liveRedDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#FF3B30',
+        marginRight: 4,
+    },
+    liveTagText: {
+        color: '#FF3B30',
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    scoreTextFullVs: {
+        color: Colors.primary,
+        fontSize: 20,
+        fontWeight: '900',
+        fontStyle: 'italic',
+    },
+    vsTimeText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 10,
+        fontWeight: '700',
+        marginTop: 2,
+    },
     matchMetaRowFull: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
     matchMetaText: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700' },
     matchTeamsRowFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

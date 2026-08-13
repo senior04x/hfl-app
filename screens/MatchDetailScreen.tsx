@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../constants/Colors';
 import MatchDetailSkeleton from '../components/MatchDetailSkeleton';
 import VideoBackground from '../components/VideoBackground';
@@ -26,6 +27,7 @@ import { apiService, supabase } from '../services/apiService';
 import { useSocket } from '../context/SocketContext';
 import { formatShortTeamName } from '../utils/stringUtils';
 import SmartImage from '../components/SmartImage';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +38,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const [match, setMatch] = useState<any>(matchData);
     const [homePlayers, setHomePlayers] = useState<any[]>([]);
     const [awayPlayers, setAwayPlayers] = useState<any[]>([]);
+    const [homeForm, setHomeForm] = useState<string[]>([]);
+    const [awayForm, setAwayForm] = useState<string[]>([]);
+    const [h2hMatches, setH2hMatches] = useState<any[]>([]);
     const [playersLoading, setPlayersLoading] = useState(false);
     const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -44,32 +49,127 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     // Animation refs
     const slideAnim = useRef(new Animated.Value(0)).current;
 
-    const fetchMatch = async (isRefreshing = false) => {
-        const id = matchId || matchData?._id;
-        if (!id) {
+    const currentId = matchId || matchData?._id || matchData?.id;
+    const CACHE_KEY = `match_detail_cache_${currentId}`;
+
+    useEffect(() => {
+        initMatchDetail();
+    }, [currentId]);
+
+    const initMatchDetail = async () => {
+        if (!currentId) {
+            setLoading(false);
+            return;
+        }
+
+        let initialData = matchData;
+        try {
+            const cachedJson = await AsyncStorage.getItem(CACHE_KEY);
+            if (cachedJson) {
+                const cached = JSON.parse(cachedJson);
+                if (cached) {
+                    if (cached.match) initialData = { ...initialData, ...cached.match };
+                    if (cached.homePlayers) setHomePlayers(cached.homePlayers);
+                    if (cached.awayPlayers) setAwayPlayers(cached.awayPlayers);
+                }
+            }
+        } catch (e) {}
+
+        if (initialData) {
+            setMatch(initialData);
+            const hId = initialData?.homeTeamId || initialData?.home_team_id || initialData?.homeTeam?.id || initialData?.homeTeam?._id;
+            if (hId) setSelectedTeamId(hId);
+            setLoading(false);
+        } else {
+            setLoading(true);
+        }
+
+        await fetchMatch(false);
+    };
+
+    const fetchMatch = async (isSilentOrRefreshing = false) => {
+        if (!currentId) {
             setLoading(false);
             return;
         }
         try {
-            if (isRefreshing) setRefreshing(true);
-            else setLoading(true);
+            if (isSilentOrRefreshing && refreshing) setRefreshing(true);
+            else if (!match && !matchData) setLoading(true);
 
-            const data = await apiService.getMatchById(id);
-            setMatch(data);
-            
-            const hId = data?.homeTeamId || data?.home_team_id;
-            const aId = data?.awayTeamId || data?.away_team_id;
+            const data = await apiService.getMatchById(currentId);
+            if (data) {
+                setMatch((prev: any) => ({ ...prev, ...data }));
+                
+                const hId = data?.homeTeamId || data?.home_team_id || data?.homeTeam?.id || data?.homeTeam?._id;
+                const aId = data?.awayTeamId || data?.away_team_id || data?.awayTeam?.id || data?.awayTeam?._id;
 
-            if (hId) setSelectedTeamId(hId);
+                if (hId && !selectedTeamId) setSelectedTeamId(hId);
 
-            if (hId && aId) {
-                setPlayersLoading(true);
-                const [homeData, awayData] = await Promise.all([
-                    apiService.getPlayers(1, 100, hId),
-                    apiService.getPlayers(1, 100, aId)
-                ]);
-                setHomePlayers(homeData || []);
-                setAwayPlayers(awayData || []);
+                let homeData: any[] = [];
+                let awayData: any[] = [];
+
+                if (hId && aId) {
+                    setPlayersLoading(true);
+                    const [hRes, aRes, hMatchesRes, aMatchesRes, allGoalEventsRes, h2hRes] = await Promise.all([
+                        apiService.getPlayers(1, 100, hId),
+                        apiService.getPlayers(1, 100, aId),
+                        supabase.from('matches').select('*').or(`home_team_id.eq.${hId},away_team_id.eq.${hId}`).eq('status', 'finished').order('created_at', { ascending: false }).limit(5),
+                        supabase.from('matches').select('*').or(`home_team_id.eq.${aId},away_team_id.eq.${aId}`).eq('status', 'finished').order('created_at', { ascending: false }).limit(5),
+                        supabase.from('match_events').select('player_id, event_type').ilike('event_type', '%goal%'),
+                        supabase.from('matches').select('*').or(`and(home_team_id.eq.${hId},away_team_id.eq.${aId}),and(home_team_id.eq.${aId},away_team_id.eq.${hId})`).eq('status', 'finished').neq('id', currentId).order('created_at', { ascending: false }).limit(5)
+                    ]);
+
+                    homeData = hRes || [];
+                    awayData = aRes || [];
+                    setH2hMatches(h2hRes.data || []);
+
+                    // Calculate real W/D/L form guide
+                    const getFormArray = (matches: any[], teamId: string) => {
+                        if (!matches || matches.length === 0) return [];
+                        return matches.map((m: any) => {
+                            const isHome = String(m.home_team_id) === String(teamId);
+                            const myScore = parseInt(isHome ? (m.home_score || 0) : (m.away_score || 0));
+                            const oppScore = parseInt(isHome ? (m.away_score || 0) : (m.home_score || 0));
+                            if (myScore > oppScore) return 'W';
+                            if (myScore === oppScore) return 'D';
+                            return 'L';
+                        });
+                    };
+
+                    const computedHForm = getFormArray(hMatchesRes.data || [], hId);
+                    const computedAForm = getFormArray(aMatchesRes.data || [], aId);
+                    setHomeForm(computedHForm);
+                    setAwayForm(computedAForm);
+
+                    // Count goals per player for Top Goalscorer spotlight
+                    const goalCounts: Record<string, number> = {};
+                    if (allGoalEventsRes.data) {
+                        allGoalEventsRes.data.forEach((e: any) => {
+                            const pId = String(e.player_id);
+                            if (pId) goalCounts[pId] = (goalCounts[pId] || 0) + 1;
+                        });
+                    }
+
+                    const enrichedHome = homeData.map((p: any) => {
+                        const pId = String(p.id || p._id);
+                        return { ...p, goalCount: goalCounts[pId] || p.goals || p.stats?.goals || 0 };
+                    }).sort((a, b) => b.goalCount - a.goalCount);
+
+                    const enrichedAway = awayData.map((p: any) => {
+                        const pId = String(p.id || p._id);
+                        return { ...p, goalCount: goalCounts[pId] || p.goals || p.stats?.goals || 0 };
+                    }).sort((a, b) => b.goalCount - a.goalCount);
+
+                    setHomePlayers(enrichedHome);
+                    setAwayPlayers(enrichedAway);
+                }
+
+                await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+                    match: data,
+                    homePlayers: homeData,
+                    awayPlayers: awayData,
+                    timestamp: Date.now()
+                }));
             }
         } catch (error) {
             console.error('Error fetching match detail:', error);
@@ -81,40 +181,54 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     useEffect(() => {
-        fetchMatch();
-    }, [matchId, matchData?._id]);
-
-    useEffect(() => {
-        const currentId = matchId || matchData?._id;
         if (!currentId) return;
 
-        const eventsChannel = supabase
-            .channel(`realtime_events_${currentId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `match_id=eq.${currentId}` }, () => {
-                fetchMatch(true);
-            })
+        // Supabase Realtime listener on matches AND match_events for instant live sync
+        const realtimeChannel = supabase
+            .channel(`realtime_match_detail_${currentId}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'matches', filter: `id=eq.${currentId}` },
+                (payload: any) => {
+                    if (payload.new) {
+                        setMatch((prev: any) => ({ ...prev, ...payload.new }));
+                    }
+                    fetchMatch(true);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'match_events', filter: `match_id=eq.${currentId}` },
+                () => {
+                    fetchMatch(true);
+                }
+            )
             .subscribe();
 
         if (socket && isConnected) {
             socket.on('match-update', (data: any) => {
-                if (data.matchId === currentId) {
-                    setMatch(data.match);
+                if (data.matchId === currentId || data.id === currentId || data.match?.id === currentId) {
+                    if (data.match) setMatch((prev: any) => ({ ...prev, ...data.match }));
                     fetchMatch(true);
                 }
             });
         }
 
         return () => {
-            supabase.removeChannel(eventsChannel);
+            supabase.removeChannel(realtimeChannel);
             if (socket) socket.off('match-update');
         };
-    }, [socket, isConnected, matchId, matchData?._id]);
+    }, [socket, isConnected, currentId]);
 
     const onRefresh = () => {
         fetchMatch(true);
     };
 
-    const switchTeam = () => {
+    const switchTeam = async () => {
+        try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+
         const isHome = selectedTeamId === match?.homeTeamId;
         const nextId = isHome ? match?.awayTeamId : match?.homeTeamId;
         const slideOutValue = -50;
@@ -255,12 +369,17 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     <TouchableOpacity
                         key={tab}
                         style={[styles.tab, activeTab === tab && styles.activeTab]}
-                        onPress={() => setActiveTab(tab)}
+                        onPress={async () => {
+                            try {
+                                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            } catch (e) {}
+                            setActiveTab(tab);
+                        }}
                     >
                         <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
                             {tab === 'lineups' ? "TARKIB" :
-                                tab === 'overview' ? 'OBZOR' :
-                                    tab === 'preview' ? 'PREVYU' :
+                                tab === 'overview' ? 'HAQIDA' :
+                                    tab === 'preview' ? "O'YIN OLDI" :
                                         tab === 'media' ? 'MEDIA' : 'XODIMLAR'}
                         </Text>
                     </TouchableOpacity>
@@ -363,8 +482,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const leagueName = match?.tournamentName || match?.league || "HFL Liga";
         const venueName = match?.venue || match?.location || 'Amatora Arena';
 
-        const homeForm = match?.homeForm || ['W', 'W', 'D', 'L', 'W'];
-        const awayForm = match?.awayForm || ['W', 'D', 'W', 'W', 'L'];
+        const displayHomeForm = homeForm.length > 0 ? homeForm : (match?.homeForm || ['W', 'W', 'D', 'L', 'W']);
+        const displayAwayForm = awayForm.length > 0 ? awayForm : (match?.awayForm || ['W', 'D', 'W', 'W', 'L']);
 
         const homeKeyPlayer = homePlayers[0];
         const awayKeyPlayer = awayPlayers[0];
@@ -425,7 +544,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                 <Text style={styles.teamFormTitle} numberOfLines={1}>{homeName.toUpperCase()}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', gap: 6 }}>
-                                {homeForm.map((res: string, idx: number) => (
+                                {displayHomeForm.map((res: string, idx: number) => (
                                     <View 
                                         key={idx} 
                                         style={[
@@ -448,7 +567,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                 <Text style={styles.teamFormTitle} numberOfLines={1}>{awayName.toUpperCase()}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', gap: 6 }}>
-                                {awayForm.map((res: string, idx: number) => (
+                                {displayAwayForm.map((res: string, idx: number) => (
                                     <View 
                                         key={idx} 
                                         style={[
@@ -466,14 +585,99 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     </View>
                 </View>
 
-                {/* 3. Key Players Spotlight */}
+                {/* 2.5 Head to Head (H2H) History Cards */}
+                <View style={styles.previewSectionCard}>
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                            <Ionicons name="time-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
+                            <Text style={styles.previewSectionTitle}>O'ZARO O'YINLAR TARIXI (H2H)</Text>
+                        </View>
+
+                        {h2hMatches.length > 0 ? (
+                            h2hMatches.map((m: any, idx: number) => {
+                                const hId = match?.homeTeamId || match?.home_team_id || match?.homeTeam?.id || match?.homeTeam?._id;
+                                const isHomeHId = String(m.home_team_id) === String(hId);
+                                const hName = isHomeHId ? homeName : awayName;
+                                const aName = isHomeHId ? awayName : homeName;
+                                const hLogo = isHomeHId ? homeLogo : awayLogo;
+                                const aLogo = isHomeHId ? awayLogo : homeLogo;
+                                
+                                const rawDate = m.date || m.match_date || m.created_at;
+                                const mDate = new Date(rawDate);
+                                const isValidDate = !isNaN(mDate.getTime());
+                                const months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+                                const dateStr = isValidDate ? `${mDate.getDate()}-${months[mDate.getMonth()]}, ${mDate.getFullYear()}` : "O'tgan o'yin";
+                                const tourText = m.round ? `${m.round}-TUR` : (m.tour ? `${m.tour}-TUR` : 'Guruh Bosqichi');
+                                const venueStr = m.venue || m.location || 'Amatora Arena';
+
+                                // Season Calculation
+                                let seasonStr = m.season || m.season_name || m.tournament_season;
+                                if (!seasonStr && isValidDate) {
+                                    const matchYear = mDate.getFullYear();
+                                    const currentYear = new Date().getFullYear();
+                                    if (matchYear < currentYear) {
+                                        seasonStr = `O'tgan mavsum (${matchYear})`;
+                                    } else {
+                                        seasonStr = `${matchYear}-Mavsum`;
+                                    }
+                                }
+                                if (!seasonStr) seasonStr = "O'tgan mavsum";
+
+                                return (
+                                    <TouchableOpacity
+                                        key={m.id || idx}
+                                        style={styles.h2hMatchCard}
+                                        onPress={() => navigation.navigate('MatchDetail', { matchId: m.id })}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={styles.h2hHeaderRow}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <View style={styles.h2hRoundBadge}>
+                                                    <Text style={styles.h2hRoundText}>{tourText}</Text>
+                                                </View>
+                                                <View style={styles.h2hSeasonBadge}>
+                                                    <Text style={styles.h2hSeasonText}>{seasonStr}</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={styles.h2hDateText}>{dateStr} • {venueStr}</Text>
+                                        </View>
+
+                                        <View style={styles.h2hScoreRow}>
+                                            <View style={styles.h2hTeamCol}>
+                                                <SmartImage uri={hLogo} style={styles.h2hTeamLogo} contentFit="contain" fallbackIcon="shield-outline" />
+                                                <Text style={styles.h2hTeamName} numberOfLines={1}>{hName}</Text>
+                                            </View>
+
+                                            <View style={styles.h2hScoreBox}>
+                                                <Text style={styles.h2hScoreText}>{m.home_score ?? 0} : {m.away_score ?? 0}</Text>
+                                            </View>
+
+                                            <View style={styles.h2hTeamCol}>
+                                                <SmartImage uri={aLogo} style={styles.h2hTeamLogo} contentFit="contain" fallbackIcon="shield-outline" />
+                                                <Text style={styles.h2hTeamName} numberOfLines={1}>{aName}</Text>
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        ) : (
+                            <View style={styles.h2hEmptyBox}>
+                                <Ionicons name="information-circle-outline" size={24} color="rgba(255,255,255,0.4)" />
+                                <Text style={styles.h2hEmptyText}>Ushbu 2 jamoa o'rtasida hozircha o'zaro rasmiy o'yinlar mavjud emas</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                {/* 3. Key Players / Top Goalscorers Spotlight */}
                 {(homeKeyPlayer || awayKeyPlayer) && (
                     <View style={styles.previewSectionCard}>
                         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={{ padding: 16 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                                <Ionicons name="star-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-                                <Text style={styles.previewSectionTitle}>ETAKCHI O'YINCHILAR</Text>
+                                <Ionicons name="trophy-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
+                                <Text style={styles.previewSectionTitle}>YETAKCHI O'YINCHILAR (TO'P URARLAR)</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
@@ -488,6 +692,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                         />
                                         <Text style={styles.keyPlayerName} numberOfLines={1}>{`${homeKeyPlayer.firstName || homeKeyPlayer.first_name || ''} ${homeKeyPlayer.lastName || homeKeyPlayer.last_name || ''}`.trim()}</Text>
                                         <Text style={styles.keyPlayerRole}>{homeName}</Text>
+                                        <View style={{ marginTop: 6, backgroundColor: 'rgba(0, 255, 135, 0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(0, 255, 135, 0.3)' }}>
+                                            <Text style={{ color: '#00FF87', fontSize: 10, fontWeight: '900' }}>⚽ {homeKeyPlayer.goalCount || 0} ta gol</Text>
+                                        </View>
                                     </TouchableOpacity>
                                 )}
 
@@ -502,6 +709,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                         />
                                         <Text style={styles.keyPlayerName} numberOfLines={1}>{`${awayKeyPlayer.firstName || awayKeyPlayer.first_name || ''} ${awayKeyPlayer.lastName || awayKeyPlayer.last_name || ''}`.trim()}</Text>
                                         <Text style={styles.keyPlayerRole}>{awayName}</Text>
+                                        <View style={{ marginTop: 6, backgroundColor: 'rgba(0, 255, 135, 0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(0, 255, 135, 0.3)' }}>
+                                            <Text style={{ color: '#00FF87', fontSize: 10, fontWeight: '900' }}>⚽ {awayKeyPlayer.goalCount || 0} ta gol</Text>
+                                        </View>
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -1152,6 +1362,99 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '700',
         marginTop: 2,
+    },
+
+    // H2H Styles
+    h2hMatchCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    h2hHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    h2hRoundBadge: {
+        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 135, 0.25)',
+    },
+    h2hRoundText: {
+        color: '#00FF87',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    h2hSeasonBadge: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    h2hSeasonText: {
+        color: 'rgba(255, 255, 255, 0.85)',
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    h2hDateText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    h2hScoreRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    h2hTeamCol: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 8,
+    },
+    h2hTeamLogo: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+    },
+    h2hTeamName: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '800',
+        flex: 1,
+    },
+    h2hScoreBox: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginHorizontal: 8,
+    },
+    h2hScoreText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    h2hEmptyBox: {
+        alignItems: 'center',
+        paddingVertical: 16,
+        gap: 6,
+    },
+    h2hEmptyText: {
+        color: 'rgba(255, 255, 255, 0.45)',
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
     },
 
     // Staff Styles

@@ -11,7 +11,8 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from './store/useAuthStore';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -50,6 +51,7 @@ SplashScreenExpo.preventAutoHideAsync().catch(() => {
 import NotificationsScreen from './screens/NotificationsScreen';
 
 const Stack = createStackNavigator();
+export const navigationRef = createNavigationContainerRef();
 
 function App() {
     const { isAuthenticated, isGuest, user } = useAuthStore();
@@ -68,6 +70,61 @@ function App() {
             }
         };
         setupNotifications();
+
+        // 📱 Handle tapping on Push Notifications (Deep Linking)
+        const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+            try {
+                const data = response?.notification?.request?.content?.data;
+                console.log('📱 Notification Tapped with data:', data);
+                if (!data) return;
+
+                if (data.type === 'news' || data.newsId) {
+                    if (navigationRef.isReady()) {
+                        (navigationRef as any).navigate('NewsDetail', { newsId: data.newsId });
+                    }
+                } else if (data.type === 'match_scheduled' || data.matchId) {
+                    if (navigationRef.isReady()) {
+                        (navigationRef as any).navigate('MatchDetail', { matchId: data.matchId });
+                    }
+                } else if (data.type === 'profile_update_status' || data.type === 'application') {
+                    if (navigationRef.isReady()) {
+                        (navigationRef as any).navigate('Applications');
+                    }
+                } else if (data.type === 'transfer_status' || data.type === 'transfer') {
+                    if (navigationRef.isReady()) {
+                        (navigationRef as any).navigate('TransferRequest');
+                    }
+                }
+            } catch (err) {
+                console.warn('Push notification navigation error:', err);
+            }
+        });
+
+        // Cold-start notification check (when app was closed and opened via notification)
+        Notifications.getLastNotificationResponseAsync().then((response) => {
+            if (response) {
+                const data = response?.notification?.request?.content?.data;
+                if (!data) return;
+
+                setTimeout(() => {
+                    if (navigationRef.isReady()) {
+                        if (data.type === 'news' || data.newsId) {
+                            (navigationRef as any).navigate('NewsDetail', { newsId: data.newsId });
+                        } else if (data.type === 'match_scheduled' || data.matchId) {
+                            (navigationRef as any).navigate('MatchDetail', { matchId: data.matchId });
+                        } else if (data.type === 'profile_update_status') {
+                            (navigationRef as any).navigate('Applications');
+                        } else if (data.type === 'transfer_status') {
+                            (navigationRef as any).navigate('TransferRequest');
+                        }
+                    }
+                }, 1200);
+            }
+        });
+
+        return () => {
+            responseListener.remove();
+        };
     }, [isAuthenticated, user]);
 
     if (isSplashVisible) {
@@ -90,6 +147,7 @@ function App() {
                         style={StyleSheet.absoluteFill}
                     >
                         <NavigationContainer 
+                            ref={navigationRef}
                             key={isAuthenticated ? `auth_user_${(user as any)?._id || (user as any)?.id}` : (isGuest ? 'guest' : 'unauth')}
                             theme={{
                             ...DarkTheme,

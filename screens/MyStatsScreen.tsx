@@ -549,30 +549,10 @@ const MyStatsScreen = ({ navigation }: any) => {
                 // 1. Immediately set localUri preview so user sees chosen photo right away!
                 setUpdateForm(prev => ({ ...prev, photoUrl: localUri }));
 
-                const fileExt = localUri.split('.').pop()?.toLowerCase() || 'jpg';
-                const fileName = `update_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-
                 try {
-                    const response = await fetch(localUri);
-                    const blob = await response.blob();
-
-                    const { error: uploadError } = await supabase.storage
-                        .from('player-photos')
-                        .upload(fileName, blob, {
-                            contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-                            upsert: true
-                        });
-
-                    if (!uploadError) {
-                        const { data } = supabase.storage
-                            .from('player-photos')
-                            .getPublicUrl(fileName);
-
-                        if (data?.publicUrl) {
-                            setUpdateForm(prev => ({ ...prev, photoUrl: data.publicUrl }));
-                        }
-                    } else {
-                        console.warn('Supabase storage upload warning:', uploadError);
+                    const uploadRes = await apiService.uploadPhoto(localUri);
+                    if (uploadRes && uploadRes.url && uploadRes.url.startsWith('http')) {
+                        setUpdateForm(prev => ({ ...prev, photoUrl: uploadRes.url }));
                     }
                 } catch (upErr) {
                     console.warn('Photo upload failed, keeping local uri preview:', upErr);
@@ -599,10 +579,14 @@ const MyStatsScreen = ({ navigation }: any) => {
 
             // Ensure photo is uploaded to Supabase Storage if it is a local file URI
             let finalPhotoUrl = updateForm.photoUrl || player?.photo || player?.avatar || null;
-            if (finalPhotoUrl && (finalPhotoUrl.startsWith('file:') || finalPhotoUrl.startsWith('content:') || finalPhotoUrl.startsWith('ph:'))) {
+            if (finalPhotoUrl && (finalPhotoUrl.startsWith('file:') || finalPhotoUrl.startsWith('content:') || finalPhotoUrl.startsWith('ph:') || finalPhotoUrl.startsWith('blob:'))) {
                 const uRes: any = await apiService.uploadPhoto(finalPhotoUrl);
-                if (uRes && uRes.url) {
+                if (uRes && uRes.url && uRes.url.startsWith('http')) {
                     finalPhotoUrl = uRes.url;
+                } else {
+                    // Fallback to existing valid HTTP photo if upload failed
+                    const existingPhoto = player?.photo || player?.avatar || '';
+                    finalPhotoUrl = existingPhoto.startsWith('http') ? existingPhoto : null;
                 }
             }
 
@@ -1560,7 +1544,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                             onPress={() => setShowSuccessModal(false)}
                             style={[styles.modalBtn, { backgroundColor: Colors.primary, width: '100%' }]}
                         >
-                            <Text style={{ color: '#000', fontWeight: '900' }}>TUSHUNDIM</Text>
+                            <Text style={{ color: '#000', fontWeight: '900' }}>RAHMAT</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

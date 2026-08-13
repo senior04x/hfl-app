@@ -16,12 +16,10 @@ import backgroundImage from '../assets/images/backroud-image.png';
 import { formatShortTeamName } from '../utils/stringUtils';
 import { LinearGradient } from 'expo-linear-gradient';
 
-
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.88;
 const CARD_SPACING = 12;
 const SIDE_PADDING = (width - CARD_WIDTH) / 2;
-
 
 export default function HomeScreen({ navigation }: any) {
     const [matches, setMatches] = useState<any[]>([]);
@@ -127,7 +125,6 @@ export default function HomeScreen({ navigation }: any) {
         })
         .slice(0, 5);
 
-    // Strictly display ONLY markaziy or ortacha matches on Home Screen. Oddiy matches show in Calendar only.
     const displayUpcomingMatches = upcomingMatches;
 
     const finishedMatches = matches
@@ -205,7 +202,12 @@ export default function HomeScreen({ navigation }: any) {
                         <View style={styles.hTeamColumn}>
                             <View style={styles.hLogoCircle}>
                                 {match.homeTeamLogo || match.homeTeam?.logo ? (
-                                    <Image source={{ uri: match.homeTeamLogo || match.homeTeam?.logo }} style={styles.hTeamLogo} />
+                                    <SmartImage
+                                        uri={match.homeTeamLogo || match.homeTeam?.logo}
+                                        style={styles.hTeamLogo}
+                                        contentFit="contain"
+                                        fallbackIcon="shield-outline"
+                                    />
                                 ) : (
                                     <Text style={styles.hLogoText}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
                                 )}
@@ -227,7 +229,12 @@ export default function HomeScreen({ navigation }: any) {
                         <View style={styles.hTeamColumn}>
                             <View style={styles.hLogoCircle}>
                                 {match.awayTeamLogo || match.awayTeam?.logo ? (
-                                    <Image source={{ uri: match.awayTeamLogo || match.awayTeam?.logo }} style={styles.hTeamLogo} />
+                                    <SmartImage
+                                        uri={match.awayTeamLogo || match.awayTeam?.logo}
+                                        style={styles.hTeamLogo}
+                                        contentFit="contain"
+                                        fallbackIcon="shield-outline"
+                                    />
                                 ) : (
                                     <Text style={styles.hLogoText}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
                                 )}
@@ -270,7 +277,6 @@ export default function HomeScreen({ navigation }: any) {
 
                                 return (
                                     <View style={styles.header}>
-                                        {/* Left Side: Avatar + Greeting & Name */}
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                             <TouchableOpacity 
                                                 style={styles.profileButton}
@@ -295,7 +301,6 @@ export default function HomeScreen({ navigation }: any) {
                                             </View>
                                         </View>
 
-                                        {/* Right Side: Notification Bell button */}
                                         <TouchableOpacity 
                                             style={styles.profileButton}
                                             onPress={() => navigation.navigate('Notifications')}
@@ -415,7 +420,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         <View style={styles.finishedTeamCol}>
                                                             <View style={styles.finishedLogoCircle}>
                                                                 {homeLogo ? (
-                                                                    <Image source={{ uri: homeLogo }} style={styles.finishedTeamLogo} resizeMode="contain" />
+                                                                    <SmartImage uri={homeLogo} style={styles.finishedTeamLogo} contentFit="contain" fallbackIcon="shield-outline" />
                                                                 ) : (
                                                                     <Text style={styles.finishedLogoFallback}>{homeName.charAt(0)}</Text>
                                                                 )}
@@ -435,7 +440,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         <View style={styles.finishedTeamCol}>
                                                             <View style={styles.finishedLogoCircle}>
                                                                 {awayLogo ? (
-                                                                    <Image source={{ uri: awayLogo }} style={styles.finishedTeamLogo} resizeMode="contain" />
+                                                                    <SmartImage uri={awayLogo} style={styles.finishedTeamLogo} contentFit="contain" fallbackIcon="shield-outline" />
                                                                 ) : (
                                                                     <Text style={styles.finishedLogoFallback}>{awayName.charAt(0)}</Text>
                                                                 )}
@@ -583,16 +588,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     hLogoCircle: {
-        width: 60,
-        height: 60,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
+        borderWidth: 0,
+        overflow: 'hidden',
     },
     hTeamLogo: {
-        width: 54,
-        height: 54,
-        resizeMode: 'contain',
+        width: 52,
+        height: 52,
+        borderRadius: 26,
     },
     hLogoText: {
         color: '#FFF',
@@ -760,8 +769,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
 
-
-
     // Recent Matches Row (List Style)
     recentMatchItem: {
         marginHorizontal: 20,
@@ -881,19 +888,20 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     finishedLogoCircle: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 4,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 0,
+        overflow: 'hidden',
     },
     finishedTeamLogo: {
-        width: 32,
-        height: 32,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
     },
     finishedLogoFallback: {
         color: '#FFFFFF',

@@ -86,6 +86,23 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
         }
     }, [state.index]);
 
+    const deduplicateAccountsList = (list: any[]) => {
+        if (!list || !Array.isArray(list)) return [];
+        const map = new Map<string, any>();
+        list.forEach(acc => {
+            if (acc.comment && typeof acc.comment === 'string' && acc.comment.includes('[PROFILE_UPDATE]')) {
+                return;
+            }
+            const key = acc.role === 'manager'
+                ? `manager_${acc.teamId || acc.id || acc._id}`
+                : `player_${acc.id || acc._id}`;
+            if (!map.has(key)) {
+                map.set(key, acc);
+            }
+        });
+        return Array.from(map.values());
+    };
+
     const handleProfilLongPress = async () => {
         try {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -99,10 +116,11 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
         modalY.setValue(0);
         const userPhone = user?.phone || user?.phoneNumber || user?.phone_number || user?.tel;
         const cachedAccounts = useAuthStore.getState().userAccounts;
+        const cleanCached = deduplicateAccountsList(cachedAccounts || []);
 
         // 1. Instant 0-second display from persistent local cache
-        if (cachedAccounts && cachedAccounts.length > 0) {
-            setAccountOptions(cachedAccounts);
+        if (cleanCached && cleanCached.length > 0) {
+            setAccountOptions(cleanCached);
             setLoadingAccounts(false);
             setShowSwitcherModal(true);
         } else {
@@ -117,8 +135,9 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                 const fullPhone = `+998${userPhone.replace(/\D/g, '').slice(-9)}`;
                 const res = await apiService.findAccountsByPhone(fullPhone);
                 if (res.success && res.accounts && res.accounts.length > 0) {
-                    setAccountOptions(res.accounts);
-                    useAuthStore.getState().setUserAccounts(res.accounts);
+                    const cleanRes = deduplicateAccountsList(res.accounts);
+                    setAccountOptions(cleanRes);
+                    useAuthStore.getState().setUserAccounts(cleanRes);
                 }
             } catch (e) {
                 console.warn('Background account refresh error:', e);
