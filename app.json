@@ -60,8 +60,19 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "notification": {
+      "icon": "./assets/images/app-icon.png",
+      "color": "#00DF82"
+    },
     "plugins": [
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/app-icon.png",
+          "color": "#00DF82",
+          "sounds": ["./assets/sounds/notification.wav"]
+        }
+      ],
       [
         "expo-splash-screen",
         {
