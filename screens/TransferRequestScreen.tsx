@@ -282,29 +282,38 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                         <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
                     </TouchableOpacity>
 
-                    {/* Step 2: Select Team */}
-                    <Text style={styles.label}>2. YANGI JAMOANI TANLANG</Text>
-                    <TouchableOpacity
-                        style={[styles.selectButton, (!selectedLeague || !isTransferWindowOpen) && styles.disabledButton]}
-                        onPress={() => {
-                            if (!isTransferWindowOpen) {
-                                Alert.alert('Yopilgan', 'Tashkilotingizda transfer oynasi hozirda yopilgan');
-                                return;
-                            }
-                            if (!selectedLeague) {
-                                Alert.alert('Eslatma', 'Iltimos, avval ligani tanlang');
-                                return;
-                            }
-                            setSearchQuery('');
-                            setModalVisible(true);
-                        }}
-                        disabled={!selectedLeague || !isTransferWindowOpen}
-                    >
-                        <Text style={[styles.selectButtonText, !selectedTeam && styles.placeholderText]}>
-                            {loadingTeams ? "Jamoalar yuklanmoqda..." : (!selectedLeague ? "Avval ligani tanlang..." : (selectedTeamObj?.name || 'Jamoani tanlang...'))}
-                        </Text>
-                        <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
-                    </TouchableOpacity>
+                    {/* Step 2: Select Team (Hidden until league is selected and teams are loaded) */}
+                    {selectedLeague ? (
+                        loadingTeams ? (
+                            <View style={styles.loadingTeamsContainer}>
+                                <ActivityIndicator size="small" color="#00FF66" />
+                                <Text style={styles.loadingTeamsText}>
+                                    "{selectedLeague}" jamoalari yuklanmoqda...
+                                </Text>
+                            </View>
+                        ) : (
+                            <>
+                                <Text style={styles.label}>2. YANGI JAMOANI TANLANG</Text>
+                                <TouchableOpacity
+                                    style={[styles.selectButton, !isTransferWindowOpen && styles.disabledButton]}
+                                    onPress={() => {
+                                        if (!isTransferWindowOpen) {
+                                            Alert.alert('Yopilgan', 'Tashkilotingizda transfer oynasi hozirda yopilgan');
+                                            return;
+                                        }
+                                        setSearchQuery('');
+                                        setModalVisible(true);
+                                    }}
+                                    disabled={!isTransferWindowOpen}
+                                >
+                                    <Text style={[styles.selectButtonText, !selectedTeam && styles.placeholderText]}>
+                                        {selectedTeamObj?.name || 'Jamoani tanlang...'}
+                                    </Text>
+                                    <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
+                                </TouchableOpacity>
+                            </>
+                        )
+                    ) : null}
 
                     {/* Step 3: Reason */}
                     <Text style={styles.label}>3. O'TISH SABABI (IXTIYORIY)</Text>
@@ -855,6 +864,24 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '900',
         letterSpacing: 0.5,
+    },
+    loadingTeamsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        backgroundColor: 'rgba(0, 255, 102, 0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.25)',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        marginBottom: 16,
+    },
+    loadingTeamsText: {
+        color: '#00FF66',
+        fontSize: 13.5,
+        fontWeight: '700',
     },
 });
 
