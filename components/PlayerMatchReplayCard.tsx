@@ -78,14 +78,6 @@ function SingleReplayPlayer({ replay }: { replay: ReplayEvent }) {
           <Ionicons name="play" size={30} color="#FFFFFF" style={{ marginLeft: 4 }} />
         </TouchableOpacity>
       )}
-
-      {/* Goal minute badge on the bottom corner of the video */}
-      <View style={styles.videoMinuteBadge}>
-        <Ionicons name="football" size={13} color="#00FF66" />
-        <Text style={styles.videoMinuteText}>
-          {replay.minute ? `${replay.minute}'-daqiqa` : 'Gol'}
-        </Text>
-      </View>
     </View>
   );
 }
@@ -95,7 +87,14 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
 
   if (!replays || replays.length === 0) return null;
 
-  const currentReplay = replays[selectedIdx] || replays[0];
+  // Sort replays strictly in chronological order by minute (1-gol: 2', 2-gol: 3', etc.)
+  const sortedReplays = [...replays].sort((a, b) => {
+    const minA = parseInt(String(a.minute || '0'), 10) || 0;
+    const minB = parseInt(String(b.minute || '0'), 10) || 0;
+    return minA - minB;
+  });
+
+  const currentReplay = sortedReplays[selectedIdx] || sortedReplays[0];
 
   const homeTeam = match?.home_team || {};
   const awayTeam = match?.away_team || {};
@@ -144,17 +143,24 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
           </Text>
         </View>
 
-        {replays.length > 1 && (
+        {sortedReplays.length > 1 ? (
           <View style={styles.multiGoalPill}>
-            <Text style={styles.multiGoalPillText}>{replays.length} TA GOL</Text>
+            <Text style={styles.multiGoalPillText}>{sortedReplays.length} TA GOL</Text>
+          </View>
+        ) : (
+          <View style={styles.singleGoalPill}>
+            <Ionicons name="football" size={11} color="#00FF66" />
+            <Text style={styles.singleGoalPillText}>
+              {currentReplay.minute ? `${currentReplay.minute}'-daqiqa` : 'Gol'}
+            </Text>
           </View>
         )}
       </View>
 
-      {/* Multi-goal Tab Switcher (if player scored >1 goals in this match) */}
-      {replays.length > 1 && (
+      {/* Multi-goal Tab Switcher (sorted by minute chronologically) */}
+      {sortedReplays.length > 1 && (
         <View style={styles.tabsRow}>
-          {replays.map((r, i) => {
+          {sortedReplays.map((r, i) => {
             const isSelected = selectedIdx === i;
             return (
               <TouchableOpacity
@@ -285,6 +291,23 @@ const styles = StyleSheet.create({
   multiGoalPillText: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  singleGoalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 255, 102, 0.12)',
+    borderColor: 'rgba(0, 255, 102, 0.3)',
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 7,
+    gap: 5,
+  },
+  singleGoalPillText: {
+    color: '#00FF66',
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
