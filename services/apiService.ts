@@ -720,8 +720,8 @@ export const apiService = {
                         playerName: playerName || 'O\'yinchi',
                         oldTeamName: oldTeamName || '',
                         newTeamName: newTeamName || '',
-                        playerId: playerId,
-                        organizationId: (transferPayload as any).organization_id || 1,
+                        playerId: data.playerId,
+                        organizationId: organizationId || 1,
                     }),
                 }).catch(() => {});
             } catch (notifErr) {}
