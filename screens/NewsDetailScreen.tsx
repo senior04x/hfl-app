@@ -173,18 +173,18 @@ export default function NewsDetailScreen({ route, navigation }: any) {
 
                         <View style={styles.metaRow}>
                             <View style={styles.authorBox}>
-                                <View style={styles.authorAvatar}>
-                                    {orgInfo?.logo_url ? (
-                                        <Image
-                                            source={{ uri: orgInfo.logo_url }}
-                                            style={{ width: 28, height: 28, borderRadius: 14 }}
-                                            resizeMode="cover"
-                                        />
-                                    ) : (
-                                        <Ionicons name="shield-checkmark" size={14} color="#000" />
-                                    )}
-                                </View>
-                                <Text style={styles.authorName}>{(orgInfo?.name || news.author || 'AMATORA ADMIN').toUpperCase()}</Text>
+                                {orgInfo?.logo_url ? (
+                                    <Image
+                                        source={{ uri: orgInfo.logo_url }}
+                                        style={styles.authorLogoFree}
+                                        resizeMode="contain"
+                                    />
+                                ) : (
+                                    <View style={styles.authorFallbackIcon}>
+                                        <Ionicons name="shield-checkmark" size={18} color={Colors.primary} />
+                                    </View>
+                                )}
+                                <Text style={styles.authorName}>{(orgInfo?.name || news.author || 'AMATORA').toUpperCase()}</Text>
                             </View>
                             <View style={styles.viewsBox}>
                                 <Ionicons name="eye-outline" size={16} color="rgba(255,255,255,0.5)" />
@@ -219,9 +219,10 @@ const styles = StyleSheet.create({
     dateText: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '900' },
     title: { color: '#FFF', fontSize: 26, fontWeight: '900', lineHeight: 34, marginBottom: 25, letterSpacing: 0.5 },
     metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-    authorBox: { flexDirection: 'row', alignItems: 'center' },
-    authorAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-    authorName: { color: '#FFF', fontSize: 13, fontWeight: '800' },
+    authorBox: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 },
+    authorLogoFree: { width: 34, height: 34, marginRight: 10, backgroundColor: 'transparent' },
+    authorFallbackIcon: { marginRight: 8, justifyContent: 'center', alignItems: 'center' },
+    authorName: { color: '#FFF', fontSize: 13, fontWeight: '800', flexShrink: 1 },
     viewsBox: { flexDirection: 'row', alignItems: 'center' },
     viewsText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginLeft: 6, fontWeight: '800' },
     divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: 25 },
