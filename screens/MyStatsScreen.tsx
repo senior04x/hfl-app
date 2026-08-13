@@ -34,6 +34,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import { SlideButton } from '../components/SlideButton';
 import ReplayVideoCard from '../components/ReplayVideoCard';
+import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
 
 const { width } = Dimensions.get('window');
 
@@ -855,6 +856,22 @@ const MyStatsScreen = ({ navigation }: any) => {
         const currentTeamName = player?.teams?.name || (approvedTransfers[0]?.new_team_name) || player?.team_name || 'Jamoa';
         const currentTeamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || (approvedTransfers[0]?.new_team_logo);
 
+        // Group player replays by match
+        const matchGroups: { [key: string]: { match: any, replays: any[] } } = {};
+        playerReplays.forEach((ev: any) => {
+            const mId = ev.match_id || ev.match?.id || 'unknown';
+            if (!matchGroups[mId]) {
+                matchGroups[mId] = {
+                    match: ev.match || {},
+                    replays: []
+                };
+            }
+            if (!matchGroups[mId].replays.some(r => r.id === ev.id)) {
+                matchGroups[mId].replays.push(ev);
+            }
+        });
+        const groupedMatches = Object.values(matchGroups);
+
         return (
             <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
                 <View style={[styles.sectionHeader, { marginTop: 10 }]}>
@@ -924,7 +941,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                     })}
                 </View>
 
-                {/* Player's Personal 20s Goal Replay Clips Feed */}
+                {/* Player's Personal 20s Goal Replay Clips Feed (Grouped by Match) */}
                 <View style={{ marginTop: 24, marginBottom: 20 }}>
                     <View style={[styles.sectionHeader, { marginBottom: 12 }]}>
                         <Ionicons name="videocam" size={20} color={Colors.primary} />
@@ -933,31 +950,15 @@ const MyStatsScreen = ({ navigation }: any) => {
 
                     {replaysLoading ? (
                         <ActivityIndicator color={Colors.primary} style={{ marginVertical: 15 }} />
-                    ) : playerReplays.length > 0 ? (
-                        playerReplays.map((ev: any, idx: number) => {
-                            const m = ev.match || {};
-                            const isHome = ev.team_id === m.home_team_id;
-                            const homeName = m.home_team?.name || m.home_team_name || 'Uy Jamoasi';
-                            const awayName = m.away_team?.name || m.away_team_name || 'Mehmon Jamoasi';
-                            const currentTeamName = isHome ? homeName : awayName;
-                            const currentTeamLogo = isHome ? (m.home_team?.logo_url || m.home_team_logo) : (m.away_team?.logo_url || m.away_team_logo);
-                            const scorerName = ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : `${player?.first_name || ''} ${player?.last_name || ''}`.trim();
-                            const scorerPhoto = ev.player?.photo_url || player?.photo_url || player?.photo || null;
-                            const vUrl = ev.replay_video_url || ev.video_url || ev.replay_url || ev.video;
-
-                            return (
-                                <ReplayVideoCard
-                                    key={ev.id || idx}
-                                    videoUrl={vUrl}
-                                    minute={ev.minute}
-                                    teamName={currentTeamName}
-                                    teamLogo={currentTeamLogo}
-                                    scorerName={scorerName}
-                                    scorerPhoto={scorerPhoto}
-                                    eventType={ev.event_type || 'goal'}
-                                />
-                            );
-                        })
+                    ) : groupedMatches.length > 0 ? (
+                        groupedMatches.map((group: any, idx: number) => (
+                            <PlayerMatchReplayCard
+                                key={group.match?.id || idx}
+                                match={group.match}
+                                replays={group.replays}
+                                playerName={`${player?.first_name || ''} ${player?.last_name || ''}`.trim()}
+                            />
+                        ))
                     ) : (
                         <View style={styles.emptyCareer}>
                             <Ionicons name="videocam-outline" size={32} color="rgba(255,255,255,0.2)" />
