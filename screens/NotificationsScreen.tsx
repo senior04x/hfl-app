@@ -136,7 +136,7 @@ export default function NotificationsScreen({ navigation }: any) {
         try {
             const [matchesData, newsData] = await Promise.all([
                 apiService.getMatches().catch(() => []),
-                supabase.from('news').select('*').order('created_at', { ascending: false }).limit(10).then(res => res.data || []).catch(() => [])
+                apiService.getNews(1, 10).catch(() => [])
             ]);
 
             const fetchedList: any[] = [];

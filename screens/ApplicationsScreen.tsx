@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         borderRadius: 10,
     },
     segmentedTabActive: {
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
     loadingContainer: {
         flex: 1,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     loadingText: {
         color: 'rgba(255, 255, 255, 0.6)',

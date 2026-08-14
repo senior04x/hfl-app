@@ -117,7 +117,7 @@ export const notificationService = {
          console.log('NOTICE: Push orientation failed in Expo Go (expected). Use Dev Build for full support.');
        } else {
          console.error('Error during push notification registration:', error);
-         Alert.alert('Push Error', error.message || 'Unknown registration error');
+         Alert.alert('Push Error', (error as any)?.message || 'Unknown registration error');
        }
        return null;
     }

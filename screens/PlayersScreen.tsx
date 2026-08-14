@@ -32,7 +32,7 @@ export default function PlayersScreen({ route, navigation }: any) {
             if (teamId) {
                 data = await apiService.getPlayersByTeam(teamId);
             } else {
-                data = await apiService.getPlayers(1, 100, undefined, tournamentId);
+                data = await apiService.getPlayers(1, 100);
             }
             setPlayers(data || []);
         } catch (error) {

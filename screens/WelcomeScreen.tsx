@@ -37,7 +37,6 @@ import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService, clearApiCache, supabase } from '../services/apiService';
-import { eskizService } from '../services/eskizService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Skeleton from '../components/Skeleton';
@@ -951,12 +950,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 18,
         marginBottom: 12,
-    },
-    cancelModalBtnText: {
-        color: Colors.textMuted,
-        fontSize: 13,
-        fontWeight: '700',
-        letterSpacing: 0.5,
     },
 
     // Glassmorphism Modal Styles

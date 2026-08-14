@@ -55,14 +55,30 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
 
         setupAudioAndPlay();
 
+        // Pause video when app is backgrounded to save CPU and battery
+        const subscription = require('react-native').AppState.addEventListener('change', (nextAppState: string) => {
+            if (nextAppState === 'active') {
+                videoRef.current?.playAsync().catch(() => {});
+            } else {
+                videoRef.current?.pauseAsync().catch(() => {});
+            }
+        });
+
         if (Platform.OS === 'android') {
             const timer = setTimeout(() => {
                 if (videoRef.current) {
                     videoRef.current.playAsync().catch(() => {});
                 }
             }, 400);
-            return () => clearTimeout(timer);
+            return () => {
+                clearTimeout(timer);
+                subscription.remove();
+            };
         }
+
+        return () => {
+            subscription.remove();
+        };
     }, []);
 
     return (

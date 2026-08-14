@@ -843,10 +843,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    headerLeagueLogo: {
-        width: 60,
-        height: 60,
-    },
     leagueCardCentered: {
         marginHorizontal: 16,
         marginBottom: 16,
@@ -929,11 +925,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
-    },
-    accordionLogo: {
-        width: 32,
-        height: 32,
-        resizeMode: 'contain',
     },
     accordionItemName: {
         color: '#FFF',

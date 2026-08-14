@@ -749,26 +749,6 @@ export const apiService = {
         }
     },
 
-    getTransferWindowStatus: async (orgId?: number | string) => {
-        try {
-            let targetOrgId = orgId;
-            if (!targetOrgId) {
-                targetOrgId = 1;
-            }
-            const { data, error } = await supabase
-                .from('organizations')
-                .select('transfer_window_open')
-                .eq('id', targetOrgId)
-                .single();
-            
-            if (error || !data) return false;
-            return !!data.transfer_window_open;
-        } catch (err) {
-            console.error('getTransferWindowStatus error:', err);
-            return false;
-        }
-    },
-
     // Chat (Supabase team_messages table with Realtime + REST fallback)
     getChatMessages: async (teamId: string, page = 1, limit = 300) => {
         try {
@@ -1527,6 +1507,31 @@ export const apiService = {
         } catch (error: any) {
             console.error('verifyOTP error:', error);
             return { success: false, reason: "Kodni tekshirishda xatolik yuz berdi." };
+        }
+    },
+
+    deleteAccount: async (userId: string | number, phone?: string) => {
+        try {
+            const { AUTH_API } = require('../constants/ApiConfig');
+            const currentUser = useAuthStore.getState().user;
+            const token = currentUser?.session?.token || currentUser?.token;
+            
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const res = await fetch(AUTH_API.DELETE_ACCOUNT, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ userId, phone, token }),
+            });
+            const data = await res.json();
+            clearApiCache();
+            return data;
+        } catch (error: any) {
+            console.error('deleteAccount error:', error);
+            return { success: false, error: "Hisobni o'chirishda xatolik yuz berdi." };
         }
     },
 

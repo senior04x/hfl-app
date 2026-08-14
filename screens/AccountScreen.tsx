@@ -52,6 +52,10 @@ export default function AccountScreen({ navigation }: any) {
 
     const [showPinModal, setShowPinModal] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+    const [showTermsModal, setShowTermsModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [pinInput, setPinInput] = useState('');
     const [targetJuniorState, setTargetJuniorState] = useState<boolean>(false);
 
@@ -135,6 +139,26 @@ export default function AccountScreen({ navigation }: any) {
 
     const handleLogout = () => {
         setShowLogoutModal(true);
+    };
+
+    const handleConfirmDeleteAccount = async () => {
+        try {
+            setIsDeleting(true);
+            const userId = user?.id || user?._id;
+            const userPhone = user?.phone || user?.phoneNumber || user?.phone_number;
+            const res = await apiService.deleteAccount(userId, userPhone);
+            if (res.success) {
+                setShowDeleteModal(false);
+                Alert.alert("Hisob o'chirildi", "Sizning hisobingiz va barcha ma'lumotlaringiz butunlay o'chirildi.");
+                logout();
+            } else {
+                Alert.alert("Xatolik", res.error || "Hisobni o'chirishda xatolik yuz berdi.");
+            }
+        } catch (e: any) {
+            Alert.alert("Xatolik", "Server bilan bog'lanishda xatolik yuz berdi.");
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const SettingItem = ({ icon, title, value, onPress, type = 'chevron', badgeCount, isMuted }: any) => (
@@ -361,16 +385,45 @@ export default function AccountScreen({ navigation }: any) {
 
 
 
-                    {/* Logout */}
-                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                        <View style={styles.logoutInner}>
-                            <Ionicons name="log-out-outline" size={22} color={Colors.danger} />
-                            <Text style={styles.logoutText}>CHIQISH</Text>
-                        </View>
-                    </TouchableOpacity>
+                    {/* Legal & Security Section */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>HUJJATLAR VA XAVFSIZLIK</Text>
+                        <SettingItem
+                            icon="shield-checkmark-outline"
+                            title="Maxfiylik siyosati (Privacy Policy)"
+                            onPress={() => setShowPrivacyModal(true)}
+                        />
+                        <SettingItem
+                            icon="document-text-outline"
+                            title="Foydalanish shartlari (Terms of Service)"
+                            onPress={() => setShowTermsModal(true)}
+                        />
+                    </View>
+
+                    {/* Actions: Logout & Delete Account */}
+                    <View style={{ marginTop: 10, paddingHorizontal: 20 }}>
+                        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                            <View style={styles.logoutInner}>
+                                <Ionicons name="log-out-outline" size={22} color={Colors.primary} />
+                                <Text style={[styles.logoutText, { color: Colors.primary }]}>CHIQISH</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        {!isGuest && (
+                            <TouchableOpacity 
+                                style={[styles.logoutButton, { marginTop: 10 }]} 
+                                onPress={() => setShowDeleteModal(true)}
+                            >
+                                <View style={styles.logoutInner}>
+                                    <Ionicons name="trash-outline" size={20} color={Colors.danger} />
+                                    <Text style={styles.logoutText}>HISOBNI O'CHIRISH</Text>
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                    </View>
 
                     {/* App Version */}
-                    <Text style={styles.versionText}>VERSIYA 2.1.1 • UPDATE VERIFIED</Text>
+                    <Text style={styles.versionText}>VERSIYA 2.1.1 • PRODUCTION CERTIFIED</Text>
                 </ScrollView>
 
                 {/* PIN Verification Modal */}
@@ -436,7 +489,7 @@ export default function AccountScreen({ navigation }: any) {
                             <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
                             <View style={{ padding: 24, alignItems: 'center' }}>
                                 <View style={styles.logoutIconBadge}>
-                                    <Ionicons name="log-out" size={28} color={Colors.danger} />
+                                    <Ionicons name="log-out" size={28} color={Colors.primary} />
                                 </View>
 
                                 <Text style={styles.logoutModalTitle}>TIZIMDAN CHIQISH</Text>
@@ -446,15 +499,15 @@ export default function AccountScreen({ navigation }: any) {
                                 </Text>
 
                                 <TouchableOpacity
-                                    style={styles.logoutConfirmBtn}
+                                    style={[styles.logoutConfirmBtn, { backgroundColor: Colors.primary }]}
                                     activeOpacity={0.8}
                                     onPress={() => {
                                         setShowLogoutModal(false);
                                         logout();
                                     }}
                                 >
-                                    <Ionicons name="log-out-outline" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                                    <Text style={styles.logoutConfirmBtnText}>TIZIMDAN CHIQISH</Text>
+                                    <Ionicons name="log-out-outline" size={18} color="#000" style={{ marginRight: 6 }} />
+                                    <Text style={[styles.logoutConfirmBtnText, { color: '#000' }]}>TIZIMDAN CHIQISH</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
@@ -466,6 +519,124 @@ export default function AccountScreen({ navigation }: any) {
                                 </TouchableOpacity>
                             </View>
                         </View>
+                    </View>
+                </Modal>
+
+                {/* Delete Account Modal (App Store Guideline 5.1.1(v) Compliant) */}
+                <Modal
+                    visible={showDeleteModal}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => !isDeleting && setShowDeleteModal(false)}
+                >
+                    <View style={styles.logoutModalOverlay}>
+                        <View style={styles.logoutModalCard}>
+                            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={{ padding: 24, alignItems: 'center' }}>
+                                <View style={styles.logoutIconBadge}>
+                                    <Ionicons name="trash" size={28} color={Colors.danger} />
+                                </View>
+
+                                <Text style={styles.logoutModalTitle}>HISOBNI O'CHIRISH</Text>
+
+                                <Text style={styles.logoutModalSubtitle}>
+                                    Diqqat! Hisobingiz, arizangiz va barcha statistik ma'lumotlaringiz butunlay o'chiriladi. Bu amalni qaytarib bo'lmaydi.
+                                </Text>
+
+                                <TouchableOpacity
+                                    style={styles.logoutConfirmBtn}
+                                    activeOpacity={0.8}
+                                    disabled={isDeleting}
+                                    onPress={handleConfirmDeleteAccount}
+                                >
+                                    {isDeleting ? (
+                                        <ActivityIndicator color="#FFF" size="small" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="trash-outline" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                                            <Text style={styles.logoutConfirmBtnText}>HISOBNI BUTUNLAY O'CHIRISH</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.logoutCancelBtn}
+                                    activeOpacity={0.7}
+                                    disabled={isDeleting}
+                                    onPress={() => setShowDeleteModal(false)}
+                                >
+                                    <Text style={styles.logoutCancelBtnText}>Bekor qilish</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Privacy Policy Modal */}
+                <Modal
+                    visible={showPrivacyModal}
+                    animationType="slide"
+                    transparent={true}
+                    onRequestClose={() => setShowPrivacyModal(false)}
+                >
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', paddingTop: 50 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' }}>
+                            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '900' }}>Maxfiylik Siyosati</Text>
+                            <TouchableOpacity onPress={() => setShowPrivacyModal(false)} style={{ padding: 6 }}>
+                                <Ionicons name="close-circle" size={28} color={Colors.primary} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={{ flex: 1, padding: 20 }} showsVerticalScrollIndicator={true}>
+                            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: 'bold', marginBottom: 10 }}>AMATORA Maxfiylik Siyosati</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 20, marginBottom: 15 }}>
+                                AMATORA ilovasi foydalanuvchilarning shaxsiy ma'lumotlari xavfsizligini ta'minlashga qat'iy rioya qiladi. Ushbu hujjat sizning ma'lumotlaringiz qanday to'planishi va ishlatilishini tushuntiradi.
+                            </Text>
+                            <Text style={{ color: '#FFF', fontSize: 14, fontWeight: 'bold', marginBottom: 6 }}>1. To'planadigan Ma'lumotlar</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 20, marginBottom: 15 }}>
+                                • Telefon raqami — autentifikatsiya va profilni tasdiqlash uchun.{'\n'}
+                                • Ism, familiya va fotosurat — futbolchi profili va jamoa ro'yxatida ko'rsatish uchun.{'\n'}
+                                • O'yin statistikasi — gollar, assistlar va kartochkalar.
+                            </Text>
+                            <Text style={{ color: '#FFF', fontSize: 14, fontWeight: 'bold', marginBottom: 6 }}>2. Ma'lumotlardan Foydalanish</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 20, marginBottom: 15 }}>
+                                Ma'lumotlar faqat turnir faoliyatini tashkil etish, o'yin jadvallari va natijalarini ko'rsatish uchun ishlatiladi. Hech qanday ma'lumot uchinchi shaxslarga tijoriy maqsadlarda berilmaydi.
+                            </Text>
+                            <Text style={{ color: '#FFF', fontSize: 14, fontWeight: 'bold', marginBottom: 6 }}>3. Foydalanuvchi Huquqlari va Hisobni O'chirish</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 20, marginBottom: 30 }}>
+                                Foydalanuvchi istalgan vaqtda o'z hisobini va unga bog'liq barcha ma'lumotlarni ilova sozlamalaridagi "Hisobni o'chirish" tugmasi orqali butunlay o'chirib tashlash huquqiga ega.
+                            </Text>
+                        </ScrollView>
+                    </View>
+                </Modal>
+
+                {/* Terms of Service Modal */}
+                <Modal
+                    visible={showTermsModal}
+                    animationType="slide"
+                    transparent={true}
+                    onRequestClose={() => setShowTermsModal(false)}
+                >
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', paddingTop: 50 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' }}>
+                            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '900' }}>Foydalanish Shartlari</Text>
+                            <TouchableOpacity onPress={() => setShowTermsModal(false)} style={{ padding: 6 }}>
+                                <Ionicons name="close-circle" size={28} color={Colors.primary} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={{ flex: 1, padding: 20 }} showsVerticalScrollIndicator={true}>
+                            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: 'bold', marginBottom: 10 }}>AMATORA Foydalanish Shartlari</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 20, marginBottom: 15 }}>
+                                Ushbu shartlar AMATORA platformasidan foydalanish qoidalarini belgilaydi. Ilovadan foydalanish orqali siz ushbu shartlarga rozilik bildirasiz.
+                            </Text>
+                            <Text style={{ color: '#FFF', fontSize: 14, fontWeight: 'bold', marginBottom: 6 }}>1. Fair Play va Odob-axloq</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 20, marginBottom: 15 }}>
+                                Barcha ishtirokchilar sport odob-axloqi, raqibga va hakamlarga hurmat qoidalariga amal qilishlari shart.
+                            </Text>
+                            <Text style={{ color: '#FFF', fontSize: 14, fontWeight: 'bold', marginBottom: 6 }}>2. Arizalar va Ma'lumotlarning To'g'riligi</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 20, marginBottom: 30 }}>
+                                Foydalanuvchi ariza topshirishda haqiqiy va to'g'ri shaxsiy ma'lumotlarni kiritish majburiyatini oladi.
+                            </Text>
+                        </ScrollView>
                     </View>
                 </Modal>
             </SafeAreaView>
@@ -537,7 +708,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 10,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         borderRadius: 10,
     },
     segmentedTabActive: {
@@ -556,7 +727,7 @@ const styles = StyleSheet.create({
     emptyAppContainer: {
         padding: 24,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     emptyAppText: {
         color: 'rgba(255, 255, 255, 0.4)',
