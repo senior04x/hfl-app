@@ -266,7 +266,8 @@ export default function HomeScreen({ navigation }: any) {
                         <>
                             {(() => {
                                 const avatarUri = userProfile?.photo || userProfile?.photo_url || userProfile?.avatar || userProfile?.logo || userProfile?.logo_url || user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url;
-                                const displayName = userProfile?.name || userProfile?.team_name || user?.name || user?.team_name || 'AMATORA';
+                                const rawName = userProfile?.firstName || user?.firstName || userProfile?.name || userProfile?.team_name || user?.name || user?.team_name || 'AMATORA';
+                                const displayName = rawName.replace(/\(sardor\)/gi, '').replace(/\(menejer\)/gi, '').trim().split(' ')[0] || 'AMATORA';
 
                                 const getGreetingText = () => {
                                     const hour = new Date().getHours();
