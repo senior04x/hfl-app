@@ -212,35 +212,34 @@ export default function AccountScreen({ navigation }: any) {
                                         if (isGuest) {
                                             displayName = 'MEHMON';
                                         } else if (isPlayer) {
-                                            const fName = detailedData?.firstName || user?.firstName || detailedData?.name || user?.name || '';
-                                            const lName = detailedData?.lastName || user?.lastName || '';
-                                            displayName = `${fName} ${lName}`.trim() || 'O\'YINCHI';
+                                            const fName = (detailedData?.firstName || user?.firstName || detailedData?.name || user?.name || '').trim().split(' ')[0];
+                                            displayName = fName || 'O\'YINCHI';
                                         } else if (isManager) {
-                                            const rawName = detailedData?.name || detailedData?.team_name || user?.teamName || user?.name || (user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'JAMOA');
+                                            const rawName = (detailedData?.name || detailedData?.team_name || user?.teamName || user?.name || detailedData?.firstName || user?.firstName || 'JAMOA').trim().split(' ')[0];
                                             displayName = rawName || 'JAMOA';
                                         }
                                         displayName = displayName.replace(/\(sardor\)/gi, '').replace(/\(menejer\)/gi, '').trim();
 
                                         let displaySubtitle = 'AMATORA AZ\'OSI';
                                         if (isGuest) {
-                                            displaySubtitle = 'CHEKLANGAN IMKONIYAT';
+                                            displaySubtitle = 'MEHMON';
                                         } else if (isPlayer) {
                                             displaySubtitle = getPositionFullUz(detailedData?.position || user?.position || 'O\'YINCHI').toUpperCase();
                                         } else if (isManager) {
-                                            displaySubtitle = (detailedData?.league || user?.league || 'JAMOA SARDORI').toUpperCase();
+                                            displaySubtitle = (detailedData?.league || user?.league || 'SARDOR').toUpperCase();
                                         }
 
                                         return (
-                                            <>
+                                            <View style={styles.namePositionRow}>
                                                 <Text style={styles.userName}>
                                                     {displayName.toUpperCase()}
                                                 </Text>
-                                                <View style={styles.roleBadge}>
+                                                <View style={styles.roleBadgeInline}>
                                                     <Text style={styles.userRole}>
                                                         {displaySubtitle}
                                                     </Text>
                                                 </View>
-                                            </>
+                                            </View>
                                         );
                                     })()}
                                 </View>
@@ -436,10 +435,24 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1 },
     profileHeader: { overflow: 'hidden' },
-    avatarContainer: { width: 140, height: 140, borderRadius: 20, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.15)', backgroundColor: 'rgba(255, 255, 255, 0.06)', justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden' },
-    userName: { color: '#FFF', fontSize: 32, fontWeight: '900', letterSpacing: 1 },
-    roleBadge: { backgroundColor: 'transparent', marginTop: 10 },
-    userRole: { color: Colors.primary, fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+    avatarContainer: { width: 140, height: 140, borderRadius: 20, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.15)', backgroundColor: 'rgba(255, 255, 255, 0.06)', justifyContent: 'center', alignItems: 'center', marginBottom: 16, overflow: 'hidden' },
+    namePositionRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        justifyContent: 'center',
+        marginTop: 4,
+    },
+    userName: { color: '#FFF', fontSize: 24, fontWeight: '900', letterSpacing: 0.5 },
+    roleBadgeInline: { 
+        marginLeft: 8,
+        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 135, 0.35)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    userRole: { color: Colors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
     section: { marginTop: 30, paddingHorizontal: 20 },
     sectionTitle: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '900', marginBottom: 15, marginLeft: 5, letterSpacing: 1.5 },
     settingItem: { 
