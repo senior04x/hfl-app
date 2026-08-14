@@ -35,6 +35,7 @@ import CalendarMatchesScreen from './screens/CalendarMatchesScreen';
 import TeamProfileScreen from './screens/TeamProfileScreen';
 import MyTeamScreen from './screens/MyTeamScreen';
 import ApplicationsScreen from './screens/ApplicationsScreen';
+import SecuritySettingsScreen from './screens/SecuritySettingsScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
 import { notificationService } from './services/notificationService';
@@ -189,6 +190,7 @@ function App() {
                                     <Stack.Screen name="Players" component={PlayersScreen} />
                                     <Stack.Screen name="PlayerStats" component={PlayerStatsScreen} />
                                     <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                                    <Stack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
                                 </Stack.Navigator>
                             ) : (
                                 <AuthNavigator />
