@@ -179,9 +179,8 @@ export default function AccountScreen({ navigation }: any) {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 110 }}
                 >
-                    {/* Profile Header with Glassmorphism Blur */}
-                    <View style={styles.profileHeaderCard}>
-                        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+                    {/* Profile Header */}
+                    <View style={styles.profileHeader}>
                         {(() => {
                             const profileImage = !isGuest ? (
                                 detailedData?.photoUrl || detailedData?.photo_url || detailedData?.photo ||
@@ -436,15 +435,7 @@ export default function AccountScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1 },
-    profileHeaderCard: { 
-        marginHorizontal: 20,
-        marginTop: 15,
-        borderRadius: 24,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    },
+    profileHeader: { overflow: 'hidden' },
     avatarContainer: { width: 140, height: 140, borderRadius: 20, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.15)', backgroundColor: 'rgba(255, 255, 255, 0.06)', justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden' },
     userName: { color: '#FFF', fontSize: 32, fontWeight: '900', letterSpacing: 1 },
     roleBadge: { backgroundColor: 'transparent', marginTop: 10 },
