@@ -363,7 +363,14 @@ export default function AccountScreen({ navigation }: any) {
                             icon="settings-outline"
                             title="Sozlamalar va xavfsizlik"
                             value="Maxfiylik, shartlar, hisob"
-                            onPress={() => navigation.navigate('SecuritySettings')}
+                            onPress={() => {
+                                const parent = navigation.getParent?.();
+                                if (parent) {
+                                    parent.navigate('SecuritySettings');
+                                } else {
+                                    (navigation as any).navigate('SecuritySettings');
+                                }
+                            }}
                         />
                     </View>
 
