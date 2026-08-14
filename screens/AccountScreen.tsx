@@ -138,7 +138,7 @@ export default function AccountScreen({ navigation }: any) {
             onPress={onPress}
             disabled={type === 'switch'}
         >
-            <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, width: '100%' }}>
                 <View style={styles.settingLeft}>
                     <View style={styles.iconContainer}>
@@ -339,7 +339,7 @@ export default function AccountScreen({ navigation }: any) {
                     {isGuest && (
                         <View style={styles.section}>
                             <View style={styles.applyBanner}>
-                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                                <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={{ padding: 25, alignItems: 'center' }}>
                                     <Text style={styles.applyTitle}>LIGAGA ARIZA TOPSHIRING</Text>
                                     <Text style={styles.applySubtitle}>O'Z JAMOANGIZ BILAN AMATORA DA QATNASHING!</Text>
@@ -442,7 +442,14 @@ const styles = StyleSheet.create({
     userRole: { color: Colors.primary, fontSize: 14, fontWeight: '900', letterSpacing: 1 },
     section: { marginTop: 30, paddingHorizontal: 20 },
     sectionTitle: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '900', marginBottom: 15, marginLeft: 5, letterSpacing: 1.5 },
-    settingItem: { borderRadius: 16, marginBottom: 10, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+    settingItem: { 
+        borderRadius: 16, 
+        marginBottom: 10, 
+        overflow: 'hidden', 
+        borderWidth: 1, 
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    },
     settingLeft: { flexDirection: 'row', alignItems: 'center' },
     iconContainer: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(0, 255, 102, 0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
     settingTitle: { color: '#FFF', fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
