@@ -230,15 +230,13 @@ export default function AccountScreen({ navigation }: any) {
                                         }
 
                                         return (
-                                            <View style={styles.namePositionRow}>
+                                            <View style={styles.nameContainer}>
                                                 <Text style={styles.userName}>
                                                     {displayName.toUpperCase()}
                                                 </Text>
-                                                <View style={styles.roleBadgeInline}>
-                                                    <Text style={styles.userRole}>
-                                                        {displaySubtitle}
-                                                    </Text>
-                                                </View>
+                                                <Text style={styles.userRoleText}>
+                                                    {displaySubtitle}
+                                                </Text>
                                             </View>
                                         );
                                     })()}
@@ -436,23 +434,25 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     profileHeader: { overflow: 'hidden' },
     avatarContainer: { width: 140, height: 140, borderRadius: 20, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.15)', backgroundColor: 'rgba(255, 255, 255, 0.06)', justifyContent: 'center', alignItems: 'center', marginBottom: 16, overflow: 'hidden' },
-    namePositionRow: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        justifyContent: 'center',
+    nameContainer: {
+        alignItems: 'center',
         marginTop: 4,
     },
-    userName: { color: '#FFF', fontSize: 24, fontWeight: '900', letterSpacing: 0.5 },
-    roleBadgeInline: { 
-        marginLeft: 8,
-        backgroundColor: 'rgba(0, 255, 135, 0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 135, 0.35)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 6,
+    userName: { 
+        color: '#FFF', 
+        fontSize: 26, 
+        fontWeight: '900', 
+        letterSpacing: 0.5,
+        textAlign: 'center',
     },
-    userRole: { color: Colors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+    userRoleText: { 
+        color: 'rgba(255, 255, 255, 0.5)', 
+        fontSize: 12, 
+        fontWeight: '800', 
+        letterSpacing: 1.5,
+        marginTop: 4,
+        textAlign: 'center',
+    },
     section: { marginTop: 30, paddingHorizontal: 20 },
     sectionTitle: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '900', marginBottom: 15, marginLeft: 5, letterSpacing: 1.5 },
     settingItem: { 
