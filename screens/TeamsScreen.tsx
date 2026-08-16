@@ -17,8 +17,10 @@ import { Team } from '../types';
 import SmartImage from '../components/SmartImage';
 import TeamsSkeleton from '../components/TeamsSkeleton';
 import VideoBackground from '../components/VideoBackground';
+import { useTranslation } from 'react-i18next';
 
 export default function TeamsScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { tournamentId } = route?.params || {};
     const { teams, setTeams, isLoading, setLoading } = useTeamStore();
 
@@ -121,7 +123,7 @@ export default function TeamsScreen({ route, navigation }: any) {
                     onRefresh={fetchTeams}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>Hozircha jamoalar mavjud emas</Text>
+                            <Text style={styles.emptyText}>{t('teams.no_teams')}</Text>
                         </View>
                     }
                 />

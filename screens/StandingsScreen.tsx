@@ -18,8 +18,10 @@ import TableSkeleton from '../components/TableSkeleton';
 import { useSocket } from '../context/SocketContext';
 import { Video, ResizeMode } from 'expo-av';
 import VideoBackground from '../components/VideoBackground';
+import { useTranslation } from 'react-i18next';
 
 const StandingsScreen = ({ route, navigation }: any) => {
+    const { t } = useTranslation();
     const { tournamentId: initialTournamentId, tournamentName: initialTournamentName } = route.params || {};
     
     const [standings, setStandings] = useState<any[]>([]);
@@ -114,11 +116,11 @@ const StandingsScreen = ({ route, navigation }: any) => {
 
     const renderHeader = () => (
         <View style={styles.tableHeader}>
-            <Text style={[styles.headerText, { width: 30 }]}>#</Text>
-            <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>JAMOA</Text>
-            <Text style={[styles.headerText, { width: 30 }]}>O'</Text>
-            <Text style={[styles.headerText, { width: 50 }]}>T/N</Text>
-            <Text style={[styles.headerText, { width: 35, fontWeight: '900' }]}>O</Text>
+            <Text style={[styles.headerText, { width: 30 }]}>{t('standings.pos')}</Text>
+            <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>{t('standings.team').toUpperCase()}</Text>
+            <Text style={[styles.headerText, { width: 30 }]}>{t('standings.played')}</Text>
+            <Text style={[styles.headerText, { width: 50 }]}>{t('standings.diff')}</Text>
+            <Text style={[styles.headerText, { width: 35, fontWeight: '900' }]}>{t('standings.points')}</Text>
         </View>
     );
 
@@ -221,7 +223,7 @@ const StandingsScreen = ({ route, navigation }: any) => {
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <Ionicons name="stats-chart-outline" size={48} color={Colors.surfaceLight} />
-                            <Text style={styles.emptyText}>Ma'lumotlar mavjud emas</Text>
+                            <Text style={styles.emptyText}>{t('common.no_data')}</Text>
                         </View>
                     }
                 />

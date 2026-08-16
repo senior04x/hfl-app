@@ -28,6 +28,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSocket } from '../context/SocketContext';
 import { useAuthStore } from '../store/useAuthStore';
+import { useTranslation } from 'react-i18next';
 import Colors from '../constants/Colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -42,8 +43,9 @@ interface PlayerPosition {
     y: number;
 }
 
-const FormationBoard = ({ route, navigation }: any) => {
-    const { teamId } = route.params || {};
+function FormationBoard({ route, navigation }: any) {
+    const { t } = useTranslation();
+    const { teamId, isReadOnly: initialReadOnly = false } = route.params || {};
     const { user } = useAuthStore();
     const isReadOnly = route.params?.isReadOnly || user?.role === 'player';
 
@@ -212,13 +214,13 @@ const FormationBoard = ({ route, navigation }: any) => {
                     <TouchableOpacity onPress={() => navigation.goBack()}>
                         <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{isReadOnly ? "Jamoa Sostavi" : "Sostav Tahrirlash"}</Text>
+                    <Text style={styles.headerTitle}>{isReadOnly ? t('teams.squad') : t('teams.edit_formation')}</Text>
                     {!isReadOnly ? (
                         <TouchableOpacity onPress={handleSave} disabled={saving}>
                             {saving ? (
                                 <ActivityIndicator size="small" color={Colors.primary} />
                             ) : (
-                                <Text style={styles.saveText}>SAQLASH</Text>
+                                <Text style={styles.saveText}>{t('common.save').toUpperCase()}</Text>
                             )}
                         </TouchableOpacity>
                     ) : (
@@ -230,8 +232,8 @@ const FormationBoard = ({ route, navigation }: any) => {
                     {/* ASOSIY TARKIB HEADER */}
                     <View style={styles.sectionHeaderRow}>
                         <Ionicons name="football-outline" size={18} color={Colors.primary} />
-                        <Text style={styles.sectionHeaderTitle}>ASOSIY TARKIB</Text>
-                        <Text style={styles.sectionHeaderCount}>{playersOnPitch.length} / 11 O'YINCHI</Text>
+                        <Text style={styles.sectionHeaderTitle}>{t('teams.starting_lineup')}</Text>
+                        <Text style={styles.sectionHeaderCount}>{playersOnPitch.length} / 11</Text>
                     </View>
 
                     <View style={styles.fieldWrapper}>
@@ -263,12 +265,12 @@ const FormationBoard = ({ route, navigation }: any) => {
                     <View style={styles.subsSection}>
                         <View style={styles.subsHeader}>
                             <Ionicons name="people-outline" size={18} color={Colors.primary} />
-                            <Text style={styles.subsTitle}>ZAXIRA O'YINCHILARI</Text>
+                            <Text style={styles.subsTitle}>{t('teams.substitutes')}</Text>
                             <Text style={styles.subsCount}>
                                 {availablePlayers.filter(p => {
                                     const id = (p._id || p.id).toString();
                                     return !playersOnPitch.some(pitchP => pitchP.id === id);
-                                }).length} NAFAAR
+                                }).length}
                             </Text>
                         </View>
                         

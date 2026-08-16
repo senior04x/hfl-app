@@ -40,6 +40,9 @@ import { apiService, clearApiCache, supabase } from '../services/apiService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Skeleton from '../components/Skeleton';
+import { useTranslation } from 'react-i18next';
+import LanguageSelectModal from '../components/LanguageSelectModal';
+import { SUPPORTED_LANGUAGES } from '../store/useLanguageStore';
 
 const { width } = Dimensions.get('window');
 
@@ -114,6 +117,7 @@ const ShimmerLogo = ({ visible }: { visible: boolean }) => {
 
 
 export default function WelcomeScreen({ navigation }: any) {
+    const { t, i18n } = useTranslation();
     const setAuth = useAuthStore((state) => state.setAuth);
     const setGuest = useAuthStore((state) => state.setGuest);
     
@@ -131,6 +135,7 @@ export default function WelcomeScreen({ navigation }: any) {
     const [showAccountModal, setShowAccountModal] = useState(false);
     const [showBotModal, setShowBotModal] = useState(false);
     const [showNotFoundModal, setShowNotFoundModal] = useState(false);
+    const [showLanguageModal, setShowLanguageModal] = useState(false);
     const [notFoundMessage, setNotFoundMessage] = useState('');
 
     // Organization Selection Modal State
@@ -379,6 +384,29 @@ const formatPhoneInput = (val: string) => {
         <AnimatedBackground overlayOpacity={0.6} backgroundImage={backgroundImage}>
             <StatusBar barStyle="light-content" />
             <SafeAreaView style={styles.container}>
+                {/* Language Switcher Pill */}
+                <View style={{ position: 'absolute', top: Platform.OS === 'ios' ? 54 : 24, right: 20, zIndex: 100 }}>
+                    <TouchableOpacity
+                        onPress={() => setShowLanguageModal(true)}
+                        activeOpacity={0.7}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: 'rgba(20, 25, 35, 0.85)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(255, 255, 255, 0.15)',
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 20,
+                            gap: 6
+                        }}
+                    >
+                        <Text style={{ fontSize: 14 }}>{SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.flag || '🇺🇿'}</Text>
+                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>{(SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label || "O'zbekcha")}</Text>
+                        <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.6)" />
+                    </TouchableOpacity>
+                </View>
+
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={{ flex: 1 }}
@@ -390,18 +418,18 @@ const formatPhoneInput = (val: string) => {
                                 <View style={{ padding: 24 }}>
                                     {loginStep === 'phone' ? (
                                         <>
-                                            <Text style={styles.cardTitle}>TIZIMGA KIRISH</Text>
+                                            <Text style={styles.cardTitle}>{t('auth.login_title')}</Text>
                                             <Text style={styles.cardSubTitle}>
-                                                Jamoa sardori yoki futbolchi telefon raqamingizni kiriting
+                                                {t('auth.login_subtitle')}
                                             </Text>
 
                                             <View style={styles.inputWrapper}>
-                                                <Text style={styles.inputLabel}>TEL RAQAMINGIZ</Text>
+                                                <Text style={styles.inputLabel}>{t('auth.phone_label')}</Text>
                                                 <View style={styles.inputContainer}>
                                                     <Text style={styles.phonePrefix}>+998</Text>
                                                     <TextInput
                                                         style={styles.phoneInput}
-                                                        placeholder="90 123 45 67"
+                                                        placeholder={t('auth.phone_placeholder')}
                                                         placeholderTextColor={Colors.textMuted}
                                                         keyboardType="number-pad"
                                                         value={phone}
@@ -431,7 +459,7 @@ const formatPhoneInput = (val: string) => {
                                                         <ActivityIndicator color="#000" />
                                                     ) : (
                                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                            <Text style={styles.confirmButtonText}>KIRISH</Text>
+                                                            <Text style={styles.confirmButtonText}>{t('auth.login')}</Text>
                                                             <Ionicons name="arrow-forward" size={16} color="#000" style={{ marginLeft: 6 }} />
                                                         </View>
                                                     )}
@@ -441,7 +469,7 @@ const formatPhoneInput = (val: string) => {
                                     ) : (
                                         <>
                                             <Text style={styles.cardSubTitle}>
-                                                Telegram bot orqali 4 xonali tasdiqlash kodi yuborildi.
+                                                {t('auth.otp_sent_to')}
                                             </Text>
 
                                             <View style={styles.inputWrapper}>
@@ -460,11 +488,11 @@ const formatPhoneInput = (val: string) => {
                                             </View>
 
                                             {resendTimer > 0 ? (
-                                                <Text style={styles.timerText}>Qayta kod yuborish: {resendTimer}s</Text>
+                                                <Text style={styles.timerText}>{t('auth.resend_timer', { seconds: resendTimer })}</Text>
                                             ) : (
                                                 <TouchableOpacity onPress={handleSendOTP} style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                                     <Ionicons name="refresh" size={16} color="#00FF87" style={{ marginRight: 6 }} />
-                                                    <Text style={styles.resendBtnText}>Kodni qayta yuborish</Text>
+                                                    <Text style={styles.resendBtnText}>{t('auth.resend_code')}</Text>
                                                 </TouchableOpacity>
                                             )}
 
@@ -487,7 +515,7 @@ const formatPhoneInput = (val: string) => {
                                                     {loading ? (
                                                         <ActivityIndicator color="#000" />
                                                     ) : (
-                                                        <Text style={styles.confirmButtonText}>KIRISH</Text>
+                                                        <Text style={styles.confirmButtonText}>{t('auth.login')}</Text>
                                                     )}
                                                 </TouchableOpacity>
                                             </View>
@@ -507,14 +535,14 @@ const formatPhoneInput = (val: string) => {
                                     style={styles.mainButton}
                                     onPress={handleLoginPress}
                                 >
-                                    <Text style={styles.mainButtonText}>KIRISH</Text>
+                                    <Text style={styles.mainButtonText}>{t('auth.login')}</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={styles.guestButton}
                                     onPress={handleRegisterPress}
                                 >
-                                    <Text style={styles.guestButtonText}>RO'YXATDAN O'TISH</Text>
+                                    <Text style={styles.guestButtonText}>{t('auth.register')}</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -535,10 +563,10 @@ const formatPhoneInput = (val: string) => {
                         <View style={{ padding: 20 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                                 <Ionicons name="people" size={24} color={Colors.primary} style={{ marginRight: 8 }} />
-                                <Text style={styles.accountModalTitle}>AKKOUNTNI TANLANG</Text>
+                                <Text style={styles.accountModalTitle}>{t('auth.select_account')}</Text>
                             </View>
                             <Text style={styles.accountModalSubtitle}>
-                                Ushbu telefon raqamiga bir nechta profil bog'langan. Qaysi profil sifatida kirmoqchisiz?
+                                {t('auth.select_account_sub')}
                             </Text>
 
                             <ScrollView style={{ maxHeight: 280, marginVertical: 14 }}>
@@ -577,12 +605,18 @@ const formatPhoneInput = (val: string) => {
                                 style={styles.cancelModalBtn}
                                 onPress={() => setShowAccountModal(false)}
                             >
-                                <Text style={styles.cancelModalBtnText}>BEKOR QILISH</Text>
+                                <Text style={styles.cancelModalBtnText}>{t('common.cancel').toUpperCase()}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
+
+            {/* Language Selection Modal */}
+            <LanguageSelectModal
+                visible={showLanguageModal}
+                onClose={() => setShowLanguageModal(false)}
+            />
 
             {/* Organization Selection Modal */}
             <Modal
@@ -598,14 +632,14 @@ const formatPhoneInput = (val: string) => {
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Ionicons name="business" size={24} color={Colors.primary} style={{ marginRight: 8 }} />
-                                    <Text style={styles.accountModalTitle}>TASHKILOTNI TANLANG</Text>
+                                    <Text style={styles.accountModalTitle}>{t('auth.select_org_title')}</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => setShowOrgModal(false)} style={{ padding: 4 }}>
                                     <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
                                 </TouchableOpacity>
                             </View>
                             <Text style={styles.accountModalSubtitle}>
-                                Ro'yxatdan o'tish uchun mas'ul ligangiz va tashkilotingizni tanlang:
+                                {t('auth.select_org_sub')}
                             </Text>
 
                             <ScrollView style={{ maxHeight: 320, marginVertical: 14 }} showsVerticalScrollIndicator={false}>
@@ -626,7 +660,7 @@ const formatPhoneInput = (val: string) => {
                                     <View style={{ paddingVertical: 30, alignItems: 'center' }}>
                                         <Ionicons name="information-circle-outline" size={32} color="rgba(255,255,255,0.4)" />
                                         <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8, fontSize: 13 }}>
-                                            Hozircha faol tashkilotlar mavjud emas
+                                            {t('auth.no_orgs')}
                                         </Text>
                                     </View>
                                 ) : (
@@ -669,7 +703,7 @@ const formatPhoneInput = (val: string) => {
                                 onPress={() => setShowOrgModal(false)}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.cancelModalBtnText}>YOPISH</Text>
+                                <Text style={styles.cancelModalBtnText}>{t('common.close').toUpperCase()}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -691,7 +725,7 @@ const formatPhoneInput = (val: string) => {
                                 <Ionicons name="paper-plane" size={30} color="#00FF87" />
                             </View>
 
-                            <Text style={styles.botModalTitle}>TELEGRAM BOTGA O'TISH</Text>
+                            <Text style={styles.botModalTitle}>{t('auth.bot_modal_title')}</Text>
 
                             <Text style={styles.botModalSubtitle}>
                                 <Text style={{ color: '#00FF87', fontWeight: '900' }}>+998 {phone}</Text> raqamingizga 4 xonali tasdiqlash kodini olish uchun Telegram botimizga o'ting.
@@ -740,16 +774,16 @@ const formatPhoneInput = (val: string) => {
                                 <Ionicons name="alert-circle-outline" size={32} color="#FFD700" />
                             </View>
 
-                            <Text style={styles.notFoundModalTitle}>ARIZA TOPILMADI</Text>
+                            <Text style={styles.notFoundModalTitle}>{t('auth.application_not_found')}</Text>
 
                             <Text style={styles.notFoundModalSubtitle}>
-                                <Text style={{ color: '#00FF87', fontWeight: '900' }}>+998 {phone}</Text> raqamiga tegishli ariza yoki jamoa topilmadi.
+                                <Text style={{ color: '#00FF87', fontWeight: '900' }}>+998 {phone}</Text> {t('errors.PHONE_NOT_FOUND')}
                             </Text>
 
                             <View style={styles.notFoundNoticeBox}>
                                 <Ionicons name="information-circle-outline" size={18} color="#FFD700" style={{ marginRight: 8 }} />
                                 <Text style={styles.notFoundNoticeText}>
-                                    Tizimdan foydalanish uchun avval ligamizga ariza topshirishingiz kerak.
+                                    {t('auth.apply_first_notice')}
                                 </Text>
                             </View>
 
@@ -762,7 +796,7 @@ const formatPhoneInput = (val: string) => {
                                 }}
                             >
                                 <Ionicons name="document-text-outline" size={18} color="#050A14" style={{ marginRight: 8 }} />
-                                <Text style={styles.notFoundPrimaryBtnText}>ARIZA TOPSHIRISH</Text>
+                                <Text style={styles.notFoundPrimaryBtnText}>{t('applications.submit_app')}</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -770,7 +804,7 @@ const formatPhoneInput = (val: string) => {
                                 activeOpacity={0.7}
                                 onPress={() => setShowNotFoundModal(false)}
                             >
-                                <Text style={styles.notFoundSecondaryBtnText}>Yopish</Text>
+                                <Text style={styles.notFoundSecondaryBtnText}>{t('common.close')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

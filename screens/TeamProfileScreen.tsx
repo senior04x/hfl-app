@@ -28,10 +28,13 @@ import { Player, Team } from '../types';
 import Translations from '../constants/Translations';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocket } from '../context/SocketContext';
+import { useTranslation } from 'react-i18next';
+import { getLocalizedPosition } from '../utils/localizationUtils';
 
 const { width } = Dimensions.get('window');
 
 export default function TeamProfileScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { teamId, team: initialTeam } = route?.params || {};
     const [team, setTeam] = useState<any | null>(initialTeam || null);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -105,13 +108,13 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                 {canEdit && (
                     <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('FormationBoard', { teamId: activeTeamId })}>
                         <Ionicons name="grid-outline" size={20} color="#FFF" />
-                        <Text style={styles.adminBtnText}>SOSTAV</Text>
+                        <Text style={styles.adminBtnText}>{t('teams.squad').toUpperCase()}</Text>
                     </TouchableOpacity>
                 )}
                 {canChat && (
                     <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('TeamChat', { teamId: activeTeamId })}>
                         <Ionicons name="chatbubbles-outline" size={20} color="#FFF" />
-                        <Text style={styles.adminBtnText}>CHAT</Text>
+                        <Text style={styles.adminBtnText}>{t('teams.team_chat').toUpperCase()}</Text>
                         {unreadCount > 0 && (
                             <View style={[
                                 styles.badgeContainer,
@@ -141,10 +144,10 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
                     <View style={styles.heroStatsRow}>
                         <Ionicons name="people" size={14} color={Colors.primary} />
-                        <Text style={styles.heroStatText}>{isPlayersLoading ? '...' : `${players.length} O'YINCHI`}</Text>
+                        <Text style={styles.heroStatText}>{isPlayersLoading ? '...' : t('teams.players_count', { count: players.length }).toUpperCase()}</Text>
                         <View style={styles.statDot} />
                         <Ionicons name="flash" size={14} color={Colors.primary} />
-                        <Text style={styles.heroStatText}>{team?.points || team?.stats?.points || 0} OCHKO</Text>
+                        <Text style={styles.heroStatText}>{t('teams.points_count', { count: team?.points || team?.stats?.points || 0 }).toUpperCase()}</Text>
                     </View>
                 </View>
             </View>
@@ -168,9 +171,9 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             <View style={styles.sectionHeader}>
                 <View style={styles.sectionTitleRow}>
                     <Ionicons name="people" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>JAMOA <Text style={styles.sectionTitleHighlight}>TARKIBI</Text></Text>
+                    <Text style={styles.sectionTitle}>{t('teams.squad')}</Text>
                 </View>
-                <Text style={styles.sectionCount}>{isPlayersLoading ? 'YUKLANMOQDA...' : `${players.length} TA FUTBOLCHI`}</Text>
+                <Text style={styles.sectionCount}>{isPlayersLoading ? t('common.loading') : `${players.length}`}</Text>
             </View>
 
             {isPlayersLoading ? (
@@ -190,6 +193,11 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                         </View>
                     ))}
                 </View>
+            ) : players.length === 0 ? (
+                <View style={styles.emptySquadContainer}>
+                    <Ionicons name="people-outline" size={38} color="rgba(255,255,255,0.2)" />
+                    <Text style={styles.emptySquadText}>{t('teams.no_players')}</Text>
+                </View>
             ) : (
                 <View style={styles.squadGrid}>
                     {players.map((player: any, idx: number) => {
@@ -208,9 +216,9 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                     </View>
                                 </View>
                                 <View style={styles.playerInfo}>
-                                    <Text style={styles.playerCardName} numberOfLines={1}>{(player.firstName || player.name || player.first_name || 'Futbolchi').toUpperCase()}</Text>
+                                    <Text style={styles.playerCardName} numberOfLines={1}>{(player.firstName || player.name || player.first_name || t('teams.player_fallback')).toUpperCase()}</Text>
                                     <Text style={styles.playerCardLastName} numberOfLines={1}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
-                                    <Text style={styles.playerCardPosition}>{Translations.translatePosition(player.position || 'O\'yinchi').toUpperCase()}</Text>
+                                    <Text style={styles.playerCardPosition}>{getLocalizedPosition(player.position, t).toUpperCase()}</Text>
 
                                     {/* PHONE BADGE / ADD PHONE BUTTON — ONLY FOR THIS TEAM'S MANAGER */}
                                     {canEdit && (
@@ -238,7 +246,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                                     }}
                                                 >
                                                     <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
-                                                    <Text style={styles.addPhoneBtnText}>+ TEL</Text>
+                                                    <Text style={styles.addPhoneBtnText}>+ {t('stats.phone', 'TEL')}</Text>
                                                 </TouchableOpacity>
                                             )}
                                         </View>
@@ -293,11 +301,11 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                     <View style={styles.phoneModalCard}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                             <Ionicons name="call" size={20} color="#00FF87" style={{ marginRight: 8 }} />
-                            <Text style={styles.phoneModalTitle}>TEL RAQAM QO'SHISH</Text>
+                            <Text style={styles.phoneModalTitle}>{t('teams.add_phone_title')}</Text>
                         </View>
 
                         <Text style={styles.phoneModalSub}>
-                            {(selectedPlayerForPhone?.firstName || selectedPlayerForPhone?.first_name || selectedPlayerForPhone?.name || 'O\'yinchi')} uchun 9 xonali telefon raqam:
+                            {t('teams.add_phone_sub', { name: selectedPlayerForPhone?.firstName || selectedPlayerForPhone?.first_name || selectedPlayerForPhone?.name || t('teams.player_fallback') })}
                         </Text>
 
                         <View style={styles.phoneInputRow}>
@@ -327,7 +335,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                 disabled={savingPhone}
                                 onPress={async () => {
                                     if (phoneInputText.length < 9) {
-                                        Alert.alert('Xato', 'Iltimos, 9 xonali telefon raqamini kiriting.');
+                                        Alert.alert(t('common.error'), t('teams.phone_length_error'));
                                         return;
                                     }
                                     try {
@@ -339,12 +347,12 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                             setPlayers((prev: any[]) => prev.map((p: any) => (p.id === pId || p._id === pId) ? { ...p, phone: fullPhone } : p));
                                             setSelectedPlayerForPhone(null);
                                             setPhoneInputText('');
-                                            Alert.alert("Muvaffaqiyatli", "Telefon raqami saqlandi!");
+                                            Alert.alert(t('common.success'), t('teams.phone_saved_success'));
                                         } else {
-                                            Alert.alert('Xato', res.error || 'Saqlashda xatolik');
+                                            Alert.alert(t('common.error'), res.error || t('errors.SERVER_ERROR'));
                                         }
                                     } catch (err: any) {
-                                        Alert.alert('Xato', 'Server bilan bog\'lanishda xatolik');
+                                        Alert.alert(t('common.error'), t('errors.NETWORK_ERROR'));
                                     } finally {
                                         setSavingPhone(false);
                                     }
@@ -530,5 +538,20 @@ const styles = StyleSheet.create({
         backgroundColor: '#00FF87',
         alignItems: 'center',
         justifyContent: 'center'
+    },
+    emptySquadContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 35,
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+        gap: 8,
+    },
+    emptySquadText: {
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 13,
+        fontWeight: '700',
     }
 });

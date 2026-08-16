@@ -17,14 +17,17 @@ import {
     Easing
 } from 'react-native';
 import { Image } from 'expo-image';
-import { apiService } from '../services/apiService';
+import { apiService, supabase } from '../services/apiService';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import VideoBackground from '../components/VideoBackground';
+import { useTranslation } from 'react-i18next';
+import { getLocalizedErrorMessage } from '../utils/errorParser';
 import Colors from '../constants/Colors';
-import SlideButton from '../components/SlideButton';
+import SlideButton, { SlideButtonStatus } from '../components/SlideButton';
 
 const TransferRequestScreen = ({ route, navigation }: any) => {
+    const { t } = useTranslation();
     const { user } = useAuthStore();
     const { playerId } = route.params || {};
 
@@ -189,7 +192,7 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                             <Ionicons name="chevron-back" size={22} color="#00FF66" style={{ marginLeft: -2 }} />
                         </View>
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Transfer So'rovi</Text>
+                    <Text style={styles.headerTitle}>{t('transfers.title')}</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
@@ -264,12 +267,12 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                     </View>
 
                     {/* Step 1: Select League */}
-                    <Text style={styles.label}>1. LIGANI TANLANG</Text>
+                    <Text style={styles.label}>{t('transfers.step_league')}</Text>
                     <TouchableOpacity
                         style={[styles.selectButton, !isTransferWindowOpen && styles.disabledButton]}
                         onPress={() => {
                             if (!isTransferWindowOpen) {
-                                Alert.alert('Yopilgan', 'Tashkilotingizda transfer oynasi hozirda yopilgan');
+                                Alert.alert(t('common.error'), t('errors.TRANSFER_NOT_ALLOWED'));
                                 return;
                             }
                             setLeagueModalVisible(true);
@@ -277,28 +280,28 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                         disabled={!isTransferWindowOpen}
                     >
                         <Text style={[styles.selectButtonText, !selectedLeague && styles.placeholderText]}>
-                            {selectedLeague || 'Liganing nomini tanlang...'}
+                            {selectedLeague || t('auth.select_league_sub')}
                         </Text>
                         <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
                     </TouchableOpacity>
 
-                    {/* Step 2: Select Team (Hidden until league is selected and teams are loaded) */}
+                    {/* Step 2: Select Team */}
                     {selectedLeague ? (
                         loadingTeams ? (
                             <View style={styles.loadingTeamsContainer}>
                                 <ActivityIndicator size="small" color="#00FF66" />
                                 <Text style={styles.loadingTeamsText}>
-                                    "{selectedLeague}" jamoalari yuklanmoqda...
+                                    {t('common.loading')}
                                 </Text>
                             </View>
                         ) : (
                             <>
-                                <Text style={styles.label}>2. YANGI JAMOANI TANLANG</Text>
+                                <Text style={styles.label}>{t('transfers.step_team')}</Text>
                                 <TouchableOpacity
                                     style={[styles.selectButton, !isTransferWindowOpen && styles.disabledButton]}
                                     onPress={() => {
                                         if (!isTransferWindowOpen) {
-                                            Alert.alert('Yopilgan', 'Tashkilotingizda transfer oynasi hozirda yopilgan');
+                                            Alert.alert(t('common.error'), t('errors.TRANSFER_NOT_ALLOWED'));
                                             return;
                                         }
                                         setSearchQuery('');
@@ -307,7 +310,7 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                                     disabled={!isTransferWindowOpen}
                                 >
                                     <Text style={[styles.selectButtonText, !selectedTeam && styles.placeholderText]}>
-                                        {selectedTeamObj?.name || 'Jamoani tanlang...'}
+                                        {selectedTeamObj?.name || t('teams.title')}
                                     </Text>
                                     <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
                                 </TouchableOpacity>
@@ -316,10 +319,10 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                     ) : null}
 
                     {/* Step 3: Reason */}
-                    <Text style={styles.label}>3. O'TISH SABABI (IXTIYORIY)</Text>
+                    <Text style={styles.label}>{t('transfers.step_reason')}</Text>
                     <TextInput
                         style={[styles.textArea, !isTransferWindowOpen && { opacity: 0.5 }]}
-                        placeholder="Nima uchun jamoani almashtirmoqchisiz? (ixtiyoriy)..."
+                        placeholder={t('transfers.reason_placeholder')}
                         placeholderTextColor="rgba(255,255,255,0.4)"
                         multiline
                         numberOfLines={5}

@@ -17,8 +17,10 @@ import GenericListSkeleton from '../components/GenericListSkeleton';
 import SmartImage from '../components/SmartImage';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
+import { useTranslation } from 'react-i18next';
 
 export default function LeagueTournamentsScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { leagueId, leagueName, league } = route?.params || {};
     const [tournaments, setTournaments] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -124,24 +126,24 @@ export default function LeagueTournamentsScreen({ route, navigation }: any) {
             <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                     <Text style={styles.statVal}>{tournaments.length}</Text>
-                    <Text style={styles.statLab}>Turnir</Text>
+                    <Text style={styles.statLab}>{t('tournaments.title')}</Text>
                 </View>
                 <View style={styles.statItem}>
                     <Text style={styles.statVal}>
                         {league?.teamCount !== undefined ? league.teamCount : (league?.tournaments?.reduce((acc: number, t: any) => acc + (t.teams?.length || 0), 0) || 0)}
                     </Text>
-                    <Text style={styles.statLab}>Jamoa</Text>
+                    <Text style={styles.statLab}>{t('teams.title')}</Text>
                 </View>
                 <View style={styles.statItem}>
                     <Text style={styles.statVal}>
                         {league?.playerCount ? league.playerCount : (tournaments.reduce((acc: number, t: any) => acc + (t.teams?.length || 0), 0) || 0)}
                     </Text>
-                    <Text style={styles.statLab}>O'yinchi</Text>
+                    <Text style={styles.statLab}>{t('teams.player')}</Text>
                 </View>
             </View>
 
             <View style={styles.sectionDivider} />
-            <Text style={styles.tournamentsTitle}>Mavjud Turnirlar</Text>
+            <Text style={styles.tournamentsTitle}>{t('tournaments.league_tournaments')}</Text>
         </View>
     );
 

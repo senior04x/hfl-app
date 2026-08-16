@@ -28,6 +28,7 @@ import { apiService } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 import TeamProfileSkeleton from '../components/TeamProfileSkeleton';
 import TacticsBoard from '../components/TacticsBoard';
+import { useTranslation } from 'react-i18next';
 import { Player, Team } from '../types';
 import Translations from '../constants/Translations';
 import { useAuthStore } from '../store/useAuthStore';
@@ -36,6 +37,7 @@ import { useSocket } from '../context/SocketContext';
 const { width } = Dimensions.get('window');
 
 export default function MyTeamScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { user, unreadCount, isChatMuted } = useAuthStore();
     const { socket } = useSocket();
 
@@ -224,12 +226,12 @@ export default function MyTeamScreen({ route, navigation }: any) {
                 />
                 <View style={styles.emptyContent}>
                     <Ionicons name="shield-outline" size={80} color="rgba(0, 255, 135, 0.4)" />
-                    <Text style={styles.emptyTitle}>JAMOA TOPILMADI</Text>
+                    <Text style={styles.emptyTitle}>{t('teams.team_not_found')}</Text>
                     <Text style={styles.emptySub}>
-                        Siz hali hech qaysi jamoaga biriktirilmagansiz yoki a'zo bo'lmagansiz.
+                        {t('teams.no_teams')}
                     </Text>
                     <TouchableOpacity onPress={() => navigation.navigate('Teams')} style={styles.loginBtn}>
-                        <Text style={styles.loginBtnText}>JAMOALARNI KO'RISH</Text>
+                        <Text style={styles.loginBtnText}>{t('teams.view_teams')}</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
@@ -278,7 +280,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                     onPress={() => navigation.navigate('TeamChat', { teamId: activeTeamId })}
                                 >
                                     <Ionicons name="chatbubbles" size={16} color="#00FF87" />
-                                    <Text style={styles.actionPillText}>CHAT</Text>
+                                    <Text style={styles.actionPillText}>{t('teams.team_chat').toUpperCase()}</Text>
                                     {unreadCount > 0 && (
                                         <View style={styles.unreadBadge}>
                                             <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
@@ -293,7 +295,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                     onPress={() => navigation.navigate('FormationBoard', { teamId: activeTeamId })}
                                 >
                                     <Ionicons name="grid" size={16} color="#00FF87" />
-                                    <Text style={styles.actionPillText}>SOSTAV</Text>
+                                    <Text style={styles.actionPillText}>{t('teams.squad').toUpperCase()}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -491,8 +493,8 @@ export default function MyTeamScreen({ route, navigation }: any) {
                             <View style={{ marginTop: 10 }}>
                                 <TacticsBoard 
                                     formation={team?.formation || '4-3-3'} 
-                                    players={players} 
-                                    onPlayerPress={(player) => navigation.navigate('PlayerStats', { playerId: player.id || player._id, player })}
+                                    players={players as any} 
+                                    onPlayerPress={(player: any) => navigation.navigate('PlayerStats', { playerId: player.id || player._id, player })}
                                 />
                             </View>
                         )}

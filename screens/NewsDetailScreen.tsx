@@ -20,10 +20,13 @@ import Colors from '../constants/Colors';
 import { apiService, supabase } from '../services/apiService';
 import { News } from '../types';
 import SmartImage from '../components/SmartImage';
+import { useTranslation } from 'react-i18next';
+import { getLocalizedNewsField, getLocalizedNewsCategory } from '../utils/localizationUtils';
 
 const { width } = Dimensions.get('window');
 
 export default function NewsDetailScreen({ route, navigation }: any) {
+    const { t, i18n } = useTranslation();
     const { newsId, news: initialNews } = route.params || {};
     const [news, setNews] = useState<News | null>(initialNews || null);
     const [isLoading, setIsLoading] = useState(!initialNews);
@@ -99,7 +102,7 @@ export default function NewsDetailScreen({ route, navigation }: any) {
         try {
             if (!news) return;
             await Share.share({
-                message: `${news.title}\n\n${news.content.substring(0, 100)}...\n\nBatafsil Amatora ilovasida!`,
+                message: `${news.title}\n\n${news.content.substring(0, 100)}...\n\n${t('news.share_text')}`,
             });
         } catch (error) {
             console.error('Error sharing:', error);
@@ -112,7 +115,7 @@ export default function NewsDetailScreen({ route, navigation }: any) {
                 <View style={styles.loadingContainer}>
                     <StatusBar barStyle="light-content" />
                     <Ionicons name="newspaper-outline" size={60} color={Colors.primary} />
-                    <Text style={styles.loadingText}>YANGILIK YUKLANMOQDA...</Text>
+                    <Text style={styles.loadingText}>{t('news.loading')}</Text>
                 </View>
             </AnimatedBackground>
         );
@@ -121,9 +124,9 @@ export default function NewsDetailScreen({ route, navigation }: any) {
     if (!news) {
         return (
             <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>YANGILIK TOPILMADI</Text>
+                <Text style={styles.errorText}>{t('news.not_found')}</Text>
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-                    <Text style={styles.backBtnText}>ORTGA QAYTISH</Text>
+                    <Text style={styles.backBtnText}>{t('news.back_to_list')}</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -162,14 +165,14 @@ export default function NewsDetailScreen({ route, navigation }: any) {
                     <View style={{ padding: 25 }}>
                         <View style={styles.categoryRow}>
                             <View style={styles.categoryBadge}>
-                                <Text style={styles.categoryBadgeText}>{news.category?.toUpperCase() || 'YANGILIK'}</Text>
+                                <Text style={styles.categoryBadgeText}>{getLocalizedNewsCategory(news.category, t).toUpperCase()}</Text>
                             </View>
                             <Text style={styles.dateText}>
-                                {new Date(news.createdAt).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
+                                {new Date(news.createdAt).toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
                             </Text>
                         </View>
 
-                        <Text style={styles.title}>{news.title.toUpperCase()}</Text>
+                        <Text style={styles.title}>{getLocalizedNewsField(news, 'title', i18n.language).toUpperCase()}</Text>
 
                         <View style={styles.metaRow}>
                             <View style={styles.authorBox}>
@@ -188,13 +191,13 @@ export default function NewsDetailScreen({ route, navigation }: any) {
                             </View>
                             <View style={styles.viewsBox}>
                                 <Ionicons name="eye-outline" size={16} color="rgba(255,255,255,0.5)" />
-                                <Text style={styles.viewsText}>{news.views || 0} MARTA</Text>
+                                <Text style={styles.viewsText}>{t('common.views_count', { count: news.views || 0 }).toUpperCase()}</Text>
                             </View>
                         </View>
 
                         <View style={styles.divider} />
 
-                        <Text style={styles.content}>{news.content}</Text>
+                        <Text style={styles.content}>{getLocalizedNewsField(news, 'content', i18n.language)}</Text>
                     </View>
                 </View>
             </ScrollView>

@@ -750,14 +750,17 @@ export const apiService = {
     },
 
     // Chat (Supabase team_messages table with Realtime + REST fallback)
-    getChatMessages: async (teamId: string, page = 1, limit = 300) => {
+    getChatMessages: async (teamId: string, page = 1, limit = 30) => {
         try {
+            const from = (page - 1) * limit;
+            const to = from + limit - 1;
+
             const { data, error } = await supabase
                 .from('team_messages')
                 .select('*')
                 .eq('team_id', String(teamId))
                 .order('created_at', { ascending: false })
-                .limit(limit);
+                .range(from, to);
 
             if (error) throw error;
             if (data && data.length > 0) {
@@ -770,7 +773,9 @@ export const apiService = {
                     senderPhoto: m.sender_photo || '',
                     text: m.text,
                     timestamp: m.created_at,
-                    replyTo: m.reply_to
+                    replyTo: m.reply_to || null,
+                    edited: Boolean(m.is_edited),
+                    editedAt: m.edited_at || null
                 }));
             }
             return [];
@@ -782,16 +787,88 @@ export const apiService = {
 
     sendChatMessage: async (messageData: any) => {
         try {
-            const payload = {
-                team_id: String(messageData.teamId),
-                sender_id: String(messageData.senderId || 'unknown'),
+            const teamIdStr = String(messageData.teamId);
+            const senderIdStr = String(messageData.senderId || 'unknown');
+            const messageText = String(messageData.text || '').trim();
+
+            // 1. Server-Side Idempotency Protection: Check if identical message was sent in last 3 seconds
+            const recentThreshold = new Date(Date.now() - 3000).toISOString();
+            const { data: duplicateMsg } = await supabase
+                .from('team_messages')
+                .select('*')
+                .eq('team_id', teamIdStr)
+                .eq('sender_id', senderIdStr)
+                .eq('text', messageText)
+                .gte('created_at', recentThreshold)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (duplicateMsg) {
+                console.log('ℹ️ Server-side idempotency prevented duplicate message insert:', duplicateMsg.id);
+                return {
+                    success: true,
+                    data: {
+                        _id: duplicateMsg.id,
+                        id: duplicateMsg.id,
+                        teamId: duplicateMsg.team_id,
+                        senderId: duplicateMsg.sender_id,
+                        senderName: duplicateMsg.sender_name,
+                        senderPhoto: duplicateMsg.sender_photo,
+                        text: duplicateMsg.text,
+                        timestamp: duplicateMsg.created_at,
+                        replyTo: duplicateMsg.reply_to,
+                        edited: Boolean(duplicateMsg.is_edited)
+                    }
+                };
+            }
+
+            const clientMsgId = messageData.clientMessageId || null;
+
+            const payload: any = {
+                team_id: teamIdStr,
+                sender_id: senderIdStr,
                 sender_name: messageData.senderName || '',
                 sender_photo: messageData.senderPhoto || '',
-                text: messageData.text,
-                reply_to: messageData.replyTo || null
+                text: messageText,
+                reply_to: messageData.replyTo || null,
+                is_edited: false,
+                edited_at: null,
+                client_message_id: clientMsgId
             };
 
             const { data, error } = await supabase.from('team_messages').insert(payload).select().single();
+            
+            // If unique constraint triggers on duplicate retry, fetch the already created row
+            if (error && (error.code === '23505' || String(error.message).includes('unique'))) {
+                console.log('ℹ️ Handled database unique constraint for client_message_id:', clientMsgId);
+                const { data: existingMsg } = await supabase
+                    .from('team_messages')
+                    .select('*')
+                    .eq('team_id', teamIdStr)
+                    .eq('sender_id', senderIdStr)
+                    .eq('client_message_id', clientMsgId)
+                    .maybeSingle();
+
+                if (existingMsg) {
+                    return {
+                        success: true,
+                        data: {
+                            _id: existingMsg.id,
+                            id: existingMsg.id,
+                            teamId: existingMsg.team_id,
+                            senderId: existingMsg.sender_id,
+                            senderName: existingMsg.sender_name,
+                            senderPhoto: existingMsg.sender_photo,
+                            text: existingMsg.text,
+                            timestamp: existingMsg.created_at,
+                            replyTo: existingMsg.reply_to,
+                            edited: Boolean(existingMsg.is_edited)
+                        }
+                    };
+                }
+            }
+
             if (error) throw error;
             return {
                 success: true,
@@ -804,12 +881,68 @@ export const apiService = {
                     senderPhoto: data.sender_photo,
                     text: data.text,
                     timestamp: data.created_at,
-                    replyTo: data.reply_to
+                    replyTo: data.reply_to,
+                    edited: Boolean(data.is_edited)
                 }
             };
         } catch (err) {
             console.warn('Supabase sendChatMessage error:', err);
             return api.post('/chats/message', messageData).then(res => res.data).catch(() => ({ success: true }));
+        }
+    },
+
+    editChatMessage: async (messageId: string | number, newText: string) => {
+        try {
+            const queryId = String(messageId);
+
+            // STRICT: Must have a valid server UUID / ID. Reject temporary / local IDs.
+            if (!queryId || queryId.startsWith('temp-') || queryId.startsWith('local-')) {
+                console.warn('⚠️ Cannot edit message with unconfirmed temporary ID:', queryId);
+                return { success: false, error: 'Unconfirmed message ID' };
+            }
+
+            // Persist edited text and official is_edited + edited_at columns in Supabase
+            const { data, error } = await supabase
+                .from('team_messages')
+                .update({ 
+                    text: newText.trim(),
+                    is_edited: true,
+                    edited_at: new Date().toISOString()
+                })
+                .eq('id', queryId)
+                .select();
+
+            if (error) {
+                console.warn('editChatMessage error:', error);
+                throw error;
+            }
+            return { success: true, data };
+        } catch (err) {
+            console.warn('Supabase editChatMessage fallback:', err);
+            return api.put(`/chats/message/${messageId}`, { text: newText, edited: true }).then(res => res.data).catch(() => ({ success: true }));
+        }
+    },
+
+    deleteChatMessage: async (messageId: string | number) => {
+        try {
+            let queryId: any = messageId;
+            if (typeof messageId === 'string' && !isNaN(Number(messageId))) {
+                queryId = Number(messageId);
+            }
+
+            const { error } = await supabase
+                .from('team_messages')
+                .delete()
+                .eq('id', queryId);
+
+            if (error) {
+                console.warn('deleteChatMessage error:', error);
+                throw error;
+            }
+            return { success: true };
+        } catch (err) {
+            console.warn('Supabase deleteChatMessage fallback:', err);
+            return api.delete(`/chats/message/${messageId}`).then(res => res.data).catch(() => ({ success: true }));
         }
     },
 
@@ -1625,6 +1758,109 @@ export const apiService = {
         } catch (e) {
             console.warn('registerPushToken error:', e);
             return { success: true };
+        }
+    },
+
+    sendTeamChatNotification: async (payload: {
+        teamId: string | number;
+        senderId: string | number;
+        messageText: string;
+        messageId?: string | number;
+        clientMessageId?: string;
+    }) => {
+        try {
+            const { API_BASE_URL } = require('../constants/ApiConfig');
+            const res = await fetch(`${API_BASE_URL}/api/notifications/team-chat-message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const json = await res.json();
+            if (json && json.success) return json;
+
+            // Direct push fallback if backend endpoint returns 404/failure
+            return await apiService.dispatchDirectTeamChatPush(payload);
+        } catch (e) {
+            console.warn('sendTeamChatNotification error, executing direct push delivery:', e);
+            return await apiService.dispatchDirectTeamChatPush(payload);
+        }
+    },
+
+    dispatchDirectTeamChatPush: async (payload: {
+        teamId: string | number;
+        senderId: string | number;
+        messageText: string;
+    }) => {
+        try {
+            const teamIdStr = String(payload.teamId);
+            const senderIdStr = String(payload.senderId);
+
+            // 1. Query push tokens for this team from Supabase
+            const { data: tokens, error } = await supabase
+                .from('push_tokens')
+                .select('token, user_id, device_id')
+                .eq('team_id', teamIdStr);
+
+            if (error || !tokens || tokens.length === 0) return { success: true, count: 0 };
+
+            // 2. Filter out sender and keep valid Expo push tokens
+            const recipientRows = tokens.filter(t => 
+                String(t.user_id) !== senderIdStr && 
+                typeof t.token === 'string' && 
+                (t.token.startsWith('ExponentPushToken[') || t.token.startsWith('ExpoPushToken['))
+            );
+
+            if (recipientRows.length === 0) return { success: true, count: 0 };
+
+            // 3. Group by recipient device language (uz, ru, en)
+            const langGroups: { [lang: string]: string[] } = { uz: [], ru: [], en: [] };
+            recipientRows.forEach(r => {
+                let lang = 'uz';
+                const dId = String(r.device_id || '');
+                if (dId.endsWith('_ru') || dId.includes('_ru_') || dId.startsWith('ru_')) lang = 'ru';
+                else if (dId.endsWith('_en') || dId.includes('_en_') || dId.startsWith('en_')) lang = 'en';
+                if (!langGroups[lang].includes(r.token)) {
+                    langGroups[lang].push(r.token);
+                }
+            });
+
+            const bodyText = payload.messageText ? String(payload.messageText).slice(0, 150) : '...';
+            const titles: { [lang: string]: string } = {
+                uz: "Jamoa chati: Yangi xabar",
+                ru: "Командный чат: Новое сообщение",
+                en: "Team Chat: New message"
+            };
+
+            for (const [lang, tokenList] of Object.entries(langGroups)) {
+                if (tokenList.length > 0) {
+                    await fetch('https://exp.host/--/api/v2/push/send', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify(tokenList.map(token => ({
+                            to: token,
+                            title: titles[lang] || titles.uz,
+                            body: bodyText,
+                            sound: 'default',
+                            priority: 'high',
+                            channelId: 'default',
+                            data: {
+                                type: 'team_chat',
+                                teamId: teamIdStr,
+                                senderId: senderIdStr
+                            }
+                        })))
+                    });
+                }
+            }
+
+            console.log(`🔔 Direct push dispatched to ${recipientRows.length} device(s)`);
+            return { success: true, count: recipientRows.length };
+        } catch (err) {
+            console.warn('dispatchDirectTeamChatPush error:', err);
+            return { success: false };
         }
     },
 

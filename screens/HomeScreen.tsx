@@ -15,6 +15,7 @@ import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 import { formatShortTeamName } from '../utils/stringUtils';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.88;
@@ -22,6 +23,7 @@ const CARD_SPACING = 12;
 const SIDE_PADDING = (width - CARD_WIDTH) / 2;
 
 export default function HomeScreen({ navigation }: any) {
+    const { t } = useTranslation();
     const [matches, setMatches] = useState<any[]>([]);
     const [sliderItems, setSliderItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -221,7 +223,7 @@ export default function HomeScreen({ navigation }: any) {
                             ) : (
                                 <View style={styles.vsContainer}>
                                     <Text style={styles.hTimeVsText}>{formattedTime}</Text>
-                                    <Text style={styles.vsSubText}>BOSHLANISHI</Text>
+                                    <Text style={styles.vsSubText}>{t('matches.starts')}</Text>
                                 </View>
                             )}
                         </View>
@@ -271,9 +273,9 @@ export default function HomeScreen({ navigation }: any) {
 
                                 const getGreetingText = () => {
                                     const hour = new Date().getHours();
-                                    if (hour >= 5 && hour < 12) return 'XAYRLI TONG ☀️';
-                                    if (hour >= 12 && hour < 18) return 'XAYRLI KUN 🌤️';
-                                    return 'XAYRLI KECH 🌙';
+                                    if (hour >= 5 && hour < 12) return t('home.good_morning');
+                                    if (hour >= 12 && hour < 18) return t('home.good_day');
+                                    return t('home.good_evening');
                                 };
 
                                 return (
@@ -344,9 +346,9 @@ export default function HomeScreen({ navigation }: any) {
 
                             <View style={styles.sectionContainer}>
                                 <View style={styles.sectionHeader}>
-                                    <Text style={styles.sectionTitle}>Markaziy O'yinlar</Text>
+                                    <Text style={styles.sectionTitle}>{t('home.featured_matches')}</Text>
                                     <TouchableOpacity onPress={() => navigation.navigate('Taqvim')}>
-                                        <Text style={styles.viewAllText}>BATAFSIL TAQVIM →</Text>
+                                        <Text style={styles.viewAllText}>{t('home.view_calendar')}</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -361,16 +363,16 @@ export default function HomeScreen({ navigation }: any) {
                                 ) : (
                                     <View style={styles.emptyCard}>
                                         <Ionicons name="calendar-outline" size={32} color={Colors.textMuted} />
-                                        <Text style={styles.emptyText}>Rejalashtirilgan o'yinlar qolmadi</Text>
+                                        <Text style={styles.emptyText}>{t('home.no_upcoming_matches')}</Text>
                                     </View>
                                 )}
                             </View>
 
                             <View style={styles.sectionContainer}>
                                 <View style={styles.sectionHeader}>
-                                    <Text style={styles.sectionTitle}>So'nggi Natijalar</Text>
+                                    <Text style={styles.sectionTitle}>{t('home.recent_results')}</Text>
                                     <TouchableOpacity onPress={() => navigation.navigate('Turnirlar')}>
-                                        <Text style={styles.viewAllText}>BARCHA NATIJALAR →</Text>
+                                        <Text style={styles.viewAllText}>{t('home.view_all_results')}</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -434,7 +436,7 @@ export default function HomeScreen({ navigation }: any) {
                                                                 {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
                                                             </Text>
                                                             <View style={styles.finishedBadgeTag}>
-                                                                <Text style={styles.finishedBadgeTagText}>TUGADI</Text>
+                                                                <Text style={styles.finishedBadgeTagText}>{t('matches.finished')}</Text>
                                                             </View>
                                                         </View>
 
@@ -468,7 +470,7 @@ export default function HomeScreen({ navigation }: any) {
                                 ) : (
                                     <View style={styles.emptyCard}>
                                         <Ionicons name="trophy-outline" size={32} color={Colors.textMuted} />
-                                        <Text style={styles.emptyText}>Tugallangan o'yinlar mavjud emas</Text>
+                                        <Text style={styles.emptyText}>{t('home.no_finished_matches')}</Text>
                                     </View>
                                 )}
                             </View>

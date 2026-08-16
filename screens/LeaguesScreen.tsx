@@ -18,8 +18,10 @@ import { useNavigation } from '@react-navigation/native';
 import SmartImage from '../components/SmartImage';
 import LeaguesSkeleton from '../components/LeaguesSkeleton';
 import VideoBackground from '../components/VideoBackground';
+import { useTranslation } from 'react-i18next';
 
 export default function LeaguesScreen() {
+    const { t } = useTranslation();
     const { tournaments: groups, setTournaments: setGroups, isLoading, setLoading } = useTournamentStore();
     const navigation = useNavigation<any>();
 
@@ -139,11 +141,11 @@ export default function LeaguesScreen() {
                 <View style={styles.statsContainer}>
                     <View style={styles.statBubble}>
                         <Text style={styles.statBubbleVal}>{league.tournaments?.length || 0}</Text>
-                        <Text style={styles.statBubbleLabel}>Turnir</Text>
+                        <Text style={styles.statBubbleLabel}>{t('tournaments.title')}</Text>
                     </View>
                     <View style={styles.statBubble}>
                         <Text style={styles.statBubbleVal}>{league.teamCount || 0}</Text>
-                        <Text style={styles.statBubbleLabel}>Jamoa</Text>
+                        <Text style={styles.statBubbleLabel}>{t('teams.title')}</Text>
                     </View>
                 </View>
             </View>

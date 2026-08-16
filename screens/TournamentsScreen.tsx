@@ -28,6 +28,7 @@ import { RefreshControl } from 'react-native';
 import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
+import { useTranslation } from 'react-i18next';
 
 
 const { width } = Dimensions.get('window');
@@ -70,6 +71,7 @@ const TournamentsHeader = ({
     teamsLoading,
     navigation
 }: any) => {
+    const { t } = useTranslation();
     const accordionHeight = animationValue.interpolate({
         inputRange: [0, 1],
         outputRange: [0, 500], // Increased to ensure no overflow issues
@@ -93,7 +95,7 @@ const TournamentsHeader = ({
                         onPress={() => setActiveTab('league')}
                     >
                         <Text style={[styles.tabText, activeTab === 'league' && styles.activeTabText]}>
-                            Liga turnirlari
+                            {t('tournaments.league_tournaments')}
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -107,7 +109,7 @@ const TournamentsHeader = ({
                             style={{ marginRight: 8 }}
                         />
                         <Text style={[styles.tabText, activeTab === 'favorites' && styles.activeTabText]}>
-                            Saralanganlar
+                            {t('tournaments.favorites')}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -208,7 +210,7 @@ const TournamentsHeader = ({
                 <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>Jamoalar</Text>
+                        <Text style={styles.statLabel}>{t('teams.title')}</Text>
                         {isLeaguesLoading || !selectedLeague ? (
                             <Skeleton width={30} height={16} borderRadius={4} />
                         ) : (
@@ -216,12 +218,12 @@ const TournamentsHeader = ({
                         )}
                     </View>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>Holati</Text>
+                        <Text style={styles.statLabel}>{t('common.status')}</Text>
                         {isLeaguesLoading || !selectedLeague ? (
                             <Skeleton width={50} height={16} borderRadius={4} />
                         ) : (
                             <Text style={styles.statValue}>
-                                {teams?.length || 0} faol
+                                {teams?.length || 0} {t('common.active').toLowerCase()}
                             </Text>
                         )}
                     </View>
@@ -262,7 +264,7 @@ const TournamentsHeader = ({
                 >
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={styles.hallOfFameBtnText}>TURNIR HAQIDA</Text>
+                        <Text style={styles.hallOfFameBtnText}>{t('tournaments.overview')}</Text>
                         <Ionicons name="arrow-forward" size={18} color={Colors.primary} style={{ marginLeft: 6 }} />
                     </View>
                 </TouchableOpacity>
@@ -285,6 +287,7 @@ const TournamentsHeader = ({
 };
 
 export default function TournamentsScreen({ navigation }: any) {
+    const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('league'); // 'league' or 'favorites'
     const [searchQuery, setSearchQuery] = useState('');
@@ -469,12 +472,12 @@ export default function TournamentsScreen({ navigation }: any) {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 16, paddingVertical: 12 }}>
                         <View style={styles.navbarLeft}>
                             <Text style={styles.navLogoText}>AMATORA</Text>
-                            <Text style={styles.navTitle}>Turnirlar</Text>
+                            <Text style={styles.navTitle}>{t('tournaments.title')}</Text>
                         </View>
                         <View style={styles.navSearchContainer}>
                             <TextInput
                                 style={styles.navSearchInput}
-                                placeholder="Jamoalarni qidirish..."
+                                placeholder={t('common.search')}
                                 placeholderTextColor="rgba(255,255,255,0.5)"
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
@@ -513,7 +516,7 @@ export default function TournamentsScreen({ navigation }: any) {
                             !teamsLoading ? (
                                 <View style={styles.emptyStateBox}>
                                     <Ionicons name="shield-outline" size={48} color="rgba(255,255,255,0.2)" />
-                                    <Text style={styles.emptyStateText}>Ushbu ligada hozircha jamoalar kiritilmagan</Text>
+                                    <Text style={styles.emptyStateText}>{t('teams.no_teams')}</Text>
                                 </View>
                             ) : null
                         }

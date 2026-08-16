@@ -35,6 +35,8 @@ import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import { SlideButton } from '../components/SlideButton';
 import ReplayVideoCard from '../components/ReplayVideoCard';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
+import { useTranslation } from 'react-i18next';
+import { getLocalizedPosition } from '../utils/localizationUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -146,10 +148,11 @@ const calculateAgeFromBirthDate = (birthStr?: string, defaultAge?: any) => {
         }
     }
 
-    return age > 0 ? `${age} yosh` : (defaultAge ? `${defaultAge} yosh` : '—');
+    return age > 0 ? `${age}` : (defaultAge ? `${defaultAge}` : '—');
 };
 
 const MyStatsScreen = ({ navigation }: any) => {
+    const { t } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const [loading, setLoading] = useState(true);
     const [player, setPlayer] = useState<any>(null);
@@ -271,9 +274,9 @@ const MyStatsScreen = ({ navigation }: any) => {
 
     const tabs = ['profil', 'karyerasi', 'oyinlari'];
     const tabLabels: any = {
-        profil: 'PROFIL',
-        karyerasi: 'KARYERAM',
-        oyinlari: "O'YINLARI"
+        profil: t('stats.tab_profile'),
+        karyerasi: t('stats.tab_my_career'),
+        oyinlari: t('stats.tab_matches')
     };
 
     const activeTabRef = useRef(activeTab);
@@ -754,12 +757,12 @@ const MyStatsScreen = ({ navigation }: any) => {
                 <StatusBar barStyle="light-content" />
                 <View style={styles.emptyContent}>
                     <Ionicons name="person-circle-outline" size={80} color="rgba(255,255,255,0.2)" />
-                    <Text style={styles.emptyTitle}>PROFIL MAVJUD EMAS</Text>
+                    <Text style={styles.emptyTitle}>{t('stats.no_profile')}</Text>
                     <Text style={styles.emptySub}>
-                        Ushbu bo'lim faqat futbolchi sifatida ro'yxatdan o'tgan foydalanuvchilar uchun amal qiladi.
+                        {t('stats.no_profile')}
                     </Text>
                     <TouchableOpacity onPress={() => navigation.navigate('Welcome')} style={styles.loginBtn}>
-                        <Text style={styles.loginBtnText}>TIZIMGA KIRISH</Text>
+                        <Text style={styles.loginBtnText}>{t('auth.login')}</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
@@ -785,10 +788,10 @@ const MyStatsScreen = ({ navigation }: any) => {
     const renderProfil = () => (
         <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
             <View style={styles.statsGrid}>
-                <StatBox label="GOLLAR" value={stats.goals} icon="football" color={Colors.primary} />
-                <StatBox label="ASSISTLAR" value={stats.assists} icon="shoe-prints" color="#3b82f6" />
-                <StatBox label="O'YINLAR" value={stats.matchesPlayed} icon="calendar" color="#FFF" />
-                <StatBox label="REYTING" value={stats.rating || player.rating || 0} icon="trending-up" color="#FACC15" />
+                <StatBox label={t('stats.goals').toUpperCase()} value={stats.goals} icon="football" color={Colors.primary} />
+                <StatBox label={t('stats.assists').toUpperCase()} value={stats.assists} icon="shoe-prints" color="#3b82f6" />
+                <StatBox label={t('stats.matches_played').toUpperCase()} value={stats.matchesPlayed} icon="calendar" color="#FFF" />
+                <StatBox label={t('stats.rating').toUpperCase()} value={stats.rating || player.rating || 0} icon="trending-up" color="#FACC15" />
             </View>
 
             <View style={styles.physicalInfoBox}>
@@ -797,22 +800,22 @@ const MyStatsScreen = ({ navigation }: any) => {
                     <View style={styles.statItem}>
                         <View style={styles.statIconBox}><Ionicons name="calendar-outline" size={18} color={Colors.primary} /></View>
                         <View>
-                            <Text style={styles.statLabelSmall}>YOSHI</Text>
-                            <Text style={styles.statValueSmall}>{computedAge}</Text>
+                            <Text style={styles.statLabelSmall}>{t('stats.age')}</Text>
+                            <Text style={styles.statValueSmall}>{computedAge !== '—' ? `${computedAge} ${t('stats.years_old')}` : '—'}</Text>
                         </View>
                     </View>
                     <View style={styles.statItem}>
                         <View style={styles.statIconBox}><Ionicons name="resize-outline" size={18} color={Colors.primary} /></View>
                         <View>
-                            <Text style={styles.statLabelSmall}>BO'YI</Text>
-                            <Text style={styles.statValueSmall}>{player?.height ? `${player.height} SM` : '—'}</Text>
+                            <Text style={styles.statLabelSmall}>{t('stats.height')}</Text>
+                            <Text style={styles.statValueSmall}>{player?.height ? `${player.height} ${t('stats.cm').toUpperCase()}` : '—'}</Text>
                         </View>
                     </View>
                     <View style={styles.statItem}>
                         <View style={styles.statIconBox}><Ionicons name="fitness-outline" size={18} color={Colors.primary} /></View>
                         <View>
-                            <Text style={styles.statLabelSmall}>VAZNI</Text>
-                            <Text style={styles.statValueSmall}>{player?.weight ? `${player.weight} KG` : '—'}</Text>
+                            <Text style={styles.statLabelSmall}>{t('stats.weight')}</Text>
+                            <Text style={styles.statValueSmall}>{player?.weight ? `${player.weight} ${t('stats.kg').toUpperCase()}` : '—'}</Text>
                         </View>
                     </View>
                 </View>
@@ -821,14 +824,14 @@ const MyStatsScreen = ({ navigation }: any) => {
             <View style={styles.infoSection}>
                 <View style={styles.sectionHeader}>
                     <Ionicons name="person-circle" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>SHAXSIY <Text style={styles.sectionTitleHighlight}>MA'LUMOTLAR</Text></Text>
+                    <Text style={styles.sectionTitle}>{t('stats.personal_info')}</Text>
                 </View>
                 <View style={styles.infoList}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <InfoRow label="OTASINING ISMI" value={player.fatherName || player.father_name || '---'} icon="person" />
-                    <InfoRow label="MILLATI" value={player.citizenship || '---'} icon="planet" />
-                    <InfoRow label="POZITSIYA" value={player.positionUz || player.position || '---'} icon="shield" />
-                    <InfoRow label="TELEFON (raqamingiz faqat sizga ko'rinadi)" value={player.phone || '---'} icon="call" />
+                    <InfoRow label={t('stats.father_name')} value={player.fatherName || player.father_name || '---'} icon="person" />
+                    <InfoRow label={t('stats.citizenship')} value={player.citizenship || '---'} icon="planet" />
+                    <InfoRow label={t('stats.position')} value={getLocalizedPosition(player.position, t)} icon="shield" />
+                    <InfoRow label={t('stats.phone')} value={player.phone || '---'} icon="call" />
                 </View>
             </View>
 
@@ -876,7 +879,7 @@ const MyStatsScreen = ({ navigation }: any) => {
             <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
                 <View style={[styles.sectionHeader, { marginTop: 10 }]}>
                     <Ionicons name="time-outline" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>KARYERA <Text style={styles.sectionTitleHighlight}>TARIXI</Text></Text>
+                    <Text style={styles.sectionTitle}>{t('stats.career_history').toUpperCase()}</Text>
                 </View>
 
                 <View style={styles.careerTimelineContainer}>
@@ -885,7 +888,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                         <View style={styles.teamMainRow}>
                             <View style={[styles.teamIconBox, { borderColor: '#00FF66', borderWidth: 1.5, width: 36, height: 36, borderRadius: 10 }]}>
                                 {currentTeamLogo ? (
-                                    <Image source={{ uri: currentTeamLogo }} style={{ width: 26, height: 26 }} contentFit="contain" />
+                                    <Image source={{ uri: currentTeamLogo }} style={{ width: 26, height: 26 }} resizeMode="contain" />
                                 ) : (
                                     <Ionicons name="shield" size={18} color="#00FF66" />
                                 )}
@@ -897,10 +900,10 @@ const MyStatsScreen = ({ navigation }: any) => {
                                     </Text>
                                     <View style={styles.currentTeamBadge}>
                                         <View style={styles.pulsingDot} />
-                                        <Text style={styles.currentTeamBadgeText}>HOZIRGI JAMOA</Text>
+                                        <Text style={styles.currentTeamBadgeText}>{t('stats.current_team').toUpperCase()}</Text>
                                     </View>
                                 </View>
-                                <Text style={styles.careerDateSub}>Amaldagi jamoasi • Hozirga qadar</Text>
+                                <Text style={styles.careerDateSub}>{t('stats.current_team_sub')}</Text>
                             </View>
                         </View>
                     </View>
@@ -916,7 +919,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                 <View style={styles.teamMainRow}>
                                     <View style={[styles.teamIconBox, { width: 34, height: 34, borderRadius: 10 }]}>
                                         {oldLogo ? (
-                                            <Image source={{ uri: oldLogo }} style={{ width: 24, height: 24 }} contentFit="contain" />
+                                            <Image source={{ uri: oldLogo }} style={{ width: 24, height: 24 }} resizeMode="contain" />
                                         ) : (
                                             <Ionicons name="shield-outline" size={16} color="rgba(255,255,255,0.6)" />
                                         )}
@@ -928,11 +931,11 @@ const MyStatsScreen = ({ navigation }: any) => {
                                             </Text>
                                             <View style={styles.transferredBadge}>
                                                 <Ionicons name="arrow-forward" size={10} color="#94A3B8" />
-                                                <Text style={styles.transferredBadgeText}>ESKI JAMOA</Text>
+                                                <Text style={styles.transferredBadgeText}>{t('stats.past_team').toUpperCase()}</Text>
                                             </View>
                                         </View>
                                         <Text style={styles.careerDateSub}>
-                                            🗓️ Transfer sanasi: {trDate}
+                                            🗓️ {t('stats.transfer_date')}: {trDate}
                                         </Text>
                                     </View>
                                 </View>
@@ -945,7 +948,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                 <View style={{ marginTop: 24, marginBottom: 20 }}>
                     <View style={[styles.sectionHeader, { marginBottom: 12 }]}>
                         <Ionicons name="videocam" size={20} color={Colors.primary} />
-                        <Text style={styles.sectionTitle}>SHAXSIY <Text style={styles.sectionTitleHighlight}>GOL QAYTARIQLARI (REPLAYS)</Text></Text>
+                        <Text style={styles.sectionTitle}>{t('stats.personal_replays')}</Text>
                     </View>
 
                     {replaysLoading ? (
@@ -962,7 +965,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                     ) : (
                         <View style={styles.emptyCareer}>
                             <Ionicons name="videocam-outline" size={32} color="rgba(255,255,255,0.2)" />
-                            <Text style={[styles.emptyCareerText, { marginTop: 6 }]}>Shaxsiy gol qaytariqlari hali mavjud emas</Text>
+                            <Text style={[styles.emptyCareerText, { marginTop: 6 }]}>{t('stats.no_replays')}</Text>
                         </View>
                     )}
                 </View>
@@ -974,7 +977,7 @@ const MyStatsScreen = ({ navigation }: any) => {
         <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
             <View style={[styles.sectionHeader, { marginTop: 10 }]}>
                 <Ionicons name="football-outline" size={20} color={Colors.primary} />
-                <Text style={styles.sectionTitle}>O'TGAN <Text style={styles.sectionTitleHighlight}>O'YINLAR</Text></Text>
+                <Text style={styles.sectionTitle}>{t('stats.past_matches').toUpperCase()}</Text>
             </View>
 
             {matchesLoading ? (
@@ -985,7 +988,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                 ))
             ) : (
                 <View style={styles.emptyCareer}>
-                    <Text style={styles.emptyCareerText}>O'yinlar tarixi mavjud emas</Text>
+                    <Text style={styles.emptyCareerText}>{t('matches.no_matches')}</Text>
                 </View>
             )}
         </ScrollView>
@@ -1115,7 +1118,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                     <Ionicons name="shield-sharp" size={14} color="#00FF87" />
                                 )}
                                 <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: '800', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
-                                    {getPositionFullUz(player?.positionUz || player?.position)}
+                                    {getLocalizedPosition(player?.position, t)}
                                 </Text>
                             </View>
 
@@ -1164,7 +1167,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                     <FontAwesome5 name="instagram" size={12} color="#E1306C" />
                                 )}
                                 <Text style={{ color: '#E1306C', fontSize: 11, fontWeight: '800', lineHeight: 14 }}>
-                                    {openingInstagram ? 'OCHILMOQDA...' : `@${instagramUsername}`}
+                                    {openingInstagram ? t('common.loading') : `@${instagramUsername}`}
                                 </Text>
                             </TouchableOpacity>
                         ) : null}
@@ -1188,7 +1191,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                         />
                                     </View>
                                     <View style={{ flex: 1, marginLeft: 12 }}>
-                                        <Text style={styles.miniTabType}>BO'LIM</Text>
+                                        <Text style={styles.miniTabType}>{t('stats.section')}</Text>
                                         <Text style={styles.miniTabName}>{tabLabels[activeTab]}</Text>
                                     </View>
                                 </View>
@@ -1270,7 +1273,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                                             <Ionicons name="shield-outline" size={14} color="#00FF87" />
                                         )}
                                         <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontWeight: '700', fontSize: 11, letterSpacing: 1 }}>
-                                            {getPositionFullUz(player?.positionUz || player?.position)}
+                                            {getLocalizedPosition(player?.position, t)}
                                         </Text>
                                     </View>
                                 </View>

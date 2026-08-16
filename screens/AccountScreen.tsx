@@ -19,26 +19,10 @@ import backgroundImage from '../assets/images/backroud-image.png';
 import { useAuthStore } from '../store/useAuthStore';
 import SmartImage from '../components/SmartImage';
 import { apiService } from '../services/apiService';
-const getPositionFullUz = (pos: string) => {
-    const map: any = {
-        'GK': "Darvozabon",
-        'LB': "Chap qanot himoyachisi",
-        'CB': "Markaziy himoyachi",
-        'RB': "O'ng qanot himoyachisi",
-        'CDM': "Tayanch yarim himoyachisi",
-        'CM': "Markaziy yarim himoyachisi",
-        'CAM': "Hujumkor yarim himoyachisi",
-        'LW': "Chap qanot hujumchisi",
-        'RW': "O'ng qanot hujumchisi",
-        'ST': "Markaziy hujumchi",
-        'CF': "Ikkinchi hujumchi",
-        'LM': "Chap qanot yarim himoyachisi",
-        'RM': "O'ng qanot yarim himoyachisi",
-        'LWB': "Chap qanot qanot himoyachisi",
-        'RWB': "O'ng qanot qanot himoyachisi",
-    };
-    return map[pos?.toUpperCase()] || pos || 'O\'YINCHI';
-};
+import { useTranslation } from 'react-i18next';
+import LanguageSelectModal from '../components/LanguageSelectModal';
+import { SUPPORTED_LANGUAGES } from '../store/useLanguageStore';
+import { getLocalizedPosition } from '../utils/localizationUtils';
 
 import { useFocusEffect } from '@react-navigation/native';
 import { useJuniorStore } from '../store/useJuniorStore';
@@ -49,8 +33,10 @@ export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout, unreadCount, isChatMuted } = useAuthStore();
     const { isJuniorMode, setJuniorMode, verifyPin } = useJuniorStore();
     const { selectedOrganizationId, setSelectedOrganizationId, organizations } = useOrganizationStore();
+    const { t, i18n } = useTranslation();
 
     const [showPinModal, setShowPinModal] = useState(false);
+    const [showLanguageModal, setShowLanguageModal] = useState(false);
     const [pinInput, setPinInput] = useState('');
     const [targetJuniorState, setTargetJuniorState] = useState<boolean>(false);
 
@@ -220,11 +206,11 @@ export default function AccountScreen({ navigation }: any) {
                                         }
                                         displayName = displayName.replace(/\(sardor\)/gi, '').replace(/\(menejer\)/gi, '').trim();
 
-                                        let displaySubtitle = 'AMATORA AZ\'OSI';
+                                        let displaySubtitle = 'AMATORA';
                                         if (isGuest) {
-                                            displaySubtitle = 'MEHMON';
+                                            displaySubtitle = t('auth.guest_mode').toUpperCase();
                                         } else if (isPlayer) {
-                                            displaySubtitle = getPositionFullUz(detailedData?.position || user?.position || 'O\'YINCHI').toUpperCase();
+                                            displaySubtitle = getLocalizedPosition(detailedData?.position || user?.position, t).toUpperCase();
                                         } else if (isManager) {
                                             displaySubtitle = (detailedData?.league || user?.league || 'SARDOR').toUpperCase();
                                         }
@@ -248,15 +234,15 @@ export default function AccountScreen({ navigation }: any) {
                     {/* Account Settings (Guest Only) */}
                     {isGuest && (
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>HISOB</Text>
+                            <Text style={styles.sectionTitle}>{t('profile.account')}</Text>
                             <TouchableOpacity style={styles.loginBanner} onPress={() => logout()}>
                                 <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, width: '100%' }}>
                                     <View style={styles.bannerInfo}>
                                         <Ionicons name="log-in-outline" size={28} color={Colors.primary} />
                                         <View style={styles.bannerTextContainer}>
-                                            <Text style={styles.bannerTitle}>TIZIMGA KIRING</Text>
-                                            <Text style={styles.bannerSubtitle}>BARCHA IMKONIYATLAR UCHUN</Text>
+                                            <Text style={styles.bannerTitle}>{t('profile.login_prompt')}</Text>
+                                            <Text style={styles.bannerSubtitle}>{t('profile.login_sub')}</Text>
                                         </View>
                                     </View>
                                     <Ionicons name="chevron-forward" size={22} color={Colors.primary} />
@@ -267,24 +253,24 @@ export default function AccountScreen({ navigation }: any) {
 
                     {!isGuest && (
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>BOSHQARUV</Text>
+                            <Text style={styles.sectionTitle}>{t('profile.management')}</Text>
                             {user?.role === 'player' && (
                                 <>
                                     <SettingItem
                                         icon="stats-chart-outline"
-                                        title="Mening statistika"
+                                        title={t('profile.my_stats')}
                                         onPress={() => navigation.navigate('MyStats', { playerId: user?.id })}
                                     />
                                     <SettingItem
                                         icon="paper-plane-outline"
-                                        title="Mening arizalarim"
-                                        value={userTransfers.length + userProfileApps.length > 0 ? `${userTransfers.length + userProfileApps.length} ta ariza` : ''}
+                                        title={t('profile.applications')}
+                                        value={userTransfers.length + userProfileApps.length > 0 ? `${userTransfers.length + userProfileApps.length} ${t('nav.applications').toLowerCase()}` : ''}
                                         onPress={() => navigation.navigate('Applications')}
                                     />
                                     {transferWindowOpen && (
                                         <SettingItem
                                             icon="swap-horizontal-outline"
-                                            title="Transfer so'rovi"
+                                            title={t('profile.transfer_requests')}
                                             onPress={() => navigation.navigate('TransferRequest', { playerId: user?.id })}
                                         />
                                     )}
@@ -294,12 +280,12 @@ export default function AccountScreen({ navigation }: any) {
                                 <>
                                     <SettingItem
                                         icon="shield-outline"
-                                        title="Mening jamoam"
+                                        title={t('profile.my_team')}
                                         onPress={() => navigation.navigate('TeamProfile', { teamId: currentTeamId })}
                                     />
                                     <SettingItem
                                         icon="chatbubbles-outline"
-                                        title="Jamoa chati"
+                                        title={t('teams.team_chat')}
                                         onPress={() => navigation.navigate('TeamChat', { 
                                             teamId: currentTeamId, 
                                             userId: user?._id || user?.id, 
@@ -311,19 +297,19 @@ export default function AccountScreen({ navigation }: any) {
                                     {user?.role === 'player' ? (
                                         <SettingItem
                                             icon="grid-outline"
-                                            title="Jamoa sostavi"
+                                            title={t('teams.squad')}
                                             onPress={() => navigation.navigate('FormationBoard', { teamId: currentTeamId, isReadOnly: true })}
                                         />
                                     ) : (
                                         <>
                                             <SettingItem
                                                 icon="grid-outline"
-                                                title="Sostavni tahrirlash"
+                                                title={t('teams.edit_formation')}
                                                 onPress={() => navigation.navigate('FormationBoard', { teamId: currentTeamId, isReadOnly: false })}
                                             />
                                             <SettingItem
                                                 icon="person-add-outline"
-                                                title="O'yinchi qo'shish"
+                                                title={t('teams.add_player')}
                                                 onPress={() => navigation.navigate('JoinApplication', { initialType: 'player', teamId: currentTeamId })}
                                             />
                                         </>
@@ -338,13 +324,13 @@ export default function AccountScreen({ navigation }: any) {
                             <View style={styles.applyBanner}>
                                 <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={{ padding: 25, alignItems: 'center' }}>
-                                    <Text style={styles.applyTitle}>LIGAGA ARIZA TOPSHIRING</Text>
-                                    <Text style={styles.applySubtitle}>O'Z JAMOANGIZ BILAN AMATORA DA QATNASHING!</Text>
+                                    <Text style={styles.applyTitle}>{t('profile.apply_to_league')}</Text>
+                                    <Text style={styles.applySubtitle}>AMATORA</Text>
                                     <TouchableOpacity
                                         style={styles.applyButton}
                                         onPress={() => (navigation as any).navigate('JoinApplication')}
                                     >
-                                        <Text style={styles.applyButtonText}>ARIZA TOPSHIRISH</Text>
+                                        <Text style={styles.applyButtonText}>{t('applications.submit_app')}</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -355,10 +341,16 @@ export default function AccountScreen({ navigation }: any) {
 
                     {/* Settings & Security Navigation */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>SOZLAMALAR</Text>
+                        <Text style={styles.sectionTitle}>{t('settings.title').toUpperCase()}</Text>
+                        <SettingItem
+                            icon="language-outline"
+                            title={t('settings.language')}
+                            value={(SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.flag || '🇺🇿') + ' ' + (SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label || "O'zbekcha")}
+                            onPress={() => setShowLanguageModal(true)}
+                        />
                         <SettingItem
                             icon="settings-outline"
-                            title="Sozlamalar va xavfsizlik"
+                            title={t('settings.security_title')}
                             onPress={() => {
                                 const parent = navigation.getParent?.();
                                 if (parent) {
@@ -373,6 +365,12 @@ export default function AccountScreen({ navigation }: any) {
                     {/* App Version */}
                     <Text style={styles.versionText}>VERSIYA 2.1.1 • PRODUCTION CERTIFIED</Text>
                 </ScrollView>
+
+                {/* Language Select Modal */}
+                <LanguageSelectModal
+                    visible={showLanguageModal}
+                    onClose={() => setShowLanguageModal(false)}
+                />
 
                 {/* PIN Verification Modal */}
                 <Modal visible={showPinModal} transparent animationType="fade" onRequestClose={() => setShowPinModal(false)}>
@@ -555,7 +553,7 @@ const styles = StyleSheet.create({
     appCardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         marginBottom: 6,
     },
     appCardTitleGroup: {

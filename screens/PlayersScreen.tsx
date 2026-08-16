@@ -20,8 +20,11 @@ import { Video, ResizeMode } from 'expo-av';
 import VideoBackground from '../components/VideoBackground';
 
 import { getOptimizedImageUrl } from '../utils/imageOptimizer';
+import { useTranslation } from 'react-i18next';
+import { getLocalizedPosition } from '../utils/localizationUtils';
 
 export default function PlayersScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { teamId, tournamentId, tournamentName } = route?.params || {};
     const { players, setPlayers, isLoading, setLoading } = usePlayerStore();
 
@@ -67,7 +70,7 @@ export default function PlayersScreen({ route, navigation }: any) {
                 <View style={styles.infoContainer}>
                     <Text style={styles.playerName}>{item.firstName || 'O\'yinchi'} {item.lastName || ''}</Text>
                     <Text style={styles.playerPosition}>
-                        {item.position || "Noma'lum position"} • #{item.number || '--'}
+                        {getLocalizedPosition(item.position, t)} • #{item.number || '--'}
                     </Text>
                 </View>
                 <View style={styles.statsContainer}>
@@ -90,7 +93,7 @@ export default function PlayersScreen({ route, navigation }: any) {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={Colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{tournamentName ? `${tournamentName} Top Scorerlar` : "O'yinchilar"}</Text>
+                <Text style={styles.headerTitle}>{tournamentName ? `${tournamentName} ${t('tournaments.players')}` : t('tournaments.players')}</Text>
                 <View style={styles.placeholder} />
             </View>
 
@@ -110,7 +113,7 @@ export default function PlayersScreen({ route, navigation }: any) {
                     removeClippedSubviews={true}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>Hozircha o'yinchilar mavjud emas</Text>
+                            <Text style={styles.emptyText}>{t('common.no_data')}</Text>
                         </View>
                     }
                 />

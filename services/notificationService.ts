@@ -4,18 +4,41 @@ import { Platform, Alert } from 'react-native';
 import Constants from 'expo-constants';
 import { apiService } from './apiService';
 
+// Active chat tracking to suppress native banners when user is already inside that chat room
+let activeTeamChatId: string | number | null = null;
+
 // Configure how notifications should be handled when the app is in foreground
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification?.request?.content?.data;
+    // If user is currently active inside this specific team chat, suppress foreground banner
+    if (data && (data.type === 'team_chat' || data.type === 'chat') && activeTeamChatId && String(data.teamId) === String(activeTeamChatId)) {
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: false,
+        shouldShowList: false,
+      };
+    }
+
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
 
 export const notificationService = {
+  setActiveTeamChatId: (id: string | number | null) => {
+    activeTeamChatId = id;
+  },
+
+  getActiveTeamChatId: () => activeTeamChatId,
+
   /**
    * Registers the device for push notifications and sends the token to the backend
    * @param userId The ID of the currently logged-in user (optional)
@@ -51,7 +74,7 @@ export const notificationService = {
 
       // Get the token from Expo
       // Project ID is required for SDK 49+
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? "14fddb89-af52-47b3-90ab-f437d786254b";
       
       console.log(`DEBUG: Fetching Expo token for project ${projectId}...`);
       const tokenData = await Notifications.getExpoPushTokenAsync({
@@ -60,19 +83,7 @@ export const notificationService = {
       
       const token = tokenData.data;
       console.log('Expo Push Token:', token);
-      
-      // DIAGNOSTIC ALERT (Temporary)
-      // Alert.alert('Push Registration', `Expo Token: ${token.substring(0, 20)}...`);
 
-      // Get native device token (FCM/APNs) for direct Firebase messaging
-      try {
-        const deviceTokenData = await Notifications.getDevicePushTokenAsync();
-        console.log('Device Push Token (FCM/APNs):', deviceTokenData.data);
-      } catch (e) {
-        console.log('NOTICE: Could not get device push token (expected in Expo Go)');
-      }
-
-      // Register with our backend
       // Register Expo Token with our backend
       if (userId) {
         const { useAuthStore } = require('../store/useAuthStore');
@@ -81,33 +92,24 @@ export const notificationService = {
         const orgId = useOrganizationStore.getState().selectedOrganizationId || 1;
         const teamId = currentUser?.teamId || (currentUser as any)?.team_id;
 
+        let currentLang = 'uz';
+        try {
+          const i18n = require('../i18n').default;
+          if (i18n && i18n.language) currentLang = i18n.language;
+        } catch (_) {}
+
         const registrationData = {
           token,
           userId: userId || 'anonymous',
           platform: Platform.OS,
-          deviceId: Constants.installationId || Device.osBuildId || 'unknown',
+          deviceId: (Constants.installationId || Device.osBuildId || 'unknown') + '_' + currentLang,
           teamId,
-          organizationId: orgId
+          organizationId: orgId,
+          language: currentLang
         };
         
         await apiService.registerPushToken(registrationData);
-        console.log('Registered Expo Token with backend:', registrationData.userId);
-
-        // Also register native device token (FCM/APNs) for direct Firebase messaging
-        try {
-          const deviceTokenData = await Notifications.getDevicePushTokenAsync();
-          if (deviceTokenData.data && deviceTokenData.data !== token) {
-            await apiService.registerPushToken({
-              token: deviceTokenData.data,
-              userId,
-              platform: Platform.OS,
-              deviceId: (Constants.installationId || Device.osBuildId || 'unknown') + '_fcm'
-            });
-            console.log('Registered Native Token with backend');
-          }
-        } catch (e) {
-          console.log('NOTICE: Direct FCM registration skipped in current environment');
-        }
+        console.log('✅ Registered Expo Token with backend:', registrationData.userId, 'lang:', currentLang);
       }
 
       return token;
@@ -116,8 +118,7 @@ export const notificationService = {
        if (isExpoGo) {
          console.log('NOTICE: Push orientation failed in Expo Go (expected). Use Dev Build for full support.');
        } else {
-         console.error('Error during push notification registration:', error);
-         Alert.alert('Push Error', (error as any)?.message || 'Unknown registration error');
+         console.warn('Push notification registration notice:', (error as any)?.message || error);
        }
        return null;
     }
@@ -128,12 +129,16 @@ export const notificationService = {
    */
   setupAndroidChannel: async () => {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
+      try {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#00DF82',
+        });
+      } catch (err) {
+        console.warn('Could not setup Android notification channel:', err);
+      }
     }
   }
 };

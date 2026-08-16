@@ -225,14 +225,14 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                     };
                 });
                 
-                realCandidates = realCandidates.sort((a, b) => b.percentage - a.percentage);
+                realCandidates = realCandidates.sort((a: any, b: any) => b.percentage - a.percentage);
                 setCandidates(realCandidates);
 
                 if (userVotedFor) {
                     setHasVoted(true);
                     setVotedCandidateId(userVotedFor);
                     const pcts: any = {};
-                    realCandidates.forEach(c => pcts[c.id] = c.percentage);
+                    realCandidates.forEach((c: any) => pcts[c.id] = c.percentage);
                     setAnimatedPercentages(pcts);
                 }
             }

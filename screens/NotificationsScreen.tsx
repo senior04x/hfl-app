@@ -10,6 +10,9 @@ import backgroundImage from '../assets/images/backroud-image.png';
 import { apiService, supabase } from '../services/apiService';
 import { useAuthStore } from '../store/useAuthStore';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
+import { formatLocalizedRelativeTime } from '../utils/dateLocalization';
+import { getLocalizedNotification } from '../utils/localizationUtils';
 
 const NOTIFICATIONS_CACHE_KEY = 'cached_notifications_v2';
 const READ_STORAGE_KEY = 'read_notification_ids_v1';
@@ -88,12 +91,13 @@ const NotificationSkeletonItem = () => {
 };
 
 export default function NotificationsScreen({ navigation }: any) {
+    const { t, i18n } = useTranslation();
+    const { user } = useAuthStore();
     const [notifications, setNotifications] = useState<any[]>([]);
     const [readIds, setReadIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState<'all' | 'match' | 'news' | 'system'>('all');
-    const { user } = useAuthStore();
 
     useEffect(() => {
         initNotifications();
@@ -314,9 +318,9 @@ export default function NotificationsScreen({ navigation }: any) {
                     </TouchableOpacity>
 
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.headerTitle}>BILDIRISHNOMALAR</Text>
+                        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
                         <Text style={styles.headerSubtitle}>
-                            {unreadCount > 0 ? `${unreadCount} ta o'qilmagan xabar` : "Barcha xabarlar o'qilgan"}
+                            {unreadCount > 0 ? t('notifications.unread_count', { count: unreadCount }) : t('notifications.all_read')}
                         </Text>
                     </View>
 
@@ -327,7 +331,7 @@ export default function NotificationsScreen({ navigation }: any) {
                             activeOpacity={0.8}
                         >
                             <Ionicons name="checkmark-done" size={18} color="#00FF87" />
-                            <Text style={styles.markAllText}>O'qildi</Text>
+                            <Text style={styles.markAllText}>{t('notifications.mark_read')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -336,10 +340,10 @@ export default function NotificationsScreen({ navigation }: any) {
                 <View style={styles.filterRow}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
                         {[
-                            { key: 'all', label: 'BARCHASI' },
-                            { key: 'match', label: "O'YINLAR" },
-                            { key: 'news', label: 'YANGILIKLAR' },
-                            { key: 'system', label: 'TIZIM' },
+                            { key: 'all', label: t('common.all').toUpperCase() },
+                            { key: 'match', label: t('matches.title').toUpperCase() },
+                            { key: 'news', label: t('news.title').toUpperCase() },
+                            { key: 'system', label: t('notifications.system').toUpperCase() },
                         ].map((filter) => {
                             const isActive = activeFilter === filter.key;
                             return (
@@ -379,12 +383,15 @@ export default function NotificationsScreen({ navigation }: any) {
                     ) : filteredNotifications.length === 0 ? (
                         <View style={styles.emptyContainer}>
                             <Ionicons name="notifications-off-outline" size={48} color="rgba(255,255,255,0.3)" />
-                            <Text style={styles.emptyTitle}>Bildirishnomalar topilmadi</Text>
-                            <Text style={styles.emptySubtitle}>Sizda hozircha ushbu bo'lim bo'yicha yangi ma'lumotlar yo'q.</Text>
+                            <Text style={styles.emptyTitle}>{t('notifications.no_notifications')}</Text>
+                            <Text style={styles.emptySubtitle}>{t('notifications.no_notifications_sub')}</Text>
                         </View>
                     ) : (
                         filteredNotifications.map((item) => {
                             const isRead = readIds.includes(item.id);
+                            const localized = getLocalizedNotification(item, t);
+                            const displayTitle = localized.title || item.title;
+                            const displaySubtitle = localized.subtitle || item.subtitle;
 
                             return (
                                 <TouchableOpacity
@@ -403,22 +410,22 @@ export default function NotificationsScreen({ navigation }: any) {
                                         <View style={{ flex: 1, marginLeft: 14 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                                                 <Text style={[styles.notifTitle, !isRead && styles.notifTitleUnread]} numberOfLines={1}>
-                                                    {item.title}
+                                                    {displayTitle}
                                                 </Text>
                                                 {!isRead && <View style={styles.unreadDot} />}
                                             </View>
 
                                             <Text style={styles.notifSubtitle} numberOfLines={2}>
-                                                {item.subtitle}
+                                                {displaySubtitle}
                                             </Text>
 
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
                                                 <Text style={styles.notifDate}>
-                                                    {new Date(item.date).toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                    {formatLocalizedRelativeTime(item.date, i18n.language)}
                                                 </Text>
                                                 {item.screenName && (
                                                     <View style={styles.actionArrow}>
-                                                        <Text style={styles.actionArrowText}>Ko'rish</Text>
+                                                        <Text style={styles.actionArrowText}>{t('common.details')}</Text>
                                                         <Ionicons name="chevron-forward" size={14} color="#00FF87" />
                                                     </View>
                                                 )}

@@ -2,12 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, View, TouchableOpacity, Dimensions, Animated, PanResponder, Text, Modal, ActivityIndicator, Image, Alert, ScrollView } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import { SmartBlurView as BlurView } from '../components/SmartBlurView';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../store/useAuthStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService, clearApiCache } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
+import { useTranslation } from 'react-i18next';
 
 import HomeScreen from '../screens/HomeScreen';
 import TournamentsScreen from '../screens/TournamentsScreen';
@@ -26,6 +27,7 @@ const Tab = createBottomTabNavigator();
 
 function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const { user, setAuth, isGuest } = useAuthStore();
+    const { t } = useTranslation();
     const userAvatarUri = user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url;
 
     // Quick Account Switcher Modal state
@@ -109,7 +111,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
         } catch (e) {}
 
         if (isGuest) {
-            Alert.alert('Akkountlar', 'Akkount ro\'yxatini ko\'rish uchun ilovaga kiring.');
+            Alert.alert(t('common.accounts', 'Akkountlar'), t('auth.login_to_view_accounts', "Akkount ro'yxatini ko'rish uchun ilovaga kiring."));
             return;
         }
 
@@ -225,16 +227,6 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                     style={StyleSheet.absoluteFill}
                 />
 
-                {/* SLIDING ACTIVE HIGHLIGHT PILL */}
-                <Animated.View
-                    style={[
-                        styles.slidingHighlight,
-                        {
-                            transform: [{ translateX }],
-                        },
-                    ]}
-                />
-
                 <View style={styles.tabRow}>
                     {state.routes.map((route, index) => {
                         const { options } = descriptors[route.key];
@@ -254,13 +246,13 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
                         let iconName: any = "home-outline";
                         if (route.name === 'Asosiy') {
-                            iconName = isFocused ? "home" : "home-outline";
+                            iconName = "home-outline";
                         } else if (route.name === 'Turnirlar') {
-                            iconName = isFocused ? "trophy" : "trophy-outline";
+                            iconName = "trophy-outline";
                         } else if (route.name === 'Taqvim') {
-                            iconName = isFocused ? "calendar" : "calendar-outline";
+                            iconName = "calendar-outline";
                         } else if (route.name === 'Yangiliklar') {
-                            iconName = isFocused ? "newspaper" : "newspaper-outline";
+                            iconName = "newspaper-outline";
                         }
 
                         return (
@@ -269,7 +261,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                                 accessibilityRole="button"
                                 accessibilityState={isFocused ? { selected: true } : {}}
                                 accessibilityLabel={options.tabBarAccessibilityLabel}
-                                testID={options.tabBarTestID}
+                                testID={(options as any).tabBarTestID || (options as any).testID}
                                 onPress={onPress}
                                 onLongPress={route.name === 'Profil' ? handleProfilLongPress : undefined}
                                 delayLongPress={300}
@@ -286,24 +278,34 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                                                     height: 24,
                                                     borderRadius: 12,
                                                     borderWidth: isFocused ? 2 : 1,
-                                                    borderColor: isFocused ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)',
+                                                    borderColor: isFocused ? '#00FF9D' : 'rgba(255, 255, 255, 0.40)',
                                                 }}
                                                 contentFit="cover"
-                                                fallbackIcon="person-circle-outline"
-                                                fallbackIconSize={24}
+                                                fallbackIcon="person-outline"
+                                                fallbackIconSize={22}
                                             />
                                         ) : (
                                             <Ionicons
-                                                name={isFocused ? "person" : "person-outline"}
-                                                size={22}
-                                                color={isFocused ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}
+                                                name="person-outline"
+                                                size={isFocused ? 24 : 22}
+                                                color={isFocused ? '#00FF9D' : 'rgba(255, 255, 255, 0.40)'}
+                                                style={isFocused && Platform.OS === 'ios' ? {
+                                                    textShadowColor: '#00DF82',
+                                                    textShadowOffset: { width: 0, height: 0 },
+                                                    textShadowRadius: 8,
+                                                } : undefined}
                                             />
                                         )
                                     ) : (
                                         <Ionicons
                                             name={iconName}
-                                            size={22}
-                                            color={isFocused ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}
+                                            size={isFocused ? 24 : 22}
+                                            color={isFocused ? '#00FF9D' : 'rgba(255, 255, 255, 0.40)'}
+                                            style={isFocused && Platform.OS === 'ios' ? {
+                                                textShadowColor: '#00DF82',
+                                                textShadowOffset: { width: 0, height: 0 },
+                                                textShadowRadius: 8,
+                                            } : undefined}
                                         />
                                     )}
                                 </View>
@@ -338,7 +340,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                         <View style={styles.headerDragZone}>
                             <View style={styles.grabberBar} />
                             <View style={styles.modalHeaderRow}>
-                                <Text style={styles.switcherTitle}>Akkountni Almashtirish</Text>
+                                <Text style={styles.switcherTitle}>{t('common.switch_account', 'Akkountni Almashtirish')}</Text>
                             </View>
                         </View>
 
@@ -413,7 +415,7 @@ export default function AppNavigator() {
             tabBar={(props) => <CustomFloatingTabBar {...props} />}
             screenOptions={{
                 headerShown: false,
-                sceneContainerStyle: { backgroundColor: 'transparent' },
+                sceneStyle: { backgroundColor: 'transparent' },
             }}
         >
             <Tab.Screen name="Asosiy" component={HomeScreen} />
@@ -441,22 +443,13 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.16)',
-        backgroundColor: 'rgba(20, 15, 25, 0.48)',
+        backgroundColor: Platform.OS === 'android' ? 'rgba(15, 23, 42, 0.90)' : 'rgba(20, 15, 25, 0.48)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.45,
         shadowRadius: 20,
         elevation: 8,
         position: 'relative',
-    },
-    slidingHighlight: {
-        position: 'absolute',
-        top: 9,
-        left: 0,
-        width: HIGHLIGHT_WIDTH,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: 'rgba(255, 255, 255, 0.18)',
     },
     tabRow: {
         flexDirection: 'row',
@@ -481,7 +474,7 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'transparent',
+        backgroundColor: 'rgba(0, 0, 0, 0.60)',
         justifyContent: 'flex-end',
         alignItems: 'center',
     },
@@ -495,8 +488,8 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderLeftWidth: 1,
         borderRightWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
-        backgroundColor: 'transparent',
+        borderColor: 'rgba(255, 255, 255, 0.14)',
+        backgroundColor: Platform.OS === 'android' ? 'rgba(15, 23, 42, 0.95)' : 'transparent',
     },
     headerDragZone: {
         paddingTop: 12,

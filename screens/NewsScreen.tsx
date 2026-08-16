@@ -22,6 +22,7 @@ import { apiService } from '../services/apiService';
 import { News } from '../types';
 import SmartImage from '../components/SmartImage';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 // ─── Skeleton Shimmer ────────────────────────────────────────────────────────
 const SkeletonBox: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({
@@ -67,67 +68,32 @@ const NewsSkeletonCard = () => (
     </View>
 );
 
-const { width, height } = Dimensions.get('window');
-
-const getRelativeTime = (dateString?: string | number | Date): string => {
-    if (!dateString) return 'Hozir';
-    const now = Date.now();
-    const past = new Date(dateString).getTime();
-    if (isNaN(past)) return 'Hozir';
-
-    const diffInSeconds = Math.floor((now - past) / 1000);
-
-    if (diffInSeconds < 10) {
-        return 'Hozir';
-    }
-    if (diffInSeconds < 60) {
-        return `${diffInSeconds} soniya oldin`;
-    }
-
-    const diffInMinutes = Math.floor(diffInSeconds / 60);
-    if (diffInMinutes < 60) {
-        return `${diffInMinutes} daqiqa oldin`;
-    }
-
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) {
-        return `${diffInHours} soat oldin`;
-    }
-
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) {
-        return `${diffInDays} kun oldin`;
-    }
-
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    if (diffInDays < 30) {
-        return `${diffInWeeks} hafta oldin`;
-    }
-
-    const diffInMonths = Math.floor(diffInDays / 30);
-    if (diffInDays < 365) {
-        return `${diffInMonths} oy oldin`;
-    }
-
-    const diffInYears = Math.floor(diffInDays / 365);
-    return `${diffInYears} yil oldin`;
-};
+import { formatLocalizedRelativeTime } from '../utils/dateLocalization';
+import { getLocalizedNewsField, getLocalizedNewsCategory } from '../utils/localizationUtils';
 
 export default function NewsScreen() {
+    const { t, i18n } = useTranslation();
     const [news, setNews] = useState<News[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [selectedCategory, setSelectedCategory] = useState('Barchasi');
+    const [selectedCategory, setSelectedCategory] = useState('all');
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const navigation = useNavigation<any>();
 
-    const categories = ['Barchasi', 'Turnirlar', 'Jamoalar', 'Transferlar', "O'yinlar"];
+    const categories = [
+        { id: 'all', label: t('news.category_all'), rawKey: 'Barchasi' },
+        { id: 'tournaments', label: t('news.category_tournaments'), rawKey: 'Turnirlar' },
+        { id: 'teams', label: t('news.category_teams'), rawKey: 'Jamoalar' },
+        { id: 'transfers', label: t('news.category_transfers'), rawKey: 'Transferlar' },
+        { id: 'matches', label: t('news.category_matches'), rawKey: "O'yinlar" },
+    ];
 
     const fetchNews = async () => {
         try {
             setIsLoading(true);
-            const category = selectedCategory === 'Barchasi' ? undefined : selectedCategory;
-            const data = await apiService.getNews(1, 40, category); 
+            const foundCategory = categories.find(c => c.id === selectedCategory);
+            const categoryParam = (!foundCategory || foundCategory.id === 'all') ? undefined : foundCategory.rawKey;
+            const data = await apiService.getNews(1, 40, categoryParam); 
             setNews(data || []);
         } catch (error) {
             console.error('Error fetching news:', error);
@@ -149,7 +115,7 @@ export default function NewsScreen() {
         <View style={styles.header}>
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
-                <Text style={styles.headerTitle}>YANGILIKLAR</Text>
+                <Text style={styles.headerTitle}>{t('news.title')}</Text>
                 <TouchableOpacity style={styles.searchBtn} onPress={() => setIsSearchVisible(true)}>
                     <Ionicons name="search" size={22} color="#000" />
                 </TouchableOpacity>
@@ -167,18 +133,18 @@ export default function NewsScreen() {
             >
                 {categories.map((cat) => (
                     <TouchableOpacity
-                        key={cat}
+                        key={cat.id}
                         style={[
                             styles.categoryBtn,
-                            selectedCategory === cat && styles.categoryBtnActive
+                            selectedCategory === cat.id && styles.categoryBtnActive
                         ]}
-                        onPress={() => setSelectedCategory(cat)}
+                        onPress={() => setSelectedCategory(cat.id)}
                     >
                         <Text style={[
                             styles.categoryText,
-                            selectedCategory === cat && styles.categoryTextActive
+                            selectedCategory === cat.id && styles.categoryTextActive
                         ]}>
-                            {cat.toUpperCase()}
+                            {cat.label.toUpperCase()}
                         </Text>
                     </TouchableOpacity>
                 ))}
@@ -187,8 +153,8 @@ export default function NewsScreen() {
     );
 
     const renderNewsItem = ({ item, index }: { item: News, index: number }) => {
-        const isFeatured = index === 0 && selectedCategory === 'Barchasi' && !searchQuery;
-        const timeAgoText = getRelativeTime(item.createdAt);
+        const isFeatured = index === 0 && selectedCategory === 'all' && !searchQuery;
+        const timeAgoText = formatLocalizedRelativeTime(item.createdAt, i18n.language);
 
         if (isFeatured) {
             return (
@@ -204,9 +170,9 @@ export default function NewsScreen() {
                         <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={{ padding: 20 }}>
                             <View style={styles.categoryBadge}>
-                                <Text style={styles.categoryBadgeText}>{item.category?.toUpperCase() || 'YANGILIK'}</Text>
+                                <Text style={styles.categoryBadgeText}>{getLocalizedNewsCategory(item.category, t).toUpperCase()}</Text>
                             </View>
-                            <Text style={styles.featuredTitle} numberOfLines={2}>{item.title.toUpperCase()}</Text>
+                            <Text style={styles.featuredTitle} numberOfLines={2}>{getLocalizedNewsField(item, 'title', i18n.language).toUpperCase()}</Text>
                             <View style={styles.newsMeta}>
                                 <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.7)" />
                                 <Text style={styles.metaText}>{timeAgoText.toUpperCase()}</Text>
@@ -232,8 +198,8 @@ export default function NewsScreen() {
                         style={styles.newsImage}
                     />
                     <View style={styles.newsContent}>
-                        <Text style={styles.newsCategory}>{item.category?.toUpperCase() || 'YANGILIK'}</Text>
-                        <Text style={styles.newsTitle} numberOfLines={2}>{item.title.toUpperCase()}</Text>
+                        <Text style={styles.newsCategory}>{getLocalizedNewsCategory(item.category, t).toUpperCase()}</Text>
+                        <Text style={styles.newsTitle} numberOfLines={2}>{getLocalizedNewsField(item, 'title', i18n.language).toUpperCase()}</Text>
                         <View style={styles.newsMeta}>
                             <Text style={styles.metaTextSmall}>{timeAgoText.toUpperCase()}</Text>
                             <View style={[styles.metaDivider, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
@@ -261,7 +227,7 @@ export default function NewsScreen() {
                                 <View style={styles.searchResultHeader}>
                                     <Text style={styles.searchResultText}>"{searchQuery.toUpperCase()}" BO'YICHA NATIJALAR: {filteredNews.length}</Text>
                                     <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                        <Text style={{ color: Colors.primary, fontWeight: '900', fontSize: 12 }}>TOZALASH</Text>
+                                        <Text style={{ color: Colors.primary, fontWeight: '900', fontSize: 12 }}>{t('common.clear').toUpperCase()}</Text>
                                     </TouchableOpacity>
                                 </View>
                             ) : null}
@@ -280,7 +246,7 @@ export default function NewsScreen() {
                         ) : (
                             <View style={styles.emptyContainer}>
                                 <Ionicons name="newspaper-outline" size={64} color="rgba(255,255,255,0.1)" />
-                                <Text style={styles.emptyText}>Hozircha yangiliklar yo'q</Text>
+                                <Text style={styles.emptyText}>{t('common.no_data')}</Text>
                             </View>
                         )
                     }
@@ -304,7 +270,7 @@ export default function NewsScreen() {
                             <View style={styles.searchInputWrapper}>
                                 <TextInput
                                     style={styles.searchInput}
-                                    placeholder="YANGILIK QIDIRING..."
+                                    placeholder={t('news.search_placeholder').toUpperCase()}
                                     placeholderTextColor="rgba(255,255,255,0.3)"
                                     value={searchQuery}
                                     onChangeText={setSearchQuery}
@@ -323,7 +289,7 @@ export default function NewsScreen() {
                             style={styles.searchConfirmBtn}
                             onPress={() => setIsSearchVisible(false)}
                         >
-                            <Text style={styles.searchConfirmText}>NATIJALARNI KO'RISH</Text>
+                            <Text style={styles.searchConfirmText}>{t('common.confirm')}</Text>
                         </TouchableOpacity>
                     </SafeAreaView>
                 </View>

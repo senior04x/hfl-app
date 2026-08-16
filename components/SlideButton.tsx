@@ -31,7 +31,9 @@ const springConfig = {
     mass: 0.8,
 };
 
-interface SlideButtonProps {
+export type SlideButtonStatus = 'idle' | 'loading' | 'success' | 'error';
+
+export interface SlideButtonProps {
     title?: string;
     loadingTitle?: string;
     successTitle?: string;
@@ -40,13 +42,15 @@ interface SlideButtonProps {
     onSwipeSuccess: () => void | Promise<void>;
     disabled?: boolean;
     loading?: boolean;
-    status?: 'idle' | 'loading' | 'success' | 'error';
+    status?: SlideButtonStatus;
     onReset?: () => void;
 }
 
 function SendIcon() {
     return <Feather name="send" size={20} color="#0b0e17" style={{ marginLeft: 1 }} />;
 }
+
+import { useTranslation } from 'react-i18next';
 
 function CheckIcon() {
     return <Feather name="check" size={22} color="#0b0e17" />;
@@ -57,17 +61,24 @@ function ErrorIcon() {
 }
 
 export const SlideButton: React.FC<SlideButtonProps> = ({
-    title = "Yuborish uchun suring",
-    loadingTitle = "Yuborilmoqda...",
-    successTitle = "Yuborildi",
-    errorTitle = "Xatolik",
-    helperText = "Tugmani oxirigacha o'ngga suring",
+    title,
+    loadingTitle,
+    successTitle,
+    errorTitle,
+    helperText,
     onSwipeSuccess,
     disabled = false,
     loading = false,
     status = 'idle',
     onReset,
 }) => {
+    const { t } = useTranslation();
+    const effectiveTitle = title || t('common.slide_to_send');
+    const effectiveLoadingTitle = loadingTitle || t('common.loading');
+    const effectiveSuccessTitle = successTitle || t('common.success');
+    const effectiveErrorTitle = errorTitle || t('common.error');
+    const effectiveHelperText = helperText || t('common.slide_hint');
+
     const [completed, setCompleted] = useState<boolean>(false);
 
     const translateX = useSharedValue(0);
@@ -206,11 +217,11 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
 
     const currentStatusText =
         status === 'loading'
-            ? loadingTitle
+            ? effectiveLoadingTitle
             : status === 'success'
-                ? successTitle
+                ? effectiveSuccessTitle
                 : status === 'error'
-                    ? errorTitle
+                    ? effectiveErrorTitle
                     : '';
 
     return (
@@ -241,7 +252,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.label} numberOfLines={1}>
-                                    {title}
+                                    {effectiveTitle}
                                 </Text>
                             </TouchableOpacity>
                         </Animated.View>
@@ -302,7 +313,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
             </Animated.View>
 
             {!completed && !disabled && (
-                <Text style={styles.helperText}>{helperText}</Text>
+                <Text style={styles.helperText}>{effectiveHelperText}</Text>
             )}
         </View>
     );
@@ -400,7 +411,7 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         borderRadius: 999,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.3)',

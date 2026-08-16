@@ -19,6 +19,8 @@ import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { apiService, clearApiCache } from '../services/apiService';
 import VideoBackground from '../components/VideoBackground';
+import { useTranslation } from 'react-i18next';
+import { getLocalizedErrorMessage } from '../utils/errorParser';
 
 const { width } = Dimensions.get('window');
 
@@ -66,6 +68,7 @@ const SettingRow: React.FC<SettingRowProps> = ({
 );
 
 export default function SecuritySettingsScreen({ navigation }: any) {
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const { user, isGuest, logout } = useAuthStore();
 
@@ -102,8 +105,8 @@ export default function SecuritySettingsScreen({ navigation }: any) {
 
             if (res && res.success) {
                 Alert.alert(
-                    "Hisob o'chirildi",
-                    "Sizning hisobingiz va barcha shaxsiy ma'lumotlaringiz muvaffaqiyatli o'chirildi.",
+                    t('settings.account_deleted'),
+                    t('settings.account_deleted_sub'),
                     [
                         {
                             text: "OK",
@@ -119,12 +122,12 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                     ]
                 );
             } else {
-                Alert.alert("Xatolik", res?.error || "Hisobni o'chirishda xatolik yuz berdi.");
+                Alert.alert(t('common.error'), getLocalizedErrorMessage(res?.error));
             }
         } catch (error: any) {
             setIsDeleting(false);
             setShowDeleteModal(false);
-            Alert.alert("Xatolik", error?.message || "Server bilan bog'lanishda xatolik yuz berdi.");
+            Alert.alert(t('common.error'), getLocalizedErrorMessage(error));
         }
     };
 
@@ -146,7 +149,7 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                 >
                     <Ionicons name="chevron-back" size={24} color="#FFF" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>SOZLAMALAR VA XAVFSIZLIK</Text>
+                <Text style={styles.headerTitle}>{t('settings.security_title')}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
@@ -157,19 +160,19 @@ export default function SecuritySettingsScreen({ navigation }: any) {
             >
                 {/* SECTION 1: Legal & Information */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>HUJJATLAR VA MA'LUMOTLAR</Text>
+                    <Text style={styles.sectionHeader}>{t('settings.legal_docs')}</Text>
                     <View style={styles.cardContainer}>
                         <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
                         <SettingRow
                             icon="shield-checkmark-outline"
-                            title="Maxfiylik siyosati"
-                            subtitle="Shaxsiy ma'lumotlarni saqlash va himoya qilish"
+                            title={t('settings.privacy_policy')}
+                            subtitle={t('settings.privacy_policy_sub')}
                             onPress={() => setShowPrivacyModal(true)}
                         />
                         <SettingRow
                             icon="document-text-outline"
-                            title="Foydalanish shartlari"
-                            subtitle="Liga reglamenti, qoidalar va Fair Play"
+                            title={t('settings.terms_of_use')}
+                            subtitle={t('settings.terms_of_use_sub')}
                             onPress={() => setShowTermsModal(true)}
                             isLast={true}
                         />
@@ -178,21 +181,21 @@ export default function SecuritySettingsScreen({ navigation }: any) {
 
                 {/* SECTION 2: Account Actions */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>HISOB VA BOSHQARUV</Text>
+                    <Text style={styles.sectionHeader}>{t('settings.account_management')}</Text>
                     <View style={styles.cardContainer}>
                         <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
                         <SettingRow
                             icon="log-out-outline"
-                            title="Tizimdan chiqish"
-                            subtitle={isGuest ? "Mehmon rejimidan chiqish" : "Joriy akkauntdan chiqish"}
+                            title={t('auth.logout')}
+                            subtitle={isGuest ? t('auth.logout_guest') : t('auth.logout_current')}
                             onPress={() => setShowLogoutModal(true)}
                             isLast={isGuest}
                         />
                         {!isGuest && (
                             <SettingRow
                                 icon="trash-outline"
-                                title="Hisobni o'chirish"
-                                subtitle="Barcha shaxsiy ma'lumotlarni butunlay o'chirish"
+                                title={t('settings.delete_account')}
+                                subtitle={t('settings.delete_account_sub')}
                                 onPress={() => setShowDeleteModal(true)}
                                 destructive={true}
                                 isLast={true}
@@ -223,22 +226,22 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                         <View style={styles.modalIconBox}>
                             <Ionicons name="log-out-outline" size={32} color={Colors.primary} />
                         </View>
-                        <Text style={styles.modalTitle}>Tizimdan chiqmoqchimisiz?</Text>
+                        <Text style={styles.modalTitle}>{t('auth.logout_confirm_title')}</Text>
                         <Text style={styles.modalSubtitle}>
-                            Qayta kirish uchun telefon raqamingiz orqali tasdiqlash kodi talab qilinadi.
+                            {t('auth.logout_confirm_sub')}
                         </Text>
                         <View style={styles.modalActions}>
                             <TouchableOpacity
                                 style={styles.modalCancelBtn}
                                 onPress={() => setShowLogoutModal(false)}
                             >
-                                <Text style={styles.modalCancelText}>BEKOR QILISH</Text>
+                                <Text style={styles.modalCancelText}>{t('common.cancel').toUpperCase()}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.modalPrimaryBtn}
                                 onPress={handleConfirmLogout}
                             >
-                                <Text style={styles.modalPrimaryText}>CHIQISH</Text>
+                                <Text style={styles.modalPrimaryText}>{t('auth.logout').toUpperCase()}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -257,15 +260,15 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                         <View style={[styles.modalIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
                             <Ionicons name="trash-outline" size={32} color={Colors.danger} />
                         </View>
-                        <Text style={[styles.modalTitle, { color: Colors.danger }]}>HISOBNI O'CHIRISH</Text>
+                        <Text style={[styles.modalTitle, { color: Colors.danger }]}>{t('settings.delete_account').toUpperCase()}</Text>
                         <Text style={styles.modalSubtitle}>
-                            Ushbu amalni ortga qaytarib bo'lmaydi! Profilingiz, o'yinchi statistikangiz, arizalaringiz va barcha shaxsiy ma'lumotlaringiz butunlay o'chiriladi.
+                            {t('settings.delete_account_modal_warning')}
                         </Text>
 
                         {isDeleting ? (
                             <View style={{ paddingVertical: 20, alignItems: 'center' }}>
                                 <ActivityIndicator size="large" color={Colors.danger} />
-                                <Text style={[styles.modalSubtitle, { marginTop: 10 }]}>Ma'lumotlar o'chirilmoqda...</Text>
+                                <Text style={[styles.modalSubtitle, { marginTop: 10 }]}>{t('settings.deleting_data')}</Text>
                             </View>
                         ) : (
                             <View style={styles.modalActions}>
@@ -273,13 +276,13 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                                     style={styles.modalCancelBtn}
                                     onPress={() => setShowDeleteModal(false)}
                                 >
-                                    <Text style={styles.modalCancelText}>BEKOR QILISH</Text>
+                                    <Text style={styles.modalCancelText}>{t('common.cancel').toUpperCase()}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.modalPrimaryBtn, { backgroundColor: Colors.danger }]}
                                     onPress={handleConfirmDelete}
                                 >
-                                    <Text style={styles.modalPrimaryText}>O'CHIRISH</Text>
+                                    <Text style={[styles.modalPrimaryText, { color: '#FFF' }]}>{t('common.delete').toUpperCase()}</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -299,7 +302,7 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                         <View style={styles.docModalHeader}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                 <Ionicons name="shield-checkmark" size={22} color={Colors.primary} />
-                                <Text style={styles.docModalTitle}>Maxfiylik Siyosati</Text>
+                                <Text style={styles.docModalTitle}>{t('settings.privacy_policy')}</Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setShowPrivacyModal(false)}
@@ -310,24 +313,24 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                         </View>
 
                         <ScrollView style={styles.docModalBody} showsVerticalScrollIndicator={false}>
-                            <Text style={styles.docSectionTitle}>1. To'planadigan Ma'lumotlar</Text>
+                            <Text style={styles.docSectionTitle}>{t('settings.privacy_sec1_title')}</Text>
                             <Text style={styles.docText}>
-                                AMATORA ilovasi foydalanuvchilarning telefon raqami, ism-familiyasi, o'yinchi fotosurati, amplua va jamoa tarkibi ma'lumotlarini to'playdi.
+                                {t('settings.privacy_sec1_text')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>2. Ma'lumotlardan Foydalanish</Text>
+                            <Text style={styles.docSectionTitle}>{t('settings.privacy_sec2_title')}</Text>
                             <Text style={styles.docText}>
-                                Ma'lumotlar faqat futbol ligasi va turnirlarini tashkil etish, taqvim va jadvallarni yuritish, o'yinchi profillarini shakllantirish hamda hisoblar bo'yicha bildirishnomalar yuborish uchun ishlatiladi.
+                                {t('settings.privacy_sec2_text')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>3. Uchinchi Shaxslar</Text>
+                            <Text style={styles.docSectionTitle}>{t('settings.privacy_sec3_title')}</Text>
                             <Text style={styles.docText}>
-                                Shaxsiy ma'lumotlar hech qanday uchinchi shaxslarga tijoriy yoki reklama maqsadlarida sotilmaydi va tarqatilmaydi.
+                                {t('settings.privacy_sec3_text')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>4. Hisobni O'chirish Huquqi</Text>
+                            <Text style={styles.docSectionTitle}>{t('settings.privacy_sec4_title')}</Text>
                             <Text style={styles.docText}>
-                                Foydalanuvchi istalgan vaqtda o'z hisobini va unga tegishli barcha ma'lumotlarni "Sozlamalar va xavfsizlik" bo'limidagi "Hisobni o'chirish" tugmasi orqali to'liq o'chirib tashlashi mumkin.
+                                {t('settings.privacy_sec4_text')}
                             </Text>
 
                             <View style={{ height: 40 }} />
@@ -348,7 +351,7 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                         <View style={styles.docModalHeader}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                 <Ionicons name="document-text" size={22} color={Colors.primary} />
-                                <Text style={styles.docModalTitle}>Foydalanish Shartlari</Text>
+                                <Text style={styles.docModalTitle}>{t('settings.terms_of_use')}</Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setShowTermsModal(false)}
@@ -359,19 +362,19 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                         </View>
 
                         <ScrollView style={styles.docModalBody} showsVerticalScrollIndicator={false}>
-                            <Text style={styles.docSectionTitle}>1. Ro'yxatdan O'tish va Arizalar</Text>
+                            <Text style={styles.docSectionTitle}>{t('settings.terms_sec1_title')}</Text>
                             <Text style={styles.docText}>
-                                Foydalanuvchi ariza topshirishda haqiqiy va to'g'ri shaxsiy ma'lumotlarni kiritish majburiyatini oladi. Bitta o'yinchi bir vaqtning o'zida liga qoidalariga zid ravishda bir nechta jamoada o'ynay olmaydi.
+                                {t('settings.terms_sec1_text')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>2. Fair Play va Sport Odob-axloqi</Text>
+                            <Text style={styles.docSectionTitle}>{t('settings.terms_sec2_title')}</Text>
                             <Text style={styles.docText}>
-                                Barcha futbolchilar, murabbiylar va jamoa a'zolari hakamlar, raqiblar va tashkilotchilarga hurmat bilan munosabatda bo'lishlari shart. Intizomsizlik diskvalifikatsiyaga sabab bo'lishi mumkin.
+                                {t('settings.terms_sec2_text')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>3. Ma'suliyat Cheklovi</Text>
+                            <Text style={styles.docSectionTitle}>{t('settings.terms_sec3_title')}</Text>
                             <Text style={styles.docText}>
-                                AMATORA platformasi o'yinlar davomida yuz berishi mumkin bo'lgan jismoniy jarohatlar yoki noqulayliklar uchun ma'suliyatni o'z zimmasiga olmaydi.
+                                {t('settings.terms_sec3_text')}
                             </Text>
 
                             <View style={{ height: 40 }} />

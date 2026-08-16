@@ -28,10 +28,12 @@ import { useSocket } from '../context/SocketContext';
 import { formatShortTeamName } from '../utils/stringUtils';
 import SmartImage from '../components/SmartImage';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
 export default function MatchDetailScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { matchData, matchId } = route?.params || {};
     const [activeTab, setActiveTab] = useState('lineups');
     const [loading, setLoading] = useState(true);
@@ -377,10 +379,10 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         }}
                     >
                         <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                            {tab === 'lineups' ? "TARKIB" :
-                                tab === 'overview' ? 'HAQIDA' :
-                                    tab === 'preview' ? "O'YIN OLDI" :
-                                        tab === 'media' ? 'MEDIA' : 'XODIMLAR'}
+                            {tab === 'lineups' ? t('matches.tab_lineups') :
+                                tab === 'overview' ? t('matches.tab_overview') :
+                                    tab === 'preview' ? t('matches.tab_preview') :
+                                        tab === 'media' ? t('matches.tab_media') : t('matches.tab_staff')}
                         </Text>
                     </TouchableOpacity>
                 ))}
@@ -400,15 +402,15 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         let cardColor = '#FFF';
 
         if (isGoal) {
-            title = 'GOL!';
+            title = t('matches.event_goal');
         } else if (isYellow) {
-            title = 'SARIQ KARTOCHKA';
+            title = t('matches.event_yellow_card');
             cardColor = '#FACC15';
         } else if (isRed) {
-            title = 'QIZIL KARTOCHKA';
+            title = t('matches.event_red_card');
             cardColor = '#EF4444';
         } else if (isAssist) {
-            title = 'ASSIST';
+            title = t('matches.event_assist');
         }
 
         return (
@@ -443,7 +445,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         if (match?.status === 'scheduled') {
             return (
                 <View style={styles.notStartedContainer}>
-                    <Text style={styles.notStartedText}>O'YIN HALI BOSHLANMAGAN</Text>
+                    <Text style={styles.notStartedText}>{t('matches.not_started')}</Text>
                 </View>
             );
         }
@@ -467,7 +469,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     events.map((ev: any, idx: number) => renderTimelineEvent(ev, idx, idx === events.length - 1))
                 ) : (
                     <View style={styles.notStartedContainer}>
-                        <Text style={styles.notStartedText}>HOZIRCHA VOQEALAR YO'Q</Text>
+                        <Text style={styles.notStartedText}>{t('match_detail.no_events')}</Text>
                     </View>
                 )}
             </ScrollView>
@@ -507,22 +509,22 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     <View style={{ padding: 16 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <Ionicons name="information-circle-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-                            <Text style={styles.previewSectionTitle}>UCHRASHUV HAQIDA</Text>
+                            <Text style={styles.previewSectionTitle}>{t('match_detail.about_match')}</Text>
                         </View>
                         <View style={styles.previewInfoRow}>
-                            <Text style={styles.previewInfoLabel}>Turnir / Liga:</Text>
+                            <Text style={styles.previewInfoLabel}>{t('match_detail.tournament_league')}</Text>
                             <Text style={styles.previewInfoVal}>{leagueName}</Text>
                         </View>
                         <View style={styles.previewInfoRow}>
-                            <Text style={styles.previewInfoLabel}>Bosqich / Tur:</Text>
-                            <Text style={styles.previewInfoVal}>{match?.round ? `${match.round}-TUR` : 'Guruh Bosqichi'}</Text>
+                            <Text style={styles.previewInfoLabel}>{t('match_detail.round_stage')}</Text>
+                            <Text style={styles.previewInfoVal}>{match?.round ? t('matches.round_tour', { round: match.round }) : '—'}</Text>
                         </View>
                         <View style={styles.previewInfoRow}>
-                            <Text style={styles.previewInfoLabel}>Sana va Vaqt:</Text>
+                            <Text style={styles.previewInfoLabel}>{t('match_detail.date_time')}</Text>
                             <Text style={styles.previewInfoVal}>{formatDate(match?.date)}</Text>
                         </View>
                         <View style={styles.previewInfoRow}>
-                            <Text style={styles.previewInfoLabel}>Maydon (Stadion):</Text>
+                            <Text style={styles.previewInfoLabel}>{t('match_detail.venue')}</Text>
                             <Text style={styles.previewInfoVal}>{venueName}</Text>
                         </View>
                     </View>

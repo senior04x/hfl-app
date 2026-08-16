@@ -26,6 +26,7 @@ import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
 import { SlideButton } from '../components/SlideButton';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
@@ -66,6 +67,7 @@ const LEAGUE_OPTIONS = [
 ];
 
 export default function JoinApplicationScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { user } = useAuthStore();
     const targetTeamId = route?.params?.teamId || user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
 
@@ -616,8 +618,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 <Ionicons name="chevron-back" size={26} color="#FFF" />
             </TouchableOpacity>
             <View style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={styles.headerTitle}>ZAYAVKA TOPSHIRISH</Text>
-                <Text style={styles.headerSubtitle}>HAVAS FUTBOL LIGASI</Text>
+                <Text style={styles.headerTitle}>{t('applications.submit_app')}</Text>
+                <Text style={styles.headerSubtitle}>AMATORA</Text>
             </View>
             <View style={{ width: 40 }} />
         </View>
@@ -630,14 +632,14 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 onPress={() => handleTypeChange('player')}
             >
                 <Ionicons name="person" size={18} color={applicationType === 'player' ? '#000' : Colors.textMuted} style={{ marginRight: 6 }} />
-                <Text style={[styles.typeOptionText, applicationType === 'player' && styles.typeOptionTextActive]}>YAKKAXON O'YINCHI</Text>
+                <Text style={[styles.typeOptionText, applicationType === 'player' && styles.typeOptionTextActive]}>{t('applications.solo_player')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
                 style={[styles.typeOption, applicationType === 'team' && styles.typeOptionActive]}
                 onPress={() => handleTypeChange('team')}
             >
                 <Ionicons name="people" size={18} color={applicationType === 'team' ? '#000' : Colors.textMuted} style={{ marginRight: 6 }} />
-                <Text style={[styles.typeOptionText, applicationType === 'team' && styles.typeOptionTextActive]}>JAMOA</Text>
+                <Text style={[styles.typeOptionText, applicationType === 'team' && styles.typeOptionTextActive]}>{t('applications.team')}</Text>
             </TouchableOpacity>
         </View>
     );
@@ -647,7 +649,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             return (
                 <View style={styles.validatingBox}>
                     <ActivityIndicator size="small" color={Colors.primary} style={{ marginRight: 8 }} />
-                    <Text style={styles.validatingText}>Ma'lumotlaringiz tekshirilmoqda...</Text>
+                    <Text style={styles.validatingText}>{t('applications.checking_info')}</Text>
                 </View>
             );
         }

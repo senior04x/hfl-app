@@ -31,8 +31,10 @@ import SmartImage from '../components/SmartImage';
 import { getTeamAbbreviation } from '../utils/stringUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSocket } from '../context/SocketContext';
+import { useTranslation } from 'react-i18next';
 
 export default function TournamentDetailScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { tournamentId, tournamentName, tournament } = route?.params || {};
     const currentTournamentId = route?.params?.tournamentId || tournamentId; // Ensure we always have it
     const [activeTab, setActiveTab] = useState('overview'); // overview, standings, players, matches
@@ -636,9 +638,9 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         activeOpacity={0.8}
                     >
                         <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]} numberOfLines={1}>
-                            {tab === 'overview' ? 'HAQIDA' :
-                                tab === 'standings' ? 'JADVAL' :
-                                    tab === 'players' ? 'O\'YINCHILAR' : 'O\'YINLAR'}
+                            {tab === 'overview' ? t('tournaments.overview') :
+                                tab === 'standings' ? t('tournaments.standings') :
+                                    tab === 'players' ? t('tournaments.players') : t('tournaments.matches')}
                         </Text>
                     </TouchableOpacity>
                 ))}
@@ -655,50 +657,50 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 {/* Information Card */}
                 <View style={styles.sectionCard}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>MA'LUMOTLAR</Text>
+                        <Text style={styles.sectionTitle}>{t('tournaments.overview')}</Text>
                     </View>
 
                     <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Boshlanish sanasi</Text>
+                        <Text style={styles.infoLabel}>{t('tournaments.start_date')}</Text>
                         <View style={styles.dashedLine} />
                         <Text style={styles.infoValue}>{formatDate(startDateVal)}</Text>
                     </View>
 
                     <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Tugash sanasi</Text>
+                        <Text style={styles.infoLabel}>{t('tournaments.end_date')}</Text>
                         <View style={styles.dashedLine} />
                         <Text style={styles.infoValue}>{formatDate(endDateVal)}</Text>
                     </View>
 
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Holati</Text>
+                    <Text style={styles.infoLabel}>{t('common.status')}</Text>
                     <View style={styles.dashedLine} />
                     <View style={styles.statusRow}>
                         <Text style={styles.infoValue}>
-                            {tournamentData?.status === 'ongoing' ? 'Ketyapti' : 
-                             tournamentData?.status === 'finished' ? 'Yakunlangan' : 'Rejalashtirilgan'}
+                            {tournamentData?.status === 'ongoing' ? t('tournaments.ongoing') : 
+                             tournamentData?.status === 'finished' ? t('tournaments.finished_status') : t('tournaments.planned_status')}
                         </Text>
                         <View style={[styles.statusDot, { backgroundColor: tournamentData?.status === 'ongoing' ? '#00FF66' : '#6A7185' }]} />
                     </View>
                 </View>
 
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Jamoalar</Text>
+                    <Text style={styles.infoLabel}>{t('tournaments.teams_tab')}</Text>
                     <View style={styles.dashedLine} />
                     <Text style={styles.infoValue}>{teams?.length || standings?.length || 0}</Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>O'yinchilar</Text>
+                    <Text style={styles.infoLabel}>{t('tournaments.total_players')}</Text>
                     <View style={styles.dashedLine} />
-                    <Text style={styles.infoValue}>{totalPlayersCount || (topPlayers.length > 0 ? topPlayers.length : 0)} ta</Text>
+                    <Text style={styles.infoValue}>{totalPlayersCount || (topPlayers.length > 0 ? topPlayers.length : 0)}</Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>O'yin vaqti</Text>
+                    <Text style={styles.infoLabel}>{t('tournaments.match_duration')}</Text>
                     <View style={styles.dashedLine} />
                     <Text style={styles.infoValue}>
-                        {tournamentData?.match_duration || tournamentData?.duration || "50 daqiqa (25x25)"}
+                        {tournamentData?.match_duration || tournamentData?.duration || "50 (25x25)"}
                     </Text>
                 </View>
             </View>

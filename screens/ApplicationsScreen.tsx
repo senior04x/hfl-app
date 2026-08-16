@@ -21,9 +21,11 @@ import backgroundImage from '../assets/images/backroud-image.png';
 import { useAuthStore } from '../store/useAuthStore';
 import { apiService } from '../services/apiService';
 import { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function ApplicationsScreen({ navigation }: any) {
     const { user, isGuest } = useAuthStore();
+    const { t } = useTranslation();
     const [appTab, setAppTab] = useState<'transfers' | 'profile'>('transfers');
     const [userTransfers, setUserTransfers] = useState<any[]>([]);
     const [userProfileApps, setUserProfileApps] = useState<any[]>([]);
@@ -103,7 +105,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                             <Ionicons name="chevron-back" size={22} color="#FFFFFF" style={{ marginLeft: -2 }} />
                         </View>
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>MENING ARIZALARIM</Text>
+                    <Text style={styles.headerTitle}>{t('applications.title')}</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
@@ -115,7 +117,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                             onPress={() => setAppTab('transfers')}
                         >
                             <Text style={[styles.segmentedTabText, appTab === 'transfers' && styles.segmentedTabTextActive]}>
-                                TRANSFER ARIZALARI {userTransfers.length > 0 ? `(${userTransfers.length})` : ''}
+                                {t('nav.transfers').toUpperCase()} {userTransfers.length > 0 ? `(${userTransfers.length})` : ''}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -123,7 +125,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                             onPress={() => setAppTab('profile')}
                         >
                             <Text style={[styles.segmentedTabText, appTab === 'profile' && styles.segmentedTabTextActive]}>
-                                MA'LUMOTLAR {userProfileApps.length > 0 ? `(${userProfileApps.length})` : ''}
+                                {t('profile.account').toUpperCase()} {userProfileApps.length > 0 ? `(${userProfileApps.length})` : ''}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -161,10 +163,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                                     <View style={styles.emptyIconBg}>
                                         <Ionicons name="swap-horizontal-outline" size={42} color="rgba(255,255,255,0.3)" />
                                     </View>
-                                    <Text style={styles.emptyTitle}>Transfer arizalari topilmadi</Text>
-                                    <Text style={styles.emptySub}>
-                                        Siz hali biron bir jamoaga o'tish bo'yicha transfer so'rovi yubormadingiz.
-                                    </Text>
+                                    <Text style={styles.emptyTitle}>{t('applications.transfer_apps_empty')}</Text>
                                 </View>
                             ) : (
                                 userTransfers.map((item: any, idx: number) => {
@@ -173,7 +172,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                                     const isRejected = item.status === 'rejected' || item.status === 'rad etilgan';
 
                                     const formattedDate = item.created_at
-                                        ? `${new Date(item.created_at).toLocaleDateString('uz-UZ')} ${new Date(item.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}`
+                                        ? `${new Date(item.created_at).toLocaleDateString()} ${new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                         : '—';
 
                                     return (
@@ -213,14 +212,14 @@ export default function ApplicationsScreen({ navigation }: any) {
                                                         isApproved && { color: '#00FF66' },
                                                         isRejected && { color: '#FF3B30' },
                                                     ]}>
-                                                        {isPending ? 'KUTILMOQDA' : isApproved ? 'TASDIQLANGAN' : 'RAD ETILGAN'}
+                                                        {isPending ? t('common.pending').toUpperCase() : isApproved ? t('common.approved').toUpperCase() : t('common.rejected').toUpperCase()}
                                                     </Text>
                                                 </View>
                                             </View>
 
                                             {item.reason ? (
                                                 <View style={styles.reasonBox}>
-                                                    <Text style={styles.appCardReasonLabel}>O'tish sababi:</Text>
+                                                    <Text style={styles.appCardReasonLabel}>{t('applications.reason')}</Text>
                                                     <Text style={styles.appCardReasonText}>"{item.reason}"</Text>
                                                 </View>
                                             ) : null}
@@ -229,7 +228,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                                                 <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.4)" style={{ marginRight: 5 }} />
                                                 <Text style={styles.appCardDate}>{formattedDate}</Text>
                                                 <View style={{ flex: 1 }} />
-                                                <Text style={styles.clickHint}>Batafsil ➔</Text>
+                                                <Text style={styles.clickHint}>{t('common.details')} ➔</Text>
                                             </View>
                                         </TouchableOpacity>
                                     );
@@ -592,7 +591,7 @@ const styles = StyleSheet.create({
     appCardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         marginBottom: 10,
     },
     appCardTitleGroup: {

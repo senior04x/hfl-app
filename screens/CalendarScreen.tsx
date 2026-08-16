@@ -20,6 +20,7 @@ import { apiService } from '../services/apiService';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 import CustomRefreshControl from '../components/CustomRefreshControl';
+import { useTranslation } from 'react-i18next';
 
 // ─── Skeleton Components ────────────────────────────────────────────────────
 const SkeletonBox: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({
@@ -65,6 +66,7 @@ const CalendarSkeletonLoader = () => (
 );
 
 export default function CalendarScreen({ navigation }: any) {
+    const { t, i18n } = useTranslation();
     const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
     const [calendarData, setCalendarData] = useState<any[]>([]);
     const [displayData, setDisplayData] = useState<any[]>([]);
@@ -287,8 +289,8 @@ export default function CalendarScreen({ navigation }: any) {
                     <TouchableOpacity style={styles.dateFilterBox} onPress={openDatePicker}>
                         <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={{ padding: 10 }}>
-                            <Text style={styles.dateLabel}>Dan</Text>
-                            <Text style={styles.dateValue}>{`${String(startDate).padStart(2, '0')} ${viewDate.toLocaleDateString('uz-UZ', { month: 'short' })}. ${viewDate.getFullYear()}`}</Text>
+                            <Text style={styles.dateLabel}>{t('common.from')}</Text>
+                            <Text style={styles.dateValue}>{`${String(startDate).padStart(2, '0')} ${viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'short' })}. ${viewDate.getFullYear()}`}</Text>
                         </View>
                         <Ionicons name="calendar-outline" size={20} color={Colors.primary} style={{ marginRight: 10 }} />
                     </TouchableOpacity>
@@ -298,8 +300,8 @@ export default function CalendarScreen({ navigation }: any) {
                     <TouchableOpacity style={styles.dateFilterBox} onPress={openDatePicker}>
                         <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={{ padding: 10 }}>
-                            <Text style={styles.dateLabel}>Gacha</Text>
-                            <Text style={styles.dateValue}>{tempEndDate || endDate ? `${String(endDate).padStart(2, '0')} ${viewDate.toLocaleDateString('uz-UZ', { month: 'short' })}. ${viewDate.getFullYear()}` : 'Tanlanmagan'}</Text>
+                            <Text style={styles.dateLabel}>{t('common.to')}</Text>
+                            <Text style={styles.dateValue}>{tempEndDate || endDate ? `${String(endDate).padStart(2, '0')} ${viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'short' })}. ${viewDate.getFullYear()}` : t('common.not_selected')}</Text>
                         </View>
                         <Ionicons name="calendar-outline" size={20} color={Colors.primary} style={{ marginRight: 10 }} />
                     </TouchableOpacity>
@@ -323,7 +325,7 @@ export default function CalendarScreen({ navigation }: any) {
                             <CalendarSkeletonLoader />
                         ) : (
                             <View style={{ padding: 40, alignItems: 'center' }}>
-                                <Text style={{ color: Colors.textMuted }}>O'yinlar topilmadi</Text>
+                                <Text style={{ color: Colors.textMuted }}>{t('common.no_data')}</Text>
                             </View>
                         )
                     }
@@ -377,19 +379,19 @@ export default function CalendarScreen({ navigation }: any) {
                             <View style={styles.dragIndicator} />
                             <View style={styles.modalDatesDisplay}>
                                 <View style={styles.modalDateBox}>
-                                    <Text style={styles.modalDateLabel}>DAN</Text>
-                                    <Text style={styles.modalDateValue}>{String(tempStartDate).padStart(2, '0')} {viewDate.toLocaleDateString('uz-UZ', { month: 'short' })}. {viewDate.getFullYear()}</Text>
+                                    <Text style={styles.modalDateLabel}>{t('common.from').toUpperCase()}</Text>
+                                    <Text style={styles.modalDateValue}>{String(tempStartDate).padStart(2, '0')} {viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'short' })}. {viewDate.getFullYear()}</Text>
                                 </View>
                                 <View style={styles.modalDateBox}>
-                                    <Text style={styles.modalDateLabel}>GACHA</Text>
-                                    <Text style={styles.modalDateValue}>{tempEndDate ? `${String(tempEndDate).padStart(2, '0')} ${viewDate.toLocaleDateString('uz-UZ', { month: 'short' })}. ${viewDate.getFullYear()}` : 'TANLANMAGAN'}</Text>
+                                    <Text style={styles.modalDateLabel}>{t('common.to').toUpperCase()}</Text>
+                                    <Text style={styles.modalDateValue}>{tempEndDate ? `${String(tempEndDate).padStart(2, '0')} ${viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'short' })}. ${viewDate.getFullYear()}` : t('common.not_selected').toUpperCase()}</Text>
                                 </View>
                             </View>
                             <View style={styles.monthHeaderRow}>
                                 <TouchableOpacity onPress={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}>
                                     <Ionicons name="chevron-back" size={20} color={Colors.primary} />
                                 </TouchableOpacity>
-                                <Text style={styles.monthHeaderText}>{viewDate.toLocaleDateString('uz-UZ', { month: 'long', year: 'numeric' }).toUpperCase()}</Text>
+                                <Text style={styles.monthHeaderText}>{viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'long', year: 'numeric' }).toUpperCase()}</Text>
                                 <TouchableOpacity onPress={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}>
                                     <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
                                 </TouchableOpacity>
@@ -398,7 +400,7 @@ export default function CalendarScreen({ navigation }: any) {
                                 {renderCalendarGrid()}
                             </View>
                             <TouchableOpacity style={styles.confirmBtn} onPress={confirmDates}>
-                                <Text style={styles.confirmBtnText}>TASDIQLASH</Text>
+                                <Text style={styles.confirmBtnText}>{t('common.confirm')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

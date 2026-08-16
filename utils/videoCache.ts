@@ -12,10 +12,11 @@ export async function getCachedVideoUri(remoteUri: string): Promise<string> {
     // Extract sanitized file name from URL
     const urlParts = remoteUri.split('/');
     const fileName = urlParts[urlParts.length - 1]?.split('?')[0] || 'cached_replay.mp4';
-    const cacheFileUri = `${FileSystem.cacheDirectory}video_replays_${fileName}`;
+    const cacheDir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory || '';
+    const cacheFileUri = `${cacheDir}video_replays_${fileName}`;
 
     // Check if video file already exists on local disk
-    const fileInfo = await FileSystem.getInfoAsync(cacheFileUri);
+    const fileInfo = await (FileSystem as any).getInfoAsync(cacheFileUri);
     if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
       console.log('⚡ [VIDEO CACHE HIT] Playing from local disk (0 MB Egress):', cacheFileUri);
       return cacheFileUri;

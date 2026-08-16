@@ -18,8 +18,10 @@ import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 
 import CustomRefreshControl from '../components/CustomRefreshControl';
+import { useTranslation } from 'react-i18next';
 
 export default function CalendarMatchesScreen({ route, navigation }: any) {
+    const { t } = useTranslation();
     const { 
         tournamentId,
         tournamentName = "Noma'lum Turnir", 
@@ -112,12 +114,12 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                         {isLive && (
                             <View style={styles.liveBadgeContainer}>
                                 <View style={styles.liveDot} />
-                                <Text style={styles.liveBadgeText}>LIVE</Text>
+                                <Text style={styles.liveBadgeText}>{t('matches.live')}</Text>
                             </View>
                         )}
                         {isFinished && (
                             <View style={styles.finishBadgeContainer}>
-                                <Text style={styles.finishBadgeText}>YAKUNLANDI</Text>
+                                <Text style={styles.finishBadgeText}>{t('matches.finished')}</Text>
                             </View>
                         )}
                     </View>
@@ -143,7 +145,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                             ) : (
                                 <View style={styles.vsContainer}>
                                     <Text style={styles.hTimeVsText}>{formattedTime}</Text>
-                                    <Text style={styles.vsSubText}>BOSHLANISHI</Text>
+                                    <Text style={styles.vsSubText}>{t('matches.starts')}</Text>
                                 </View>
                             )}
                         </View>
@@ -191,7 +193,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                     <Ionicons name="search" size={20} color={Colors.primary} style={styles.searchIcon} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Qidiruv"
+                        placeholder={t('common.search')}
                         placeholderTextColor="#8A94A6"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -202,7 +204,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                 {loading && !refreshing ? (
                     <View style={[styles.emptyContainer, { flex: 1, justifyContent: 'center' }]}>
                         <ActivityIndicator size="large" color={Colors.primary} />
-                        <Text style={[styles.emptyText, { marginTop: 10 }]}>Yuklanmoqda...</Text>
+                        <Text style={[styles.emptyText, { marginTop: 10 }]}>{t('common.loading')}</Text>
                     </View>
                 ) : (
                     <FlatList
@@ -219,7 +221,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                         }
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
-                                <Text style={styles.emptyText}>Topilmadi</Text>
+                                <Text style={styles.emptyText}>{t('common.no_data')}</Text>
                             </View>
                         }
                     />

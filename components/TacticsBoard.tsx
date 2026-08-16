@@ -20,9 +20,11 @@ interface PlayerPosition {
 interface TacticsBoardProps {
     players: PlayerPosition[];
     teamColor?: string;
+    formation?: string;
+    onPlayerPress?: (player: any) => void;
 }
 
-const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#3B82F6' }) => {
+const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#3B82F6', formation, onPlayerPress }) => {
     // Pitch stripes
     const stripes = Array.from({ length: 11 }).map((_, i) => i);
 

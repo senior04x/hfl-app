@@ -50,6 +50,8 @@ if (Platform.OS !== 'web') {
 }
 
 import NotificationsScreen from './screens/NotificationsScreen';
+import './i18n';
+import { initI18n } from './i18n';
 
 const Stack = createStackNavigator();
 export const navigationRef = createNavigationContainerRef();
@@ -57,6 +59,10 @@ export const navigationRef = createNavigationContainerRef();
 function App() {
     const { isAuthenticated, isGuest, user } = useAuthStore();
     const [isSplashVisible, setIsSplashVisible] = React.useState(Platform.OS !== 'web');
+
+    React.useEffect(() => {
+        initI18n().catch((e) => console.warn('i18n init error:', e));
+    }, []);
 
     React.useEffect(() => {
         if (Platform.OS === 'web') return;
@@ -97,6 +103,10 @@ function App() {
                     if (navigationRef.isReady()) {
                         (navigationRef as any).navigate('TransferRequest');
                     }
+                } else if (data.type === 'team_chat' || data.type === 'chat' || data.teamId) {
+                    if (navigationRef.isReady() && data.teamId) {
+                        (navigationRef as any).navigate('TeamChat', { teamId: data.teamId });
+                    }
                 }
             } catch (err) {
                 console.warn('Push notification navigation error:', err);
@@ -104,26 +114,32 @@ function App() {
         });
 
         // Cold-start notification check (when app was closed and opened via notification)
-        Notifications.getLastNotificationResponseAsync().then((response) => {
-            if (response) {
-                const data = response?.notification?.request?.content?.data;
-                if (!data) return;
+        Notifications.getLastNotificationResponseAsync()
+            .then((response) => {
+                if (response) {
+                    const data = response?.notification?.request?.content?.data;
+                    if (!data) return;
 
-                setTimeout(() => {
-                    if (navigationRef.isReady()) {
-                        if (data.type === 'news' || data.newsId) {
-                            (navigationRef as any).navigate('NewsDetail', { newsId: data.newsId });
-                        } else if (data.type === 'match_scheduled' || data.matchId) {
-                            (navigationRef as any).navigate('MatchDetail', { matchId: data.matchId });
-                        } else if (data.type === 'profile_update_status') {
-                            (navigationRef as any).navigate('Applications');
-                        } else if (data.type === 'transfer_status') {
-                            (navigationRef as any).navigate('TransferRequest');
+                    setTimeout(() => {
+                        if (navigationRef.isReady()) {
+                            if (data.type === 'news' || data.newsId) {
+                                (navigationRef as any).navigate('NewsDetail', { newsId: data.newsId });
+                            } else if (data.type === 'match_scheduled' || data.matchId) {
+                                (navigationRef as any).navigate('MatchDetail', { matchId: data.matchId });
+                            } else if (data.type === 'profile_update_status') {
+                                (navigationRef as any).navigate('Applications');
+                            } else if (data.type === 'transfer_status') {
+                                (navigationRef as any).navigate('TransferRequest');
+                            } else if (data.type === 'team_chat' || data.type === 'chat' || data.teamId) {
+                                (navigationRef as any).navigate('TeamChat', { teamId: data.teamId });
+                            }
                         }
-                    }
-                }, 1200);
-            }
-        });
+                    }, 1200);
+                }
+            })
+            .catch((err) => {
+                console.warn('Cold start notification check notice:', err);
+            });
 
         return () => {
             responseListener.remove();
