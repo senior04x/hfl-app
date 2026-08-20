@@ -337,6 +337,54 @@ export default function HomeScreen({ navigation }: any) {
         const matchDate = new Date(rawDate);
         const isValidDate = !isNaN(matchDate.getTime());
 
+        // Live Minute Calculation directly from database fields
+        let liveMinuteText = '';
+        if (matchIsLive) {
+            const st = String(match.status || '').toLowerCase().trim();
+            const directMin = match.minute ?? match.current_minute ?? match.match_minute ?? match.live_minute;
+            
+            if (directMin !== undefined && directMin !== null && !isNaN(Number(directMin)) && Number(directMin) > 0) {
+                if (st.includes('half_time') || st.includes('halftime') || st.includes('tanaffus')) {
+                    liveMinuteText = `Tanaffus (${Number(directMin)}')`;
+                } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
+                    liveMinuteText = `2-taym (${Number(directMin)}')`;
+                } else if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
+                    liveMinuteText = `1-taym (${Number(directMin)}')`;
+                } else {
+                    liveMinuteText = `${Number(directMin)}'`;
+                }
+            } else {
+                const halfDurMins = Number(match.half_duration) || 25;
+                const matchDurMins = Number(match.match_duration) || (halfDurMins * 2);
+                const halfDurSecs = halfDurMins * 60;
+                let timerSec = Number(match.timer_seconds);
+                if (isNaN(timerSec) || timerSec <= 0) timerSec = halfDurSecs;
+
+                if (match.is_timer_running && match.timer_started_at) {
+                    const elapsedSinceStart = Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000);
+                    if (elapsedSinceStart > 0) {
+                        timerSec = Math.max(0, timerSec - elapsedSinceStart);
+                    }
+                }
+
+                if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
+                    const elapsed = Math.max(0, halfDurSecs - timerSec);
+                    const curMin = Math.min(halfDurMins, Math.floor(elapsed / 60) + 1);
+                    liveMinuteText = `1-taym (${curMin}')`;
+                } else if (st.includes('half_time') || st.includes('halftime') || st.includes('tanaffus')) {
+                    liveMinuteText = `Tanaffus (${halfDurMins}')`;
+                } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
+                    const secondHalfElapsed = Math.max(0, halfDurSecs - timerSec);
+                    const curMin = Math.min(matchDurMins, halfDurMins + Math.floor(secondHalfElapsed / 60) + 1);
+                    liveMinuteText = `2-taym (${curMin}')`;
+                } else {
+                    const elapsed = Math.max(0, halfDurSecs - timerSec);
+                    const curMin = Math.max(1, Math.floor(elapsed / 60) + 1);
+                    liveMinuteText = `${curMin}'`;
+                }
+            }
+        }
+
         const months = [
             'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 
             'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
@@ -418,7 +466,14 @@ export default function HomeScreen({ navigation }: any) {
 
                         <View style={styles.hScoreColumn}>
                             {matchIsLive || matchIsFinished ? (
-                                <Text style={styles.hScoreText}>{match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}</Text>
+                                <View style={{ alignItems: 'center' }}>
+                                    <Text style={styles.hScoreText}>{match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}</Text>
+                                    {matchIsLive && liveMinuteText ? (
+                                        <View style={styles.liveMinuteTag}>
+                                            <Text style={styles.liveMinuteTagText}>{liveMinuteText}</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
                             ) : (
                                 <View style={styles.vsContainer}>
                                     <Text style={styles.hTimeVsText}>{formattedTime}</Text>
@@ -1071,6 +1126,21 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginTop: -4,
         letterSpacing: 1,
+    },
+    liveMinuteTag: {
+        backgroundColor: 'rgba(255, 59, 48, 0.18)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+        marginTop: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 59, 48, 0.4)',
+    },
+    liveMinuteTagText: {
+        color: '#FF3B30',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.5,
     },
 
     emptyCard: {
