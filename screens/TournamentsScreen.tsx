@@ -22,7 +22,7 @@ import Colors from '../constants/Colors';
 import { useTournamentStore } from '../store/useTournamentStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
-import { apiService } from '../services/apiService';
+import { apiService, supabase } from '../services/apiService';
 import GenericListSkeleton from '../components/GenericListSkeleton';
 import Skeleton from '../components/Skeleton';
 import TournamentsSkeleton from '../components/TournamentsSkeleton';
