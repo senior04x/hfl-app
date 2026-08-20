@@ -623,9 +623,7 @@ export default function TournamentsScreen({ navigation }: any) {
                             {isActive ? (
                                 <View style={styles.leagueTagBadge}>
                                     <Text style={styles.leagueTagText}>
-                                        {roundNumber > 0 
-                                            ? `${roundNumber}-${t('matches.tour', 'TUR')} • ${t('common.active', 'FAOL').toUpperCase()}`
-                                            : t('common.active', 'FAOL').toUpperCase()}
+                                        {t('common.active', 'FAOL').toUpperCase()}
                                     </Text>
                                 </View>
                             ) : (
