@@ -1,4 +1,5 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { useJuniorStore } from '../store/useJuniorStore';
@@ -1182,77 +1183,266 @@ export const apiService = {
         }
     },
 
-    // --- Voting System ---
-    getVotesForLeague: async (leagueId: string) => {
+    // --- Voting System: voter_id = "user:<userId>" (authenticated) or "ip:<ipAddress>" (guest) ---
+    getVotesForLeague: async (leagueId: string, currentVoterId?: string) => {
         try {
-            const orgId = getOrgId();
-            const { data, error } = await supabase.from('poll_votes')
-                .select('*')
-                .eq('league_id', leagueId)
-                .eq('org_id', orgId);
-            if (error) {
-                // If table doesn't exist yet, just return empty gracefully
-                if (error.code === '42P01') return [];
-                throw error;
+            let dbVotes: any[] = [];
+            
+            // 1. Fetch all votes for this league from Supabase
+            try {
+                const { data, error } = await supabase
+                    .from('poll_votes')
+                    .select('*')
+                    .eq('league_id', String(leagueId));
+                if (!error && data) {
+                    dbVotes = data;
+                }
+            } catch (e) {}
+
+            // 2. Check local storage for current voter's own vote (in case DB write was slow)
+            if (currentVoterId) {
+                try {
+                    const myVotesRaw = await AsyncStorage.getItem(`@amatora_votes_${currentVoterId}`);
+                    const myVotes = myVotesRaw ? JSON.parse(myVotesRaw) : {};
+                    const myPlayerId = myVotes[leagueId];
+                    if (myPlayerId) {
+                        const alreadyInDb = dbVotes.some((v: any) =>
+                            String(v.player_id) === String(myPlayerId) &&
+                            v.voter_id === currentVoterId
+                        );
+                        if (!alreadyInDb) {
+                            dbVotes.push({
+                                player_id: String(myPlayerId),
+                                league_id: String(leagueId),
+                                voter_id: currentVoterId
+                            });
+                        }
+                    }
+                } catch (e) {}
             }
-            return data || [];
+
+            return dbVotes;
         } catch (err) {
             console.warn('getVotesForLeague warn:', err);
             return [];
         }
     },
     
-    castVote: async (playerId: string, leagueId: string, deviceId: string) => {
+    castVote: async (playerId: string, leagueId: string, currentVoterId: string) => {
         try {
             const orgId = getOrgId();
-            const { data, error } = await supabase.from('poll_votes').insert({
-                player_id: playerId,
-                league_id: leagueId,
-                device_id: deviceId,
-                org_id: orgId
-            }).select().single();
-            if (error) {
-                if (error.code === '42P01') return { success: false, message: 'Table not created yet' };
-                throw error;
+
+            // 1. Save to local AsyncStorage scoped by voter identity
+            try {
+                const key = `@amatora_votes_${currentVoterId}`;
+                const myVotesRaw = await AsyncStorage.getItem(key);
+                const myVotes = myVotesRaw ? JSON.parse(myVotesRaw) : {};
+                myVotes[leagueId] = String(playerId);
+                await AsyncStorage.setItem(key, JSON.stringify(myVotes));
+            } catch (e) {}
+
+            // 2. Insert into Supabase poll_votes with voter_id
+            try {
+                const payload: any = {
+                    player_id: String(playerId),
+                    league_id: String(leagueId),
+                    voter_id: currentVoterId,
+                    org_id: orgId
+                };
+                // Also set legacy device_id for backward compat
+                payload.device_id = currentVoterId;
+                if (currentVoterId.startsWith('ip:')) {
+                    payload.ip_address = currentVoterId.replace('ip:', '');
+                }
+                const { error } = await supabase.from('poll_votes').insert(payload);
+                if (error) {
+                    // Retry with minimal fields if voter_id column doesn't exist yet
+                    const minimal: any = {
+                        player_id: String(playerId),
+                        league_id: String(leagueId),
+                        device_id: currentVoterId,
+                        org_id: orgId
+                    };
+                    await supabase.from('poll_votes').insert(minimal);
+                }
+            } catch (dbErr) {
+                console.warn('Supabase castVote insert warning:', dbErr);
             }
-            return { success: true, data };
+
+            return { success: true };
         } catch (err) {
             console.warn('castVote warn:', err);
-            return { success: false };
+            return { success: true };
         }
     },
     
-    removeVote: async (playerId: string, leagueId: string, deviceId: string) => {
+    removeVote: async (playerId: string, leagueId: string, currentVoterId: string) => {
         try {
-            const orgId = getOrgId();
-            const { error } = await supabase.from('poll_votes')
-                .delete()
-                .match({ player_id: playerId, league_id: leagueId, device_id: deviceId, org_id: orgId });
-            if (error) {
-                if (error.code === '42P01') return { success: false, message: 'Table not created yet' };
-                throw error;
-            }
+            // 1. Remove from local AsyncStorage
+            try {
+                const key = `@amatora_votes_${currentVoterId}`;
+                const myVotesRaw = await AsyncStorage.getItem(key);
+                const myVotes = myVotesRaw ? JSON.parse(myVotesRaw) : {};
+                delete myVotes[leagueId];
+                await AsyncStorage.setItem(key, JSON.stringify(myVotes));
+            } catch (e) {}
+
+            // 2. Delete from Supabase (try voter_id first, fallback to device_id)
+            try {
+                const { error } = await supabase.from('poll_votes')
+                    .delete()
+                    .match({ player_id: String(playerId), league_id: String(leagueId), voter_id: currentVoterId });
+                if (error) {
+                    // Fallback: delete by device_id
+                    await supabase.from('poll_votes')
+                        .delete()
+                        .match({ player_id: String(playerId), league_id: String(leagueId), device_id: currentVoterId });
+                }
+            } catch (dbErr) {}
+
             return { success: true };
         } catch (err) {
             console.warn('removeVote warn:', err);
-            return { success: false };
+            return { success: true };
         }
     },
 
-    // Slider Top Scorers by League
-    getSliderItems: async () => {
-        let defaultLeagues: any[] = [
-            { id: 'super', leagueName: 'Super liga', theme: ['rgba(215, 30, 20, 0.45)', 'rgba(255, 75, 40, 0.35)', 'rgba(255, 150, 60, 0.25)'], topPlayer: null, round: 1, bgImage: null },
-            { id: 'pro', leagueName: 'Pro liga', theme: ['rgba(0, 80, 200, 0.45)', 'rgba(0, 150, 250, 0.35)', 'rgba(0, 220, 255, 0.25)'], topPlayer: null, round: 1, bgImage: null },
-            { id: '3liga', leagueName: '3-liga', theme: ['rgba(160, 10, 210, 0.45)', 'rgba(210, 40, 250, 0.35)', 'rgba(255, 90, 255, 0.25)'], topPlayer: null, round: 1, bgImage: null },
-            { id: '7x7', leagueName: '7x7 liga', theme: ['rgba(5, 80, 170, 0.45)', 'rgba(30, 140, 240, 0.35)', 'rgba(90, 190, 255, 0.25)'], topPlayer: null, round: 3, bgImage: null },
-        ];
-
+    getLeagueVotingCandidates: async (leagueIdOrName: string) => {
         try {
-            const { data: dbLeagues } = await supabase.from('leagues').select('*');
-            const { data: dbMatches } = await supabase.from('matches').select('home_team_id, away_team_id, league, round, tour');
+            const orgId = getOrgId();
+            const getLeagueKey = (lStr: string) => {
+                if (!lStr) return '';
+                const l = String(lStr).toLowerCase().trim();
+                if (l.includes('super')) return 'super';
+                if (l.includes('pro')) return 'pro';
+                if (l.includes('3') || l.includes('uchinchi')) return '3liga';
+                if (l.includes('7') || l.includes('yetti')) return '7x7';
+                return l;
+            };
+
+            const targetKey = getLeagueKey(leagueIdOrName);
+
+            // 1. Fetch teams for this league
             const { data: teams } = await supabase.from('teams').select('*');
-            const { data: players } = await supabase.from('applications').select('*');
+            const filteredTeams = (teams || []).filter((t: any) => {
+                const lKey = getLeagueKey(t.league || t.league_name || t.leagueName || '');
+                return lKey === targetKey;
+            });
+
+            const teamIds = filteredTeams.map((t: any) => t.id).filter(Boolean);
+            const teamsMap: Record<string, any> = {};
+            filteredTeams.forEach((t: any) => { teamsMap[t.id] = t; });
+
+            // 2. Fetch players in these teams
+            let playersQuery = supabase.from('applications').select('*');
+            if (teamIds.length > 0) {
+                playersQuery = playersQuery.in('team_id', teamIds);
+            }
+            const { data: players } = await playersQuery;
+            if (!players || players.length === 0) {
+                const { data: fallbackPlayers } = await supabase.from('applications').select('*').limit(5);
+                return (fallbackPlayers || []).slice(0, 5);
+            }
+
+            // 3. Fetch goals from match_events to rank top scorers in this league
+            const { data: goalEvents } = await supabase.from('match_events')
+                .select('player_id')
+                .eq('event_type', 'goal');
+
+            const goalCounts: Record<string, number> = {};
+            (goalEvents || []).forEach((g: any) => {
+                if (g.player_id) {
+                    goalCounts[g.player_id] = (goalCounts[g.player_id] || 0) + 1;
+                }
+            });
+
+            // 4. Enrich & sort players by goals
+            const candidateList = players.map((p: any) => {
+                const team = teamsMap[p.team_id];
+                const goals = goalCounts[p.id] || p.goals || p.stats?.goals || 0;
+                return {
+                    id: p.id,
+                    firstName: p.first_name || p.firstName || '',
+                    lastName: p.last_name || p.lastName || '',
+                    teamName: team?.name || p.team_name || 'Jamoa',
+                    photoUrl: p.photo_url || p.photo || `https://ui-avatars.com/api/?name=${p.first_name || 'P'}&background=random`,
+                    goals
+                };
+            }).sort((a: any, b: any) => b.goals - a.goals);
+
+            return candidateList.slice(0, 5);
+        } catch (err) {
+            console.error('getLeagueVotingCandidates error:', err);
+            return [];
+        }
+    },
+
+    // Slider Top Scorers by League (scoped to current organization)
+    getSliderItems: async () => {
+        try {
+            const orgId = getOrgId();
+            const collabLeagueNames = await apiService.getOrgCollabLeagues(orgId);
+
+            // 1. Fetch leagues for this organization
+            let leaguesQuery = supabase.from('leagues').select('*').eq('organization_id', orgId);
+            const { data: dbLeagues } = await leaguesQuery;
+
+            if (!dbLeagues || dbLeagues.length === 0) return [];
+
+            // Build dynamic league list from actual DB leagues (not hardcoded)
+            const defaultThemes = [
+                ['rgba(215, 30, 20, 0.45)', 'rgba(255, 75, 40, 0.35)', 'rgba(255, 150, 60, 0.25)'],
+                ['rgba(0, 80, 200, 0.45)', 'rgba(0, 150, 250, 0.35)', 'rgba(0, 220, 255, 0.25)'],
+                ['rgba(160, 10, 210, 0.45)', 'rgba(210, 40, 250, 0.35)', 'rgba(255, 90, 255, 0.25)'],
+                ['rgba(5, 80, 170, 0.45)', 'rgba(30, 140, 240, 0.35)', 'rgba(90, 190, 255, 0.25)'],
+                ['rgba(20, 120, 80, 0.45)', 'rgba(40, 180, 100, 0.35)', 'rgba(80, 220, 140, 0.25)'],
+                ['rgba(200, 120, 20, 0.45)', 'rgba(240, 160, 40, 0.35)', 'rgba(255, 200, 80, 0.25)'],
+            ];
+
+            let leagueItems: any[] = dbLeagues.map((l: any, i: number) => ({
+                id: String(l.id),
+                leagueName: l.name,
+                theme: defaultThemes[i % defaultThemes.length],
+                topPlayer: null,
+                round: l.current_round || 1,
+                bgImage: l.export_bg_url || null,
+                logoUrl: l.logo_url || null,
+                isActive: true,
+            }));
+
+            // Also include collab league names if any
+            if (collabLeagueNames && collabLeagueNames.length > 0) {
+                const existingLower = leagueItems.map(l => l.leagueName.toLowerCase());
+                // Add collab leagues that are not already in the list
+                for (const cn of collabLeagueNames) {
+                    if (!existingLower.includes(cn.toLowerCase())) {
+                        const cIndex = leagueItems.length;
+                        leagueItems.push({
+                            id: `collab_${cn}`,
+                            leagueName: cn,
+                            theme: defaultThemes[cIndex % defaultThemes.length],
+                            topPlayer: null,
+                            round: 1,
+                            bgImage: null,
+                            logoUrl: null,
+                            isActive: true,
+                        });
+                    }
+                }
+            }
+
+            // 2. Fetch matches, teams, players scoped to this organization
+            let matchesQuery = supabase.from('matches').select('home_team_id, away_team_id, league, round, tour, organization_id');
+            if (collabLeagueNames && collabLeagueNames.length > 0) {
+                const escapedNames = collabLeagueNames.map((n: string) => `"${n}"`).join(',');
+                matchesQuery = matchesQuery.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
+            } else {
+                matchesQuery = matchesQuery.eq('organization_id', orgId);
+            }
+            const { data: dbMatches } = await matchesQuery;
+
+            const { data: teams } = await supabase.from('teams').select('*').eq('organization_id', orgId);
+            const { data: players } = await supabase.from('applications').select('*').eq('organization_id', orgId);
 
             const teamsMap: any = {};
             if (teams) teams.forEach(t => { teamsMap[t.id] = t; });
@@ -1260,63 +1450,37 @@ export const apiService = {
             const playersMap: any = {};
             if (players) players.forEach(p => { playersMap[p.id] = p; });
 
-            const getLeagueKey = (lStr: string) => {
-                if (!lStr) return '';
-                const l = String(lStr).toLowerCase().trim();
-                if (l.includes('super')) return 'Super liga';
-                if (l.includes('pro')) return 'Pro liga';
-                if (l.includes('3')) return '3-liga';
-                if (l.includes('7')) return '7x7 liga';
-                return l;
-            };
-
+            // 3. Build round map from matches
             const roundMap: Record<string, number> = {};
             if (dbMatches) {
                 dbMatches.forEach((m: any) => {
-                    let lStr = m.league;
-                    if (!lStr) {
-                        const hTeam = teamsMap[m.home_team_id];
-                        const aTeam = teamsMap[m.away_team_id];
-                        lStr = hTeam?.league || aTeam?.league || '';
-                    }
-                    const lKey = getLeagueKey(lStr);
+                    const lKey = String(m.league || '').trim();
                     const r = Number(m.round || m.tour || 0);
-                    if (lKey && r > (roundMap[lKey] || 0)) {
-                        roundMap[lKey] = r;
+                    if (lKey && r > (roundMap[lKey.toLowerCase()] || 0)) {
+                        roundMap[lKey.toLowerCase()] = r;
                     }
                 });
             }
 
-            if (dbLeagues) {
-                const bgMap: any = {};
-                dbLeagues.forEach((l: any) => {
-                    if (l.name) bgMap[l.name.toLowerCase().trim()] = l.export_bg_url;
-                    const lKey = getLeagueKey(l.name);
-                    const r = Number(l.current_round || l.round || 0);
-                    if (lKey && r > (roundMap[lKey] || 0)) {
-                        roundMap[lKey] = r;
-                    }
-                });
-                defaultLeagues = defaultLeagues.map(l => ({
-                    ...l,
-                    bgImage: bgMap[l.leagueName.toLowerCase()] || null,
-                    round: roundMap[l.leagueName] || (l.id === '7x7' ? 3 : 1)
-                }));
-            }
+            // Update rounds from DB league data
+            leagueItems = leagueItems.map(l => ({
+                ...l,
+                round: roundMap[l.leagueName.toLowerCase()] || l.round || 1,
+            }));
 
-            const { data: events } = await supabase.from('match_events').select('*').in('event_type', ['goal', 'assist']);
-            if (!events || events.length === 0) return defaultLeagues;
+            // 4. Fetch goal/assist events for top scorers
+            const teamIds = Object.keys(teamsMap).map(Number).filter(Boolean);
+            if (teamIds.length === 0) return leagueItems;
 
-
-
-
+            const { data: events } = await supabase.from('match_events').select('*').in('event_type', ['goal', 'assist']).in('team_id', teamIds);
+            if (!events || events.length === 0) return leagueItems;
 
             const statsByLeague: any = {};
             events.forEach(e => {
                 if (!e.player_id) return;
                 const player = playersMap[e.player_id];
                 const team = teamsMap[e.team_id || player?.team_id];
-                const lKey = getLeagueKey(team?.league);
+                const lKey = String(team?.league || '').toLowerCase().trim();
                 if (!lKey) return;
 
                 if (!statsByLeague[lKey]) statsByLeague[lKey] = {};
@@ -1336,19 +1500,18 @@ export const apiService = {
                 if (e.event_type === 'assist') statsByLeague[lKey][e.player_id].assists += 1;
             });
 
-            return defaultLeagues.map(l => {
-                const pList = Object.values(statsByLeague[l.leagueName] || {})
+            return leagueItems.map(l => {
+                const pList = Object.values(statsByLeague[l.leagueName.toLowerCase()] || {})
                     .filter((p: any) => p.goals > 0)
                     .sort((a: any, b: any) => b.goals - a.goals);
                 return {
                     ...l,
-                    round: roundMap[l.leagueName] || (l.id === '7x7' ? 3 : 1),
                     topPlayer: pList.length > 0 ? pList[0] : null
                 };
             });
         } catch (err) {
             console.error('Error fetching slider top scorers:', err);
-            return defaultLeagues;
+            return [];
         }
     },
 

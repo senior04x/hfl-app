@@ -1,52 +1,120 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Dimensions, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import ApiSlider from '../components/ApiSlider';
 import { apiService } from '../services/apiService';
+import { storyService } from '../services/storyService';
 import { useSocket } from '../context/SocketContext';
 import HomeSkeleton from '../components/HomeSkeleton';
 import Skeleton from '../components/Skeleton';
 import { useAuthStore } from '../store/useAuthStore';
+import { useOrganizationStore } from '../store/useOrganizationStore';
 import SmartImage from '../components/SmartImage';
 import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
-import { formatShortTeamName } from '../utils/stringUtils';
+import { formatShortTeamName, formatLocalizedVenue, formatLocalizedDate } from '../utils/stringUtils';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import MatchStoriesTray, { StoryGroup } from '../components/MatchStoriesTray';
+import StoryViewerModal from '../components/StoryViewerModal';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.88;
 const CARD_SPACING = 12;
 const SIDE_PADDING = (width - CARD_WIDTH) / 2;
 
+const CACHE_KEY_PREFIX = '@amatora_home_cache_v4_org_';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minut
+
 export default function HomeScreen({ navigation }: any) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const currentLang = i18n.language || 'uz';
     const [matches, setMatches] = useState<any[]>([]);
     const [sliderItems, setSliderItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const { socket, isConnected } = useSocket();
     const { user } = useAuthStore();
+    const selectedOrgId = useOrganizationStore(s => s.selectedOrganizationId);
     const [userProfile, setUserProfile] = useState<any>(null);
 
+    // Determine current org ID from user profile or store
+    const currentOrgId = user?.organizationId || user?.organization_id || (user?.organization as any)?.id || selectedOrgId || 1;
+    const CACHE_KEY = `${CACHE_KEY_PREFIX}${currentOrgId}`;
+
+    // Stories state with persistent viewed tracking (@amatora_viewed_stories)
+    const [storyModalVisible, setStoryModalVisible] = useState(false);
+    const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
+    const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([]);
+    const viewedStoryIdsRef = useRef<string[]>([]);
+    const hasCachedDataRef = useRef(false);
+
+    /**
+     * Cache-First Loader: Reads previously saved home screen data instantly.
+     * Returns true if cache is fresh (< 5 mins old) and valid.
+     */
+    const loadCachedData = async (): Promise<boolean> => {
+        try {
+            const cachedRaw = await AsyncStorage.getItem(CACHE_KEY);
+            if (cachedRaw) {
+                const cached = JSON.parse(cachedRaw);
+                if (cached) {
+                    if (Array.isArray(cached.matches) && cached.matches.length > 0) {
+                        setMatches(cached.matches);
+                    }
+                    if (Array.isArray(cached.sliderItems) && cached.sliderItems.length > 0) {
+                        setSliderItems(cached.sliderItems);
+                    }
+                    if (Array.isArray(cached.storyGroups) && cached.storyGroups.length > 0) {
+                        setStoryGroups(cached.storyGroups);
+                    }
+                    if (cached.userProfile) {
+                        setUserProfile(cached.userProfile);
+                    }
+                    hasCachedDataRef.current = true;
+                    setLoading(false);
+
+                    const age = Date.now() - (cached.timestamp || 0);
+                    return age < CACHE_TTL;
+                }
+            }
+        } catch (e) {
+            console.error('Error reading home cache:', e);
+        }
+        return false;
+    };
+
     useEffect(() => {
-        loadData();
+        const init = async () => {
+            const isFresh = await loadCachedData();
+            if (!isFresh) {
+                // If cache is missing or stale, fetch in background without skeleton flicker if cache was present
+                loadData(false, hasCachedDataRef.current);
+            }
+        };
+        init();
     }, [user?.id]);
 
     useEffect(() => {
         if (socket && isConnected) {
             socket.on('match-update', (updatedMatch: any) => {
-                setMatches(prev => prev.map(m => m._id === updatedMatch.matchId ? { ...m, ...updatedMatch.match } : m));
+                setMatches(prev => {
+                    const updated = prev.map(m => (m._id === updatedMatch.matchId || m.id === updatedMatch.matchId) ? { ...m, ...updatedMatch.match } : m);
+                    const stories = storyService.buildStoriesFromRealData(updated, sliderItems, viewedStoryIdsRef.current);
+                    setStoryGroups(stories);
+                    return updated;
+                });
             });
 
             return () => {
                 socket.off('match-update');
             };
         }
-    }, [socket, isConnected]);
+    }, [socket, isConnected, sliderItems]);
 
     const fetchUserProfileData = async () => {
         if (!user?.id) return null;
@@ -63,37 +131,62 @@ export default function HomeScreen({ navigation }: any) {
         return null;
     };
 
-    const loadData = async (isRefreshing = false) => {
+    const loadData = async (isRefreshing = false, isSilent = false) => {
         try {
-            if (isRefreshing) setRefreshing(true);
-            else setLoading(true);
+            if (isRefreshing) {
+                setRefreshing(true);
+            } else if (!isSilent && !hasCachedDataRef.current) {
+                setLoading(true);
+            }
             
-            // Parallelize matches, slider items, and user profile fetching
-            const [matchesData, sliderData, profileData] = await Promise.all([
+            // Parallelize matches, slider items, user profile, and viewed stories fetching
+            const [matchesData, sliderData, profileData, viewedIds] = await Promise.all([
                 apiService.getMatches().catch(err => { console.error('Matches fetch err:', err); return []; }),
                 apiService.getSliderItems().catch(err => { console.error('Slider fetch err:', err); return []; }),
-                fetchUserProfileData().catch(err => { console.error('Profile fetch err:', err); return null; })
+                fetchUserProfileData().catch(err => { console.error('Profile fetch err:', err); return null; }),
+                storyService.getViewedStoryIds().catch(() => [] as string[])
             ]);
 
-            if (matchesData && Array.isArray(matchesData)) {
-                setMatches(matchesData);
-            }
+            viewedStoryIdsRef.current = viewedIds || [];
 
+            const fetchedMatches = (matchesData && Array.isArray(matchesData)) ? matchesData : [];
+            setMatches(fetchedMatches);
+
+            let validSlider: any[] = [];
             if (sliderData && Array.isArray(sliderData)) {
-                const validItems = sliderData.filter((item: any) => item.isActive !== false);
-                setSliderItems(validItems);
-                validItems.forEach((item: any) => {
+                validSlider = sliderData.filter((item: any) => item.isActive !== false);
+                setSliderItems(validSlider);
+                validSlider.forEach((item: any) => {
                     if (item.bgImage) Image.prefetch(item.bgImage).catch(() => {});
                     if (item.topPlayer?.photoUrl) Image.prefetch(item.topPlayer.photoUrl).catch(() => {});
                     if (item.topPlayer?.teamLogo) Image.prefetch(item.topPlayer.teamLogo).catch(() => {});
                 });
             }
 
+            // Build 100% real stories strictly from Supabase database
+            const realStories = storyService.buildStoriesFromRealData(
+                fetchedMatches,
+                validSlider,
+                viewedStoryIdsRef.current
+            );
+            setStoryGroups(realStories);
+
             if (profileData) {
                 setUserProfile(profileData);
             } else if (!user?.id) {
                 setUserProfile(null);
             }
+
+            hasCachedDataRef.current = true;
+
+            // Save fresh snapshot to AsyncStorage cache
+            await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+                matches: fetchedMatches,
+                sliderItems: validSlider,
+                storyGroups: realStories,
+                userProfile: profileData || null,
+                timestamp: Date.now()
+            }));
         } catch (error) {
             console.error('Error loading home data:', error);
         } finally {
@@ -103,7 +196,31 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     const onRefresh = () => {
-        loadData(true);
+        loadData(true, false);
+    };
+
+    const handleSelectStoryGroup = async (group: StoryGroup, index: number) => {
+        setSelectedStoryIndex(index);
+        setStoryModalVisible(true);
+        await handleStoryGroupViewed(group.id);
+    };
+
+    const handleStoryGroupViewed = async (groupId: string) => {
+        if (!groupId) return;
+        // Immediately update UI state to marked as viewed (subtle grey ring)
+        setStoryGroups(prev =>
+            prev.map(s => (s.id === groupId ? { ...s, isViewed: true } : s))
+        );
+
+        // Persist to AsyncStorage (@amatora_viewed_stories)
+        if (!viewedStoryIdsRef.current.includes(groupId)) {
+            viewedStoryIdsRef.current.push(groupId);
+            await storyService.markStoryAsViewed(groupId);
+        }
+    };
+
+    const handleNavigateMatchFromStory = (matchId: string) => {
+        navigation.navigate('MatchDetail', { matchId });
     };
 
     // Derived State for different sections
@@ -118,25 +235,83 @@ export default function HomeScreen({ navigation }: any) {
         return 3;
     };
 
-    const upcomingMatches = matches
-        .filter(m => m.status === 'scheduled' && (m.importance === 'markaziy' || m.importance === 'ortacha'))
+    // Filter upcoming matches: strictly markaziy & ortacha (max 4)
+    const allUpcoming = matches.filter(m => m.status === 'scheduled');
+    const featuredUpcoming = allUpcoming.filter(m => m.importance === 'markaziy' || m.importance === 'ortacha');
+    const displayUpcomingMatches = (featuredUpcoming.length > 0 ? featuredUpcoming : allUpcoming)
         .sort((a, b) => {
             const rankDiff = getImportanceRank(a.importance) - getImportanceRank(b.importance);
             if (rankDiff !== 0) return rankDiff;
-            return new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime();
+            return new Date(a.date || a.createdAt || 0).getTime() - new Date(b.date || b.createdAt || 0).getTime();
         })
-        .slice(0, 5);
+        .slice(0, 4);
 
-    const displayUpcomingMatches = upcomingMatches;
+    // Filter finished matches: grouped by League (only markaziy & ortacha, max 3 per league)
+    const groupedFinishedMatches = useMemo(() => {
+        const allFinished = matches.filter(m => m.status === 'finished');
+        const featuredFinished = allFinished.filter(m => m.importance === 'markaziy' || m.importance === 'ortacha');
+        const sourceMatches = featuredFinished.length > 0 ? featuredFinished : allFinished;
 
-    const finishedMatches = matches
-        .filter(m => m.status === 'finished')
-        .sort((a, b) => {
-            const rankDiff = getImportanceRank(a.importance) - getImportanceRank(b.importance);
-            if (rankDiff !== 0) return rankDiff;
-            return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
-        })
-        .slice(0, 5);
+        const groupsMap: Record<string, { leagueId: string; leagueName: string; matches: any[] }> = {};
+
+        sourceMatches.forEach(m => {
+            const leagueId = String(m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.league || 'amatora_default');
+            const leagueName = m.tournamentName || m.league || "Amatora Liga";
+
+            if (!groupsMap[leagueId]) {
+                groupsMap[leagueId] = {
+                    leagueId,
+                    leagueName,
+                    matches: []
+                };
+            }
+            groupsMap[leagueId].matches.push(m);
+        });
+
+        return Object.values(groupsMap).map(group => ({
+            ...group,
+            matches: group.matches
+                .sort((a, b) => {
+                    const rankDiff = getImportanceRank(a.importance) - getImportanceRank(b.importance);
+                    if (rankDiff !== 0) return rankDiff;
+                    return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+                })
+                .slice(0, 3)
+        }));
+    }, [matches]);
+
+    const handleViewAllResults = async () => {
+        try {
+            // Find active tournament from current matches
+            const targetMatch = matches.find(m => m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.tournamentName || m.league);
+            const targetTournamentId = targetMatch?.tournament_id || targetMatch?.tournamentId || targetMatch?.league_id || targetMatch?.leagueId || targetMatch?.league;
+            const targetTournamentName = targetMatch?.tournamentName || targetMatch?.league || "Amatora Liga";
+
+            if (targetTournamentId) {
+                navigation.navigate('TournamentDetail', {
+                    tournamentId: targetTournamentId,
+                    tournamentName: targetTournamentName,
+                    initialTab: 'matches',
+                    tab: 'matches'
+                });
+                return;
+            }
+
+            const tournaments = await apiService.getTournaments().catch(() => []);
+            if (tournaments && tournaments.length > 0) {
+                const firstT = tournaments[0];
+                navigation.navigate('TournamentDetail', {
+                    tournamentId: firstT._id || firstT.id,
+                    tournamentName: firstT.name,
+                    initialTab: 'matches',
+                    tab: 'matches'
+                });
+                return;
+            }
+        } catch (e) {}
+
+        navigation.navigate('MainTabs', { screen: 'Turnirlar' });
+    };
 
     // Reusable Match Card Component with Importance Border & Badge
     const renderMatchCard = (match: any, isLive: boolean = false, isVertical: boolean = false) => {
@@ -168,9 +343,15 @@ export default function HomeScreen({ navigation }: any) {
         }
         if (!formattedTime) formattedTime = '18:00';
 
-        const formattedFullDate = isValidDate ? `${day}-${month}, ${year}` : (match.date_str || "Bo'lajak o'yin");
+        const formattedFullDate = isValidDate 
+            ? formatLocalizedDate(rawDate, currentLang, formattedTime) 
+            : (match.date_str || t('matches.not_started', "Bo'lajak o'yin"));
 
-        const roundTagText = match.round ? `${match.round}-TUR` : (match.tour ? `${match.tour}-TUR` : '');
+        const localizedVenue = formatLocalizedVenue(match.venue || "Amatora Arena", currentLang);
+
+        const roundTagText = match.round 
+            ? t('matches.round_tour', { round: match.round }) 
+            : (match.tour ? t('matches.round_tour', { round: match.tour }) : '');
 
         return (
             <TouchableOpacity
@@ -246,7 +427,7 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
 
                     <View style={styles.hMatchFooter}>
-                        <Text style={styles.hMatchDate}>{formattedFullDate} • {match.venue || "Amatora Arena"}</Text>
+                        <Text style={styles.hMatchDate}>{formattedFullDate} • {localizedVenue}</Text>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -258,6 +439,7 @@ export default function HomeScreen({ navigation }: any) {
             <SafeAreaView style={styles.container} edges={['top']}>
                 <ScrollView
                     showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 130 }}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
                     }
@@ -283,7 +465,7 @@ export default function HomeScreen({ navigation }: any) {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                             <TouchableOpacity 
                                                 style={styles.profileButton}
-                                                onPress={() => navigation.navigate('Profil')}
+                                                onPress={() => navigation.navigate('MainTabs', { screen: 'Profil' })}
                                                 activeOpacity={0.8}
                                             >
                                                 {avatarUri ? (
@@ -318,6 +500,14 @@ export default function HomeScreen({ navigation }: any) {
                                 );
                             })()}
 
+                            {/* Stories & Highlight Reels Bar (Vaqtinchalik commentga olingan)
+                            {storyGroups && storyGroups.length > 0 && (
+                                <MatchStoriesTray
+                                    stories={storyGroups}
+                                    onSelectStoryGroup={handleSelectStoryGroup}
+                                />
+                            )} */}
+
                             <View style={styles.sliderContainer}>
                                 <ApiSlider initialItems={sliderItems} externalLoading={loading} />
                             </View>
@@ -347,7 +537,7 @@ export default function HomeScreen({ navigation }: any) {
                             <View style={styles.sectionContainer}>
                                 <View style={styles.sectionHeader}>
                                     <Text style={styles.sectionTitle}>{t('home.featured_matches')}</Text>
-                                    <TouchableOpacity onPress={() => navigation.navigate('Taqvim')}>
+                                    <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
                                         <Text style={styles.viewAllText}>{t('home.view_calendar')}</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -368,115 +558,152 @@ export default function HomeScreen({ navigation }: any) {
                                 )}
                             </View>
 
-                            <View style={styles.sectionContainer}>
-                                <View style={styles.sectionHeader}>
-                                    <Text style={styles.sectionTitle}>{t('home.recent_results')}</Text>
-                                    <TouchableOpacity onPress={() => navigation.navigate('Turnirlar')}>
-                                        <Text style={styles.viewAllText}>{t('home.view_all_results')}</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {loading ? (
+                            {loading ? (
+                                <View style={styles.sectionContainer}>
+                                    <View style={styles.sectionHeader}>
+                                        <Text style={styles.sectionTitle}>{t('home.recent_results')}</Text>
+                                    </View>
                                     <View style={{ paddingHorizontal: 20 }}>
                                         <Skeleton width="100%" height={120} borderRadius={20} style={{ marginBottom: 10 }} />
                                         <Skeleton width="100%" height={120} borderRadius={20} />
                                     </View>
-                                ) : finishedMatches.length > 0 ? (
-                                    finishedMatches.map((match, idx) => {
-                                        const rawDate = match.date || match.match_date;
-                                        const matchDate = new Date(rawDate);
-                                        const isValidDate = !isNaN(matchDate.getTime());
-
-                                        const months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
-                                        const day = isValidDate ? matchDate.getDate() : '';
-                                        const month = isValidDate ? months[matchDate.getMonth()] : '';
-                                        const formattedDate = isValidDate ? `${day}-${month}` : (match.date_str || "Tugagan o'yin");
-
-                                        const homeLogo = match.homeTeamLogo || match.homeTeam?.logo || match.home_team_logo;
-                                        const awayLogo = match.awayTeamLogo || match.awayTeam?.logo || match.away_team_logo;
-                                        const homeName = formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Mezbon', 12);
-                                        const awayName = formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12);
-                                        const venue = match.venue || match.stadium_name || match.stadium || "Amatora Arena";
-                                        const leagueName = match.tournamentName || match.league_name || match.league || "SUPER LIGA";
-                                        const roundText = match.round ? `${match.round}-TUR` : (match.tour ? `${match.tour}-TUR` : "TUGAGAN O'YIN");
-
-                                        return (
-                                            <TouchableOpacity
-                                                key={match._id || match.id || idx}
-                                                style={styles.finishedMatchCard}
-                                                onPress={() => navigation.navigate('MatchDetail', { matchId: match._id || match.id })}
-                                                activeOpacity={0.85}
+                                </View>
+                            ) : groupedFinishedMatches.length > 0 ? (
+                                groupedFinishedMatches.map((group: any, groupIdx: number) => (
+                                    <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
+                                        <View style={styles.sectionHeader}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                                                <Ionicons name="trophy" size={16} color={Colors.primary} />
+                                                <Text style={[styles.sectionTitle, { fontSize: 16 }]} numberOfLines={1}>
+                                                    {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity 
+                                                onPress={() => {
+                                                    navigation.navigate('TournamentDetail', {
+                                                        tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
+                                                        tournamentName: group.leagueName,
+                                                        initialTab: 'matches',
+                                                        tab: 'matches'
+                                                    });
+                                                }}
+                                                activeOpacity={0.75}
                                             >
-                                                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                                                <View style={styles.finishedCardInner}>
-                                                    <View style={styles.finishedHeaderRow}>
-                                                        <View style={styles.finishedLeagueBadge}>
-                                                            <Ionicons name="trophy-outline" size={12} color={Colors.primary} style={{ marginRight: 4 }} />
-                                                            <Text style={styles.finishedLeagueText} numberOfLines={1}>{leagueName.toUpperCase()}</Text>
-                                                        </View>
-                                                        <View style={styles.finishedRoundBadge}>
-                                                            <Text style={styles.finishedRoundText}>{roundText}</Text>
-                                                        </View>
-                                                    </View>
-
-                                                    <View style={styles.finishedScoreRow}>
-                                                        <View style={styles.finishedTeamCol}>
-                                                            <View style={styles.finishedLogoCircle}>
-                                                                {homeLogo ? (
-                                                                    <SmartImage uri={homeLogo} style={styles.finishedTeamLogo} contentFit="contain" fallbackIcon="shield-outline" />
-                                                                ) : (
-                                                                    <Text style={styles.finishedLogoFallback}>{homeName.charAt(0)}</Text>
-                                                                )}
-                                                            </View>
-                                                            <Text style={styles.finishedTeamName} numberOfLines={1}>{homeName}</Text>
-                                                        </View>
-
-                                                        <View style={styles.finishedScoreBox}>
-                                                            <Text style={styles.finishedScoreText}>
-                                                                {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
-                                                            </Text>
-                                                            <View style={styles.finishedBadgeTag}>
-                                                                <Text style={styles.finishedBadgeTagText}>{t('matches.finished')}</Text>
-                                                            </View>
-                                                        </View>
-
-                                                        <View style={styles.finishedTeamCol}>
-                                                            <View style={styles.finishedLogoCircle}>
-                                                                {awayLogo ? (
-                                                                    <SmartImage uri={awayLogo} style={styles.finishedTeamLogo} contentFit="contain" fallbackIcon="shield-outline" />
-                                                                ) : (
-                                                                    <Text style={styles.finishedLogoFallback}>{awayName.charAt(0)}</Text>
-                                                                )}
-                                                            </View>
-                                                            <Text style={styles.finishedTeamName} numberOfLines={1}>{awayName}</Text>
-                                                        </View>
-                                                    </View>
-
-                                                    <View style={styles.finishedFooterRow}>
-                                                        <View style={styles.finishedFooterItem}>
-                                                            <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 4 }} />
-                                                            <Text style={styles.finishedFooterText}>{formattedDate}</Text>
-                                                        </View>
-                                                        <Text style={styles.finishedDotSeparator}>•</Text>
-                                                        <View style={styles.finishedFooterItem}>
-                                                            <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 4 }} />
-                                                            <Text style={styles.finishedFooterText} numberOfLines={1}>{venue}</Text>
-                                                        </View>
-                                                    </View>
-                                                </View>
+                                                <Text style={styles.viewAllText}>
+                                                    {t('home.view_league_results', { league: group.leagueName.toUpperCase() })}
+                                                </Text>
                                             </TouchableOpacity>
-                                        );
-                                    })
-                                ) : (
+                                        </View>
+
+                                        <View style={styles.verticalMatchList}>
+                                            {group.matches.map((match: any, idx: number) => {
+                                                const rawDate = match.date || match.match_date || match.created_at;
+                                                const formattedDate = formatLocalizedDate(rawDate, currentLang);
+                                                const roundText = match.round 
+                                                    ? t('matches.round_tour', { round: match.round }) 
+                                                    : (match.tour ? t('matches.round_tour', { round: match.tour }) : t('matches.round_tour', { round: 1 }));
+                                                const leagueName = match.tournamentName || match.league || group.leagueName;
+                                                const venue = formatLocalizedVenue(match.venue || match.location || "Amatora Arena", currentLang);
+
+                                                const homeLogo = match.homeTeamLogo || match.homeTeam?.logo || match.home_team_logo;
+                                                const awayLogo = match.awayTeamLogo || match.awayTeam?.logo || match.away_team_logo;
+                                                const homeName = formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Mezbon', 12);
+                                                const awayName = formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12);
+
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={match._id || match.id || idx}
+                                                        style={styles.finishedMatchCard}
+                                                        onPress={() => navigation.navigate('MatchDetail', { matchId: match._id || match.id })}
+                                                        activeOpacity={0.85}
+                                                    >
+                                                        <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                                                        <View style={styles.finishedCardInner}>
+                                                            <View style={styles.finishedHeaderRow}>
+                                                                <View style={styles.finishedLeagueBadge}>
+                                                                    <Ionicons name="trophy-outline" size={12} color={Colors.primary} style={{ marginRight: 4 }} />
+                                                                    <Text style={styles.finishedLeagueText} numberOfLines={1}>{leagueName.toUpperCase()}</Text>
+                                                                </View>
+                                                                <View style={styles.finishedRoundBadge}>
+                                                                    <Text style={styles.finishedRoundText}>{roundText}</Text>
+                                                                </View>
+                                                            </View>
+
+                                                            <View style={styles.finishedScoreRow}>
+                                                                <View style={styles.finishedTeamCol}>
+                                                                    <View style={styles.finishedLogoCircle}>
+                                                                        {homeLogo ? (
+                                                                            <SmartImage uri={homeLogo} style={styles.finishedTeamLogo} contentFit="contain" fallbackIcon="shield-outline" />
+                                                                        ) : (
+                                                                            <Text style={styles.finishedLogoFallback}>{homeName.charAt(0)}</Text>
+                                                                        )}
+                                                                    </View>
+                                                                    <Text style={styles.finishedTeamName} numberOfLines={1}>{homeName}</Text>
+                                                                </View>
+
+                                                                <View style={styles.finishedScoreBox}>
+                                                                    <Text style={styles.finishedScoreText}>
+                                                                        {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
+                                                                    </Text>
+                                                                    <View style={styles.finishedBadgeTag}>
+                                                                        <Text style={styles.finishedBadgeTagText}>{t('matches.finished')}</Text>
+                                                                    </View>
+                                                                </View>
+
+                                                                <View style={styles.finishedTeamCol}>
+                                                                    <View style={styles.finishedLogoCircle}>
+                                                                        {awayLogo ? (
+                                                                            <SmartImage uri={awayLogo} style={styles.finishedTeamLogo} contentFit="contain" fallbackIcon="shield-outline" />
+                                                                        ) : (
+                                                                            <Text style={styles.finishedLogoFallback}>{awayName.charAt(0)}</Text>
+                                                                        )}
+                                                                    </View>
+                                                                    <Text style={styles.finishedTeamName} numberOfLines={1}>{awayName}</Text>
+                                                                </View>
+                                                            </View>
+
+                                                            <View style={styles.finishedFooterRow}>
+                                                                <View style={styles.finishedFooterItem}>
+                                                                    <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 4 }} />
+                                                                    <Text style={styles.finishedFooterText}>{formattedDate}</Text>
+                                                                </View>
+                                                                <Text style={styles.finishedDotSeparator}>•</Text>
+                                                                <View style={styles.finishedFooterItem}>
+                                                                    <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 4 }} />
+                                                                    <Text style={styles.finishedFooterText} numberOfLines={1}>{venue}</Text>
+                                                                </View>
+                                                            </View>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
+                                    </View>
+                                ))
+                            ) : (
+                                <View style={styles.sectionContainer}>
+                                    <View style={styles.sectionHeader}>
+                                        <Text style={styles.sectionTitle}>{t('home.recent_results')}</Text>
+                                    </View>
                                     <View style={styles.emptyCard}>
                                         <Ionicons name="trophy-outline" size={32} color={Colors.textMuted} />
                                         <Text style={styles.emptyText}>{t('home.no_finished_matches')}</Text>
                                     </View>
-                                )}
-                            </View>
+                                </View>
+                            )}
                         </>
                     )}
                 </ScrollView>
+
+                {/* Fullscreen Story Viewer Modal (Vaqtinchalik commentga olingan)
+                <StoryViewerModal
+                    visible={storyModalVisible}
+                    storyGroups={storyGroups}
+                    initialGroupIndex={selectedStoryIndex}
+                    onClose={() => setStoryModalVisible(false)}
+                    onNavigateMatch={handleNavigateMatchFromStory}
+                    onStoryGroupViewed={handleStoryGroupViewed}
+                /> */}
             </SafeAreaView>
         </AnimatedBackground>
     );
