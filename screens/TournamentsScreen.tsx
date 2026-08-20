@@ -60,17 +60,19 @@ const getLeagueLogoSource = (league: any) => {
 
 // Stable Header Component to prevent unwanted re-renders during selection
 const TournamentsHeader = ({
+    isGuest,
     activeTab,
     setActiveTab,
     isLeagueSelectorOpen,
     toggleLeagueSelector,
     isLeaguesLoading,
     selectedLeague,
-    handleSocialPress,
+    activeOrg,
+    organizations,
+    handleOrgSelect,
     animationValue,
     leagues,
     handleLeagueSelect,
-    tournaments,
     teams,
     teamsLoading,
     navigation
@@ -78,7 +80,7 @@ const TournamentsHeader = ({
     const { t } = useTranslation();
     const accordionHeight = animationValue.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, 500], // Increased to ensure no overflow issues
+        outputRange: [0, 500],
     });
 
     const accordionOpacity = animationValue.interpolate({
@@ -86,7 +88,9 @@ const TournamentsHeader = ({
         outputRange: [0, 1],
     });
 
-    const currentLogoSource = getLeagueLogoSource(selectedLeague);
+    // Current Large Logo: For guest it is the Organization logo, for auth it is League logo
+    const orgLogo = activeOrg?.logo_url || activeOrg?.logo || activeOrg?.photo_url;
+    const currentLeagueLogoSource = getLeagueLogoSource(selectedLeague);
 
     return (
         <View style={styles.headerContent}>
@@ -99,7 +103,7 @@ const TournamentsHeader = ({
                         onPress={() => setActiveTab('league')}
                     >
                         <Text style={[styles.tabText, activeTab === 'league' && styles.activeTabText]}>
-                            {t('tournaments.league_tournaments')}
+                            {isGuest ? t('tournaments.all_leagues', 'TASHKILOT LIGALARI') : t('tournaments.league_tournaments')}
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -119,7 +123,7 @@ const TournamentsHeader = ({
                 </View>
             </View>
 
-            {/* League Info Card with Glass Effect — Only Large Logo Without Background */}
+            {/* Central Info Card with Glass Effect — Only Large Logo Without Background */}
             <TouchableOpacity 
                 style={styles.leagueCardCentered} 
                 onPress={toggleLeagueSelector}
@@ -129,16 +133,35 @@ const TournamentsHeader = ({
                 <View style={styles.leagueCardCenteredContent}>
                     {/* Large Logo without background */}
                     <View style={styles.largeLogoWrapper}>
-                        {isLeaguesLoading || !selectedLeague ? (
-                            <Skeleton width="92%" height={210} borderRadius={16} />
-                        ) : currentLogoSource ? (
-                            <Image
-                                source={currentLogoSource}
-                                style={styles.headerLeagueLogoLarge}
-                                resizeMode="contain"
-                            />
+                        {isGuest ? (
+                            isLeaguesLoading || !activeOrg ? (
+                                <Skeleton width="92%" height={210} borderRadius={16} />
+                            ) : orgLogo && typeof orgLogo === 'string' && (orgLogo.startsWith('http') || orgLogo.length > 8) ? (
+                                <Image
+                                    source={{ uri: orgLogo }}
+                                    style={styles.headerLeagueLogoLarge}
+                                    resizeMode="contain"
+                                />
+                            ) : (
+                                <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="business" size={120} color={Colors.primary} />
+                                    <Text style={{ color: '#00FF9D', fontSize: 22, fontWeight: '900', marginTop: 8 }}>
+                                        {(activeOrg?.slug || activeOrg?.name || 'HFL').toUpperCase()}
+                                    </Text>
+                                </View>
+                            )
                         ) : (
-                            <Ionicons name="shield" size={140} color={Colors.primary} />
+                            isLeaguesLoading || !selectedLeague ? (
+                                <Skeleton width="92%" height={210} borderRadius={16} />
+                            ) : currentLeagueLogoSource ? (
+                                <Image
+                                    source={currentLeagueLogoSource}
+                                    style={styles.headerLeagueLogoLarge}
+                                    resizeMode="contain"
+                                />
+                            ) : (
+                                <Ionicons name="shield" size={140} color={Colors.primary} />
+                            )
                         )}
                     </View>
 
@@ -153,7 +176,7 @@ const TournamentsHeader = ({
             </TouchableOpacity>
 
 
-            {/* Accordion Expansion: League List with Animated.View */}
+            {/* Accordion Expansion: Organization List (for guest) OR League List (for auth) */}
             <Animated.View style={[
                 styles.leagueAccordion,
                 {
@@ -169,35 +192,30 @@ const TournamentsHeader = ({
             ]}>
                 <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={styles.accordionContent}>
-                    {isLeaguesLoading ? (
-                        <View style={{ padding: 16 }}>
-                            <Skeleton width="100%" height={40} borderRadius={6} style={{ marginBottom: 12 }} />
-                            <Skeleton width="100%" height={40} borderRadius={6} style={{ marginBottom: 12 }} />
-                            <Skeleton width="100%" height={40} borderRadius={6} />
-                        </View>
-                    ) : (
-                        leagues.map((league: any) => {
-                            const isSelected = (selectedLeague?.id === league.id || selectedLeague?._id === league._id);
-                            const itemLogo = getLeagueLogoSource(league);
+                    {isGuest ? (
+                        /* GUEST MODE: Organization Selector in Accordion */
+                        (organizations || []).map((org: any) => {
+                            const isSelected = (activeOrg?.id === org.id);
+                            const itemOrgLogo = org.logo_url || org.logo || org.photo_url;
                             return (
                                 <TouchableOpacity
-                                    key={league.id || league._id}
+                                    key={org.id}
                                     style={[
                                         styles.accordionItem,
                                         isSelected && styles.activeAccordionItem
                                     ]}
-                                    onPress={() => handleLeagueSelect(league)}
+                                    onPress={() => handleOrgSelect(org)}
                                     activeOpacity={0.6}
                                 >
                                     <View style={styles.accordionLogoContainer}>
-                                        {itemLogo ? (
-                                            <Image source={itemLogo} style={styles.accordionLogo} resizeMode="contain" />
+                                        {itemOrgLogo && typeof itemOrgLogo === 'string' && (itemOrgLogo.startsWith('http') || itemOrgLogo.length > 8) ? (
+                                            <Image source={{ uri: itemOrgLogo }} style={styles.accordionLogo} resizeMode="contain" />
                                         ) : (
-                                            <Ionicons name="football" size={18} color={Colors.primary} />
+                                            <Ionicons name="business" size={18} color={Colors.primary} />
                                         )}
                                     </View>
                                     <Text style={[styles.accordionItemName, isSelected && { color: Colors.primary, fontWeight: '900' }]} numberOfLines={1}>
-                                        {league.name?.toUpperCase()}
+                                        {(org.name || 'TASHKILOT').toUpperCase()}
                                     </Text>
                                     {isSelected && (
                                         <Ionicons name="checkmark-circle" size={20} color={Colors.primary} style={{ marginLeft: 8 }} />
@@ -205,6 +223,45 @@ const TournamentsHeader = ({
                                 </TouchableOpacity>
                             );
                         })
+                    ) : (
+                        /* AUTH MODE: League Selector in Accordion */
+                        isLeaguesLoading ? (
+                            <View style={{ padding: 16 }}>
+                                <Skeleton width="100%" height={40} borderRadius={6} style={{ marginBottom: 12 }} />
+                                <Skeleton width="100%" height={40} borderRadius={6} style={{ marginBottom: 12 }} />
+                                <Skeleton width="100%" height={40} borderRadius={6} />
+                            </View>
+                        ) : (
+                            leagues.map((league: any) => {
+                                const isSelected = (selectedLeague?.id === league.id || selectedLeague?._id === league._id);
+                                const itemLogo = getLeagueLogoSource(league);
+                                return (
+                                    <TouchableOpacity
+                                        key={league.id || league._id}
+                                        style={[
+                                            styles.accordionItem,
+                                            isSelected && styles.activeAccordionItem
+                                        ]}
+                                        onPress={() => handleLeagueSelect(league)}
+                                        activeOpacity={0.6}
+                                    >
+                                        <View style={styles.accordionLogoContainer}>
+                                            {itemLogo ? (
+                                                <Image source={itemLogo} style={styles.accordionLogo} resizeMode="contain" />
+                                            ) : (
+                                                <Ionicons name="football" size={18} color={Colors.primary} />
+                                            )}
+                                        </View>
+                                        <Text style={[styles.accordionItemName, isSelected && { color: Colors.primary, fontWeight: '900' }]} numberOfLines={1}>
+                                            {league.name?.toUpperCase()}
+                                        </Text>
+                                        {isSelected && (
+                                            <Ionicons name="checkmark-circle" size={20} color={Colors.primary} style={{ marginLeft: 8 }} />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )
                     )}
                 </View>
             </Animated.View>
@@ -214,38 +271,40 @@ const TournamentsHeader = ({
                 <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>{t('teams.title')}</Text>
-                        {isLeaguesLoading || !selectedLeague ? (
+                        <Text style={styles.statLabel}>{isGuest ? t('tournaments.title', 'Ligalar') : t('teams.title')}</Text>
+                        {isLeaguesLoading ? (
                             <Skeleton width={30} height={16} borderRadius={4} />
                         ) : (
-                            <Text style={styles.statValue}>{teams?.length || 0}</Text>
+                            <Text style={styles.statValue}>
+                                {isGuest ? (leagues?.length || 0) : (teams?.length || 0)}
+                            </Text>
                         )}
                     </View>
                     <View style={styles.statItem}>
                         <Text style={styles.statLabel}>{t('common.status')}</Text>
-                        {isLeaguesLoading || !selectedLeague ? (
+                        {isLeaguesLoading ? (
                             <Skeleton width={50} height={16} borderRadius={4} />
                         ) : (
                             <Text style={styles.statValue}>
-                                {teams?.length || 0} {t('common.active').toLowerCase()}
+                                {isGuest ? `${leagues?.length || 0} ${t('common.active', 'faol').toLowerCase()}` : `${teams?.length || 0} ${t('common.active', 'faol').toLowerCase()}`}
                             </Text>
                         )}
                     </View>
                     <View style={styles.statItem}>
                         <Text style={styles.statLabel}>Region</Text>
-                        {isLeaguesLoading || !selectedLeague ? (
+                        {isLeaguesLoading ? (
                             <Skeleton width={70} height={16} borderRadius={4} />
                         ) : (
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Image
                                     source={{
-                                        uri: selectedLeague?.location?.toLowerCase().includes('rossiya') || selectedLeague?.location?.toLowerCase().includes('russia')
-                                            ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Russia.svg/1200px-Flag_of_Russia.svg.png'
-                                            : 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
+                                        uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
                                     }}
                                     style={[styles.flagIcon, { width: 14, height: 10, marginRight: 4 }]}
                                 />
-                                <Text style={styles.statValue}>{selectedLeague?.location?.split(' ')[0] || 'O\'zbekiston'}</Text>
+                                <Text style={styles.statValue}>
+                                    {isGuest ? (activeOrg?.location || "O'zbekiston") : (selectedLeague?.location?.split(' ')[0] || "O'zbekiston")}
+                                </Text>
                             </View>
                         )}
                     </View>
@@ -257,7 +316,14 @@ const TournamentsHeader = ({
                 <TouchableOpacity 
                     style={styles.hallOfFameBtn}
                     onPress={() => {
-                        if (selectedLeague) {
+                        if (isGuest) {
+                            if (leagues && leagues.length > 0) {
+                                navigation.navigate('TournamentDetail', { 
+                                    tournament: leagues[0],
+                                    tournamentId: leagues[0].id || leagues[0]._id 
+                                });
+                            }
+                        } else if (selectedLeague) {
                             navigation.navigate('TournamentDetail', { 
                                 tournament: selectedLeague,
                                 tournamentId: selectedLeague.id || selectedLeague._id 
@@ -268,21 +334,36 @@ const TournamentsHeader = ({
                 >
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={styles.hallOfFameBtnText}>{t('tournaments.overview')}</Text>
+                        <Text style={styles.hallOfFameBtnText}>
+                            {isGuest ? t('tournaments.view_leagues', 'Ligalarni Ko\'rish') : t('tournaments.overview')}
+                        </Text>
                         <Ionicons name="arrow-forward" size={18} color={Colors.primary} style={{ marginLeft: 6 }} />
                     </View>
                 </TouchableOpacity>
             </View>
 
-            {/* Teams List Header */}
+            {/* List Header Badge */}
             <View style={styles.listHeader}>
                 <View style={styles.listHeaderBadge}>
                     <BlurView intensity={10} tint="light" style={StyleSheet.absoluteFill} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6 }}>
-                        <Ionicons name="shield-checkmark-outline" size={16} color="#00FF66" style={{ marginRight: 6 }} />
+                        <Ionicons 
+                            name={isGuest ? "trophy-outline" : "shield-checkmark-outline"} 
+                            size={16} 
+                            color="#00FF66" 
+                            style={{ marginRight: 6 }} 
+                        />
                         <Text style={styles.listHeaderText}>
-                            {(selectedLeague?.name || 'LIGA').toUpperCase()} JAMOALARI ({teams?.length || 0})
+                            {isGuest 
+                                ? `${(activeOrg?.name || 'TASHKILOT').toUpperCase()} LIGALARI (${leagues?.length || 0})`
+                                : `${(selectedLeague?.name || 'LIGA').toUpperCase()} JAMOALARI (${teams?.length || 0})`}
                         </Text>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+};
                     </View>
                 </View>
             </View>
@@ -526,8 +607,8 @@ export default function TournamentsScreen({ navigation }: any) {
     const renderLeagueItemForGuest = ({ item: league, index }: { item: any, index: number }) => {
         if (league._isSkeleton) {
             return (
-                <View style={[styles.guestLeagueCard, { borderBottomWidth: 0 }]} key={`skeleton-${index}`}>
-                    <Skeleton circle width={54} height={54} style={{ marginRight: 14 }} />
+                <View style={[styles.teamItem, { borderBottomWidth: 0 }]} key={`skeleton-${index}`}>
+                    <Skeleton circle width={48} height={48} style={{ marginRight: 14 }} />
                     <View style={{ flex: 1 }}>
                         <Skeleton width={width * 0.5} height={18} borderRadius={4} style={{ marginBottom: 6 }} />
                         <Skeleton width={width * 0.3} height={12} borderRadius={4} />
@@ -542,42 +623,53 @@ export default function TournamentsScreen({ navigation }: any) {
         return (
             <TouchableOpacity
                 key={league.id || league._id}
-                style={styles.guestLeagueCard}
+                style={styles.teamItem}
                 onPress={() => navigation.navigate('TournamentDetail', { 
                     tournament: league, 
                     tournamentId: league.id || league._id 
                 })}
-                activeOpacity={0.75}
+                activeOpacity={0.7}
             >
                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                <View style={styles.guestLeagueCardContent}>
-                    <View style={styles.guestLeagueLogoWrapper}>
-                        {leagueLogo ? (
-                            <Image source={leagueLogo} style={styles.guestLeagueLogoImage} resizeMode="contain" />
+                <View style={styles.teamItemContent}>
+                    {/* RANK POSITION BADGE / MEDAL */}
+                    <View style={{ width: 26, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                        {index === 0 ? (
+                            <FontAwesome5 name="medal" size={16} color="#FFD700" />
+                        ) : index === 1 ? (
+                            <FontAwesome5 name="medal" size={16} color="#C0C0C0" />
+                        ) : index === 2 ? (
+                            <FontAwesome5 name="medal" size={16} color="#CD7F32" />
                         ) : (
-                            <Ionicons name="trophy" size={28} color={Colors.primary} />
+                            <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '900', fontSize: 13 }}>
+                                {index + 1}
+                            </Text>
                         )}
                     </View>
 
-                    <View style={{ flex: 1, marginLeft: 14 }}>
-                        <Text style={styles.guestLeagueName} numberOfLines={1}>
+                    <View style={styles.teamLogoCircle}>
+                        {leagueLogo ? (
+                            <Image source={leagueLogo} style={styles.teamLogoImage} resizeMode="contain" />
+                        ) : (
+                            <Ionicons name="trophy" size={24} color={Colors.primary} />
+                        )}
+                    </View>
+                    <View style={styles.teamMainInfo}>
+                        <Text style={styles.teamItemName} numberOfLines={1}>
                             {(league.name || 'LIGA').toUpperCase()}
                         </Text>
-                        <View style={styles.guestLeagueMetaRow}>
+                        <View style={styles.teamBadgeRow}>
                             <View style={styles.leagueTagBadge}>
                                 <Text style={styles.leagueTagText}>
                                     {roundNumber}-TUR • FAOL
                                 </Text>
                             </View>
-                            <Text style={styles.guestLeagueRegionText} numberOfLines={1}>
+                            <Text style={{ color: '#00FF66', fontSize: 11, fontWeight: '900', marginLeft: 8 }}>
                                 {league.location || "O'zbekiston"}
                             </Text>
                         </View>
                     </View>
-
-                    <View style={styles.guestLeagueActionBtn}>
-                        <Ionicons name="arrow-forward" size={18} color="#00FF9D" />
-                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
                 </View>
             </TouchableOpacity>
         );
@@ -650,6 +742,12 @@ export default function TournamentsScreen({ navigation }: any) {
         );
     };
 
+    const handleOrgSelect = useCallback((org: any) => {
+        setIsLeagueSelectorOpen(false);
+        setSelectedOrganizationId(org.id);
+        fetchLeagues(org.id);
+    }, []);
+
     return (
         <AnimatedBackground overlayOpacity={0.7} backgroundImage={backgroundImage}>
 
@@ -680,18 +778,23 @@ export default function TournamentsScreen({ navigation }: any) {
                     <TournamentsSkeleton />
                 ) : (
                     <FlatList
-                        data={teamsLoading ? Array(5).fill({ _isSkeleton: true }) : filteredTeams}
-                        keyExtractor={(item, index) => item?.id || item?._id || `team-item-${index}`}
-                        renderItem={renderTeamItem}
+                        data={isGuest 
+                            ? (isLeaguesLoading ? Array(4).fill({ _isSkeleton: true }) : filteredLeagues)
+                            : (teamsLoading ? Array(5).fill({ _isSkeleton: true }) : filteredTeams)}
+                        keyExtractor={(item, index) => item?.id || item?._id || `item-${index}`}
+                        renderItem={isGuest ? renderLeagueItemForGuest : renderTeamItem}
                         ListHeaderComponent={
                             <TournamentsHeader
+                                isGuest={isGuest}
                                 activeTab={activeTab}
                                 setActiveTab={setActiveTab}
                                 isLeagueSelectorOpen={isLeagueSelectorOpen}
                                 toggleLeagueSelector={toggleLeagueSelector}
                                 isLeaguesLoading={isLeaguesLoading}
                                 selectedLeague={selectedLeague}
-                                handleSocialPress={handleSocialPress}
+                                activeOrg={activeOrg}
+                                organizations={organizations}
+                                handleOrgSelect={handleOrgSelect}
                                 animationValue={animationValue}
                                 leagues={leagues}
                                 handleLeagueSelect={handleLeagueSelect}
@@ -701,18 +804,27 @@ export default function TournamentsScreen({ navigation }: any) {
                             />
                         }
                         ListEmptyComponent={
-                            !teamsLoading ? (
-                                <View style={styles.emptyStateBox}>
-                                    <Ionicons name="shield-outline" size={48} color="rgba(255,255,255,0.2)" />
-                                    <Text style={styles.emptyStateText}>{t('teams.no_teams', "Jamoalar mavjud emas")}</Text>
-                                </View>
-                            ) : null
+                            isGuest ? (
+                                !isLeaguesLoading ? (
+                                    <View style={styles.emptyStateBox}>
+                                        <Ionicons name="trophy-outline" size={48} color="rgba(255,255,255,0.2)" />
+                                        <Text style={styles.emptyStateText}>{t('tournaments.no_tournaments', "Ligalar mavjud emas")}</Text>
+                                    </View>
+                                ) : null
+                            ) : (
+                                !teamsLoading ? (
+                                    <View style={styles.emptyStateBox}>
+                                        <Ionicons name="shield-outline" size={48} color="rgba(255,255,255,0.2)" />
+                                        <Text style={styles.emptyStateText}>{t('teams.no_teams', "Jamoalar mavjud emas")}</Text>
+                                    </View>
+                                ) : null
+                            )
                         }
                         contentContainerStyle={[styles.list, { paddingBottom: 130 }]}
                         refreshControl={
                             <RefreshControl
-                                refreshing={teamsLoading && teams.length > 0}
-                                onRefresh={() => fetchLeagueTeams(selectedLeague?.name || selectedLeague?.id || '')}
+                                refreshing={isGuest ? (isLeaguesLoading && leagues.length > 0) : (teamsLoading && teams.length > 0)}
+                                onRefresh={() => isGuest ? fetchLeagues(selectedOrganizationId, true) : fetchLeagueTeams(selectedLeague?.name || selectedLeague?.id || '')}
                                 tintColor={Colors.primary}
                                 colors={[Colors.primary]}
                             />
