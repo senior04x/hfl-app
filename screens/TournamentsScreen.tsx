@@ -407,11 +407,18 @@ export default function TournamentsScreen({ navigation }: any) {
                 setIsLeaguesLoading(true);
             }
             
-            const [data, allTeamsData, matchesRes] = await Promise.all([
+            const [data, allTeamsData, matchesRes, statusRes] = await Promise.all([
                 apiService.getLeaguesByOrgId(targetOrgId),
                 apiService.getTeams(1, 500),
-                supabase.from('matches').select('id, league, round, tour, status, organization_id, league_id')
+                supabase.from('matches').select('id, league, round, tour, status, organization_id, league_id'),
+                supabase.from('sponsors').select('name, logo_url').like('name', 'LEAGUE_STATUS_%')
             ]);
+
+            const statusMap: Record<string, boolean> = {};
+            (statusRes?.data || []).forEach((s: any) => {
+                const lId = s.name.replace('LEAGUE_STATUS_', '');
+                statusMap[lId] = s.logo_url === 'active';
+            });
 
             const matchesList = matchesRes?.data || [];
 
@@ -454,10 +461,16 @@ export default function TournamentsScreen({ navigation }: any) {
                     const latestRound = maxRound > 0 ? maxRound : fallbackRound;
                     const hasPlayed = hasPlayedOrScheduled || latestRound > 0 || leagueMatches.length > 0;
 
+                    // Explicit admin switch status check
+                    const isExplicitActive = statusMap[String(l.id)] !== undefined 
+                        ? statusMap[String(l.id)] 
+                        : (l.is_active !== undefined ? l.is_active !== false : hasPlayed);
+
                     return {
                         ...l,
+                        is_active: isExplicitActive,
                         latestRound: latestRound > 0 ? latestRound : 1,
-                        hasPlayedMatches: hasPlayed,
+                        hasPlayedMatches: isExplicitActive && hasPlayed,
                         matchesCount: leagueMatches.length
                     };
                 });
@@ -614,7 +627,7 @@ export default function TournamentsScreen({ navigation }: any) {
                             {(league.name || 'LIGA').toUpperCase()}
                         </Text>
                         <View style={styles.teamBadgeRow}>
-                            {hasPlayed && roundNumber > 0 ? (
+                            {league.is_active !== false && hasPlayed && roundNumber > 0 ? (
                                 <View style={styles.leagueTagBadge}>
                                     <Text style={styles.leagueTagText}>
                                         {`${roundNumber}-${t('matches.tour', 'TUR')} • ${t('common.active', 'FAOL').toUpperCase()}`}
