@@ -698,13 +698,6 @@ export default function TournamentsScreen({ navigation }: any) {
                                     {(team.league || selectedLeague?.name || 'HFL LIGA').toUpperCase()}
                                 </Text>
                             </View>
-                            {team.status === 'partially_approved' || team.status === 'pending' ? (
-                                <View style={[styles.leagueTagBadge, { backgroundColor: 'rgba(255, 180, 0, 0.15)', borderColor: 'rgba(255, 180, 0, 0.4)', marginLeft: 6 }]}>
-                                    <Text style={[styles.leagueTagText, { color: '#FFB800' }]}>
-                                        {team.status === 'partially_approved' ? 'QISMAN TASDIQLANGAN' : t('common.pending', 'KUTILMOQDA').toUpperCase()}
-                                    </Text>
-                                </View>
-                            ) : null}
                             <Text style={{ color: '#00FF66', fontSize: 11, fontWeight: '900', marginLeft: 8 }}>
                                 {points} {t('teams.points', 'OCHKO').toUpperCase()}
                             </Text>
