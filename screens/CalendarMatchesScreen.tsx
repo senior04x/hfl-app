@@ -20,6 +20,7 @@ import backgroundImage from '../assets/images/backroud-image.png';
 import CustomRefreshControl from '../components/CustomRefreshControl';
 import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
+import { formatLocalizedVenue } from '../utils/localizationUtils';
 
 export default function CalendarMatchesScreen({ route, navigation }: any) {
     const { t, i18n } = useTranslation();
@@ -156,7 +157,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
         const homeLogo = item.homeTeam?.logo || item.homeTeamLogo || item.home_team?.logo_url;
         const awayLogo = item.awayTeam?.logo || item.awayTeamLogo || item.away_team?.logo_url;
         const leagueName = item.tournamentName || item.league || tournamentName || "HFL Liga";
-        const venueName = item.venue || item.location || 'AMATORA ARENA';
+        const venueName = formatLocalizedVenue(item.venue || item.location || 'AMATORA ARENA', currentLang);
 
         return (
             <TouchableOpacity
@@ -227,7 +228,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
 
                     {/* Footer */}
                     <View style={styles.hMatchFooter}>
-                        <Text style={styles.hMatchDate}>{date} • {venueName}</Text>
+                        <Text style={styles.hMatchDate}>{formattedSubtitleDate} • {venueName}</Text>
                     </View>
                 </View>
             </TouchableOpacity>

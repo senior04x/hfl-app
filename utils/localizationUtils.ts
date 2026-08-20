@@ -156,3 +156,39 @@ export function getLocalizedNotification(item: any, t: any): { title: string, su
             };
     }
 }
+
+export function formatLocalizedVenue(venue: string | undefined | null, lang: string): string {
+    if (!venue) return 'AMATORA ARENA';
+    const str = String(venue).trim();
+    const l = (lang || 'uz').toLowerCase();
+
+    if (l === 'uz') {
+        return str;
+    }
+
+    // Russian Localization
+    if (l === 'ru') {
+        return str
+            .replace(/(\d+)-maydon/gi, '$1-е поле')
+            .replace(/(\d+)\s*maydon/gi, '$1-е поле')
+            .replace(/maydon/gi, 'поле')
+            .replace(/Sun'iy|Sun’iy|Suniy/gi, 'Искусственное')
+            .replace(/Tabiiy/gi, 'Натуральное')
+            .replace(/Zal/gi, 'Зал')
+            .replace(/Markaziy/gi, 'Центральный');
+    }
+
+    // English Localization
+    if (l === 'en') {
+        return str
+            .replace(/(\d+)-maydon/gi, 'Pitch $1')
+            .replace(/(\d+)\s*maydon/gi, 'Pitch $1')
+            .replace(/maydon/gi, 'Pitch')
+            .replace(/Sun'iy|Sun’iy|Suniy/gi, 'Artificial')
+            .replace(/Tabiiy/gi, 'Natural')
+            .replace(/Zal/gi, 'Indoor')
+            .replace(/Markaziy/gi, 'Central');
+    }
+
+    return str;
+}
