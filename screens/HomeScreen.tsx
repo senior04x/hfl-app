@@ -347,7 +347,8 @@ export default function HomeScreen({ navigation }: any) {
         // Live Timing, Seconds (MM:SS), Period, and Half-Time Detection
         let isHalfTime = false;
         let liveBadgeLabel = 'LIVE';
-        let liveClockDisplay = '';
+        let liveTimerTime = '';
+        let livePeriodLabel = '';
 
         if (matchIsLive) {
             const st = String(match.status || '').toLowerCase().trim();
@@ -368,26 +369,30 @@ export default function HomeScreen({ navigation }: any) {
 
             if (isHalfTime) {
                 liveBadgeLabel = 'TANAFFUS';
-                liveClockDisplay = 'TANAFFUS';
+                liveTimerTime = 'TANAFFUS';
+                livePeriodLabel = '';
             } else if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
                 liveBadgeLabel = '1-TAYM';
+                livePeriodLabel = '1-TAYM';
                 const elapsed = Math.max(0, halfDurSecs - timerSec);
                 const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
                 const ss = (elapsed % 60).toString().padStart(2, '0');
-                liveClockDisplay = `1-TAYM ${mm}:${ss}`;
+                liveTimerTime = `${mm}:${ss}`;
             } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
                 liveBadgeLabel = '2-TAYM';
+                livePeriodLabel = '2-TAYM';
                 const secondHalfElapsed = Math.max(0, halfDurSecs - timerSec);
                 const totalElapsed = halfDurSecs + secondHalfElapsed;
                 const mm = Math.floor(totalElapsed / 60).toString().padStart(2, '0');
                 const ss = (totalElapsed % 60).toString().padStart(2, '0');
-                liveClockDisplay = `2-TAYM ${mm}:${ss}`;
+                liveTimerTime = `${mm}:${ss}`;
             } else {
                 liveBadgeLabel = 'LIVE';
+                livePeriodLabel = 'LIVE';
                 const elapsed = Math.max(0, halfDurSecs - timerSec);
                 const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
                 const ss = (elapsed % 60).toString().padStart(2, '0');
-                liveClockDisplay = `${mm}:${ss}`;
+                liveTimerTime = `${mm}:${ss}`;
             }
         }
 
@@ -472,11 +477,21 @@ export default function HomeScreen({ navigation }: any) {
 
                         <View style={styles.hScoreColumn}>
                             {matchIsLive || matchIsFinished ? (
-                                <View style={{ alignItems: 'center' }}>
+                                <View style={styles.scoreAndTimerCenterBox}>
                                     <Text style={styles.hScoreText}>{match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}</Text>
-                                    {matchIsLive && liveClockDisplay ? (
-                                        <View style={[styles.liveMinuteTag, isHalfTime && styles.halftimeMinuteTag]}>
-                                            <Text style={[styles.liveMinuteTagText, isHalfTime && styles.halftimeMinuteTagText]}>{liveClockDisplay}</Text>
+                                    {matchIsLive ? (
+                                        <View style={styles.cleanLiveTimerContainer}>
+                                            <Text style={[
+                                                styles.cleanTimerText,
+                                                isHalfTime && styles.cleanHalftimeText
+                                            ]}>
+                                                {liveTimerTime}
+                                            </Text>
+                                            {!isHalfTime && livePeriodLabel ? (
+                                                <Text style={styles.cleanPeriodSubText}>
+                                                    {livePeriodLabel}
+                                                </Text>
+                                            ) : null}
                                         </View>
                                     ) : null}
                                 </View>
@@ -1143,6 +1158,36 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginTop: -4,
         letterSpacing: 1,
+    },
+    scoreAndTimerCenterBox: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cleanLiveTimerContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    cleanTimerText: {
+        color: '#FF3B30',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+        textAlign: 'center',
+    },
+    cleanHalftimeText: {
+        color: '#FACC15',
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+    },
+    cleanPeriodSubText: {
+        color: 'rgba(255, 255, 255, 0.75)',
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+        marginTop: 1,
+        textAlign: 'center',
     },
     liveMinuteTag: {
         backgroundColor: 'rgba(255, 59, 48, 0.18)',
