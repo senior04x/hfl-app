@@ -296,12 +296,12 @@ const TournamentsHeader = ({
                         {isLeaguesLoading ? (
                             <Skeleton width={32} height={18} borderRadius={4} />
                         ) : (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 22, marginTop: 2 }}>
                                 <Image
                                     source={{
-                                        uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
+                                        uri: 'https://flagcdn.com/w80/uz.png'
                                     }}
-                                    style={{ width: 28, height: 18, borderRadius: 3 }}
+                                    style={{ width: 30, height: 19, borderRadius: 3, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.3)' }}
                                     resizeMode="cover"
                                 />
                             </View>
