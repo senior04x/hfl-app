@@ -372,14 +372,14 @@ export default function HomeScreen({ navigation }: any) {
                 liveTimerTime = 'TANAFFUS';
                 livePeriodLabel = '';
             } else if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
-                liveBadgeLabel = '1-TAYM';
+                liveBadgeLabel = 'LIVE';
                 livePeriodLabel = '1-TAYM';
                 const elapsed = Math.max(0, halfDurSecs - timerSec);
                 const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
                 const ss = (elapsed % 60).toString().padStart(2, '0');
                 liveTimerTime = `${mm}:${ss}`;
             } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
-                liveBadgeLabel = '2-TAYM';
+                liveBadgeLabel = 'LIVE';
                 livePeriodLabel = '2-TAYM';
                 const secondHalfElapsed = Math.max(0, halfDurSecs - timerSec);
                 const totalElapsed = halfDurSecs + secondHalfElapsed;
@@ -388,7 +388,7 @@ export default function HomeScreen({ navigation }: any) {
                 liveTimerTime = `${mm}:${ss}`;
             } else {
                 liveBadgeLabel = 'LIVE';
-                livePeriodLabel = 'LIVE';
+                livePeriodLabel = '1-TAYM';
                 const elapsed = Math.max(0, halfDurSecs - timerSec);
                 const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
                 const ss = (elapsed % 60).toString().padStart(2, '0');
