@@ -407,18 +407,11 @@ export default function TournamentsScreen({ navigation }: any) {
                 setIsLeaguesLoading(true);
             }
             
-            const [data, allTeamsData, matchesRes, statusRes] = await Promise.all([
+            const [data, allTeamsData, matchesRes] = await Promise.all([
                 apiService.getLeaguesByOrgId(targetOrgId),
                 apiService.getTeams(1, 500),
-                supabase.from('matches').select('id, league, round, tour, status, organization_id, league_id'),
-                supabase.from('sponsors').select('name, logo_url').like('name', 'LEAGUE_STATUS_%')
+                supabase.from('matches').select('id, league, round, tour, status, organization_id, league_id')
             ]);
-
-            const statusMap: Record<string, boolean> = {};
-            (statusRes?.data || []).forEach((s: any) => {
-                const lId = s.name.replace('LEAGUE_STATUS_', '');
-                statusMap[lId] = s.logo_url === 'active';
-            });
 
             const matchesList = matchesRes?.data || [];
 
@@ -461,16 +454,16 @@ export default function TournamentsScreen({ navigation }: any) {
                     const latestRound = maxRound > 0 ? maxRound : fallbackRound;
                     const hasPlayed = hasPlayedOrScheduled || latestRound > 0 || leagueMatches.length > 0;
 
-                    // Explicit admin switch status check
-                    const isExplicitActive = statusMap[String(l.id)] !== undefined 
-                        ? statusMap[String(l.id)] 
-                        : (l.is_active !== undefined ? l.is_active !== false : hasPlayed);
+                    // Direct database is_active column check
+                    const isLeagueActive = (l.is_active !== undefined && l.is_active !== null) 
+                        ? (l.is_active === true || l.is_active === 'true') 
+                        : hasPlayed;
 
                     return {
                         ...l,
-                        is_active: isExplicitActive,
+                        is_active: isLeagueActive,
                         latestRound: latestRound > 0 ? latestRound : 1,
-                        hasPlayedMatches: isExplicitActive && hasPlayed,
+                        hasPlayedMatches: isLeagueActive && hasPlayed,
                         matchesCount: leagueMatches.length
                     };
                 });
