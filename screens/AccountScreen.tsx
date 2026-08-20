@@ -27,7 +27,8 @@ import { getLocalizedPosition } from '../utils/localizationUtils';
 import { useFocusEffect } from '@react-navigation/native';
 import { useJuniorStore } from '../store/useJuniorStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
-import { Modal, TextInput } from 'react-native';
+import { Modal, TextInput, Linking } from 'react-native';
+import OrganizationSelectModal from '../components/OrganizationSelectModal';
 
 export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout, unreadCount, isChatMuted } = useAuthStore();
@@ -37,6 +38,7 @@ export default function AccountScreen({ navigation }: any) {
 
     const [showPinModal, setShowPinModal] = useState(false);
     const [showLanguageModal, setShowLanguageModal] = useState(false);
+    const [showOrgSelectModal, setShowOrgSelectModal] = useState(false);
     const [pinInput, setPinInput] = useState('');
     const [targetJuniorState, setTargetJuniorState] = useState<boolean>(false);
 
@@ -50,6 +52,23 @@ export default function AccountScreen({ navigation }: any) {
     const [userTransfers, setUserTransfers] = useState<any[]>([]);
     const [userProfileApps, setUserProfileApps] = useState<any[]>([]);
     const [appsLoading, setAppsLoading] = useState(false);
+
+    const handleApplyToLeaguePress = () => {
+        setShowOrgSelectModal(true);
+    };
+
+    const handleSelectOrganizationForApply = async (org: any) => {
+        setShowOrgSelectModal(false);
+        const rawSlug = org.slug || org.name || org.title || org.id || 'hfl';
+        const cleanSlug = String(rawSlug).toLowerCase().trim().replace(/\s+/g, '-');
+        const targetUrl = `https://amatora.uz/${cleanSlug}`;
+
+        try {
+            await Linking.openURL(targetUrl);
+        } catch (err) {
+            Alert.alert('Xato', `Havola ochib bo'lmadi: ${targetUrl}`);
+        }
+    };
 
     useEffect(() => {
         if (!isGuest) {
@@ -163,7 +182,7 @@ export default function AccountScreen({ navigation }: any) {
                 <ScrollView 
                     style={styles.container} 
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 110 }}
+                    contentContainerStyle={{ paddingBottom: 130 }}
                 >
                     {/* Profile Header */}
                     <View style={styles.profileHeader}>
@@ -324,13 +343,14 @@ export default function AccountScreen({ navigation }: any) {
                             <View style={styles.applyBanner}>
                                 <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={{ padding: 25, alignItems: 'center' }}>
-                                    <Text style={styles.applyTitle}>{t('profile.apply_to_league')}</Text>
-                                    <Text style={styles.applySubtitle}>AMATORA</Text>
+                                    <Ionicons name="football-outline" size={36} color={Colors.primary} style={{ marginBottom: 8 }} />
+                                    <Text style={styles.applyTitle}>{t('profile.apply_to_league', 'LIGAGA ARIZA BERISH')}</Text>
+                                    <Text style={styles.applySubtitle}>Tegishli tashkilot sayti orqali ariza topshiring</Text>
                                     <TouchableOpacity
                                         style={styles.applyButton}
-                                        onPress={() => (navigation as any).navigate('JoinApplication')}
+                                        onPress={handleApplyToLeaguePress}
                                     >
-                                        <Text style={styles.applyButtonText}>{t('applications.submit_app')}</Text>
+                                        <Text style={styles.applyButtonText}>{t('applications.submit_app', 'Ariza Topshirish')}</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -370,6 +390,13 @@ export default function AccountScreen({ navigation }: any) {
                 <LanguageSelectModal
                     visible={showLanguageModal}
                     onClose={() => setShowLanguageModal(false)}
+                />
+
+                {/* Organization Selection Modal for League Application */}
+                <OrganizationSelectModal
+                    visible={showOrgSelectModal}
+                    onClose={() => setShowOrgSelectModal(false)}
+                    onSelect={handleSelectOrganizationForApply}
                 />
 
                 {/* PIN Verification Modal */}
