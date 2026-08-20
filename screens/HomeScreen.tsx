@@ -223,10 +223,26 @@ export default function HomeScreen({ navigation }: any) {
         navigation.navigate('MatchDetail', { matchId });
     };
 
+    // Robust match status helpers
+    const isMatchLive = (st?: string) => {
+        const s = String(st || '').toLowerCase().trim();
+        return s === 'live' || s === 'first_half' || s === 'second_half' || s === 'half_time' || s === 'halftime' || s === 'ongoing' || s === 'in_progress' || s === '1st_half' || s === '2nd_half' || s === '1-taym' || s === '2-taym' || s === 'tanaffus';
+    };
+
+    const isMatchFinished = (st?: string) => {
+        const s = String(st || '').toLowerCase().trim();
+        return s === 'finished' || s === 'completed' || s === 'ended' || s === 'tugadi';
+    };
+
+    const isMatchUpcoming = (st?: string) => {
+        const s = String(st || '').toLowerCase().trim();
+        return s === 'scheduled' || s === 'upcoming' || s === 'pending' || s === 'rejalashtirilgan' || (!isMatchLive(s) && !isMatchFinished(s));
+    };
+
     // Derived State for different sections
     const liveMatches = matches
-        .filter(m => m.status === 'live')
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        .filter(m => isMatchLive(m.status))
+        .sort((a, b) => new Date(a.date || a.createdAt || 0).getTime() - new Date(b.date || b.createdAt || 0).getTime());
 
     // Importance Rank helper for sorting: Markaziy (1) -> Ortacha (2) -> Oddiy (3)
     const getImportanceRank = (imp?: string) => {
@@ -236,7 +252,7 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     // Filter upcoming matches: strictly markaziy & ortacha (max 4)
-    const allUpcoming = matches.filter(m => m.status === 'scheduled');
+    const allUpcoming = matches.filter(m => isMatchUpcoming(m.status));
     const featuredUpcoming = allUpcoming.filter(m => m.importance === 'markaziy' || m.importance === 'ortacha');
     const displayUpcomingMatches = (featuredUpcoming.length > 0 ? featuredUpcoming : allUpcoming)
         .sort((a, b) => {
@@ -248,7 +264,7 @@ export default function HomeScreen({ navigation }: any) {
 
     // Filter finished matches: grouped by League (only markaziy & ortacha, max 3 per league)
     const groupedFinishedMatches = useMemo(() => {
-        const allFinished = matches.filter(m => m.status === 'finished');
+        const allFinished = matches.filter(m => isMatchFinished(m.status));
         const featuredFinished = allFinished.filter(m => m.importance === 'markaziy' || m.importance === 'ortacha');
         const sourceMatches = featuredFinished.length > 0 ? featuredFinished : allFinished;
 
@@ -315,6 +331,8 @@ export default function HomeScreen({ navigation }: any) {
 
     // Reusable Match Card Component with Importance Border & Badge
     const renderMatchCard = (match: any, isLive: boolean = false, isVertical: boolean = false) => {
+        const matchIsLive = isLive || isMatchLive(match.status);
+        const matchIsFinished = isMatchFinished(match.status);
         const rawDate = match.date || match.match_date;
         const matchDate = new Date(rawDate);
         const isValidDate = !isNaN(matchDate.getTime());
@@ -358,7 +376,7 @@ export default function HomeScreen({ navigation }: any) {
                 key={match._id || Math.random().toString()}
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
-                    isLive && styles.hMatchCardLive
+                    matchIsLive && styles.hMatchCardLive
                 ]}
                 onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
                 activeOpacity={0.85}
@@ -369,7 +387,7 @@ export default function HomeScreen({ navigation }: any) {
                     <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader]}>
                         <Text style={styles.hMatchLeague} numberOfLines={1}>{match.tournamentName || "O'rtoqlik uchrashuvi"}</Text>
                         
-                        {isLive ? (
+                        {matchIsLive ? (
                             <View style={styles.liveBadgeContainer}>
                                 <View style={styles.liveDot} />
                                 <Text style={styles.liveBadgeText}>LIVE</Text>
@@ -399,8 +417,8 @@ export default function HomeScreen({ navigation }: any) {
                         </View>
 
                         <View style={styles.hScoreColumn}>
-                            {isLive || match.status === 'finished' ? (
-                                <Text style={styles.hScoreText}>{match.score?.home || 0} - {match.score?.away || 0}</Text>
+                            {matchIsLive || matchIsFinished ? (
+                                <Text style={styles.hScoreText}>{match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}</Text>
                             ) : (
                                 <View style={styles.vsContainer}>
                                     <Text style={styles.hTimeVsText}>{formattedTime}</Text>
