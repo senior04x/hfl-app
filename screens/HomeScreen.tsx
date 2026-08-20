@@ -172,18 +172,39 @@ export default function HomeScreen({ navigation }: any) {
             )
             .subscribe();
 
-        // 2. Fast Broadcast Channel for Instant 0ms Timer Sync
-        const broadcastChannel = supabase
-            .channel('obs_fast_timer_global')
+        // 2. Fast Broadcast Channels for Instant 0ms Timer Sync across stream1 & stream2
+        const stream1Channel = supabase
+            .channel('obs_fast_stream1')
             .on('broadcast', { event: 'timer_update' }, (msg: any) => {
-                if (msg.payload && msg.payload.match_id) {
+                if (msg.payload) {
                     const p = msg.payload;
-                    setMatches(prev => prev.map(m => {
-                        if (String(m.id || m._id) === String(p.match_id)) {
-                            return { ...m, ...p };
-                        }
-                        return m;
-                    }));
+                    const targetId = p.match_id || p.id;
+                    if (targetId) {
+                        setMatches(prev => prev.map(m => {
+                            if (String(m.id || m._id) === String(targetId)) {
+                                return { ...m, ...p };
+                            }
+                            return m;
+                        }));
+                    }
+                }
+            })
+            .subscribe();
+
+        const stream2Channel = supabase
+            .channel('obs_fast_stream2')
+            .on('broadcast', { event: 'timer_update' }, (msg: any) => {
+                if (msg.payload) {
+                    const p = msg.payload;
+                    const targetId = p.match_id || p.id;
+                    if (targetId) {
+                        setMatches(prev => prev.map(m => {
+                            if (String(m.id || m._id) === String(targetId)) {
+                                return { ...m, ...p };
+                            }
+                            return m;
+                        }));
+                    }
                 }
             })
             .subscribe();
@@ -202,7 +223,8 @@ export default function HomeScreen({ navigation }: any) {
 
         return () => {
             supabase.removeChannel(realtimeChannel);
-            supabase.removeChannel(broadcastChannel);
+            supabase.removeChannel(stream1Channel);
+            supabase.removeChannel(stream2Channel);
             if (socket) socket.off('match-update');
         };
     }, [socket, isConnected, sliderItems]);
