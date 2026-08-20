@@ -80,7 +80,8 @@ const TournamentsHeader = ({
     leaguePlayersCount,
     navigation
 }: any) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const currentLang = i18n.language || 'uz';
     const accordionHeight = animationValue.interpolate({
         inputRange: [0, 1],
         outputRange: [0, 500],
@@ -285,7 +286,7 @@ const TournamentsHeader = ({
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Ionicons name="information-circle-outline" size={17} color="#00FF66" style={{ marginRight: 8 }} />
                             <Text style={styles.aboutLeagueButtonText}>
-                                {t('tournaments.about_league', 'LIGA HAQIDA').toUpperCase()}
+                                {t('tournaments.about_league', currentLang === 'ru' ? 'О ЛИГЕ' : (currentLang === 'en' ? 'ABOUT LEAGUE' : 'LIGA HAQIDA')).toUpperCase()}
                             </Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color="#00FF66" />

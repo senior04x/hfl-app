@@ -129,6 +129,7 @@
   },
   "tournaments": {
     "title": "Tournaments",
+    "about_league": "ABOUT LEAGUE",
     "leagues": "Leagues",
     "all_leagues": "ORGANIZATION LEAGUES",
     "league_tournaments": "LEAGUE TOURNAMENTS",

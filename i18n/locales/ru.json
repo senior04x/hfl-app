@@ -129,6 +129,7 @@
   },
   "tournaments": {
     "title": "Турниры",
+    "about_league": "О ЛИГЕ",
     "leagues": "Лиги",
     "all_leagues": "ЛИГИ ОРГАНИЗАЦИИ",
     "league_tournaments": "ТУРНИРЫ ЛИГИ",

@@ -129,6 +129,7 @@
   },
   "tournaments": {
     "title": "Turnirlar",
+    "about_league": "LIGA HAQIDA",
     "leagues": "Ligalar",
     "all_leagues": "TASHKILOT LIGALARI",
     "league_tournaments": "LIGA TURNIRLARI",
