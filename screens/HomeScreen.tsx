@@ -428,8 +428,9 @@ export default function HomeScreen({ navigation }: any) {
         const matchDate = new Date(rawDate);
         const isValidDate = !isNaN(matchDate.getTime());
 
-        // Live Timing, Seconds (MM:SS), Period, and Half-Time Detection
+        // Live Timing, Seconds (MM:SS), Period, Pause, and Half-Time Detection (1:1 Admin-App Mirror)
         let isHalfTime = false;
+        let isPaused = false;
         let liveBadgeLabel = 'LIVE';
         let liveTimerTime = '';
         let livePeriodLabel = '';
@@ -438,49 +439,54 @@ export default function HomeScreen({ navigation }: any) {
             const st = String(match.status || '').toLowerCase().trim();
             isHalfTime = st.includes('half_time') || st.includes('halftime') || st.includes('tanaffus') || st === 'break';
             
-            const halfDurMins = Number(match.half_duration) || 25;
-            const matchDurMins = Number(match.match_duration) || (halfDurMins * 2);
-            const halfDurSecs = halfDurMins * 60;
-            let timerSec = Number(match.timer_seconds);
-            if (isNaN(timerSec)) timerSec = halfDurSecs;
+            const isSecondHalf = st.includes('second') || st.includes('2-taym') || st.includes('2nd');
 
-            let elapsed = 0;
-            if (match.timer_started_at && match.is_timer_running) {
-                const diffSec = Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000));
-                elapsed = diffSec;
-            } else if (match.timer_seconds !== undefined && match.timer_seconds !== null) {
-                if (timerSec <= halfDurSecs && timerSec > 0) {
-                    elapsed = halfDurSecs - timerSec;
-                } else if (timerSec === 0) {
-                    elapsed = halfDurSecs;
+            const halfDurMins = Number(match.half_duration) || (String(match.league || '').includes('7x7') ? 25 : 30);
+            const halfDurSecs = halfDurMins * 60;
+
+            const isTimerRunning = match.is_timer_running === true || match.is_timer_running === 'true';
+            let curTimerSec = Number(match.timer_seconds);
+            if (isNaN(curTimerSec) || curTimerSec < 0) curTimerSec = halfDurSecs;
+
+            if (isTimerRunning && match.timer_started_at) {
+                const startedMs = new Date(match.timer_started_at).getTime();
+                if (!isNaN(startedMs)) {
+                    const elapsedFromStart = Math.max(0, Math.floor((Date.now() - startedMs) / 1000));
+                    curTimerSec = Math.max(0, curTimerSec - elapsedFromStart);
                 }
-            } else if (match.minute || match.current_minute) {
-                elapsed = Math.max(0, (Number(match.minute || match.current_minute) - 1) * 60);
+            } else if (!isTimerRunning && !isHalfTime) {
+                isPaused = true;
             }
+
+            // Calculate Elapsed Time Count-UP (admin-app exact replica)
+            let totalElapsedSec = 0;
+            if (isHalfTime) {
+                totalElapsedSec = halfDurSecs;
+            } else if (isSecondHalf) {
+                const secondHalfElapsed = Math.max(0, halfDurSecs - curTimerSec);
+                totalElapsedSec = halfDurSecs + secondHalfElapsed;
+            } else {
+                totalElapsedSec = Math.max(0, halfDurSecs - curTimerSec);
+            }
+
+            // Fallback to match.minute or match.current_minute if totalElapsedSec is 0
+            if (totalElapsedSec === 0 && (match.minute || match.current_minute)) {
+                totalElapsedSec = Math.max(0, (Number(match.minute || match.current_minute) - 1) * 60);
+            }
+
+            const mm = Math.floor(totalElapsedSec / 60).toString().padStart(2, '0');
+            const ss = (totalElapsedSec % 60).toString().padStart(2, '0');
 
             if (isHalfTime) {
                 liveBadgeLabel = 'TANAFFUS';
                 liveTimerTime = 'TANAFFUS';
                 livePeriodLabel = '';
-            } else if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
-                liveBadgeLabel = 'LIVE';
-                livePeriodLabel = '1-TAYM';
-                const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
-                const ss = (elapsed % 60).toString().padStart(2, '0');
-                liveTimerTime = `${mm}:${ss}`;
-            } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
-                liveBadgeLabel = 'LIVE';
-                livePeriodLabel = '2-TAYM';
-                const totalElapsed = halfDurSecs + elapsed;
-                const mm = Math.floor(totalElapsed / 60).toString().padStart(2, '0');
-                const ss = (totalElapsed % 60).toString().padStart(2, '0');
-                liveTimerTime = `${mm}:${ss}`;
             } else {
-                liveBadgeLabel = 'LIVE';
-                livePeriodLabel = '1-TAYM';
-                const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
-                const ss = (elapsed % 60).toString().padStart(2, '0');
+                liveBadgeLabel = isPaused ? 'PAUZA' : 'LIVE';
                 liveTimerTime = `${mm}:${ss}`;
+                livePeriodLabel = isPaused 
+                    ? `PAUZA (${isSecondHalf ? '2-TAYM' : '1-TAYM'})`
+                    : (isSecondHalf ? '2-TAYM' : '1-TAYM');
             }
         }
 
@@ -523,7 +529,7 @@ export default function HomeScreen({ navigation }: any) {
                 key={match._id || Math.random().toString()}
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
-                    matchIsLive && (isHalfTime ? styles.hMatchCardHalftime : styles.hMatchCardLive)
+                    matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
                 onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
                 activeOpacity={0.85}
@@ -535,9 +541,9 @@ export default function HomeScreen({ navigation }: any) {
                         <Text style={styles.hMatchLeague} numberOfLines={1}>{match.tournamentName || "O'rtoqlik uchrashuvi"}</Text>
                         
                         {Boolean(matchIsLive) ? (
-                            <View style={[styles.liveBadgeContainer, isHalfTime && styles.halftimeBadgeContainer]}>
-                                <View style={[styles.liveDot, isHalfTime && styles.halftimeDot]} />
-                                <Text style={[styles.liveBadgeText, isHalfTime && styles.halftimeBadgeText]}>{liveBadgeLabel}</Text>
+                            <View style={[styles.liveBadgeContainer, (isHalfTime || isPaused) && styles.halftimeBadgeContainer]}>
+                                <View style={[styles.liveDot, (isHalfTime || isPaused) && styles.halftimeDot]} />
+                                <Text style={[styles.liveBadgeText, (isHalfTime || isPaused) && styles.halftimeBadgeText]}>{liveBadgeLabel}</Text>
                             </View>
                         ) : Boolean(roundTagText) ? (
                             <View style={styles.roundBadgeTag}>
@@ -571,12 +577,15 @@ export default function HomeScreen({ navigation }: any) {
                                         <View style={styles.cleanLiveTimerContainer}>
                                             <Text style={[
                                                 styles.cleanTimerText,
-                                                isHalfTime && styles.cleanHalftimeText
+                                                (isHalfTime || isPaused) && styles.cleanHalftimeText
                                             ]}>
                                                 {liveTimerTime}
                                             </Text>
                                             {!isHalfTime && Boolean(livePeriodLabel) ? (
-                                                <Text style={styles.cleanPeriodSubText}>
+                                                <Text style={[
+                                                    styles.cleanPeriodSubText,
+                                                    isPaused && { color: '#FACC15' }
+                                                ]}>
                                                     {livePeriodLabel}
                                                 </Text>
                                             ) : null}
