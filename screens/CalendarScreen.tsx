@@ -345,6 +345,7 @@ export default function CalendarScreen({ navigation }: any) {
                                             tournamentId: tourney.id,
                                             tournamentName: tourney.name,
                                             date: dayGroup.date,
+                                            timestamp: dayGroup.timestamp,
                                             matches: tourney.matches
                                         })}
                                     >

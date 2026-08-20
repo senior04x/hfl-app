@@ -22,11 +22,14 @@ import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
 
 export default function CalendarMatchesScreen({ route, navigation }: any) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const currentLang = i18n.language || 'uz';
     const { 
         tournamentId,
         tournamentName = "Noma'lum Turnir", 
-        date = "Sanasi ko'rsatilmagan", 
+        date = "Sanasi ko'rsatilmagan",
+        timestamp,
+        rawDate,
         matches: initialMatches = [] 
     } = route?.params || {};
     
@@ -34,6 +37,64 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
     const [loading, setLoading] = useState(initialMatches.length === 0);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const formattedSubtitleDate = React.useMemo(() => {
+        let dateObj: Date | null = null;
+        if (timestamp) {
+            dateObj = new Date(timestamp);
+        } else if (rawDate) {
+            dateObj = new Date(rawDate);
+        } else if (initialMatches && initialMatches.length > 0) {
+            const firstM = initialMatches[0];
+            const mRaw = firstM.date || firstM.scheduledAt || firstM.match_date;
+            if (mRaw) dateObj = new Date(mRaw);
+        }
+
+        if (!dateObj || isNaN(dateObj.getTime())) {
+            if (typeof date === 'string') {
+                const parsed = new Date(date);
+                if (!isNaN(parsed.getTime())) dateObj = parsed;
+            }
+        }
+
+        if (dateObj && !isNaN(dateObj.getTime())) {
+            if (currentLang === 'uz') {
+                const day = dateObj.getDate();
+                const monthsUz = [
+                    'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+                    'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'
+                ];
+                const weekdaysUz = [
+                    'Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba',
+                    'Payshanba', 'Juma', 'Shanba'
+                ];
+                const monthName = monthsUz[dateObj.getMonth()];
+                const weekdayName = weekdaysUz[dateObj.getDay()];
+                return `${day}-${monthName}, ${weekdayName}`.toUpperCase();
+            } else if (currentLang === 'ru') {
+                const day = dateObj.getDate();
+                const monthsRu = [
+                    'Января', 'Февраля', 'Марта', 'Апреля', 'Мая', 'Июня',
+                    'Июля', 'Августа', 'Сентября', 'Октября', 'Ноября', 'Декабря'
+                ];
+                const weekdaysRu = [
+                    'Воскресенье', 'Понедельник', 'Вторник', 'Среда',
+                    'Четверг', 'Пятница', 'Суббота'
+                ];
+                const monthName = monthsRu[dateObj.getMonth()];
+                const weekdayName = weekdaysRu[dateObj.getDay()];
+                return `${day} ${monthName}, ${weekdayName}`.toUpperCase();
+            } else {
+                return dateObj.toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long'
+                }).toUpperCase();
+            }
+        }
+
+        return String(date).toUpperCase();
+    }, [timestamp, rawDate, initialMatches, date, currentLang]);
 
     useEffect(() => {
         if (initialMatches.length === 0 && tournamentId) {
@@ -179,7 +240,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                 {/* Universal App Navbar */}
                 <AppNavbar
                     title={`${tournamentName}`}
-                    subtitle={date.split(',')[0] || 'AMATORA'}
+                    subtitle={formattedSubtitleDate}
                     onBackPress={() => navigation.goBack()}
                     showSearch={true}
                     searchQuery={searchQuery}
