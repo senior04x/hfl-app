@@ -509,6 +509,7 @@ export default function HomeScreen({ navigation }: any) {
                         <Text style={styles.hMatchDate}>{formattedFullDate} • {localizedVenue}</Text>
                     </View>
                 </View>
+            </TouchableOpacity>
         );
     };
 
