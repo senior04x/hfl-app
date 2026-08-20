@@ -386,7 +386,7 @@ export const apiService = {
         const cacheKey = `teams_${orgId}_${isJunior}_${page}_${limit}_${leagueName || 'all'}`;
         return getCachedData(cacheKey, async () => {
             try {
-                let query = supabase.from('teams').select('*').order('name');
+                let query = supabase.from('teams').select('*').eq('status', 'approved').order('name');
                 if (leagueName) {
                     query = query.ilike('league', `%${leagueName}%`);
                 }

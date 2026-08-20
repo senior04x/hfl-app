@@ -7,10 +7,14 @@ import {
     ActivityIndicator,
     Image,
     ScrollView,
+    FlatList,
     TextInput,
     Linking,
-    Animated
+    Animated,
+    Dimensions
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
@@ -37,13 +41,44 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { tournamentId, tournamentName, tournament } = route?.params || {};
     const currentTournamentId = route?.params?.tournamentId || tournamentId; // Ensure we always have it
-    const [activeTab, setActiveTab] = useState('overview'); // overview, standings, players, matches
+    const TABS = ['overview', 'standings', 'players', 'matches'] as const;
+
+    const requestedTab = route?.params?.initialTab || route?.params?.tab;
+    const initialActiveTab = (requestedTab === 'oyinlar' || requestedTab === 'matches') 
+        ? 'matches' 
+        : (requestedTab === 'standings' || requestedTab === 'jadval' ? 'standings' : (requestedTab === 'players' || requestedTab === 'oyinchilar' ? 'players' : 'overview'));
+    const [activeTab, setActiveTab] = useState<string>(initialActiveTab);
+
+    // Swipe pager refs
+    const pagerRef = useRef<FlatList>(null);
+    const scrollXPager = useRef(new Animated.Value(0)).current;
+    const isTabPressRef = useRef(false);
+
+    // Sync if route params change or initialTab is passed
+    useEffect(() => {
+        const reqTab = route?.params?.initialTab || route?.params?.tab;
+        if (reqTab) {
+            const target = (reqTab === 'oyinlar' || reqTab === 'matches') 
+                ? 'matches' 
+                : (reqTab === 'standings' || reqTab === 'jadval' ? 'standings' : (reqTab === 'players' || reqTab === 'oyinchilar' ? 'players' : 'overview'));
+            const idx = TABS.indexOf(target as any);
+            if (idx >= 0) {
+                setTimeout(() => {
+                    handleTabPress(target);
+                }, 80);
+            }
+        }
+    }, [route?.params?.initialTab, route?.params?.tab]);
     
     const { teams, setTeams, isLoading: isTeamsLoading, setLoading: setTeamsLoading } = useTeamStore();
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingStandings, setIsLoadingStandings] = useState(false);
     const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
     const [isLoadingMatches, setIsLoadingMatches] = useState(false);
+    
+    // Flags to prevent redundant re-fetching when switching tabs
+    const playersLoadedRef = useRef(false);
+    const matchesLoadedRef = useRef(false);
     
     const [tournamentData, setTournamentData] = useState<any>(tournament);
     const [organizerInfo, setOrganizerInfo] = useState<any>({
@@ -96,8 +131,15 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
     const { socket, isConnected } = useSocket();
     const CACHE_KEY = `tournament_detail_v2_${currentTournamentId}`;
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    const PLAYERS_CACHE_KEY = `tournament_players_v2_${currentTournamentId}`;
+    const MATCHES_CACHE_KEY = `tournament_matches_v2_${currentTournamentId}`;
 
-    const loadCachedData = async () => {
+    /**
+     * Load cached data and return whether cache is fresh (< 5 min old).
+     * If fresh, no need to re-fetch from network.
+     */
+    const loadCachedData = async (): Promise<boolean> => {
         try {
             const cached = await AsyncStorage.getItem(CACHE_KEY);
             if (cached) {
@@ -113,10 +155,15 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 if (parsed.latestMatches) setLatestMatches(parsed.latestMatches);
                 if (parsed.availableTournaments) setAvailableTournaments(parsed.availableTournaments);
                 setIsLoading(false);
+
+                // Check if cache is still fresh
+                const age = Date.now() - (parsed.timestamp || 0);
+                return age < CACHE_TTL;
             }
         } catch (e) {
             console.error('Error loading cached tournament details:', e);
         }
+        return false;
     };
 
     const fetchTournamentData = async (isSilent = false) => {
@@ -212,7 +259,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
             if (teamIds.length > 0) {
                 const [{ count: pCount }, allMatchesData] = await Promise.all([
-                    supabase.from('applications').select('id', { count: 'exact', head: true }).in('team_id', teamIds),
+                    supabase.from('applications').select('id', { count: 'exact', head: true }).eq('status', 'approved').in('team_id', teamIds),
                     apiService.getMatches({ tournamentId: currentTournamentId })
                 ]);
 
@@ -239,11 +286,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 setLatestMatches([]);
             }
 
-            const baseLeagueName = (mergedTournament?.name || tournamentName || '')
-                .replace(/\s*\(\d{4}\/\d{4}\)/g, '')
-                .replace(/\s*\d{4}\/\d{4}/g, '')
-                .trim();
-
             let seasonQuery = supabase
                 .from('leagues')
                 .select('*')
@@ -251,10 +293,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
             if (targetOrgId) {
                 seasonQuery = seasonQuery.eq('organization_id', targetOrgId);
-            }
-            if (baseLeagueName) {
-                const nameKeyword = baseLeagueName.split(' ')[0] || baseLeagueName;
-                seasonQuery = seasonQuery.ilike('name', `%${nameKeyword}%`);
             }
 
             const { data: matchedSeasonsLeagues } = await seasonQuery;
@@ -266,7 +304,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     _id: l.id,
                     id: l.id,
                     season: l.season || '2026/2027',
-                    displayName: `${l.name} (${l.season || '2026/2027'})`
+                    displayName: l.name
                 }));
                 setAvailableTournaments(finalTournaments);
             } else {
@@ -301,8 +339,18 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     useEffect(() => {
         if (!currentTournamentId) return;
 
-        loadCachedData();
-        fetchTournamentData(false);
+        // Reset tab-loaded flags for new tournament
+        playersLoadedRef.current = false;
+        matchesLoadedRef.current = false;
+
+        const init = async () => {
+            const isCacheFresh = await loadCachedData();
+            // Only fetch from network if cache is stale or missing
+            if (!isCacheFresh) {
+                fetchTournamentData(false);
+            }
+        };
+        init();
 
         // Supabase Realtime multi-table subscription for instant score/team updates
         const realtimeChannel = supabase
@@ -344,7 +392,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
     // 2. Fetch Players specifically for this tournament's teams
     // 2. Fetch Players specifically for this tournament's teams and calculate exact stats
-    const fetchTournamentPlayers = async () => {
+    const fetchTournamentPlayers = async (force = false) => {
+        if (!force && playersLoadedRef.current && topPlayers.length > 0) return;
         setIsLoadingPlayers(true);
         try {
             const teamIds = (teams && teams.length > 0 ? teams : standings).map((t: any) => t.teamId || t.id || t._id).filter(Boolean);
@@ -352,7 +401,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 const teamIdsSet = new Set(teamIds.map(String));
 
                 const [{ data: rawPlayers }, { data: matchesData }] = await Promise.all([
-                    supabase.from('applications').select('*').in('team_id', teamIds),
+                    supabase.from('applications').select('*').eq('status', 'approved').in('team_id', teamIds),
                     supabase.from('matches').select('*').or(`status.eq.finished,status.eq.completed`)
                 ]);
 
@@ -463,6 +512,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 });
 
                 setTopPlayers(processedPlayers);
+                playersLoadedRef.current = true;
+                // Cache players
+                try {
+                    await AsyncStorage.setItem(PLAYERS_CACHE_KEY, JSON.stringify({
+                        players: processedPlayers,
+                        timestamp: Date.now()
+                    }));
+                } catch (e) {}
             } else {
                 setTopPlayers([]);
             }
@@ -474,7 +531,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     };
 
     // 3. Fetch Matches specifically for this tournament
-    const fetchTournamentMatches = async () => {
+    const fetchTournamentMatches = async (force = false) => {
+        if (!force && matchesLoadedRef.current && matches.length > 0) return;
         setIsLoadingMatches(true);
         try {
             const teamIdsSet = new Set((teams && teams.length > 0 ? teams : standings).map((t: any) => String(t.teamId || t.id || t._id)));
@@ -489,6 +547,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             });
 
             setMatches(filteredLeagueMatches);
+            matchesLoadedRef.current = true;
+            // Cache matches
+            try {
+                await AsyncStorage.setItem(MATCHES_CACHE_KEY, JSON.stringify({
+                    matches: filteredLeagueMatches,
+                    timestamp: Date.now()
+                }));
+            } catch (e) {}
         } catch (err) {
             console.error('Error fetching league matches:', err);
         } finally {
@@ -496,14 +562,47 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         }
     };
 
-    // Lazy Loading Tab Handler
+    // Lazy Loading Tab Handler — only fetch if not already loaded
     useEffect(() => {
         if (!currentTournamentId) return;
 
         if (activeTab === 'players') {
-            fetchTournamentPlayers();
+            // Try loading cached players first
+            if (!playersLoadedRef.current) {
+                (async () => {
+                    try {
+                        const raw = await AsyncStorage.getItem(PLAYERS_CACHE_KEY);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            const age = Date.now() - (parsed.timestamp || 0);
+                            if (parsed.players && parsed.players.length > 0 && age < CACHE_TTL) {
+                                setTopPlayers(parsed.players);
+                                playersLoadedRef.current = true;
+                                return;
+                            }
+                        }
+                    } catch (e) {}
+                    fetchTournamentPlayers();
+                })();
+            }
         } else if (activeTab === 'matches') {
-            fetchTournamentMatches();
+            if (!matchesLoadedRef.current) {
+                (async () => {
+                    try {
+                        const raw = await AsyncStorage.getItem(MATCHES_CACHE_KEY);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            const age = Date.now() - (parsed.timestamp || 0);
+                            if (parsed.matches && parsed.matches.length > 0 && age < CACHE_TTL) {
+                                setMatches(parsed.matches);
+                                matchesLoadedRef.current = true;
+                                return;
+                            }
+                        }
+                    } catch (e) {}
+                    fetchTournamentMatches();
+                })();
+            }
         }
     }, [activeTab, currentTournamentId]);
 
@@ -549,10 +648,19 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
     const { standings: filteredStandings, topPlayers: filteredPlayers, matches: filteredMatches } = getFilteredData();
 
+    const getDisplaySeason = () => {
+        if (tournamentData?.season && tournamentData.season.trim()) return tournamentData.season.trim();
+        if (tournament?.season && tournament.season.trim()) return tournament.season.trim();
+        const nameStr = tournamentData?.name || tournamentName || tournament?.name || '';
+        const match = nameStr.match(/\b(20\d{2}[\/-]20\d{2}|20\d{2})\b/);
+        if (match) return match[0];
+        return '2026/2027';
+    };
+
     const renderHeader = () => {
         const dropdownHeight = seasonAnimationValue.interpolate({
             inputRange: [0, 1],
-            outputRange: [0, Math.min(availableTournaments.length * 50, 200)]
+            outputRange: [0, Math.min(Math.max(availableTournaments.length, 1) * 56, 220)]
         });
 
         const dropdownOpacity = seasonAnimationValue.interpolate({
@@ -571,77 +679,94 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         <Text style={styles.headerTitle} numberOfLines={1}>
                             {tournamentData?.name?.toUpperCase() || tournamentName?.toUpperCase() || 'TURNIR'}
                         </Text>
-                        <TouchableOpacity 
-                            style={styles.seasonBadge} 
-                            onPress={toggleSeasonSelector}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.seasonText}>{(tournamentData?.season || 'MAVSUM').toUpperCase()}</Text>
-                            {availableTournaments.length > 1 && (
-                                <Ionicons name={isSeasonSelectorOpen ? "chevron-up" : "chevron-down"} size={14} color="#000" />
-                            )}
-                        </TouchableOpacity>
+                        <View style={styles.seasonBadge}>
+                            <Text style={styles.seasonText}>{getDisplaySeason()}</Text>
+                        </View>
                     </View>
                 </View>
-
-                {/* Season Dropdown with Glass Effect */}
-                {availableTournaments.length > 1 && (
-                    <Animated.View style={[styles.seasonDropdown, { maxHeight: dropdownHeight, opacity: dropdownOpacity }]}>
-                        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-                        <ScrollView nestedScrollEnabled>
-                             {availableTournaments.map((t) => (
-                                <TouchableOpacity 
-                                    key={t._id} 
-                                    style={[styles.seasonItem, t._id === currentTournamentId && styles.activeSeasonItem]}
-                                    onPress={() => {
-                                        if (t._id !== currentTournamentId) {
-                                            setIsSeasonSelectorOpen(false);
-                                            navigation.replace('TournamentDetail', { 
-                                                tournamentId: t._id, 
-                                                tournamentName: t.name, 
-                                                tournament: t 
-                                            });
-                                        }
-                                    }}
-                                >
-                                    <View style={{ flex: 1 }}>
-                                      <Text style={[styles.seasonItemText, t._id === currentTournamentId && styles.activeSeasonItemText]}>
-                                          {t.season?.toUpperCase() || t.name?.toUpperCase() || 'NOMA\'LUM MAVSUM'}
-                                      </Text>
-                                      {t.season && (
-                                        <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }}>
-                                          {t.name?.toUpperCase()}
-                                        </Text>
-                                      )}
-                                    </View>
-                                    {t._id === currentTournamentId && (
-                                        <Ionicons name="checkmark-sharp" size={16} color={Colors.primary} />
-                                    )}
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </Animated.View>
-                )}
             </View>
         );
+    };
+
+    const handleTabPress = (tab: string) => {
+        const idx = TABS.indexOf(tab as any);
+        if (idx >= 0) {
+            isTabPressRef.current = true;
+            setActiveTab(tab);
+            pagerRef.current?.scrollToOffset({ offset: idx * SCREEN_WIDTH, animated: false });
+            // Reset immediately since no animation delay
+            requestAnimationFrame(() => { isTabPressRef.current = false; });
+        }
+    };
+
+    const onPagerScroll = Animated.event(
+        [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
+        { useNativeDriver: false }
+    );
+
+    const onPagerMomentumEnd = (e: any) => {
+        if (isTabPressRef.current) return;
+        const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+        if (idx >= 0 && idx < TABS.length) {
+            setActiveTab(TABS[idx]);
+        }
+    };
+
+    const TAB_COUNT = TABS.length;
+    const TAB_MARGIN = 6;
+    const TABS_PADDING = 12;
+    const TOTAL_GAP = TAB_MARGIN * (TAB_COUNT - 1);
+    const TAB_WIDTH_CALC = (SCREEN_WIDTH - TABS_PADDING * 2 - TOTAL_GAP) / TAB_COUNT;
+
+    const indicatorTranslateX = scrollXPager.interpolate({
+        inputRange: TABS.map((_, i) => i * SCREEN_WIDTH),
+        outputRange: TABS.map((_, i) => i * (TAB_WIDTH_CALC + TAB_MARGIN)),
+        extrapolate: 'clamp',
+    });
+
+    const getTabLabel = (tab: string) => {
+        switch (tab) {
+            case 'overview': return t('tournaments.overview');
+            case 'standings': return t('tournaments.standings');
+            case 'players': return t('tournaments.players');
+            case 'matches': return t('tournaments.matches');
+            default: return tab;
+        }
     };
 
     const renderTabs = () => (
         <View style={styles.tabsContainer}>
             <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={styles.fixedTabsRow}>
-                {['overview', 'standings', 'players', 'matches'].map((tab) => (
+                {/* Animated green background indicator */}
+                <Animated.View
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: TAB_WIDTH_CALC,
+                        height: '100%',
+                        borderRadius: 14,
+                        backgroundColor: Colors.primary,
+                        transform: [{ translateX: indicatorTranslateX }],
+                    }}
+                />
+                {TABS.map((tab) => (
                     <TouchableOpacity
                         key={tab}
-                        style={[styles.tab, activeTab === tab && styles.activeTab]}
-                        onPress={() => setActiveTab(tab)}
+                        style={[styles.tab, { backgroundColor: 'transparent', borderColor: 'transparent' }]}
+                        onPress={() => handleTabPress(tab)}
                         activeOpacity={0.8}
                     >
-                        <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]} numberOfLines={1}>
-                            {tab === 'overview' ? t('tournaments.overview') :
-                                tab === 'standings' ? t('tournaments.standings') :
-                                    tab === 'players' ? t('tournaments.players') : t('tournaments.matches')}
-                        </Text>
+                        <Animated.Text
+                            style={[
+                                styles.tabText,
+                                activeTab === tab && styles.activeTabText
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {getTabLabel(tab)}
+                        </Animated.Text>
                     </TouchableOpacity>
                 ))}
             </View>
@@ -825,7 +950,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 <Ionicons name="search" size={20} color={Colors.textMuted} style={styles.searchIcon} />
                 <TextInput
                     style={styles.searchInput}
-                    placeholder="QIDIRISH..."
+                    placeholder={t('tournaments.search_placeholder', 'QIDIRISH...')}
                     placeholderTextColor={Colors.textMuted}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -840,17 +965,17 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     
                     {/* Header Columns matching exact screenshot */}
                     <View style={styles.screenshotTableHeader}>
-                        <Text style={styles.screenshotHeaderPos}>#</Text>
-                        <Text style={styles.screenshotHeaderTeam}>JAMOA</Text>
-                        <Text style={styles.screenshotHeaderPlayed}>O'</Text>
-                        <Text style={styles.screenshotHeaderGd}>T/N</Text>
-                        <Text style={styles.screenshotHeaderPoints}>O</Text>
+                        <Text style={styles.screenshotHeaderPos}>{t('tournaments.table_rank', '#')}</Text>
+                        <Text style={styles.screenshotHeaderTeam}>{t('tournaments.table_team', 'JAMOA')}</Text>
+                        <Text style={styles.screenshotHeaderPlayed}>{t('tournaments.table_played', 'O\'')}</Text>
+                        <Text style={styles.screenshotHeaderGd}>{t('tournaments.table_gd', 'T/N')}</Text>
+                        <Text style={styles.screenshotHeaderPoints}>{t('tournaments.table_points', 'O')}</Text>
                     </View>
 
                     <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
                         {filteredStandings.length === 0 ? (
                             <View style={styles.empty}>
-                                <Text style={styles.emptyText}>MA'LUMOT TOPILMADI</Text>
+                                <Text style={styles.emptyText}>{t('tournaments.no_data', 'MA\'LUMOT TOPILMADI')}</Text>
                             </View>
                         ) : (
                             filteredStandings.map((team, index) => {
@@ -910,11 +1035,11 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
     const renderPlayers = () => {
         const statOptions = [
-            { id: 'goals', label: 'GOLLAR', icon: 'football' },
-            { id: 'assists', label: 'ASISTLAR', icon: 'people' },
-            { id: 'yellowCards', label: 'SARIQ KARTALAR', icon: 'square', color: '#FFD700' },
-            { id: 'redCards', label: 'QIZIL KARTALAR', icon: 'square', color: '#FF0000' },
-            { id: 'matchesPlayed', label: 'O\'YINLAR', icon: 'calendar' },
+            { id: 'goals', label: t('tournaments.stat_goals', 'GOLLAR'), icon: 'football' },
+            { id: 'assists', label: t('tournaments.stat_assists', 'ASSISTLAR'), icon: 'people' },
+            { id: 'yellowCards', label: t('tournaments.stat_yellow_cards', 'SARIQ KARTALAR'), icon: 'square', color: '#FFD700' },
+            { id: 'redCards', label: t('tournaments.stat_red_cards', 'QIZIL KARTALAR'), icon: 'square', color: '#FF0000' },
+            { id: 'matchesPlayed', label: t('tournaments.stat_matches_played', 'O\'YINLAR'), icon: 'calendar' },
         ];
 
         const activeOption = statOptions.find(opt => opt.id === statFilter) || statOptions[0];
@@ -935,7 +1060,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     <Ionicons name="search" size={20} color={Colors.textMuted} style={styles.searchIcon} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="QIDIRISH..."
+                        placeholder={t('tournaments.search_placeholder', 'QIDIRISH...')}
                         placeholderTextColor={Colors.textMuted}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -991,7 +1116,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
                         {filteredPlayers.length === 0 ? (
                             <View style={styles.empty}>
-                                <Text style={styles.emptyText}>MA'LUMOT TOPILMADI</Text>
+                                <Text style={styles.emptyText}>{t('tournaments.no_data', 'MA\'LUMOT TOPILMADI')}</Text>
                             </View>
                         ) : (
                             filteredPlayers.map((player, index) => {
@@ -1050,7 +1175,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 <Ionicons name="search" size={20} color={Colors.textMuted} style={styles.searchIcon} />
                 <TextInput
                     style={styles.searchInput}
-                    placeholder="QIDIRISH..."
+                    placeholder={t('tournaments.search_placeholder', 'QIDIRISH...')}
                     placeholderTextColor={Colors.textMuted}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -1063,7 +1188,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
                     {filteredMatches.length === 0 ? (
                         <View style={styles.empty}>
-                            <Text style={styles.emptyText}>Hozircha o'yinlar belgilanmagan</Text>
+                            <Text style={styles.emptyText}>{t('tournaments.no_data', 'MA\'LUMOT TOPILMADI')}</Text>
                         </View>
                     ) : (
                         filteredMatches.map((match) => {
@@ -1145,6 +1270,13 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         </View>
     );
 
+    const pagerPages = [
+        { key: 'overview', render: renderOverview },
+        { key: 'standings', render: renderStandings },
+        { key: 'players', render: renderPlayers },
+        { key: 'matches', render: renderMatches },
+    ];
+
     return (
         <AnimatedBackground overlayOpacity={0.85} backgroundImage={backgroundImage}>
             <SafeAreaView style={styles.container} edges={['top']}>
@@ -1154,10 +1286,28 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 {isLoading ? (
                     <TournamentDetailSkeleton />
                 ) : (
-                    activeTab === 'overview' ? renderOverview() :
-                    activeTab === 'standings' ? renderStandings() :
-                    activeTab === 'players' ? renderPlayers() :
-                    renderMatches()
+                    <FlatList
+                        ref={pagerRef}
+                        data={pagerPages}
+                        keyExtractor={(item) => item.key}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        bounces={false}
+                        onScroll={onPagerScroll}
+                        scrollEventThrottle={16}
+                        onMomentumScrollEnd={onPagerMomentumEnd}
+                        getItemLayout={(_, index) => ({
+                            length: SCREEN_WIDTH,
+                            offset: SCREEN_WIDTH * index,
+                            index,
+                        })}
+                        renderItem={({ item }) => (
+                            <View style={{ width: SCREEN_WIDTH, flex: 1 }}>
+                                {item.render()}
+                            </View>
+                        )}
+                    />
                 )}
             </SafeAreaView>
         </AnimatedBackground>
