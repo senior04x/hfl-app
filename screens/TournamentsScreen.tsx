@@ -586,8 +586,8 @@ export default function TournamentsScreen({ navigation }: any) {
         }
 
         const leagueLogo = getLeagueLogoSource(league);
-        const roundNumber = league.latestRound || league.current_round || league.round || 0;
-        const hasPlayed = league.hasPlayedMatches === true || (roundNumber > 0 && (league.matchesCount || 0) > 0);
+        const roundNumber = Number(league.latestRound || league.current_round || league.round || 0);
+        const isActive = (league.is_active === true || league.is_active === 'true' || league.is_active !== false);
 
         return (
             <TouchableOpacity
@@ -620,10 +620,12 @@ export default function TournamentsScreen({ navigation }: any) {
                             {(league.name || 'LIGA').toUpperCase()}
                         </Text>
                         <View style={styles.teamBadgeRow}>
-                            {league.is_active !== false && hasPlayed && roundNumber > 0 ? (
+                            {isActive ? (
                                 <View style={styles.leagueTagBadge}>
                                     <Text style={styles.leagueTagText}>
-                                        {`${roundNumber}-${t('matches.tour', 'TUR')} • ${t('common.active', 'FAOL').toUpperCase()}`}
+                                        {roundNumber > 0 
+                                            ? `${roundNumber}-${t('matches.tour', 'TUR')} • ${t('common.active', 'FAOL').toUpperCase()}`
+                                            : t('common.active', 'FAOL').toUpperCase()}
                                     </Text>
                                 </View>
                             ) : (
