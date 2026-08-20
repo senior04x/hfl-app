@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, Alert } from 'react-native';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { apiService } from './apiService';
 
 // Active chat tracking to suppress native banners when user is already inside that chat room
@@ -45,17 +45,18 @@ export const notificationService = {
    */
   registerForPushNotificationsAsync: async (userId?: string) => {
     if (!Device.isDevice) {
-      console.log('NOTICE: Must use physical device for Push Notifications');
       return null;
     }
 
-    // Check if running in Expo Go (remote notifications not supported in SDK 53+)
-    const isExpoGo = Constants.appOwnership === 'expo' || Constants.appOwnership === 'guest';
-    console.log(`DEBUG: appOwnership=${Constants.appOwnership}, platform=${Platform.OS}`);
+    // In Expo SDK 53+, remote push token is unsupported inside Expo Go on Android
+    const isExpoGo =
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+      Constants.appOwnership === 'expo' ||
+      Constants.appOwnership === 'guest';
     
     if (isExpoGo && Platform.OS === 'android') {
-       console.log('NOTICE: Android Push Notifications (remote) are not supported in Expo Go (SDK 53+). Please use a development build.');
-       // We still try to get the token for internal use, but handle errors silently
+      // Local notifications & Supabase realtime work seamlessly inside Expo Go
+      return null;
     }
 
     try {

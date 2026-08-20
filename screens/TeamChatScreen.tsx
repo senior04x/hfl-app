@@ -81,10 +81,12 @@ function TeamChatScreen({ route, navigation }: any) {
     const messageRefs = useRef<{ [key: string]: any }>({});
     const [isRateLimited, setIsRateLimited] = useState(false);
 
-    // Initialize LayoutAnimation for Android
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    // Initialize LayoutAnimation for Android (safely ignore in New Architecture)
+    try {
+      if (Platform.OS === 'android' && UIManager?.setLayoutAnimationEnabledExperimental) {
         UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
+      }
+    } catch (_) {}
 
     const { height } = Dimensions.get('window');
     const pan = useRef(new Animated.ValueXY()).current;
@@ -1205,7 +1207,7 @@ function TeamChatScreen({ route, navigation }: any) {
                 <View style={styles.header}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="chevron-back" size={28} color={Colors.primary} />
+                        <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
                     
                     <TouchableOpacity 
