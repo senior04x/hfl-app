@@ -987,16 +987,19 @@ export const apiService = {
     // Matches (Direct from Supabase 'matches' table)
     getMatches: async (params?: any) => {
         try {
+            const isGuest = useAuthStore.getState().isGuest;
             const orgId = getOrgId();
-            const collabLeagueNames = await apiService.getOrgCollabLeagues(orgId);
+            const collabLeagueNames = !isGuest ? await apiService.getOrgCollabLeagues(orgId) : [];
 
             let query = supabase.from('matches').select('*').order('match_date', { ascending: false });
 
-            if (collabLeagueNames && collabLeagueNames.length > 0) {
-                const escapedNames = collabLeagueNames.map(n => `"${n.replace(/"/g, '""')}"`).join(',');
-                query = query.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
-            } else {
-                query = query.eq('organization_id', orgId);
+            if (!isGuest) {
+                if (collabLeagueNames && collabLeagueNames.length > 0) {
+                    const escapedNames = collabLeagueNames.map(n => `"${n.replace(/"/g, '""')}"`).join(',');
+                    query = query.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
+                } else {
+                    query = query.eq('organization_id', orgId);
+                }
             }
 
             const { data: matchesData, error: mErr } = await query;
@@ -1388,14 +1391,18 @@ export const apiService = {
         }
     },
 
-    // Slider Top Scorers by League (scoped to current organization)
+    // Slider Top Scorers by League (scoped to current organization or all organizations for guest)
     getSliderItems: async () => {
         try {
+            const isGuest = useAuthStore.getState().isGuest;
             const orgId = getOrgId();
-            const collabLeagueNames = await apiService.getOrgCollabLeagues(orgId);
+            const collabLeagueNames = !isGuest ? await apiService.getOrgCollabLeagues(orgId) : [];
 
-            // 1. Fetch leagues for this organization
-            let leaguesQuery = supabase.from('leagues').select('*').eq('organization_id', orgId);
+            // 1. Fetch leagues for this organization or all if guest
+            let leaguesQuery = supabase.from('leagues').select('*');
+            if (!isGuest) {
+                leaguesQuery = leaguesQuery.eq('organization_id', orgId);
+            }
             const { data: dbLeagues } = await leaguesQuery;
 
             if (!dbLeagues || dbLeagues.length === 0) return [];
@@ -1422,7 +1429,7 @@ export const apiService = {
             }));
 
             // Also include collab league names if any
-            if (collabLeagueNames && collabLeagueNames.length > 0) {
+            if (!isGuest && collabLeagueNames && collabLeagueNames.length > 0) {
                 const existingLower = leagueItems.map(l => l.leagueName.toLowerCase());
                 // Add collab leagues that are not already in the list
                 for (const cn of collabLeagueNames) {
@@ -1442,18 +1449,25 @@ export const apiService = {
                 }
             }
 
-            // 2. Fetch matches, teams, players scoped to this organization
+            // 2. Fetch matches, teams, players
             let matchesQuery = supabase.from('matches').select('home_team_id, away_team_id, league, round, tour, organization_id');
-            if (collabLeagueNames && collabLeagueNames.length > 0) {
-                const escapedNames = collabLeagueNames.map((n: string) => `"${n}"`).join(',');
-                matchesQuery = matchesQuery.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
-            } else {
-                matchesQuery = matchesQuery.eq('organization_id', orgId);
-            }
-            const { data: dbMatches } = await matchesQuery;
+            let teamsQuery = supabase.from('teams').select('*');
+            let playersQuery = supabase.from('applications').select('*');
 
-            const { data: teams } = await supabase.from('teams').select('*').eq('organization_id', orgId);
-            const { data: players } = await supabase.from('applications').select('*').eq('organization_id', orgId);
+            if (!isGuest) {
+                if (collabLeagueNames && collabLeagueNames.length > 0) {
+                    const escapedNames = collabLeagueNames.map((n: string) => `"${n}"`).join(',');
+                    matchesQuery = matchesQuery.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
+                } else {
+                    matchesQuery = matchesQuery.eq('organization_id', orgId);
+                }
+                teamsQuery = teamsQuery.eq('organization_id', orgId);
+                playersQuery = playersQuery.eq('organization_id', orgId);
+            }
+
+            const { data: dbMatches } = await matchesQuery;
+            const { data: teams } = await teamsQuery;
+            const { data: players } = await playersQuery;
 
             const teamsMap: any = {};
             if (teams) teams.forEach(t => { teamsMap[t.id] = t; });

@@ -20,10 +20,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useTournamentStore } from '../store/useTournamentStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService } from '../services/apiService';
 import GenericListSkeleton from '../components/GenericListSkeleton';
 import Skeleton from '../components/Skeleton';
 import TournamentsSkeleton from '../components/TournamentsSkeleton';
+import OrganizationSelectModal from '../components/OrganizationSelectModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RefreshControl } from 'react-native';
 import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
@@ -286,17 +290,85 @@ const TournamentsHeader = ({
     );
 };
 
+// Guest Mode Header Component: Displays Organization Logo and Name, allows switching
+const GuestTournamentsHeader = ({ organization, leaguesCount, onPressOrg }: any) => {
+    const { t } = useTranslation();
+    const orgName = (organization?.name || 'HAVAS FUTBOL LIGASI').toUpperCase();
+    const orgLogo = organization?.logo_url || organization?.logo || organization?.logoUrl;
+    const orgInitials = (organization?.slug || organization?.name || 'HFL').slice(0, 3).toUpperCase();
+
+    return (
+        <View style={styles.headerContent}>
+            {/* Organization Info Card - Clickable to open select modal */}
+            <TouchableOpacity 
+                style={styles.guestOrgCard}
+                onPress={onPressOrg}
+                activeOpacity={0.8}
+            >
+                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={styles.guestOrgContent}>
+                    <View style={styles.guestOrgLogoWrapper}>
+                        {orgLogo && typeof orgLogo === 'string' && (orgLogo.startsWith('http') || orgLogo.length > 8) ? (
+                            <Image
+                                source={{ uri: orgLogo }}
+                                style={styles.guestOrgLogoImage}
+                                resizeMode="contain"
+                            />
+                        ) : (
+                            <View style={styles.guestOrgFallbackBox}>
+                                <Ionicons name="shield-checkmark" size={26} color="#00FF9D" />
+                                <Text style={styles.guestOrgFallbackText}>{orgInitials}</Text>
+                            </View>
+                        )}
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 14 }}>
+                        <View style={styles.guestOrgBadge}>
+                            <Ionicons name="business-outline" size={12} color="#00FF9D" />
+                            <Text style={styles.guestOrgBadgeText}>RASMIY TASHKILOT</Text>
+                        </View>
+                        <Text style={styles.guestOrgName} numberOfLines={1}>{orgName}</Text>
+                        <Text style={styles.guestOrgSubtitle}>{t('tournaments.title')}: {leaguesCount} ta liga</Text>
+                    </View>
+                    <View style={styles.guestOrgSwitchBtn}>
+                        <Ionicons name="swap-horizontal" size={14} color="#00FF9D" />
+                        <Ionicons name="chevron-down" size={14} color="#00FF9D" />
+                    </View>
+                </View>
+            </TouchableOpacity>
+
+            {/* List Header */}
+            <View style={styles.listHeader}>
+                <View style={styles.listHeaderBadge}>
+                    <BlurView intensity={10} tint="light" style={StyleSheet.absoluteFill} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6 }}>
+                        <Ionicons name="trophy-outline" size={16} color="#00FF66" style={{ marginRight: 6 }} />
+                        <Text style={styles.listHeaderText}>
+                            TASHKILOTNING BARCHA LIGALARI ({leaguesCount})
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+};
+
 export default function TournamentsScreen({ navigation }: any) {
     const { t } = useTranslation();
+    const { isGuest } = useAuthStore();
+    const { organizations, selectedOrganizationId, setSelectedOrganizationId } = useOrganizationStore();
+    const activeOrg = (organizations || []).find((o: any) => o.id === selectedOrganizationId) || organizations?.[0];
+
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('league'); // 'league' or 'favorites'
     const [searchQuery, setSearchQuery] = useState('');
     const [leagues, setLeagues] = useState<any[]>([]);
     const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
     const [isLeagueSelectorOpen, setIsLeagueSelectorOpen] = useState(false);
+    const [showOrgSelectModal, setShowOrgSelectModal] = useState(false);
     const [isLeaguesLoading, setIsLeaguesLoading] = useState(true);
     const [teams, setTeams] = useState<any[]>([]);
     const [teamsLoading, setTeamsLoading] = useState(false);
+    const hasCachedLeaguesRef = useRef(false);
 
     const animationValue = useRef(new Animated.Value(0)).current;
 
@@ -311,6 +383,79 @@ export default function TournamentsScreen({ navigation }: any) {
             useNativeDriver: false,
         }).start();
     }, [isLeagueSelectorOpen]);
+
+    const TOURNAMENTS_CACHE_TTL = 5 * 60 * 1000; // 5 minut
+
+    const loadCachedLeagues = async (targetOrgId: number): Promise<boolean> => {
+        try {
+            const cacheKey = `@amatora_tournaments_cache_${targetOrgId}`;
+            const raw = await AsyncStorage.getItem(cacheKey);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && Array.isArray(parsed.leagues) && parsed.leagues.length > 0) {
+                    setLeagues(parsed.leagues);
+                    if (parsed.selectedLeague) {
+                        setSelectedLeague(parsed.selectedLeague);
+                    }
+                    if (Array.isArray(parsed.teams) && parsed.teams.length > 0) {
+                        setTeams(parsed.teams);
+                    }
+                    hasCachedLeaguesRef.current = true;
+                    setIsLeaguesLoading(false);
+
+                    const age = Date.now() - (parsed.timestamp || 0);
+                    return age < TOURNAMENTS_CACHE_TTL;
+                }
+            }
+        } catch (e) {
+            console.error('Error loading tournaments cache:', e);
+        }
+        return false;
+    };
+
+    const fetchLeagues = async (orgIdParam?: number, isSilent = false) => {
+        const targetOrgId = orgIdParam || selectedOrganizationId || 1;
+        try {
+            if (!isSilent && !hasCachedLeaguesRef.current) {
+                setIsLeaguesLoading(true);
+            }
+            const data = await apiService.getLeaguesByOrgId(targetOrgId);
+            if (data && Array.isArray(data)) {
+                setLeagues(data);
+                if (data.length > 0) {
+                    const firstLeague = data[0];
+                    setSelectedLeague(firstLeague);
+                    const fetchedTeams = await fetchLeagueTeams(firstLeague.name || firstLeague.id || '');
+                    
+                    // Save snapshot to cache
+                    await AsyncStorage.setItem(`@amatora_tournaments_cache_${targetOrgId}`, JSON.stringify({
+                        leagues: data,
+                        selectedLeague: firstLeague,
+                        teams: fetchedTeams || [],
+                        timestamp: Date.now()
+                    }));
+                } else {
+                    setSelectedLeague(null);
+                    setTeams([]);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching leagues:', error);
+        } finally {
+            setIsLeaguesLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const init = async () => {
+            const targetOrgId = selectedOrganizationId || 1;
+            const isFresh = await loadCachedLeagues(targetOrgId);
+            if (!isFresh) {
+                fetchLeagues(targetOrgId, hasCachedLeaguesRef.current);
+            }
+        };
+        init();
+    }, [selectedOrganizationId]);
 
     const sortTeamsByStandingsRank = (arr: any[]) => {
         return [...arr].sort((a: any, b: any) => {
@@ -342,42 +487,21 @@ export default function TournamentsScreen({ navigation }: any) {
             const teamData = await apiService.getTeams(1, 100, leagueName);
             const sortedTeams = sortTeamsByStandingsRank(teamData || []);
             setTeams(sortedTeams);
+            return sortedTeams;
         } catch (error) {
             console.error('Error fetching league teams:', error);
             setTeams([]);
+            return [];
         } finally {
             setTeamsLoading(false);
         }
     };
 
-    const fetchLeagues = async () => {
-        try {
-            setIsLeaguesLoading(true);
-            const data = await apiService.getLeagues();
-            if (data && Array.isArray(data)) {
-                setLeagues(data);
-                if (data.length > 0 && !selectedLeague) {
-                    const firstLeague = data[0];
-                    setSelectedLeague(firstLeague);
-                    await fetchLeagueTeams(firstLeague.name || firstLeague.id || '');
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching leagues:', error);
-        } finally {
-            setIsLeaguesLoading(false);
-        }
-    };
-
     useEffect(() => {
-        fetchLeagues();
-    }, []);
-
-    useEffect(() => {
-        if (selectedLeague && (leagues?.length || 0) > 0 && !isLeaguesLoading) {
+        if (selectedLeague && (leagues?.length || 0) > 0 && !isLeaguesLoading && !hasCachedLeaguesRef.current) {
             fetchLeagueTeams(selectedLeague.name || selectedLeague.id || '');
         }
-    }, [selectedLeague?._id, selectedLeague?.name]);
+    }, [selectedLeague?.id, selectedLeague?.name]);
 
     const handleLeagueSelect = useCallback((league: any) => {
         setIsLeagueSelectorOpen(false);
@@ -394,6 +518,70 @@ export default function TournamentsScreen({ navigation }: any) {
     const filteredTeams = (teams || []).filter(t =>
         t.name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const filteredLeagues = (leagues || []).filter(l =>
+        l.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const renderLeagueItemForGuest = ({ item: league, index }: { item: any, index: number }) => {
+        if (league._isSkeleton) {
+            return (
+                <View style={[styles.guestLeagueCard, { borderBottomWidth: 0 }]} key={`skeleton-${index}`}>
+                    <Skeleton circle width={54} height={54} style={{ marginRight: 14 }} />
+                    <View style={{ flex: 1 }}>
+                        <Skeleton width={width * 0.5} height={18} borderRadius={4} style={{ marginBottom: 6 }} />
+                        <Skeleton width={width * 0.3} height={12} borderRadius={4} />
+                    </View>
+                </View>
+            );
+        }
+
+        const leagueLogo = getLeagueLogoSource(league);
+        const roundNumber = league.current_round || league.round || 1;
+
+        return (
+            <TouchableOpacity
+                key={league.id || league._id}
+                style={styles.guestLeagueCard}
+                onPress={() => navigation.navigate('TournamentDetail', { 
+                    tournament: league, 
+                    tournamentId: league.id || league._id 
+                })}
+                activeOpacity={0.75}
+            >
+                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={styles.guestLeagueCardContent}>
+                    <View style={styles.guestLeagueLogoWrapper}>
+                        {leagueLogo ? (
+                            <Image source={leagueLogo} style={styles.guestLeagueLogoImage} resizeMode="contain" />
+                        ) : (
+                            <Ionicons name="trophy" size={28} color={Colors.primary} />
+                        )}
+                    </View>
+
+                    <View style={{ flex: 1, marginLeft: 14 }}>
+                        <Text style={styles.guestLeagueName} numberOfLines={1}>
+                            {(league.name || 'LIGA').toUpperCase()}
+                        </Text>
+                        <View style={styles.guestLeagueMetaRow}>
+                            <View style={styles.leagueTagBadge}>
+                                <Text style={styles.leagueTagText}>
+                                    {roundNumber}-TUR • FAOL
+                                </Text>
+                            </View>
+                            <Text style={styles.guestLeagueRegionText} numberOfLines={1}>
+                                {league.location || "O'zbekiston"}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.guestLeagueActionBtn}>
+                        <Ionicons name="arrow-forward" size={18} color="#00FF9D" />
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     const renderTeamItem = ({ item: team, index }: { item: any, index: number }) => {
         if (team._isSkeleton) {
@@ -488,12 +676,44 @@ export default function TournamentsScreen({ navigation }: any) {
                 </View>
 
 
-                {isLeaguesLoading ? (
+                {isLeaguesLoading && leagues.length === 0 ? (
                     <TournamentsSkeleton />
+                ) : isGuest ? (
+                    <FlatList
+                        data={isLeaguesLoading ? Array(4).fill({ _isSkeleton: true }) : filteredLeagues}
+                        keyExtractor={(item, index) => item?.id || item?._id || `guest-league-item-${index}`}
+                        renderItem={renderLeagueItemForGuest}
+                        ListHeaderComponent={
+                            <GuestTournamentsHeader
+                                organization={activeOrg}
+                                leaguesCount={leagues?.length || 0}
+                                onPressOrg={() => setShowOrgSelectModal(true)}
+                            />
+                        }
+                        ListEmptyComponent={
+                            !isLeaguesLoading ? (
+                                <View style={styles.emptyStateBox}>
+                                    <Ionicons name="trophy-outline" size={48} color="rgba(255,255,255,0.2)" />
+                                    <Text style={styles.emptyStateText}>
+                                        {t('tournaments.no_tournaments', 'Ushbu tashkilotda hozircha ligalar mavjud emas')}
+                                    </Text>
+                                </View>
+                            ) : null
+                        }
+                        contentContainerStyle={[styles.list, { paddingBottom: 130 }]}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={isLeaguesLoading && leagues.length > 0}
+                                onRefresh={() => fetchLeagues(selectedOrganizationId, true)}
+                                tintColor={Colors.primary}
+                                colors={[Colors.primary]}
+                            />
+                        }
+                    />
                 ) : (
                     <FlatList
                         data={teamsLoading ? Array(5).fill({ _isSkeleton: true }) : filteredTeams}
-                        keyExtractor={(item, index) => item?.id || item?._id || `skeleton-${index}`}
+                        keyExtractor={(item, index) => item?.id || item?._id || `team-item-${index}`}
                         renderItem={renderTeamItem}
                         ListHeaderComponent={
                             <TournamentsHeader
@@ -520,7 +740,7 @@ export default function TournamentsScreen({ navigation }: any) {
                                 </View>
                             ) : null
                         }
-                        contentContainerStyle={styles.list}
+                        contentContainerStyle={[styles.list, { paddingBottom: 130 }]}
                         refreshControl={
                             <RefreshControl
                                 refreshing={teamsLoading && teams.length > 0}
@@ -532,6 +752,16 @@ export default function TournamentsScreen({ navigation }: any) {
                     />
                 )}
             </SafeAreaView>
+
+            {/* Organization Selection Modal for Guest Mode */}
+            <OrganizationSelectModal
+                visible={showOrgSelectModal}
+                onClose={() => setShowOrgSelectModal(false)}
+                onSelect={(org) => {
+                    setSelectedOrganizationId(org.id);
+                    fetchLeagues(org.id);
+                }}
+            />
         </AnimatedBackground>
     );
 }
@@ -1051,5 +1281,143 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginTop: 12,
         fontWeight: '600',
+    },
+    // Guest Mode Styles
+    guestOrgCard: {
+        marginHorizontal: 16,
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.25)',
+        backgroundColor: 'rgba(20, 25, 35, 0.65)',
+        marginBottom: 18,
+    },
+    guestOrgContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+    },
+    guestOrgLogoWrapper: {
+        width: 58,
+        height: 58,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        overflow: 'hidden',
+    },
+    guestOrgLogoImage: {
+        width: 44,
+        height: 44,
+    },
+    guestOrgFallbackBox: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    guestOrgFallbackText: {
+        color: '#00FF9D',
+        fontSize: 10,
+        fontWeight: '900',
+        marginTop: 1,
+    },
+    guestOrgSwitchBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 223, 130, 0.15)',
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 223, 130, 0.35)',
+        gap: 2,
+    },
+    guestOrgBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 223, 130, 0.15)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        alignSelf: 'flex-start',
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 223, 130, 0.3)',
+        gap: 4,
+    },
+    guestOrgBadgeText: {
+        color: '#00FF9D',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    guestOrgName: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.3,
+        marginBottom: 2,
+    },
+    guestOrgSubtitle: {
+        color: 'rgba(255, 255, 255, 0.55)',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    guestLeagueCard: {
+        marginHorizontal: 16,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        marginBottom: 12,
+    },
+    guestLeagueCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+    },
+    guestLeagueLogoWrapper: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    guestLeagueLogoImage: {
+        width: 42,
+        height: 42,
+    },
+    guestLeagueName: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.4,
+        marginBottom: 6,
+    },
+    guestLeagueMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    guestLeagueRegionText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    guestLeagueActionBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0, 223, 130, 0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 223, 130, 0.3)',
+        marginLeft: 8,
     },
 });
