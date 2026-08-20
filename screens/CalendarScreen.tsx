@@ -66,8 +66,90 @@ const CalendarSkeletonLoader = () => (
     </View>
 );
 
+// ─── Localization Dictionaries ───────────────────────────────────────────────
+const MONTHS_UZ = [
+    'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+    'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'
+];
+const MONTHS_RU = [
+    'Января', 'Февраля', 'Марта', 'Апреля', 'Мая', 'Июня',
+    'Июля', 'Августа', 'Сентября', 'Октября', 'Ноября', 'Декабря'
+];
+const MONTHS_RU_NOM = [
+    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+];
+const MONTHS_EN = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const WEEKDAYS_UZ = [
+    'Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba',
+    'Payshanba', 'Juma', 'Shanba'
+];
+const WEEKDAYS_RU = [
+    'Воскресенье', 'Понедельник', 'Вторник', 'Среда',
+    'Четверг', 'Пятница', 'Суббота'
+];
+const WEEKDAYS_EN = [
+    'Sunday', 'Monday', 'Tuesday', 'Wednesday',
+    'Thursday', 'Friday', 'Saturday'
+];
+
+const DAYS_OF_WEEK_SHORT: Record<string, string[]> = {
+    uz: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'],
+    ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+    en: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+};
+
+const formatLocalizedGroupDate = (dateObj: Date, lang: string) => {
+    const day = dateObj.getDate();
+    const year = dateObj.getFullYear();
+    if (lang === 'uz') {
+        const month = MONTHS_UZ[dateObj.getMonth()];
+        const weekday = WEEKDAYS_UZ[dateObj.getDay()];
+        return `${day}-${month} ${year}, ${weekday}`;
+    } else if (lang === 'ru') {
+        const month = MONTHS_RU[dateObj.getMonth()];
+        const weekday = WEEKDAYS_RU[dateObj.getDay()];
+        return `${day} ${month} ${year}, ${weekday}`;
+    } else {
+        const month = MONTHS_EN[dateObj.getMonth()];
+        const weekday = WEEKDAYS_EN[dateObj.getDay()];
+        return `${month} ${day}, ${year}, ${weekday}`;
+    }
+};
+
+const formatFilterDate = (day: number, vDate: Date, lang: string) => {
+    if (!day) return '';
+    const mIdx = vDate.getMonth();
+    const year = vDate.getFullYear();
+    const padDay = String(day).padStart(2, '0');
+    if (lang === 'uz') {
+        return `${padDay} ${MONTHS_UZ[mIdx]} ${year}`;
+    } else if (lang === 'ru') {
+        return `${padDay} ${MONTHS_RU[mIdx]} ${year}`;
+    } else {
+        return `${MONTHS_EN[mIdx]} ${padDay}, ${year}`;
+    }
+};
+
+const formatMonthHeader = (vDate: Date, lang: string) => {
+    const mIdx = vDate.getMonth();
+    const year = vDate.getFullYear();
+    if (lang === 'uz') {
+        return `${MONTHS_UZ[mIdx]} ${year}`;
+    } else if (lang === 'ru') {
+        return `${MONTHS_RU_NOM[mIdx]} ${year}`;
+    } else {
+        return `${MONTHS_EN[mIdx]} ${year}`;
+    }
+};
+
 export default function CalendarScreen({ navigation }: any) {
     const { t, i18n } = useTranslation();
+    const currentLang = i18n.language || 'uz';
     const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
     const [calendarData, setCalendarData] = useState<any[]>([]);
     const [displayData, setDisplayData] = useState<any[]>([]);
@@ -90,7 +172,7 @@ export default function CalendarScreen({ navigation }: any) {
 
     useEffect(() => {
         fetchMatches();
-    }, [startDate, endDate, viewDate]);
+    }, [startDate, endDate, viewDate, currentLang]);
 
     const fetchMatches = async () => {
         try {
@@ -115,37 +197,37 @@ export default function CalendarScreen({ navigation }: any) {
                 const groups: { [key: string]: any } = {};
                 filteredByDate.forEach(match => {
                     const dateObj = new Date(match.date || match.scheduledAt);
-                    const dateKey = dateObj.toLocaleDateString('uz-UZ', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                        weekday: 'short'
-                    });
+                    const formattedDateStr = formatLocalizedGroupDate(dateObj, currentLang);
+                    const groupKey = `${dateObj.getFullYear()}-${dateObj.getMonth()}-${dateObj.getDate()}`;
 
-                    if (!groups[dateKey]) {
-                        groups[dateKey] = {
-                            date: dateKey,
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = {
+                            id: groupKey,
+                            date: formattedDateStr,
+                            dateObj: dateObj,
                             timestamp: dateObj.getTime(),
                             tournaments: {}
                         };
                     }
 
                     const tourneyName = match.tournamentName || match.league || 'Boshqa';
-                    if (!groups[dateKey].tournaments[tourneyName]) {
-                        groups[dateKey].tournaments[tourneyName] = {
-                            id: `${dateKey}_${tourneyName}`,
+                    if (!groups[groupKey].tournaments[tourneyName]) {
+                        groups[groupKey].tournaments[tourneyName] = {
+                            id: `${groupKey}_${tourneyName}`,
                             name: tourneyName,
                             matches: []
                         };
                     }
 
-                    groups[dateKey].tournaments[tourneyName].matches.push(match);
+                    groups[groupKey].tournaments[tourneyName].matches.push(match);
                 });
 
                 const formatted = Object.values(groups)
                     .sort((a: any, b: any) => a.timestamp - b.timestamp)
                     .map((group: any) => ({
+                        id: group.id,
                         date: group.date,
+                        timestamp: group.timestamp,
                         tournaments: Object.values(group.tournaments)
                     }));
 
@@ -204,7 +286,7 @@ export default function CalendarScreen({ navigation }: any) {
         const startDayOfWeek = getFirstDayOfMonth(year, month);
         
         const days = [];
-        const daysOfWeek = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya']; 
+        const daysOfWeek = DAYS_OF_WEEK_SHORT[currentLang] || DAYS_OF_WEEK_SHORT.uz; 
 
         const headerRow = daysOfWeek.map((d, i) => (
             <View key={`header-${i}`} style={styles.calCell}>
@@ -271,13 +353,17 @@ export default function CalendarScreen({ navigation }: any) {
                         style={[styles.tab, selectedTab === 'all' && styles.activeTab]}
                         onPress={() => setSelectedTab('all')}
                     >
-                        <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>Barcha o'yinlar</Text>
+                        <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>
+                            {t('calendar.all_matches', "Barcha o'yinlar")}
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.tab, selectedTab === 'my' && styles.activeTab]}
                         onPress={() => setSelectedTab('my')}
                     >
-                        <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>Mening taqvimim</Text>
+                        <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>
+                            {t('calendar.my_calendar', 'Mening taqvimim')}
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
@@ -288,7 +374,7 @@ export default function CalendarScreen({ navigation }: any) {
                         <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={{ padding: 10 }}>
                             <Text style={styles.dateLabel}>{t('common.from')}</Text>
-                            <Text style={styles.dateValue}>{`${String(startDate).padStart(2, '0')} ${viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'short' })}. ${viewDate.getFullYear()}`}</Text>
+                            <Text style={styles.dateValue}>{formatFilterDate(startDate, viewDate, currentLang)}</Text>
                         </View>
                         <Ionicons name="calendar-outline" size={20} color={Colors.primary} style={{ marginRight: 10 }} />
                     </TouchableOpacity>
@@ -299,7 +385,7 @@ export default function CalendarScreen({ navigation }: any) {
                         <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={{ padding: 10 }}>
                             <Text style={styles.dateLabel}>{t('common.to')}</Text>
-                            <Text style={styles.dateValue}>{tempEndDate || endDate ? `${String(endDate).padStart(2, '0')} ${viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'short' })}. ${viewDate.getFullYear()}` : t('common.not_selected')}</Text>
+                            <Text style={styles.dateValue}>{tempEndDate || endDate ? formatFilterDate(tempEndDate || endDate, viewDate, currentLang) : t('common.not_selected')}</Text>
                         </View>
                         <Ionicons name="calendar-outline" size={20} color={Colors.primary} style={{ marginRight: 10 }} />
                     </TouchableOpacity>
@@ -353,7 +439,7 @@ export default function CalendarScreen({ navigation }: any) {
                                         <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
                                             <Text style={styles.tournamentName}>{tourney.name.toUpperCase()}</Text>
                                             <View style={styles.matchCountBadge}>
-                                                <Text style={styles.matchCountText}>{tourney.matches.length} TA O'YIN</Text>
+                                                <Text style={styles.matchCountText}>{tourney.matches.length} {t('matches.matches_count', 'TA O\'YIN').toUpperCase()}</Text>
                                                 <Ionicons name="chevron-forward" size={16} color={Colors.primary} style={{ marginLeft: 4 }} />
                                             </View>
                                         </View>
@@ -364,9 +450,9 @@ export default function CalendarScreen({ navigation }: any) {
                     )}
                 />
 
-                {/* Date Picker Modal */}
+                {/* Range Date Picker Modal */}
                 <Modal
-                    animationType="slide"
+                    animationType="fade"
                     transparent={true}
                     visible={isDatePickerVisible}
                     onRequestClose={() => setDatePickerVisible(false)}
@@ -379,18 +465,18 @@ export default function CalendarScreen({ navigation }: any) {
                             <View style={styles.modalDatesDisplay}>
                                 <View style={styles.modalDateBox}>
                                     <Text style={styles.modalDateLabel}>{t('common.from').toUpperCase()}</Text>
-                                    <Text style={styles.modalDateValue}>{String(tempStartDate).padStart(2, '0')} {viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'short' })}. {viewDate.getFullYear()}</Text>
+                                    <Text style={styles.modalDateValue}>{formatFilterDate(tempStartDate, viewDate, currentLang)}</Text>
                                 </View>
                                 <View style={styles.modalDateBox}>
                                     <Text style={styles.modalDateLabel}>{t('common.to').toUpperCase()}</Text>
-                                    <Text style={styles.modalDateValue}>{tempEndDate ? `${String(tempEndDate).padStart(2, '0')} ${viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'short' })}. ${viewDate.getFullYear()}` : t('common.not_selected').toUpperCase()}</Text>
+                                    <Text style={styles.modalDateValue}>{tempEndDate ? formatFilterDate(tempEndDate, viewDate, currentLang) : t('common.not_selected').toUpperCase()}</Text>
                                 </View>
                             </View>
                             <View style={styles.monthHeaderRow}>
                                 <TouchableOpacity onPress={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}>
                                     <Ionicons name="chevron-back" size={20} color={Colors.primary} />
                                 </TouchableOpacity>
-                                <Text style={styles.monthHeaderText}>{viewDate.toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : (i18n.language === 'en' ? 'en-US' : 'uz-UZ'), { month: 'long', year: 'numeric' }).toUpperCase()}</Text>
+                                <Text style={styles.monthHeaderText}>{formatMonthHeader(viewDate, currentLang).toUpperCase()}</Text>
                                 <TouchableOpacity onPress={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}>
                                     <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
                                 </TouchableOpacity>
