@@ -633,9 +633,6 @@ export default function TournamentsScreen({ navigation }: any) {
                                     </Text>
                                 </View>
                             )}
-                            <Text style={{ color: '#00FF66', fontSize: 11, fontWeight: '900', marginLeft: 8 }}>
-                                {league.location || "O'zbekiston"}
-                            </Text>
                         </View>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
