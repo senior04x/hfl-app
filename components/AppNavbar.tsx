@@ -76,13 +76,14 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
                             {searchQuery ? (
                                 <TouchableOpacity 
                                     onPress={() => onSearchChange && onSearchChange('')}
-                                    hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                                    style={{ marginRight: 4 }}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    activeOpacity={0.7}
                                 >
-                                    <Ionicons name="close-circle" size={16} color="rgba(255, 255, 255, 0.6)" />
+                                    <Ionicons name="close-circle" size={18} color="rgba(255, 255, 255, 0.75)" />
                                 </TouchableOpacity>
-                            ) : null}
-                            <Ionicons name="search" size={17} color="rgba(255, 255, 255, 0.7)" />
+                            ) : (
+                                <Ionicons name="search" size={17} color="rgba(255, 255, 255, 0.6)" />
+                            )}
                         </View>
                     ) : rightElement ? (
                         rightElement
