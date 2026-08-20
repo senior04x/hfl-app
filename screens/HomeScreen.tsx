@@ -53,6 +53,13 @@ export default function HomeScreen({ navigation }: any) {
     const viewedStoryIdsRef = useRef<string[]>([]);
     const hasCachedDataRef = useRef(false);
 
+    // 1-second live ticker for real-time match clock (MM:SS)
+    const [, setLiveTick] = useState(0);
+    useEffect(() => {
+        const timer = setInterval(() => setLiveTick(t => t + 1), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
     /**
      * Cache-First Loader: Reads previously saved home screen data instantly.
      * Returns true if cache is fresh (< 5 mins old) and valid.
@@ -337,51 +344,50 @@ export default function HomeScreen({ navigation }: any) {
         const matchDate = new Date(rawDate);
         const isValidDate = !isNaN(matchDate.getTime());
 
-        // Live Minute Calculation directly from database fields
-        let liveMinuteText = '';
+        // Live Timing, Seconds (MM:SS), Period, and Half-Time Detection
+        let isHalfTime = false;
+        let liveBadgeLabel = 'LIVE';
+        let liveClockDisplay = '';
+
         if (matchIsLive) {
             const st = String(match.status || '').toLowerCase().trim();
-            const directMin = match.minute ?? match.current_minute ?? match.match_minute ?? match.live_minute;
+            isHalfTime = st.includes('half_time') || st.includes('halftime') || st.includes('tanaffus') || st === 'break';
             
-            if (directMin !== undefined && directMin !== null && !isNaN(Number(directMin)) && Number(directMin) > 0) {
-                if (st.includes('half_time') || st.includes('halftime') || st.includes('tanaffus')) {
-                    liveMinuteText = `Tanaffus (${Number(directMin)}')`;
-                } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
-                    liveMinuteText = `2-taym (${Number(directMin)}')`;
-                } else if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
-                    liveMinuteText = `1-taym (${Number(directMin)}')`;
-                } else {
-                    liveMinuteText = `${Number(directMin)}'`;
+            const halfDurMins = Number(match.half_duration) || 25;
+            const matchDurMins = Number(match.match_duration) || (halfDurMins * 2);
+            const halfDurSecs = halfDurMins * 60;
+            let timerSec = Number(match.timer_seconds);
+            if (isNaN(timerSec) || timerSec <= 0) timerSec = halfDurSecs;
+
+            if (match.is_timer_running && match.timer_started_at) {
+                const elapsedSinceStart = Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000);
+                if (elapsedSinceStart > 0) {
+                    timerSec = Math.max(0, timerSec - elapsedSinceStart);
                 }
+            }
+
+            if (isHalfTime) {
+                liveBadgeLabel = 'TANAFFUS';
+                liveClockDisplay = 'TANAFFUS';
+            } else if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
+                liveBadgeLabel = '1-TAYM';
+                const elapsed = Math.max(0, halfDurSecs - timerSec);
+                const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const ss = (elapsed % 60).toString().padStart(2, '0');
+                liveClockDisplay = `1-TAYM ${mm}:${ss}`;
+            } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
+                liveBadgeLabel = '2-TAYM';
+                const secondHalfElapsed = Math.max(0, halfDurSecs - timerSec);
+                const totalElapsed = halfDurSecs + secondHalfElapsed;
+                const mm = Math.floor(totalElapsed / 60).toString().padStart(2, '0');
+                const ss = (totalElapsed % 60).toString().padStart(2, '0');
+                liveClockDisplay = `2-TAYM ${mm}:${ss}`;
             } else {
-                const halfDurMins = Number(match.half_duration) || 25;
-                const matchDurMins = Number(match.match_duration) || (halfDurMins * 2);
-                const halfDurSecs = halfDurMins * 60;
-                let timerSec = Number(match.timer_seconds);
-                if (isNaN(timerSec) || timerSec <= 0) timerSec = halfDurSecs;
-
-                if (match.is_timer_running && match.timer_started_at) {
-                    const elapsedSinceStart = Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000);
-                    if (elapsedSinceStart > 0) {
-                        timerSec = Math.max(0, timerSec - elapsedSinceStart);
-                    }
-                }
-
-                if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
-                    const elapsed = Math.max(0, halfDurSecs - timerSec);
-                    const curMin = Math.min(halfDurMins, Math.floor(elapsed / 60) + 1);
-                    liveMinuteText = `1-taym (${curMin}')`;
-                } else if (st.includes('half_time') || st.includes('halftime') || st.includes('tanaffus')) {
-                    liveMinuteText = `Tanaffus (${halfDurMins}')`;
-                } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
-                    const secondHalfElapsed = Math.max(0, halfDurSecs - timerSec);
-                    const curMin = Math.min(matchDurMins, halfDurMins + Math.floor(secondHalfElapsed / 60) + 1);
-                    liveMinuteText = `2-taym (${curMin}')`;
-                } else {
-                    const elapsed = Math.max(0, halfDurSecs - timerSec);
-                    const curMin = Math.max(1, Math.floor(elapsed / 60) + 1);
-                    liveMinuteText = `${curMin}'`;
-                }
+                liveBadgeLabel = 'LIVE';
+                const elapsed = Math.max(0, halfDurSecs - timerSec);
+                const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const ss = (elapsed % 60).toString().padStart(2, '0');
+                liveClockDisplay = `${mm}:${ss}`;
             }
         }
 
@@ -424,7 +430,7 @@ export default function HomeScreen({ navigation }: any) {
                 key={match._id || Math.random().toString()}
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
-                    matchIsLive && styles.hMatchCardLive
+                    matchIsLive && (isHalfTime ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
                 onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
                 activeOpacity={0.85}
@@ -436,9 +442,9 @@ export default function HomeScreen({ navigation }: any) {
                         <Text style={styles.hMatchLeague} numberOfLines={1}>{match.tournamentName || "O'rtoqlik uchrashuvi"}</Text>
                         
                         {matchIsLive ? (
-                            <View style={styles.liveBadgeContainer}>
-                                <View style={styles.liveDot} />
-                                <Text style={styles.liveBadgeText}>LIVE</Text>
+                            <View style={[styles.liveBadgeContainer, isHalfTime && styles.halftimeBadgeContainer]}>
+                                <View style={[styles.liveDot, isHalfTime && styles.halftimeDot]} />
+                                <Text style={[styles.liveBadgeText, isHalfTime && styles.halftimeBadgeText]}>{liveBadgeLabel}</Text>
                             </View>
                         ) : roundTagText ? (
                             <View style={styles.roundBadgeTag}>
@@ -468,9 +474,9 @@ export default function HomeScreen({ navigation }: any) {
                             {matchIsLive || matchIsFinished ? (
                                 <View style={{ alignItems: 'center' }}>
                                     <Text style={styles.hScoreText}>{match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}</Text>
-                                    {matchIsLive && liveMinuteText ? (
-                                        <View style={styles.liveMinuteTag}>
-                                            <Text style={styles.liveMinuteTagText}>{liveMinuteText}</Text>
+                                    {matchIsLive && liveClockDisplay ? (
+                                        <View style={[styles.liveMinuteTag, isHalfTime && styles.halftimeMinuteTag]}>
+                                            <Text style={[styles.liveMinuteTagText, isHalfTime && styles.halftimeMinuteTagText]}>{liveClockDisplay}</Text>
                                         </View>
                                     ) : null}
                                 </View>
@@ -503,7 +509,6 @@ export default function HomeScreen({ navigation }: any) {
                         <Text style={styles.hMatchDate}>{formattedFullDate} • {localizedVenue}</Text>
                     </View>
                 </View>
-            </TouchableOpacity>
         );
     };
 
@@ -950,22 +955,33 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(239, 68, 68, 0.2)',
-        paddingHorizontal: 6,
+        paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 4,
+        borderRadius: 6,
+    },
+    halftimeBadgeContainer: {
+        backgroundColor: 'rgba(250, 204, 21, 0.2)',
+        borderColor: 'rgba(250, 204, 21, 0.4)',
+        borderWidth: 1,
     },
     liveDot: {
         width: 6,
         height: 6,
         borderRadius: 3,
         backgroundColor: Colors.danger,
-        marginRight: 4,
+        marginRight: 5,
+    },
+    halftimeDot: {
+        backgroundColor: '#FACC15',
     },
     liveBadgeText: {
         color: Colors.danger,
         fontSize: 10,
         fontWeight: 'bold',
         letterSpacing: 0.5,
+    },
+    halftimeBadgeText: {
+        color: '#FACC15',
     },
     markaziyBadgeTag: {
         backgroundColor: 'rgba(255, 230, 0, 0.2)',
@@ -1141,6 +1157,21 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '900',
         letterSpacing: 0.5,
+    },
+    halftimeMinuteTag: {
+        backgroundColor: 'rgba(250, 204, 21, 0.2)',
+        borderColor: 'rgba(250, 204, 21, 0.6)',
+    },
+    halftimeMinuteTagText: {
+        color: '#FACC15',
+    },
+    hMatchCardLive: {
+        borderColor: 'rgba(255, 59, 48, 0.5)',
+        backgroundColor: 'rgba(255, 59, 48, 0.08)',
+    },
+    hMatchCardHalftime: {
+        borderColor: 'rgba(250, 204, 21, 0.65)',
+        backgroundColor: 'rgba(250, 204, 21, 0.1)',
     },
 
     emptyCard: {
