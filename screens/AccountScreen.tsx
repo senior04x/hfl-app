@@ -29,6 +29,7 @@ import { useJuniorStore } from '../store/useJuniorStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { Modal, TextInput, Linking } from 'react-native';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
+import AppNavbar from '../components/AppNavbar';
 
 export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout, unreadCount, isChatMuted } = useAuthStore();
@@ -179,6 +180,30 @@ export default function AccountScreen({ navigation }: any) {
     return (
         <AnimatedBackground overlayOpacity={0.7} backgroundImage={backgroundImage}>
             <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* Universal App Navbar */}
+                <AppNavbar
+                    title={t('profile.title', 'PROFIL')}
+                    subtitle="AMATORA"
+                    rightElement={
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Notifications')}
+                            style={{
+                                width: 38,
+                                height: 38,
+                                borderRadius: 12,
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(255, 255, 255, 0.12)',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                            activeOpacity={0.75}
+                        >
+                            <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
+                        </TouchableOpacity>
+                    }
+                />
+
                 <ScrollView 
                     style={styles.container} 
                     showsVerticalScrollIndicator={false}

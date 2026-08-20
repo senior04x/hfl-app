@@ -18,6 +18,7 @@ import SmartImage from '../components/SmartImage';
 import TeamsSkeleton from '../components/TeamsSkeleton';
 import VideoBackground from '../components/VideoBackground';
 import { useTranslation } from 'react-i18next';
+import AppNavbar from '../components/AppNavbar';
 
 export default function TeamsScreen({ route, navigation }: any) {
     const { t } = useTranslation();
@@ -103,13 +104,11 @@ export default function TeamsScreen({ route, navigation }: any) {
                 style={StyleSheet.absoluteFill}
             />
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{route?.params?.tournamentName || 'Jamoalar'}</Text>
-                <View style={styles.placeholder} />
-            </View>
+                <AppNavbar
+                    title={route?.params?.tournamentName || t('teams.title', 'JAMOALAR')}
+                    subtitle="AMATORA"
+                    onBackPress={() => navigation.goBack()}
+                />
 
             {isLoading && teams.length === 0 ? (
                 <TeamsSkeleton />

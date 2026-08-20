@@ -33,6 +33,7 @@ import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 import { useTranslation } from 'react-i18next';
+import AppNavbar from '../components/AppNavbar';
 
 
 const { width } = Dimensions.get('window');
@@ -725,27 +726,15 @@ export default function TournamentsScreen({ navigation }: any) {
         <AnimatedBackground overlayOpacity={0.7} backgroundImage={backgroundImage}>
 
             <SafeAreaView style={styles.safeArea} edges={['top']}>
-                {/* Custom Navbar */}
-                <View style={styles.navbar}>
-                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 16, paddingVertical: 12 }}>
-                        <View style={styles.navbarLeft}>
-                            <Text style={styles.navLogoText}>AMATORA</Text>
-                            <Text style={styles.navTitle}>{t('tournaments.title')}</Text>
-                        </View>
-                        <View style={styles.navSearchContainer}>
-                            <TextInput
-                                style={styles.navSearchInput}
-                                placeholder={t('common.search')}
-                                placeholderTextColor="rgba(255,255,255,0.5)"
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                            />
-                            <Ionicons name="search" size={20} color="#FFF" />
-                        </View>
-                    </View>
-                </View>
-
+                {/* Universal Navbar */}
+                <AppNavbar
+                    title={t('tournaments.title', 'TURNIRLAR')}
+                    subtitle="AMATORA"
+                    showSearch={true}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchPlaceholder={t('common.search', 'Qidiruv...')}
+                />
 
                 {isLeaguesLoading && leagues.length === 0 ? (
                     <TournamentsSkeleton />

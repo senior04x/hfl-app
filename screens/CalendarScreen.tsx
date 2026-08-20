@@ -21,6 +21,7 @@ import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 import CustomRefreshControl from '../components/CustomRefreshControl';
 import { useTranslation } from 'react-i18next';
+import AppNavbar from '../components/AppNavbar';
 
 // ─── Skeleton Components ────────────────────────────────────────────────────
 const SkeletonBox: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({
@@ -257,14 +258,11 @@ export default function CalendarScreen({ navigation }: any) {
         <AnimatedBackground overlayOpacity={0.75} backgroundImage={backgroundImage}>
 
             <SafeAreaView style={styles.container}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 10 }}>
-                        <Text style={styles.headerTitle}>Amatora</Text>
-                        <Text style={styles.headerSubtitle}>Taqvim</Text>
-                    </View>
-                </View>
+                {/* Universal App Navbar */}
+                <AppNavbar
+                    title={t('calendar.title', 'TAQVIM')}
+                    subtitle="AMATORA"
+                />
 
                 {/* Top Tabs */}
                 <View style={styles.tabsContainer}>

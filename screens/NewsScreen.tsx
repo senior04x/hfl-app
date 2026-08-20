@@ -23,6 +23,7 @@ import { News } from '../types';
 import SmartImage from '../components/SmartImage';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import AppNavbar from '../components/AppNavbar';
 
 // ─── Skeleton Shimmer ────────────────────────────────────────────────────────
 const SkeletonBox: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({
@@ -112,15 +113,14 @@ export default function NewsScreen() {
     );
 
     const renderHeader = () => (
-        <View style={styles.header}>
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
-                <Text style={styles.headerTitle}>{t('news.title')}</Text>
-                <TouchableOpacity style={styles.searchBtn} onPress={() => setIsSearchVisible(true)}>
-                    <Ionicons name="search" size={22} color="#000" />
-                </TouchableOpacity>
-            </View>
-        </View>
+        <AppNavbar
+            title={t('news.title', 'YANGILIKLAR')}
+            subtitle="AMATORA"
+            showSearch={true}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder={t('common.search', 'Qidiruv...')}
+        />
     );
 
     const renderCategories = () => (

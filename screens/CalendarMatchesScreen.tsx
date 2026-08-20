@@ -19,6 +19,7 @@ import backgroundImage from '../assets/images/backroud-image.png';
 
 import CustomRefreshControl from '../components/CustomRefreshControl';
 import { useTranslation } from 'react-i18next';
+import AppNavbar from '../components/AppNavbar';
 
 export default function CalendarMatchesScreen({ route, navigation }: any) {
     const { t } = useTranslation();
@@ -175,30 +176,16 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
     return (
         <AnimatedBackground overlayOpacity={0.85} backgroundImage={backgroundImage}>
             <SafeAreaView style={{ flex: 1 }}>
-                {/* Custom Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="chevron-back" size={28} color={Colors.primary} />
-                    </TouchableOpacity>
-                    <View style={styles.headerTitleContainer}>
-                        <Text style={styles.headerTitle} numberOfLines={2} adjustsFontSizeToFit>
-                            {`${tournamentName}, ${date.split(',')[0]}`}
-                        </Text>
-                    </View>
-                    <View style={{ width: 40 }} />
-                </View>
-
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color={Colors.primary} style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder={t('common.search')}
-                        placeholderTextColor="#8A94A6"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                </View>
+                {/* Universal App Navbar */}
+                <AppNavbar
+                    title={`${tournamentName}`}
+                    subtitle={date.split(',')[0] || 'AMATORA'}
+                    onBackPress={() => navigation.goBack()}
+                    showSearch={true}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchPlaceholder={t('common.search', 'Qidiruv...')}
+                />
 
                 {/* Matches List */}
                 {loading && !refreshing ? (
