@@ -275,7 +275,7 @@ const TournamentsHeader = ({
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
                     <View style={styles.statItem}>
                         <Text style={styles.statLabel}>
-                            {isGuest ? t('tournaments.title', 'Ligalar') : t('teams.title', 'Jamoalar')}
+                            {isGuest ? t('tournaments.leagues', 'Ligalar') : t('teams.title', 'Jamoalar')}
                         </Text>
                         {isGuest ? (
                             isLeaguesLoading ? (
