@@ -5,13 +5,13 @@ import {
     StyleSheet,
     TouchableOpacity,
     FlatList,
-    SafeAreaView,
     Modal,
     Pressable,
     ActivityIndicator,
     Image,
     Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
@@ -257,7 +257,7 @@ export default function CalendarScreen({ navigation }: any) {
     return (
         <AnimatedBackground overlayOpacity={0.75} backgroundImage={backgroundImage}>
 
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={styles.container} edges={['top']}>
                 {/* Universal App Navbar */}
                 <AppNavbar
                     title={t('calendar.title', 'TAQVIM')}

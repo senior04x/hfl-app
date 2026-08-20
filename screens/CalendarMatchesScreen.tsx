@@ -5,11 +5,11 @@ import {
     StyleSheet,
     TouchableOpacity,
     FlatList,
-    SafeAreaView,
     TextInput,
     Image,
     ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
@@ -175,7 +175,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
 
     return (
         <AnimatedBackground overlayOpacity={0.85} backgroundImage={backgroundImage}>
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 {/* Universal App Navbar */}
                 <AppNavbar
                     title={`${tournamentName}`}
