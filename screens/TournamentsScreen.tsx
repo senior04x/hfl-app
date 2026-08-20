@@ -678,38 +678,6 @@ export default function TournamentsScreen({ navigation }: any) {
 
                 {isLeaguesLoading && leagues.length === 0 ? (
                     <TournamentsSkeleton />
-                ) : isGuest ? (
-                    <FlatList
-                        data={isLeaguesLoading ? Array(4).fill({ _isSkeleton: true }) : filteredLeagues}
-                        keyExtractor={(item, index) => item?.id || item?._id || `guest-league-item-${index}`}
-                        renderItem={renderLeagueItemForGuest}
-                        ListHeaderComponent={
-                            <GuestTournamentsHeader
-                                organization={activeOrg}
-                                leaguesCount={leagues?.length || 0}
-                                onPressOrg={() => setShowOrgSelectModal(true)}
-                            />
-                        }
-                        ListEmptyComponent={
-                            !isLeaguesLoading ? (
-                                <View style={styles.emptyStateBox}>
-                                    <Ionicons name="trophy-outline" size={48} color="rgba(255,255,255,0.2)" />
-                                    <Text style={styles.emptyStateText}>
-                                        {t('tournaments.no_tournaments', 'Ushbu tashkilotda hozircha ligalar mavjud emas')}
-                                    </Text>
-                                </View>
-                            ) : null
-                        }
-                        contentContainerStyle={[styles.list, { paddingBottom: 130 }]}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={isLeaguesLoading && leagues.length > 0}
-                                onRefresh={() => fetchLeagues(selectedOrganizationId, true)}
-                                tintColor={Colors.primary}
-                                colors={[Colors.primary]}
-                            />
-                        }
-                    />
                 ) : (
                     <FlatList
                         data={teamsLoading ? Array(5).fill({ _isSkeleton: true }) : filteredTeams}
@@ -736,7 +704,7 @@ export default function TournamentsScreen({ navigation }: any) {
                             !teamsLoading ? (
                                 <View style={styles.emptyStateBox}>
                                     <Ionicons name="shield-outline" size={48} color="rgba(255,255,255,0.2)" />
-                                    <Text style={styles.emptyStateText}>{t('teams.no_teams')}</Text>
+                                    <Text style={styles.emptyStateText}>{t('teams.no_teams', "Jamoalar mavjud emas")}</Text>
                                 </View>
                             ) : null
                         }
