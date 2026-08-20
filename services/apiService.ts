@@ -1044,13 +1044,13 @@ export const apiService = {
                 const awayTeam = teamsMap[m.away_team_id];
                 const timerData = timerMap[String(m.id)] || {};
 
-                const effectiveHomeScore = timerData.home_score !== undefined ? timerData.home_score : (m.home_score ?? 0);
-                const effectiveAwayScore = timerData.away_score !== undefined ? timerData.away_score : (m.away_score ?? 0);
-                const effectiveStatus = timerData.status || m.status;
+                const effectiveHomeScore = (m.home_score !== undefined && m.home_score !== null) ? m.home_score : (timerData.home_score ?? 0);
+                const effectiveAwayScore = (m.away_score !== undefined && m.away_score !== null) ? m.away_score : (timerData.away_score ?? 0);
+                const effectiveStatus = m.status || timerData.status;
 
                 return {
-                    ...m,
                     ...timerData,
+                    ...m,
                     _id: m.id,
                     importance: m.importance || 'oddiy',
                     date: m.match_date || m.date || new Date().toISOString(),

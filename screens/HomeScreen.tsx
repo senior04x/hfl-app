@@ -447,18 +447,15 @@ export default function HomeScreen({ navigation }: any) {
             let elapsed = 0;
             if (match.timer_started_at && match.is_timer_running) {
                 const diffSec = Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000));
-                if (timerSec > halfDurSecs / 2) {
-                    const curRemaining = Math.max(0, timerSec - diffSec);
-                    elapsed = Math.max(0, halfDurSecs - curRemaining);
-                } else {
-                    elapsed = timerSec + diffSec;
-                }
-            } else {
-                if (timerSec > 0 && timerSec < halfDurSecs) {
+                elapsed = diffSec;
+            } else if (match.timer_seconds !== undefined && match.timer_seconds !== null) {
+                if (timerSec <= halfDurSecs && timerSec > 0) {
                     elapsed = halfDurSecs - timerSec;
                 } else if (timerSec === 0) {
-                    elapsed = 0;
+                    elapsed = halfDurSecs;
                 }
+            } else if (match.minute || match.current_minute) {
+                elapsed = Math.max(0, (Number(match.minute || match.current_minute) - 1) * 60);
             }
 
             if (isHalfTime) {
