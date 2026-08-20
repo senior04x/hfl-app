@@ -537,12 +537,12 @@ export default function HomeScreen({ navigation }: any) {
                     <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader]}>
                         <Text style={styles.hMatchLeague} numberOfLines={1}>{match.tournamentName || "O'rtoqlik uchrashuvi"}</Text>
                         
-                        {matchIsLive ? (
+                        {Boolean(matchIsLive) ? (
                             <View style={[styles.liveBadgeContainer, isHalfTime && styles.halftimeBadgeContainer]}>
                                 <View style={[styles.liveDot, isHalfTime && styles.halftimeDot]} />
                                 <Text style={[styles.liveBadgeText, isHalfTime && styles.halftimeBadgeText]}>{liveBadgeLabel}</Text>
                             </View>
-                        ) : roundTagText ? (
+                        ) : Boolean(roundTagText) ? (
                             <View style={styles.roundBadgeTag}>
                                 <Text style={styles.roundBadgeText}>{roundTagText}</Text>
                             </View>
@@ -567,10 +567,10 @@ export default function HomeScreen({ navigation }: any) {
                         </View>
 
                         <View style={styles.hScoreColumn}>
-                            {matchIsLive || matchIsFinished ? (
+                            {Boolean(matchIsLive || matchIsFinished) ? (
                                 <View style={styles.scoreAndTimerCenterBox}>
                                     <Text style={styles.hScoreText}>{match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}</Text>
-                                    {matchIsLive ? (
+                                    {Boolean(matchIsLive) ? (
                                         <View style={styles.cleanLiveTimerContainer}>
                                             <Text style={[
                                                 styles.cleanTimerText,
@@ -578,7 +578,7 @@ export default function HomeScreen({ navigation }: any) {
                                             ]}>
                                                 {liveTimerTime}
                                             </Text>
-                                            {!isHalfTime && livePeriodLabel ? (
+                                            {!isHalfTime && Boolean(livePeriodLabel) ? (
                                                 <Text style={styles.cleanPeriodSubText}>
                                                     {livePeriodLabel}
                                                 </Text>
@@ -612,7 +612,7 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
 
                     <View style={styles.hMatchFooter}>
-                        <Text style={styles.hMatchDate}>{formattedFullDate} • {localizedVenue}</Text>
+                        <Text style={styles.hMatchDate}>{`${formattedFullDate} • ${localizedVenue}`}</Text>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -773,7 +773,8 @@ export default function HomeScreen({ navigation }: any) {
                                                             {t('home.view_league_results', { league: group.leagueName.toUpperCase() })}
                                                         </Text>
                                                     </TouchableOpacity>
-                                                </View>                                                <View style={styles.verticalMatchList}>
+                                                </View>
+                                                <View style={styles.verticalMatchList}>
                                                     {group.matches.map((m: any) => renderMatchCard(m, false, true))}
                                                 </View>
                                             </View>
