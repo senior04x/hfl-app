@@ -77,6 +77,7 @@ const TournamentsHeader = ({
     teams,
     totalTeamsCount,
     teamsLoading,
+    leaguePlayersCount,
     navigation
 }: any) => {
     const { t } = useTranslation();
@@ -273,23 +274,47 @@ const TournamentsHeader = ({
                 <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>{t('tournaments.title', 'Ligalar')}</Text>
-                        {isLeaguesLoading ? (
-                            <Skeleton width={30} height={16} borderRadius={4} />
+                        <Text style={styles.statLabel}>
+                            {isGuest ? t('tournaments.title', 'Ligalar') : t('teams.title', 'Jamoalar')}
+                        </Text>
+                        {isGuest ? (
+                            isLeaguesLoading ? (
+                                <Skeleton width={30} height={16} borderRadius={4} />
+                            ) : (
+                                <Text style={styles.statValue}>
+                                    {leagues?.length || 0}
+                                </Text>
+                            )
                         ) : (
-                            <Text style={styles.statValue}>
-                                {leagues?.length || 0}
-                            </Text>
+                            teamsLoading ? (
+                                <Skeleton width={30} height={16} borderRadius={4} />
+                            ) : (
+                                <Text style={styles.statValue}>
+                                    {teams?.length || 0}
+                                </Text>
+                            )
                         )}
                     </View>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>{t('teams.title', 'Jamoalar')}</Text>
-                        {isLeaguesLoading ? (
-                            <Skeleton width={50} height={16} borderRadius={4} />
+                        <Text style={styles.statLabel}>
+                            {isGuest ? t('teams.title', 'Jamoalar') : t('players.title', "O'yinchilar")}
+                        </Text>
+                        {isGuest ? (
+                            isLeaguesLoading ? (
+                                <Skeleton width={50} height={16} borderRadius={4} />
+                            ) : (
+                                <Text style={styles.statValue}>
+                                    {totalTeamsCount || teams?.length || 0}
+                                </Text>
+                            )
                         ) : (
-                            <Text style={styles.statValue}>
-                                {totalTeamsCount || teams?.length || 0}
-                            </Text>
+                            teamsLoading ? (
+                                <Skeleton width={50} height={16} borderRadius={4} />
+                            ) : (
+                                <Text style={styles.statValue}>
+                                    {leaguePlayersCount || (teams?.length ? teams.length * 11 : 0)}
+                                </Text>
+                            )
                         )}
                     </View>
                     <View style={styles.statItem}>
@@ -351,6 +376,7 @@ export default function TournamentsScreen({ navigation }: any) {
     const [teams, setTeams] = useState<any[]>([]);
     const [totalTeamsCount, setTotalTeamsCount] = useState<number>(0);
     const [teamsLoading, setTeamsLoading] = useState(false);
+    const [leaguePlayersCount, setLeaguePlayersCount] = useState<number>(0);
     const hasCachedLeaguesRef = useRef(false);
 
     const animationValue = useRef(new Animated.Value(0)).current;
@@ -386,11 +412,15 @@ export default function TournamentsScreen({ navigation }: any) {
                     if (parsed.totalTeamsCount) {
                         setTotalTeamsCount(parsed.totalTeamsCount);
                     }
+                    if (parsed.leaguePlayersCount) {
+                        setLeaguePlayersCount(parsed.leaguePlayersCount);
+                    }
                     hasCachedLeaguesRef.current = true;
                     setIsLeaguesLoading(false);
 
-                    const age = Date.now() - (parsed.timestamp || 0);
-                    return age < TOURNAMENTS_CACHE_TTL;
+                    if (Date.now() - parsed.timestamp < TOURNAMENTS_CACHE_TTL) {
+                        return true;
+                    }
                 }
             }
         } catch (e) {
@@ -482,6 +512,7 @@ export default function TournamentsScreen({ navigation }: any) {
                         selectedLeague: firstLeague,
                         teams: fetchedTeams || [],
                         totalTeamsCount: orgTeamsTotal,
+                        leaguePlayersCount: leaguePlayersCount,
                         timestamp: Date.now()
                     }));
                 } else {
@@ -537,10 +568,30 @@ export default function TournamentsScreen({ navigation }: any) {
             const teamData = await apiService.getTeams(1, 100, leagueName);
             const sortedTeams = sortTeamsByStandingsRank(teamData || []);
             setTeams(sortedTeams);
+
+            // Fetch active player count for this league's teams
+            const teamIds = (sortedTeams || []).map((t: any) => t.id || t._id).filter(Boolean);
+            if (teamIds.length > 0) {
+                try {
+                    const { count: pCount } = await supabase
+                        .from('applications')
+                        .select('id', { count: 'exact', head: true })
+                        .in('team_id', teamIds)
+                        .eq('status', 'approved')
+                        .neq('is_archived', true);
+                    setLeaguePlayersCount(pCount || 0);
+                } catch (e) {
+                    setLeaguePlayersCount(0);
+                }
+            } else {
+                setLeaguePlayersCount(0);
+            }
+
             return sortedTeams;
         } catch (error) {
             console.error('Error fetching league teams:', error);
             setTeams([]);
+            setLeaguePlayersCount(0);
             return [];
         } finally {
             setTeamsLoading(false);
@@ -756,6 +807,7 @@ export default function TournamentsScreen({ navigation }: any) {
                                 teams={teams}
                                 totalTeamsCount={totalTeamsCount}
                                 teamsLoading={teamsLoading}
+                                leaguePlayersCount={leaguePlayersCount}
                                 navigation={navigation}
                             />
                         }
