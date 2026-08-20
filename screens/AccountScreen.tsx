@@ -395,6 +395,7 @@ export default function AccountScreen({ navigation }: any) {
                 {/* Organization Selection Modal for League Application */}
                 <OrganizationSelectModal
                     visible={showOrgSelectModal}
+                    isApplyMode={true}
                     onClose={() => setShowOrgSelectModal(false)}
                     onSelect={handleSelectOrganizationForApply}
                 />
