@@ -269,6 +269,30 @@ const TournamentsHeader = ({
                 </View>
             </Animated.View>
 
+            {/* About League Button (Only in Auth Mode, never in Guest mode) */}
+            {!isGuest && selectedLeague ? (
+                <TouchableOpacity
+                    style={styles.aboutLeagueButton}
+                    onPress={() => navigation.navigate('TournamentDetail', {
+                        tournamentId: selectedLeague?.id,
+                        tournamentName: selectedLeague?.name,
+                        tournament: selectedLeague
+                    })}
+                    activeOpacity={0.8}
+                >
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={styles.aboutLeagueButtonInner}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="information-circle-outline" size={17} color="#00FF66" style={{ marginRight: 8 }} />
+                            <Text style={styles.aboutLeagueButtonText}>
+                                {t('tournaments.about_league', 'LIGA HAQIDA').toUpperCase()}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#00FF66" />
+                    </View>
+                </TouchableOpacity>
+            ) : null}
+
             {/* Stats Row with Glass Effect */}
             <View style={styles.statsRow}>
                 <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
@@ -1507,5 +1531,27 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0, 223, 130, 0.3)',
         marginLeft: 8,
+    },
+    aboutLeagueButton: {
+        marginHorizontal: 16,
+        marginBottom: 14,
+        borderRadius: 14,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.35)',
+        backgroundColor: 'rgba(0, 255, 102, 0.08)',
+    },
+    aboutLeagueButtonInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    aboutLeagueButtonText: {
+        color: '#00FF66',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.8,
     },
 });
