@@ -70,7 +70,12 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             ]);
 
             if (teamData) setTeam(teamData);
-            setPlayers(playersData || []);
+            const activeTeamPlayers = (playersData || []).filter((p: any) => {
+                const st = String(p.status || '').toLowerCase().trim();
+                const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
+                return !isArchived && st === 'approved';
+            });
+            setPlayers(activeTeamPlayers);
             setMatches(matchesData?.slice(0, 5) || []);
         } catch (error) {
             console.error('Error fetching team details:', error);
@@ -101,7 +106,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
         <View style={styles.heroSection}>
             <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                <Ionicons name="chevron-back" size={28} color={Colors.primary} />
+                <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
 
             <View style={styles.adminActionRow}>

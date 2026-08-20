@@ -258,12 +258,18 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             let finalLatestMatches: any[] = [];
 
             if (teamIds.length > 0) {
-                const [{ count: pCount }, allMatchesData] = await Promise.all([
-                    supabase.from('applications').select('id', { count: 'exact', head: true }).eq('status', 'approved').in('team_id', teamIds),
+                const [{ data: pData }, allMatchesData] = await Promise.all([
+                    supabase.from('applications').select('id, is_archived, status').eq('status', 'approved').in('team_id', teamIds),
                     apiService.getMatches({ tournamentId: currentTournamentId })
                 ]);
 
-                finalCount = pCount || 0;
+                const activePlayers = (pData || []).filter((p: any) => {
+                    const st = String(p.status || '').toLowerCase().trim();
+                    const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
+                    return !isArchived && st === 'approved';
+                });
+
+                finalCount = activePlayers.length;
                 setTotalPlayersCount(finalCount);
 
                 const teamIdsSet = new Set(teamIds.map(String));
@@ -405,7 +411,11 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     supabase.from('matches').select('*').or(`status.eq.finished,status.eq.completed`)
                 ]);
 
-                const playersList = rawPlayers || [];
+                const playersList = (rawPlayers || []).filter((p: any) => {
+                    const st = String(p.status || '').toLowerCase().trim();
+                    const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
+                    return !isArchived && st === 'approved';
+                });
                 const playerIds = playersList.map((p: any) => p.id);
 
                 let eventsMap: Record<string, any> = {};

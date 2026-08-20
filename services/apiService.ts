@@ -201,7 +201,12 @@ export const apiService = {
                 const { data, error } = await query;
                 if (error) throw error;
                 return (data || [])
-                    .filter((p: any) => !p.comment || !p.comment.includes('[PROFILE_UPDATE]'))
+                    .filter((p: any) => {
+                        const st = String(p.status || '').toLowerCase().trim();
+                        const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
+                        const isProfileUpdate = p.comment && p.comment.includes('[PROFILE_UPDATE]');
+                        return !isArchived && st === 'approved' && !isProfileUpdate;
+                    })
                     .map((p: any) => ({
                         ...p,
                         _id: p.id,
@@ -561,14 +566,20 @@ export const apiService = {
             const { data, error } = await supabase
                 .from('applications')
                 .select('*')
-                .eq('team_id', teamId);
+                .eq('team_id', teamId)
+                .eq('status', 'approved');
 
             if (error) {
                 console.warn('getPlayersByTeam error:', error);
                 throw error;
             }
 
-            const rawList = data || [];
+            const rawList = (data || []).filter((p: any) => {
+                const st = String(p.status || '').toLowerCase().trim();
+                const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
+                return !isArchived && st === 'approved';
+            });
+
             return rawList.map((p: any) => ({
                 ...p,
                 _id: p.id || p._id,
