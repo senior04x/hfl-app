@@ -1011,29 +1011,59 @@ export const apiService = {
 
             if (mErr || !matchesData) throw mErr;
 
-            const { data: teamsData } = await supabase.from('teams').select('*');
+            const matchIds = matchesData.map((m: any) => m.id).filter(Boolean);
+            const timerKeys = matchIds.map((id: any) => `MATCH_TIMER_${id}`);
+
+            const [{ data: teamsData }, { data: timerSponsors }] = await Promise.all([
+                supabase.from('teams').select('*'),
+                timerKeys.length > 0 
+                    ? supabase.from('sponsors').select('name, logo_url').in('name', timerKeys)
+                    : Promise.resolve({ data: [] })
+            ]);
+
             const teamsMap: Record<string, any> = {};
             if (teamsData) {
                 teamsData.forEach((t: any) => { teamsMap[t.id] = t; });
             }
 
+            const timerMap: Record<string, any> = {};
+            if (timerSponsors) {
+                timerSponsors.forEach((sp: any) => {
+                    if (sp.logo_url) {
+                        try {
+                            const parsed = JSON.parse(sp.logo_url);
+                            const mId = sp.name.replace('MATCH_TIMER_', '');
+                            timerMap[mId] = parsed;
+                        } catch (e) {}
+                    }
+                });
+            }
+
             const formattedMatches = matchesData.map((m: any) => {
                 const homeTeam = teamsMap[m.home_team_id];
                 const awayTeam = teamsMap[m.away_team_id];
+                const timerData = timerMap[String(m.id)] || {};
+
+                const effectiveHomeScore = timerData.home_score !== undefined ? timerData.home_score : (m.home_score ?? 0);
+                const effectiveAwayScore = timerData.away_score !== undefined ? timerData.away_score : (m.away_score ?? 0);
+                const effectiveStatus = timerData.status || m.status;
 
                 return {
                     ...m,
+                    ...timerData,
                     _id: m.id,
                     importance: m.importance || 'oddiy',
                     date: m.match_date || m.date || new Date().toISOString(),
-                    status: (m.status === 'upcoming' || m.status === 'scheduled') ? 'scheduled' : m.status,
+                    status: (effectiveStatus === 'upcoming' || effectiveStatus === 'scheduled') ? 'scheduled' : effectiveStatus,
                     homeTeamName: homeTeam?.name || m.home_team_name || 'Uy jamoasi',
-                    homeTeamLogo: homeTeam?.logo_url || m.home_team_logo || '',
+                    homeTeamLogo: homeTeam?.logo_url || homeTeam?.logo || m.home_team_logo || '',
                     awayTeamName: awayTeam?.name || m.away_team_name || 'Mehmon jamoa',
-                    awayTeamLogo: awayTeam?.logo_url || m.away_team_logo || '',
-                    homeTeam: homeTeam ? { name: homeTeam.name, logo: homeTeam.logo_url } : { name: m.home_team_name, logo: m.home_team_logo },
-                    awayTeam: awayTeam ? { name: awayTeam.name, logo: awayTeam.logo_url } : { name: m.away_team_name, logo: m.away_team_logo },
-                    score: { home: m.home_score ?? 0, away: m.away_score ?? 0 },
+                    awayTeamLogo: awayTeam?.logo_url || awayTeam?.logo || m.away_team_logo || '',
+                    homeTeam: homeTeam ? { name: homeTeam.name, logo: homeTeam.logo_url || homeTeam.logo } : { name: m.home_team_name, logo: m.home_team_logo },
+                    awayTeam: awayTeam ? { name: awayTeam.name, logo: awayTeam.logo_url || awayTeam.logo } : { name: m.away_team_name, logo: m.away_team_logo },
+                    score: { home: effectiveHomeScore, away: effectiveAwayScore },
+                    home_score: effectiveHomeScore,
+                    away_score: effectiveAwayScore,
                     match_time: m.match_time || m.time || '',
                     time: m.match_time || m.time || '',
                     tournamentName: m.league || 'HFL Liga',

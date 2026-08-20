@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import MatchStoriesTray, { StoryGroup } from '../components/MatchStoriesTray';
 import StoryViewerModal from '../components/StoryViewerModal';
+import { supabase } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.88;
@@ -107,6 +108,87 @@ export default function HomeScreen({ navigation }: any) {
     }, [user?.id]);
 
     useEffect(() => {
+        // 1. Supabase Postgres Changes Realtime Listener (Instant score, status, goals sync)
+        const realtimeChannel = supabase
+            .channel('home_realtime_matches_sync')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'matches' },
+                (payload: any) => {
+                    if (payload.new && payload.new.id) {
+                        setMatches(prev => prev.map(m => {
+                            if (String(m.id || m._id) === String(payload.new.id)) {
+                                const homeScore = payload.new.home_score !== undefined ? payload.new.home_score : (m.home_score ?? 0);
+                                const awayScore = payload.new.away_score !== undefined ? payload.new.away_score : (m.away_score ?? 0);
+                                return {
+                                    ...m,
+                                    ...payload.new,
+                                    score: { home: homeScore, away: awayScore },
+                                    home_score: homeScore,
+                                    away_score: awayScore,
+                                    status: payload.new.status || m.status,
+                                };
+                            }
+                            return m;
+                        }));
+                    }
+                    loadData(false, true);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'match_events' },
+                () => {
+                    loadData(false, true);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'sponsors' },
+                (payload: any) => {
+                    const record = payload.new || payload.record;
+                    if (record?.name && record.name.startsWith('MATCH_TIMER_') && record.logo_url) {
+                        try {
+                            const parsed = JSON.parse(record.logo_url);
+                            const mId = record.name.replace('MATCH_TIMER_', '');
+                            setMatches(prev => prev.map(m => {
+                                if (String(m.id || m._id) === String(mId)) {
+                                    const homeScore = parsed.home_score !== undefined ? parsed.home_score : (m.home_score ?? 0);
+                                    const awayScore = parsed.away_score !== undefined ? parsed.away_score : (m.away_score ?? 0);
+                                    return {
+                                        ...m,
+                                        ...parsed,
+                                        score: { home: homeScore, away: awayScore },
+                                        home_score: homeScore,
+                                        away_score: awayScore,
+                                        status: parsed.status || m.status,
+                                    };
+                                }
+                                return m;
+                            }));
+                        } catch (e) {}
+                    }
+                }
+            )
+            .subscribe();
+
+        // 2. Fast Broadcast Channel for Instant 0ms Timer Sync
+        const broadcastChannel = supabase
+            .channel('obs_fast_timer_global')
+            .on('broadcast', { event: 'timer_update' }, (msg: any) => {
+                if (msg.payload && msg.payload.match_id) {
+                    const p = msg.payload;
+                    setMatches(prev => prev.map(m => {
+                        if (String(m.id || m._id) === String(p.match_id)) {
+                            return { ...m, ...p };
+                        }
+                        return m;
+                    }));
+                }
+            })
+            .subscribe();
+
+        // 3. Socket fallback listener
         if (socket && isConnected) {
             socket.on('match-update', (updatedMatch: any) => {
                 setMatches(prev => {
@@ -116,11 +198,13 @@ export default function HomeScreen({ navigation }: any) {
                     return updated;
                 });
             });
-
-            return () => {
-                socket.off('match-update');
-            };
         }
+
+        return () => {
+            supabase.removeChannel(realtimeChannel);
+            supabase.removeChannel(broadcastChannel);
+            if (socket) socket.off('match-update');
+        };
     }, [socket, isConnected, sliderItems]);
 
     const fetchUserProfileData = async () => {
@@ -358,12 +442,22 @@ export default function HomeScreen({ navigation }: any) {
             const matchDurMins = Number(match.match_duration) || (halfDurMins * 2);
             const halfDurSecs = halfDurMins * 60;
             let timerSec = Number(match.timer_seconds);
-            if (isNaN(timerSec) || timerSec <= 0) timerSec = halfDurSecs;
+            if (isNaN(timerSec)) timerSec = halfDurSecs;
 
-            if (match.is_timer_running && match.timer_started_at) {
-                const elapsedSinceStart = Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000);
-                if (elapsedSinceStart > 0) {
-                    timerSec = Math.max(0, timerSec - elapsedSinceStart);
+            let elapsed = 0;
+            if (match.timer_started_at && match.is_timer_running) {
+                const diffSec = Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000));
+                if (timerSec > halfDurSecs / 2) {
+                    const curRemaining = Math.max(0, timerSec - diffSec);
+                    elapsed = Math.max(0, halfDurSecs - curRemaining);
+                } else {
+                    elapsed = timerSec + diffSec;
+                }
+            } else {
+                if (timerSec > 0 && timerSec < halfDurSecs) {
+                    elapsed = halfDurSecs - timerSec;
+                } else if (timerSec === 0) {
+                    elapsed = 0;
                 }
             }
 
@@ -374,22 +468,19 @@ export default function HomeScreen({ navigation }: any) {
             } else if (st.includes('first') || st.includes('1-taym') || st.includes('1st')) {
                 liveBadgeLabel = 'LIVE';
                 livePeriodLabel = '1-TAYM';
-                const elapsed = Math.max(0, halfDurSecs - timerSec);
                 const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
                 const ss = (elapsed % 60).toString().padStart(2, '0');
                 liveTimerTime = `${mm}:${ss}`;
             } else if (st.includes('second') || st.includes('2-taym') || st.includes('2nd')) {
                 liveBadgeLabel = 'LIVE';
                 livePeriodLabel = '2-TAYM';
-                const secondHalfElapsed = Math.max(0, halfDurSecs - timerSec);
-                const totalElapsed = halfDurSecs + secondHalfElapsed;
+                const totalElapsed = halfDurSecs + elapsed;
                 const mm = Math.floor(totalElapsed / 60).toString().padStart(2, '0');
                 const ss = (totalElapsed % 60).toString().padStart(2, '0');
                 liveTimerTime = `${mm}:${ss}`;
             } else {
                 liveBadgeLabel = 'LIVE';
                 livePeriodLabel = '1-TAYM';
-                const elapsed = Math.max(0, halfDurSecs - timerSec);
                 const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
                 const ss = (elapsed % 60).toString().padStart(2, '0');
                 liveTimerTime = `${mm}:${ss}`;
