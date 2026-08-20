@@ -312,7 +312,7 @@ const TournamentsHeader = ({
                                 <Skeleton width={50} height={16} borderRadius={4} />
                             ) : (
                                 <Text style={styles.statValue}>
-                                    {leaguePlayersCount || (teams?.length ? teams.length * 11 : 0)}
+                                    {leaguePlayersCount ?? 0}
                                 </Text>
                             )
                         )}
