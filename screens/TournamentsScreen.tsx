@@ -294,18 +294,16 @@ const TournamentsHeader = ({
                     <View style={styles.statItem}>
                         <Text style={styles.statLabel}>{t('common.region', 'Region')}</Text>
                         {isLeaguesLoading ? (
-                            <Skeleton width={70} height={16} borderRadius={4} />
+                            <Skeleton width={32} height={18} borderRadius={4} />
                         ) : (
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
                                 <Image
                                     source={{
                                         uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Flag_of_Uzbekistan.svg/1200px-Flag_of_Uzbekistan.svg.png'
                                     }}
-                                    style={[styles.flagIcon, { width: 14, height: 10, marginRight: 4 }]}
+                                    style={{ width: 28, height: 18, borderRadius: 3 }}
+                                    resizeMode="cover"
                                 />
-                                <Text style={styles.statValue}>
-                                    {isGuest ? (activeOrg?.location || "O'zbekiston") : (selectedLeague?.location?.split(' ')[0] || "O'zbekiston")}
-                                </Text>
                             </View>
                         )}
                     </View>
@@ -400,6 +398,8 @@ export default function TournamentsScreen({ navigation }: any) {
         return false;
     };
 
+    const normalizeStr = (str: any) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
     const fetchLeagues = async (orgIdParam?: number, isSilent = false) => {
         const targetOrgId = orgIdParam || selectedOrganizationId || 1;
         try {
@@ -407,43 +407,56 @@ export default function TournamentsScreen({ navigation }: any) {
                 setIsLeaguesLoading(true);
             }
             
-            const [data, teamsCountRes, matchesRes] = await Promise.all([
+            const [data, allTeamsData, matchesRes] = await Promise.all([
                 apiService.getLeaguesByOrgId(targetOrgId),
-                supabase.from('teams').select('id, league', { count: 'exact' }).eq('organization_id', targetOrgId),
-                supabase.from('matches').select('league, round, tour, status').eq('organization_id', targetOrgId)
+                apiService.getTeams(1, 500),
+                supabase.from('matches').select('id, league, round, tour, status, organization_id, league_id')
             ]);
-
-            const orgTeamsTotal = teamsCountRes?.count || (teamsCountRes?.data?.length) || 0;
-            setTotalTeamsCount(orgTeamsTotal);
 
             const matchesList = matchesRes?.data || [];
 
             if (data && Array.isArray(data)) {
+                const orgLeagueNorms = new Set(data.map((l: any) => normalizeStr(l.name)));
+
+                // Calculate total unique teams for this organization
+                const orgTeams = (allTeamsData || []).filter((t: any) => {
+                    const tOrg = Number(t.organization_id);
+                    if (tOrg && tOrg === targetOrgId) return true;
+                    if (t.league && orgLeagueNorms.has(normalizeStr(t.league))) return true;
+                    return false;
+                });
+                const orgTeamsTotal = orgTeams.length > 0 ? orgTeams.length : (allTeamsData?.length || 0);
+                setTotalTeamsCount(orgTeamsTotal);
+
                 // Enrich each league with latest round and active/inactive status
                 const enrichedLeagues = data.map((l: any) => {
-                    const lName = String(l.name || '').toLowerCase().trim();
-                    const leagueMatches = matchesList.filter((m: any) => 
-                        String(m.league || '').toLowerCase().trim() === lName
-                    );
+                    const lNorm = normalizeStr(l.name);
+                    const leagueMatches = matchesList.filter((m: any) => {
+                        const mNorm = normalizeStr(m.league || m.tournament_name || '');
+                        const isIdMatch = m.league_id && Number(m.league_id) === Number(l.id);
+                        const isOrgMatch = (!m.organization_id || Number(m.organization_id) === targetOrgId);
+                        return isOrgMatch && (isIdMatch || (mNorm && lNorm && (mNorm === lNorm || mNorm.includes(lNorm) || lNorm.includes(mNorm))));
+                    });
 
                     let maxRound = 0;
-                    let hasFinishedOrLive = false;
+                    let hasPlayedOrScheduled = false;
 
                     leagueMatches.forEach((m: any) => {
                         const r = Number(m.round || m.tour || 0);
                         if (r > maxRound) maxRound = r;
-                        if (m.status === 'finished' || m.status === 'completed' || m.status === 'live') {
-                            hasFinishedOrLive = true;
+                        const st = String(m.status || '').toLowerCase();
+                        if (st === 'finished' || st === 'completed' || st === 'live' || st === 'first_half' || st === 'second_half' || st === 'halftime' || st === 'scheduled' || st === 'ongoing' || st === 'active') {
+                            hasPlayedOrScheduled = true;
                         }
                     });
 
                     const fallbackRound = Number(l.current_round || l.round || 0);
                     const latestRound = maxRound > 0 ? maxRound : fallbackRound;
-                    const hasPlayed = hasFinishedOrLive || (latestRound > 0 && leagueMatches.length > 0);
+                    const hasPlayed = hasPlayedOrScheduled || latestRound > 0 || leagueMatches.length > 0;
 
                     return {
                         ...l,
-                        latestRound,
+                        latestRound: latestRound > 0 ? latestRound : 1,
                         hasPlayedMatches: hasPlayed,
                         matchesCount: leagueMatches.length
                     };
