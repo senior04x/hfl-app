@@ -74,6 +74,7 @@ const TournamentsHeader = ({
     leagues,
     handleLeagueSelect,
     teams,
+    totalTeamsCount,
     teamsLoading,
     navigation
 }: any) => {
@@ -271,27 +272,27 @@ const TournamentsHeader = ({
                 <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, paddingVertical: 15 }}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>{isGuest ? t('tournaments.title', 'Ligalar') : t('teams.title')}</Text>
+                        <Text style={styles.statLabel}>{t('tournaments.title', 'Ligalar')}</Text>
                         {isLeaguesLoading ? (
                             <Skeleton width={30} height={16} borderRadius={4} />
                         ) : (
                             <Text style={styles.statValue}>
-                                {isGuest ? (leagues?.length || 0) : (teams?.length || 0)}
+                                {leagues?.length || 0}
                             </Text>
                         )}
                     </View>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>{t('common.status')}</Text>
+                        <Text style={styles.statLabel}>{t('teams.title', 'Jamoalar')}</Text>
                         {isLeaguesLoading ? (
                             <Skeleton width={50} height={16} borderRadius={4} />
                         ) : (
                             <Text style={styles.statValue}>
-                                {isGuest ? `${leagues?.length || 0} ${t('common.active', 'faol').toLowerCase()}` : `${teams?.length || 0} ${t('common.active', 'faol').toLowerCase()}`}
+                                {totalTeamsCount || teams?.length || 0}
                             </Text>
                         )}
                     </View>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>Region</Text>
+                        <Text style={styles.statLabel}>{t('common.region', 'Region')}</Text>
                         {isLeaguesLoading ? (
                             <Skeleton width={70} height={16} borderRadius={4} />
                         ) : (
@@ -311,37 +312,6 @@ const TournamentsHeader = ({
                 </View>
             </View>
 
-            {/* Action Buttons with Glass Effect */}
-            <View style={styles.actionsRow}>
-                <TouchableOpacity 
-                    style={styles.hallOfFameBtn}
-                    onPress={() => {
-                        if (isGuest) {
-                            if (leagues && leagues.length > 0) {
-                                navigation.navigate('TournamentDetail', { 
-                                    tournament: leagues[0],
-                                    tournamentId: leagues[0].id || leagues[0]._id 
-                                });
-                            }
-                        } else if (selectedLeague) {
-                            navigation.navigate('TournamentDetail', { 
-                                tournament: selectedLeague,
-                                tournamentId: selectedLeague.id || selectedLeague._id 
-                            });
-                        }
-                    }}
-                    activeOpacity={0.8}
-                >
-                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={styles.hallOfFameBtnText}>
-                            {isGuest ? t('tournaments.view_leagues', 'Ligalarni Ko\'rish') : t('tournaments.overview')}
-                        </Text>
-                        <Ionicons name="arrow-forward" size={18} color={Colors.primary} style={{ marginLeft: 6 }} />
-                    </View>
-                </TouchableOpacity>
-            </View>
-
             {/* List Header Badge */}
             <View style={styles.listHeader}>
                 <View style={styles.listHeaderBadge}>
@@ -355,8 +325,8 @@ const TournamentsHeader = ({
                         />
                         <Text style={styles.listHeaderText}>
                             {isGuest 
-                                ? `${(activeOrg?.name || 'TASHKILOT').toUpperCase()} LIGALARI (${leagues?.length || 0})`
-                                : `${(selectedLeague?.name || 'LIGA').toUpperCase()} JAMOALARI (${teams?.length || 0})`}
+                                ? `${(activeOrg?.name || 'TASHKILOT').toUpperCase()} ${t('tournaments.title', 'LIGALARI').toUpperCase()} (${leagues?.length || 0})`
+                                : `${(selectedLeague?.name || 'LIGA').toUpperCase()} ${t('teams.title', 'JAMOALARI').toUpperCase()} (${teams?.length || 0})`}
                         </Text>
                     </View>
                 </View>
@@ -380,6 +350,7 @@ export default function TournamentsScreen({ navigation }: any) {
     const [showOrgSelectModal, setShowOrgSelectModal] = useState(false);
     const [isLeaguesLoading, setIsLeaguesLoading] = useState(true);
     const [teams, setTeams] = useState<any[]>([]);
+    const [totalTeamsCount, setTotalTeamsCount] = useState<number>(0);
     const [teamsLoading, setTeamsLoading] = useState(false);
     const hasCachedLeaguesRef = useRef(false);
 
@@ -413,6 +384,9 @@ export default function TournamentsScreen({ navigation }: any) {
                     if (Array.isArray(parsed.teams) && parsed.teams.length > 0) {
                         setTeams(parsed.teams);
                     }
+                    if (parsed.totalTeamsCount) {
+                        setTotalTeamsCount(parsed.totalTeamsCount);
+                    }
                     hasCachedLeaguesRef.current = true;
                     setIsLeaguesLoading(false);
 
@@ -432,19 +406,62 @@ export default function TournamentsScreen({ navigation }: any) {
             if (!isSilent && !hasCachedLeaguesRef.current) {
                 setIsLeaguesLoading(true);
             }
-            const data = await apiService.getLeaguesByOrgId(targetOrgId);
+            
+            const [data, teamsCountRes, matchesRes] = await Promise.all([
+                apiService.getLeaguesByOrgId(targetOrgId),
+                supabase.from('teams').select('id, league', { count: 'exact' }).eq('organization_id', targetOrgId),
+                supabase.from('matches').select('league, round, tour, status').eq('organization_id', targetOrgId)
+            ]);
+
+            const orgTeamsTotal = teamsCountRes?.count || (teamsCountRes?.data?.length) || 0;
+            setTotalTeamsCount(orgTeamsTotal);
+
+            const matchesList = matchesRes?.data || [];
+
             if (data && Array.isArray(data)) {
-                setLeagues(data);
-                if (data.length > 0) {
-                    const firstLeague = data[0];
+                // Enrich each league with latest round and active/inactive status
+                const enrichedLeagues = data.map((l: any) => {
+                    const lName = String(l.name || '').toLowerCase().trim();
+                    const leagueMatches = matchesList.filter((m: any) => 
+                        String(m.league || '').toLowerCase().trim() === lName
+                    );
+
+                    let maxRound = 0;
+                    let hasFinishedOrLive = false;
+
+                    leagueMatches.forEach((m: any) => {
+                        const r = Number(m.round || m.tour || 0);
+                        if (r > maxRound) maxRound = r;
+                        if (m.status === 'finished' || m.status === 'completed' || m.status === 'live') {
+                            hasFinishedOrLive = true;
+                        }
+                    });
+
+                    const fallbackRound = Number(l.current_round || l.round || 0);
+                    const latestRound = maxRound > 0 ? maxRound : fallbackRound;
+                    const hasPlayed = hasFinishedOrLive || (latestRound > 0 && leagueMatches.length > 0);
+
+                    return {
+                        ...l,
+                        latestRound,
+                        hasPlayedMatches: hasPlayed,
+                        matchesCount: leagueMatches.length
+                    };
+                });
+
+                setLeagues(enrichedLeagues);
+
+                if (enrichedLeagues.length > 0) {
+                    const firstLeague = enrichedLeagues[0];
                     setSelectedLeague(firstLeague);
                     const fetchedTeams = await fetchLeagueTeams(firstLeague.name || firstLeague.id || '');
                     
                     // Save snapshot to cache
                     await AsyncStorage.setItem(`@amatora_tournaments_cache_${targetOrgId}`, JSON.stringify({
-                        leagues: data,
+                        leagues: enrichedLeagues,
                         selectedLeague: firstLeague,
                         teams: fetchedTeams || [],
+                        totalTeamsCount: orgTeamsTotal,
                         timestamp: Date.now()
                     }));
                 } else {
@@ -550,7 +567,8 @@ export default function TournamentsScreen({ navigation }: any) {
         }
 
         const leagueLogo = getLeagueLogoSource(league);
-        const roundNumber = league.current_round || league.round || 1;
+        const roundNumber = league.latestRound || league.current_round || league.round || 0;
+        const hasPlayed = league.hasPlayedMatches === true || (roundNumber > 0 && (league.matchesCount || 0) > 0);
 
         return (
             <TouchableOpacity
@@ -564,19 +582,11 @@ export default function TournamentsScreen({ navigation }: any) {
             >
                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                 <View style={styles.teamItemContent}>
-                    {/* RANK POSITION BADGE / MEDAL */}
+                    {/* PLAIN NUMBER 1, 2, 3 (NO MEDALS) */}
                     <View style={{ width: 26, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
-                        {index === 0 ? (
-                            <FontAwesome5 name="medal" size={16} color="#FFD700" />
-                        ) : index === 1 ? (
-                            <FontAwesome5 name="medal" size={16} color="#C0C0C0" />
-                        ) : index === 2 ? (
-                            <FontAwesome5 name="medal" size={16} color="#CD7F32" />
-                        ) : (
-                            <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '900', fontSize: 13 }}>
-                                {index + 1}
-                            </Text>
-                        )}
+                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '900', fontSize: 14 }}>
+                            {index + 1}
+                        </Text>
                     </View>
 
                     <View style={styles.teamLogoCircle}>
@@ -591,11 +601,19 @@ export default function TournamentsScreen({ navigation }: any) {
                             {(league.name || 'LIGA').toUpperCase()}
                         </Text>
                         <View style={styles.teamBadgeRow}>
-                            <View style={styles.leagueTagBadge}>
-                                <Text style={styles.leagueTagText}>
-                                    {roundNumber}-TUR • FAOL
-                                </Text>
-                            </View>
+                            {hasPlayed && roundNumber > 0 ? (
+                                <View style={styles.leagueTagBadge}>
+                                    <Text style={styles.leagueTagText}>
+                                        {`${roundNumber}-${t('matches.tour', 'TUR')} • ${t('common.active', 'FAOL').toUpperCase()}`}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <View style={[styles.leagueTagBadge, { backgroundColor: 'rgba(255, 75, 75, 0.15)', borderColor: 'rgba(255, 75, 75, 0.3)' }]}>
+                                    <Text style={[styles.leagueTagText, { color: '#FF5555' }]}>
+                                        {t('common.inactive', 'NOFAOL').toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
                             <Text style={{ color: '#00FF66', fontSize: 11, fontWeight: '900', marginLeft: 8 }}>
                                 {league.location || "O'zbekiston"}
                             </Text>
@@ -664,7 +682,7 @@ export default function TournamentsScreen({ navigation }: any) {
                                 </Text>
                             </View>
                             <Text style={{ color: '#00FF66', fontSize: 11, fontWeight: '900', marginLeft: 8 }}>
-                                {points} OCHKO
+                                {points} {t('teams.points', 'OCHKO').toUpperCase()}
                             </Text>
                         </View>
                     </View>
@@ -731,6 +749,7 @@ export default function TournamentsScreen({ navigation }: any) {
                                 leagues={leagues}
                                 handleLeagueSelect={handleLeagueSelect}
                                 teams={teams}
+                                totalTeamsCount={totalTeamsCount}
                                 teamsLoading={teamsLoading}
                                 navigation={navigation}
                             />
