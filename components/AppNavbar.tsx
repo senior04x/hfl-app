@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
     View,
     Text,
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     subtitleText: {
-        color: '#00FF66',
+        color: 'rgba(255, 255, 255, 0.5)',
         fontSize: 10,
         fontWeight: '900',
         letterSpacing: 2,

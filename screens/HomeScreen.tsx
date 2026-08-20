@@ -38,7 +38,7 @@ export default function HomeScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const { socket, isConnected } = useSocket();
-    const { user } = useAuthStore();
+    const { user, isGuest } = useAuthStore();
     const selectedOrgId = useOrganizationStore(s => s.selectedOrganizationId);
     const [userProfile, setUserProfile] = useState<any>(null);
 
@@ -481,8 +481,12 @@ export default function HomeScreen({ navigation }: any) {
                                                 )}
                                             </TouchableOpacity>
                                             <View>
-                                                <Text style={styles.welcomeText}>{getGreetingText()}</Text>
-                                                <Text style={styles.brandText}>{displayName.toUpperCase()}</Text>
+                                                <Text style={styles.welcomeText}>
+                                                    {isGuest ? 'AMATORA' : getGreetingText().toUpperCase()}
+                                                </Text>
+                                                <Text style={styles.brandText}>
+                                                    {isGuest ? getGreetingText().toUpperCase() : displayName.toUpperCase()}
+                                                </Text>
                                             </View>
                                         </View>
 
@@ -724,7 +728,7 @@ const styles = StyleSheet.create({
         marginTop: 5,
     },
     welcomeText: {
-        color: '#00FF66',
+        color: 'rgba(255, 255, 255, 0.5)',
         fontSize: 10,
         fontWeight: '900',
         marginBottom: 1,
