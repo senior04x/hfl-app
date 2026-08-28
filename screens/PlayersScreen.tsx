@@ -15,6 +15,8 @@ import { usePlayerStore } from '../store/usePlayerStore';
 import { apiService } from '../services/apiService';
 import { Player } from '../types';
 import PlayerListSkeleton from '../components/PlayerListSkeleton';
+import PlayerComparisonModal from '../components/PlayerComparisonModal';
+import { calculateFifaAttributes } from '../utils/playerCardUtils';
 
 import { Video, ResizeMode } from 'expo-av';
 import VideoBackground from '../components/VideoBackground';
@@ -27,6 +29,7 @@ export default function PlayersScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { teamId, tournamentId, tournamentName } = route?.params || {};
     const { players, setPlayers, isLoading, setLoading } = usePlayerStore();
+    const [showCompareModal, setShowCompareModal] = React.useState(false);
 
     const fetchPlayers = async () => {
         try {
@@ -52,6 +55,7 @@ export default function PlayersScreen({ route, navigation }: any) {
     const renderPlayerItem = ({ item }: { item: Player }) => {
         const avatarUri = item.avatar || (item as any).photo;
         const optimizedAvatar = getOptimizedImageUrl(avatarUri, { width: 150, quality: 80 });
+        const fifaAttrs = calculateFifaAttributes(item);
 
         return (
             <TouchableOpacity
@@ -74,6 +78,9 @@ export default function PlayersScreen({ route, navigation }: any) {
                     </Text>
                 </View>
                 <View style={styles.statsContainer}>
+                    <View style={{ backgroundColor: 'rgba(0, 223, 130, 0.15)', borderWidth: 1, borderColor: '#00DF82', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 6 }}>
+                        <Text style={{ color: '#00DF82', fontSize: 11, fontWeight: '900' }}>{fifaAttrs.ovr}</Text>
+                    </View>
                     <Text style={styles.goals}>{item.stats?.goals || 0} G</Text>
                 </View>
             </TouchableOpacity>
@@ -91,10 +98,30 @@ export default function PlayersScreen({ route, navigation }: any) {
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                    <Ionicons name="arrow-back" size={24} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{tournamentName ? `${tournamentName} ${t('tournaments.players')}` : t('tournaments.players')}</Text>
-                <View style={styles.placeholder} />
+                {players.length >= 2 ? (
+                    <TouchableOpacity
+                        onPress={() => setShowCompareModal(true)}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            backgroundColor: 'rgba(0, 223, 130, 0.15)',
+                            borderWidth: 1,
+                            borderColor: '#00DF82',
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            borderRadius: 14,
+                        }}
+                    >
+                        <Ionicons name="git-compare" size={14} color="#00DF82" />
+                        <Text style={{ color: '#00DF82', fontSize: 11, fontWeight: '800' }}>VS</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <View style={styles.placeholder} />
+                )}
             </View>
 
             {isLoading && players.length === 0 ? (
@@ -119,6 +146,16 @@ export default function PlayersScreen({ route, navigation }: any) {
                 />
             )}
             </SafeAreaView>
+
+            {players.length > 0 && (
+                <PlayerComparisonModal
+                    visible={showCompareModal}
+                    onClose={() => setShowCompareModal(false)}
+                    player1={players[0]}
+                    player2={players[1] || undefined}
+                    allPlayers={players}
+                />
+            )}
         </View>
     );
 }

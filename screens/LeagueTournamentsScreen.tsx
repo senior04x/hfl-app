@@ -153,7 +153,7 @@ export default function LeagueTournamentsScreen({ route, navigation }: any) {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="chevron-back" size={28} color={Colors.primary} />
+                    <Ionicons name="arrow-back" size={24} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{leagueName || 'Turnirlar'}</Text>
             </View>

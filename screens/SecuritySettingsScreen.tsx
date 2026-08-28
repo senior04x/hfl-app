@@ -147,7 +147,7 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                     onPress={() => navigation.goBack()}
                     activeOpacity={0.7}
                 >
-                    <Ionicons name="chevron-back" size={24} color="#FFF" />
+                    <Ionicons name="arrow-back" size={24} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('settings.security_title')}</Text>
                 <View style={{ width: 40 }} />

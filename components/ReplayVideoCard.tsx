@@ -9,6 +9,7 @@ import { getCachedVideoUri } from '../utils/videoCache';
 const DEFAULT_AVATAR = require('../shadow-man.png');
 
 interface ReplayVideoCardProps {
+  id?: string;
   videoUrl: string;
   minute?: number | string;
   teamName?: string;
@@ -18,9 +19,13 @@ interface ReplayVideoCardProps {
   assistantName?: string;
   assistantPhoto?: string;
   eventType?: string;
+  activePlayingId?: string | null;
+  onPlay?: (id: string) => void;
+  onPause?: (id: string) => void;
 }
 
 export default function ReplayVideoCard({
+  id,
   videoUrl,
   minute,
   teamName,
@@ -29,8 +34,13 @@ export default function ReplayVideoCard({
   scorerPhoto,
   assistantName,
   assistantPhoto,
-  eventType = 'goal'
+  eventType = 'goal',
+  activePlayingId,
+  onPlay,
+  onPause
 }: ReplayVideoCardProps) {
+  const cardId = id || videoUrl;
+  const isCurrentActive = activePlayingId === cardId;
   const videoRef = useRef<Video>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,14 +56,38 @@ export default function ReplayVideoCard({
     return () => { isMounted = false; };
   }, [videoUrl]);
 
+  // If another video becomes active, pause this video immediately
+  useEffect(() => {
+    if (!isCurrentActive && isPlaying) {
+      videoRef.current?.pauseAsync().catch(() => {});
+      setIsPlaying(false);
+    }
+  }, [isCurrentActive]);
+
   const togglePlay = async () => {
     if (!videoRef.current) return;
     if (isPlaying) {
-      await videoRef.current.pauseAsync();
+      await videoRef.current.pauseAsync().catch(() => {});
       setIsPlaying(false);
+      if (onPause) onPause(cardId);
     } else {
-      await videoRef.current.playAsync();
+      if (onPlay) onPlay(cardId);
+      await videoRef.current.playAsync().catch(() => {});
       setIsPlaying(true);
+    }
+  };
+
+  const handlePlaybackStatusUpdate = (status: any) => {
+    if (!status.isLoaded) return;
+    if (status.isPlaying) {
+      if (!isPlaying) {
+        setIsPlaying(true);
+        if (onPlay && !isCurrentActive) onPlay(cardId);
+      }
+    } else {
+      if (isPlaying) {
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -99,6 +133,7 @@ export default function ReplayVideoCard({
           shouldPlay={false}
           isLooping={true}
           useNativeControls={true}
+          onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
           onLoad={() => setLoading(false)}
           onError={(e) => console.log('Replay video error:', e)}
         />

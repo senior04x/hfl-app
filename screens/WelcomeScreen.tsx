@@ -380,12 +380,26 @@ const formatPhoneInput = (val: string) => {
         }
     };
 
+    const handleGuestLogin = () => {
+        setGuest(true);
+    };
+
     return (
         <AnimatedBackground overlayOpacity={0.6} backgroundImage={backgroundImage}>
             <StatusBar barStyle="light-content" />
             <SafeAreaView style={styles.container}>
-                {/* Language Switcher Pill */}
-                <View style={{ position: 'absolute', top: Platform.OS === 'ios' ? 54 : 24, right: 20, zIndex: 100 }}>
+                {/* Top Header Controls: Left (Language) & Right (Guest Mode) */}
+                <View style={{ 
+                    position: 'absolute', 
+                    top: Platform.OS === 'ios' ? 54 : 24, 
+                    left: 20, 
+                    right: 20, 
+                    zIndex: 100,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    {/* Language Switcher Pill on the LEFT */}
                     <TouchableOpacity
                         onPress={() => setShowLanguageModal(true)}
                         activeOpacity={0.7}
@@ -396,7 +410,7 @@ const formatPhoneInput = (val: string) => {
                             borderWidth: 1,
                             borderColor: 'rgba(255, 255, 255, 0.15)',
                             paddingHorizontal: 12,
-                            paddingVertical: 6,
+                            paddingVertical: 7,
                             borderRadius: 20,
                             gap: 6
                         }}
@@ -404,6 +418,27 @@ const formatPhoneInput = (val: string) => {
                         <Text style={{ fontSize: 14 }}>{SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.flag || '🇺🇿'}</Text>
                         <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>{(SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label || "O'zbekcha")}</Text>
                         <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.6)" />
+                    </TouchableOpacity>
+
+                    {/* Guest Login Pill on the RIGHT */}
+                    <TouchableOpacity
+                        onPress={handleGuestLogin}
+                        activeOpacity={0.7}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: 'rgba(0, 223, 130, 0.15)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(0, 223, 130, 0.35)',
+                            paddingHorizontal: 13,
+                            paddingVertical: 7,
+                            borderRadius: 20,
+                            gap: 6
+                        }}
+                    >
+                        <Ionicons name="person-outline" size={14} color="#00FF9D" />
+                        <Text style={{ color: '#00FF9D', fontSize: 12, fontWeight: '800' }}>{t('auth.guest_mode', "Mehmon bo'lib kirish")}</Text>
+                        <Ionicons name="arrow-forward" size={12} color="#00FF9D" />
                     </TouchableOpacity>
                 </View>
 

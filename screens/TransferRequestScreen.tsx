@@ -188,9 +188,7 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <View style={styles.backIconCenter}>
-                            <Ionicons name="chevron-back" size={22} color="#00FF66" style={{ marginLeft: -2 }} />
-                        </View>
+                        <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>{t('transfers.title')}</Text>
                     <View style={{ width: 40 }} />

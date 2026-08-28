@@ -182,7 +182,7 @@ const StandingsScreen = ({ route, navigation }: any) => {
             <SafeAreaView style={{ flex: 1 }}>
                 <View style={styles.screenHeader}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Ionicons name="chevron-back" size={24} color={Colors.primary} />
+                    <Ionicons name="arrow-back" size={24} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.title} numberOfLines={1}>
                     {currentTournament?.name || initialTournamentName || 'Turnir Jadvali'}

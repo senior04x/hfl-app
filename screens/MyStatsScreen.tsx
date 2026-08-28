@@ -35,6 +35,10 @@ import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import { SlideButton } from '../components/SlideButton';
 import ReplayVideoCard from '../components/ReplayVideoCard';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
+import FifaPlayerCard from '../components/FifaPlayerCard';
+import PlayerCardZoomModal from '../components/PlayerCardZoomModal';
+import PlayerComparisonModal from '../components/PlayerComparisonModal';
+import { aiScoutService, PlayerAiStats } from '../services/aiScoutService';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 
@@ -199,6 +203,8 @@ const MyStatsScreen = ({ navigation }: any) => {
     const [exportState, setExportState] = useState<'idle' | 'loading' | 'complete'>('idle');
     const [exportProgress, setExportProgress] = useState(0);
     const [showExportModal, setShowExportModal] = useState(false);
+    const [showCardZoomModal, setShowCardZoomModal] = useState(false);
+    const [showComparisonModal, setShowComparisonModal] = useState(false);
     const posterShotRef = useRef<any>(null);
 
     const handleExportPress = () => {
@@ -274,9 +280,9 @@ const MyStatsScreen = ({ navigation }: any) => {
 
     const tabs = ['profil', 'karyerasi', 'oyinlari'];
     const tabLabels: any = {
-        profil: t('stats.tab_profile'),
-        karyerasi: t('stats.tab_my_career'),
-        oyinlari: t('stats.tab_matches')
+        profil: t('stats.tab_profile', 'PROFIL'),
+        karyerasi: t('stats.tab_my_career', 'KARYERAM'),
+        oyinlari: t('stats.tab_matches', 'O\'YINLARI')
     };
 
     const activeTabRef = useRef(activeTab);
@@ -383,6 +389,7 @@ const MyStatsScreen = ({ navigation }: any) => {
 
     // Player Transfers History state
     const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
+    const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
 
     const fetchPlayer = async () => {
         try {
@@ -393,6 +400,11 @@ const MyStatsScreen = ({ navigation }: any) => {
             ]);
             if (data) {
                 const parsed = extractPlayerData(data);
+                
+                // AI Scout evaluation for FIFA Card & Radar
+                const evaluatedAi = await aiScoutService.evaluatePlayer(parsed);
+                parsed.aiStats = evaluatedAi;
+                setAiStats(evaluatedAi);
                 setPlayer(parsed);
                 if (parsed.instagram_username) {
                     setInstagramUsername(parsed.instagram_username);
@@ -833,6 +845,67 @@ const MyStatsScreen = ({ navigation }: any) => {
                     <InfoRow label={t('stats.position')} value={getLocalizedPosition(player.position, t)} icon="shield" />
                     <InfoRow label={t('stats.phone')} value={player.phone || '---'} icon="call" />
                 </View>
+            </View>
+
+            {/* 3D FIFA / EA FC PLAYER CARD */}
+            <View style={{ marginTop: 24, marginBottom: 16, alignItems: 'center', width: '100%' }}>
+                <View style={[styles.sectionHeader, { width: '100%', marginBottom: 10 }]}>
+                    <Ionicons name="sparkles" size={20} color={Colors.primary} />
+                    <Text style={styles.sectionTitle}>{t('stats.player_card_title', 'O\'YINCHI KARTASI')}</Text>
+                </View>
+
+                <View style={{ marginBottom: 12, alignItems: 'center' }}>
+                    <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
+                        {t('stats.card_tap_hint', 'Kattalashtirish va 3D ko\'rish uchun kartaga bosing')}
+                    </Text>
+                </View>
+
+                <FifaPlayerCard
+                    player={player}
+                    size="lg"
+                    interactive3D={true}
+                    showPlayStyles={true}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowCardZoomModal(true);
+                    }}
+                />
+
+                {aiStats?.aiScoutSummary ? (
+                    <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 223, 130, 0.08)', borderWidth: 1, borderColor: 'rgba(0, 223, 130, 0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, gap: 8, maxWidth: width - 48 }}>
+                        <Ionicons name={aiStats.hasVideoScouted ? "sparkles" : "analytics-outline"} size={16} color={Colors.primary} />
+                        <Text style={{ color: '#E2E8F0', fontSize: 11, fontWeight: '700', flex: 1, lineHeight: 15 }}>
+                            {aiStats.aiScoutSummary}
+                        </Text>
+                    </View>
+                ) : null}
+
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowComparisonModal(true);
+                    }}
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        backgroundColor: 'rgba(0, 223, 130, 0.15)',
+                        borderWidth: 1.2,
+                        borderColor: Colors.primary,
+                        borderRadius: 14,
+                        paddingVertical: 13,
+                        paddingHorizontal: 20,
+                        marginTop: 22,
+                        width: '100%'
+                    }}
+                >
+                    <Ionicons name="git-compare" size={18} color={Colors.primary} />
+                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>
+                        {t('stats.compare_h2h', 'O\'YINCHILARNI TAQQOSLASH (H2H)')}
+                    </Text>
+                </TouchableOpacity>
             </View>
 
             <View style={{ marginBottom: 35 }} />
@@ -1639,6 +1712,18 @@ const MyStatsScreen = ({ navigation }: any) => {
                     </View>
                 </View>
             </Modal>
+
+            <PlayerComparisonModal
+                visible={showComparisonModal}
+                onClose={() => setShowComparisonModal(false)}
+                player1={player}
+            />
+
+            <PlayerCardZoomModal
+                visible={showCardZoomModal}
+                onClose={() => setShowCardZoomModal(false)}
+                player={player}
+            />
         </View>
     );
 };

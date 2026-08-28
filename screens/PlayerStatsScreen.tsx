@@ -12,9 +12,13 @@ import {
     Animated,
     StatusBar,
     Platform,
-    Alert
+    Alert,
+    Modal,
+    PanResponder
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as Sharing from 'expo-sharing';
+import ViewShot, { captureRef } from 'react-native-view-shot';
 import { apiService } from '../services/apiService';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -25,6 +29,11 @@ import { supabase } from '../services/supabase';
 import ReplayVideoCard from '../components/ReplayVideoCard';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
+import PlayerRadarChart from '../components/PlayerRadarChart';
+import FifaPlayerCard from '../components/FifaPlayerCard';
+import PlayerComparisonModal from '../components/PlayerComparisonModal';
+import PlayerCardZoomModal from '../components/PlayerCardZoomModal';
+import { aiScoutService, PlayerAiStats } from '../services/aiScoutService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
@@ -152,6 +161,8 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
     const [openingInstagram, setOpeningInstagram] = useState(false);
+    const [showComparisonModal, setShowComparisonModal] = useState(false);
+    const [showCardZoomModal, setShowCardZoomModal] = useState(false);
 
     const handleOpenInstagram = async (url: string) => {
         if (!url || openingInstagram) return;
@@ -171,35 +182,161 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         }
     };
     
+    // Export State & ViewShot Ref
+    const [exportState, setExportState] = useState<'idle' | 'loading' | 'complete'>('idle');
+    const [exportProgress, setExportProgress] = useState(0);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const posterShotRef = useRef<any>(null);
+    const [scrollEnabled, setScrollEnabled] = useState(true);
+
+    const handleExportPress = () => {
+        if (exportState !== 'idle') return;
+        setExportState('loading');
+        setExportProgress(0);
+
+        let current = 0;
+        const timer = setInterval(() => {
+            current += 10;
+            setExportProgress(current);
+            if (current >= 100) {
+                clearInterval(timer);
+                setExportState('complete');
+                setShowExportModal(true);
+                setTimeout(() => {
+                    setExportState('idle');
+                    setExportProgress(0);
+                }, 3000);
+            }
+        }, 120);
+    };
+
+    const handleSharePoster = async () => {
+        try {
+            if (posterShotRef.current) {
+                const uri = await captureRef(posterShotRef, {
+                    format: 'png',
+                    quality: 1.0,
+                    result: 'tmpfile'
+                });
+                const isAvailable = await Sharing.isAvailableAsync();
+                if (isAvailable) {
+                    await Sharing.shareAsync(uri, {
+                        mimeType: 'image/png',
+                        dialogTitle: 'Matchday Player Card',
+                        UTI: 'public.png'
+                    });
+                } else {
+                    Alert.alert('Tayyor!', `Posteringiz saqlandi: ${uri}`);
+                }
+            } else {
+                Alert.alert('Eslatma', 'Posterni rasmga olib bo\'lmadi. Qayta urinib ko\'ring.');
+            }
+        } catch (e) {
+            console.error('Error exporting poster:', e);
+            Alert.alert('Xatolik', 'Posterni eksport qilishda xatolik bo\'ldi');
+        }
+    };
+    
     const slideAnim = useRef(new Animated.Value(0)).current;
 
     const tabs = ['profil', 'karyerasi', 'oyinlari'];
+    const activeTabRef = useRef(activeTab);
+    activeTabRef.current = activeTab;
+
     const tabLabels: any = {
-        profil: t('stats.tab_profile'),
-        karyerasi: t('stats.tab_career'),
-        oyinlari: t('stats.tab_matches')
+        profil: t('stats.tab_profile', 'PROFIL'),
+        karyerasi: t('stats.tab_career', 'KARYERASI'),
+        oyinlari: t('stats.tab_matches', 'O\'YINLARI')
     };
 
     const nextTab = () => {
-        const currentIndex = tabs.indexOf(activeTab);
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+
+        const currentIndex = tabs.indexOf(activeTabRef.current);
         const nextIndex = (currentIndex + 1) % tabs.length;
         const nextTabName = tabs[nextIndex];
         
         Animated.timing(slideAnim, {
-            toValue: -50,
-            duration: 150,
+            toValue: -80,
+            duration: 100,
             useNativeDriver: true,
         }).start(() => {
             setActiveTab(nextTabName);
-            slideAnim.setValue(50);
+            slideAnim.setValue(80);
             Animated.spring(slideAnim, {
                 toValue: 0,
-                friction: 8,
-                tension: 40,
+                friction: 7,
+                tension: 45,
                 useNativeDriver: true,
             }).start();
         });
     };
+
+    const prevTab = () => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+
+        const currentIndex = tabs.indexOf(activeTabRef.current);
+        const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        const prevTabName = tabs[prevIndex];
+        
+        Animated.timing(slideAnim, {
+            toValue: 80,
+            duration: 100,
+            useNativeDriver: true,
+        }).start(() => {
+            setActiveTab(prevTabName);
+            slideAnim.setValue(-80);
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                friction: 7,
+                tension: 45,
+                useNativeDriver: true,
+            }).start();
+        });
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => false,
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                return Math.abs(gestureState.dx) > 25 && Math.abs(gestureState.dy) < 15;
+            },
+            onPanResponderGrant: () => {
+                setScrollEnabled(false);
+            },
+            onPanResponderMove: (_, gestureState) => {
+                slideAnim.setValue(gestureState.dx * 0.4);
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                setScrollEnabled(true);
+                if (gestureState.dx < -50) {
+                    nextTab();
+                } else if (gestureState.dx > 50) {
+                    prevTab();
+                } else {
+                    Animated.spring(slideAnim, {
+                        toValue: 0,
+                        friction: 7,
+                        tension: 50,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                setScrollEnabled(true);
+                Animated.spring(slideAnim, {
+                    toValue: 0,
+                    friction: 7,
+                    tension: 50,
+                    useNativeDriver: true,
+                }).start();
+            }
+        })
+    ).current;
 
     useEffect(() => {
         if (playerId) {
@@ -208,6 +345,8 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             setLoading(false);
         }
     }, [playerId]);
+
+    const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
 
     const fetchPlayer = async () => {
         try {
@@ -223,6 +362,11 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     ...playerData,
                     stats: statsData || playerData.stats
                 });
+
+                // AI Scout evaluation for FIFA card
+                const evaluatedAi = await aiScoutService.evaluatePlayer(parsed);
+                parsed.aiStats = evaluatedAi;
+                setAiStats(evaluatedAi);
                 setPlayer(parsed);
                 if (activeTab === 'oyinlari') fetchPlayerMatches();
             }
@@ -318,6 +462,110 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     <InfoRow label={t('stats.position')} value={getLocalizedPosition(player.position, t)} icon="shield" />
                 </View>
             </View>
+
+            {/* 3D FIFA / EA FC PLAYER CARD */}
+            <View style={{ marginTop: 24, marginBottom: 16, alignItems: 'center', width: '100%' }}>
+                <View style={[styles.sectionHeader, { width: '100%', marginBottom: 10 }]}>
+                    <Ionicons name="sparkles" size={20} color={Colors.primary} />
+                    <Text style={styles.sectionTitle}>{t('stats.player_card_title', 'O\'YINCHI KARTASI')}</Text>
+                </View>
+
+                <View style={{ marginBottom: 12, alignItems: 'center' }}>
+                    <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
+                        {t('stats.card_tap_hint', 'Kattalashtirish va 3D ko\'rish uchun kartaga bosing')}
+                    </Text>
+                </View>
+
+                <FifaPlayerCard
+                    player={player}
+                    size="lg"
+                    interactive3D={true}
+                    showPlayStyles={true}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowCardZoomModal(true);
+                    }}
+                />
+
+                {aiStats?.aiScoutSummary ? (
+                    <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 223, 130, 0.08)', borderWidth: 1, borderColor: 'rgba(0, 223, 130, 0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, gap: 8, maxWidth: width - 48 }}>
+                        <Ionicons name={aiStats.hasVideoScouted ? "sparkles" : "analytics-outline"} size={16} color={Colors.primary} />
+                        <Text style={{ color: '#E2E8F0', fontSize: 11, fontWeight: '700', flex: 1, lineHeight: 15 }}>
+                            {aiStats.aiScoutSummary}
+                        </Text>
+                    </View>
+                ) : null}
+            </View>
+
+            {/* 3D SPIDER / RADAR POLYGON CHART SECTION */}
+            <View style={{ marginTop: 16, marginBottom: 24, alignItems: 'center', width: '100%' }}>
+                <View style={[styles.sectionHeader, { width: '100%', marginBottom: 6 }]}>
+                    <Ionicons name="pie-chart" size={20} color={Colors.primary} />
+                    <Text style={styles.sectionTitle}>3D ATRIBUTLAR RADARI</Text>
+                </View>
+                <PlayerRadarChart
+                    player1={player}
+                    player1Name={`${player.firstName || ''} ${player.lastName || ''}`.trim() || 'O\'yinchi'}
+                    size={Math.min(width - 40, 330)}
+                />
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowComparisonModal(true);
+                    }}
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        backgroundColor: 'rgba(0, 223, 130, 0.15)',
+                        borderWidth: 1.2,
+                        borderColor: Colors.primary,
+                        borderRadius: 14,
+                        paddingVertical: 12,
+                        paddingHorizontal: 20,
+                        marginTop: 12,
+                        width: '100%'
+                    }}
+                >
+                    <Ionicons name="git-compare" size={18} color={Colors.primary} />
+                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>
+                        BOSHQASI BILAN TAQQOSLASH (VS)
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* MATCHDAY POSTER EXPORT SECTION */}
+            <View style={{ marginTop: 10, marginBottom: 25, width: '100%' }}>
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handleExportPress}
+                    disabled={exportState !== 'idle'}
+                    style={styles.exportBtn}
+                >
+                    {exportState === 'idle' && (
+                        <>
+                            <Ionicons name="sparkles" size={18} color="#000" />
+                            <Text style={styles.exportBtnText}>{t('stats.create_matchday_poster', 'MATCHDAY POSTER YARATISH')}</Text>
+                        </>
+                    )}
+                    {exportState === 'loading' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <ActivityIndicator size="small" color="#000" />
+                            <Text style={styles.exportBtnText}>{t('stats.generating_poster', 'POSTER YARATILMOQDA...')} {exportProgress}%</Text>
+                        </View>
+                    )}
+                    {exportState === 'complete' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="checkmark-circle" size={20} color="#000" />
+                            <Text style={styles.exportBtnText}>{t('stats.poster_ready', 'POSTER TAYYOR!')}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 35 }} />
         </ScrollView>
     );
 
@@ -553,7 +801,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     {/* ⚽ PARALLEL TOP ROW: BACK BUTTON ALIGNED TO TOP EDGE PARALLEL WITH PLAYER PHOTO */}
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: 30, marginBottom: 20 }}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonBtn}>
-                            <Ionicons name="arrow-back" size={22} color="#FFF" />
+                            <Ionicons name="arrow-back" size={24} color="#FFF" />
                         </TouchableOpacity>
 
                         {/* PLAYER PHOTO CREST (BIGGER 1X1 SQUARE CARD) */}
@@ -712,6 +960,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                                         <Ionicons 
                                             name={
                                                 activeTab === 'profil' ? 'person' : 
+                                                activeTab === 'fifa_card' ? 'sparkles' :
                                                 activeTab === 'karyerasi' ? 'trophy' : 'football'
                                             } 
                                             size={20} 
@@ -732,7 +981,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.mainContent}>
+                <View style={styles.mainContent} {...panResponder.panHandlers}>
                     <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
                         {activeTab === 'profil' && renderProfil()}
                         {activeTab === 'karyerasi' && renderKaryera()}
@@ -740,6 +989,133 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     </Animated.View>
                 </View>
             </ScrollView>
+
+            {/* ⚽ MINIMALIST ULTIMATE FOOTBALL PLAYER POSTER MODAL */}
+            <Modal
+                visible={showExportModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowExportModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={{ width: '90%', maxHeight: '85%', backgroundColor: '#050A14', borderRadius: 32, borderWidth: 1.5, borderColor: 'rgba(0, 255, 135, 0.3)', overflow: 'hidden', shadowColor: '#00FF87', shadowRadius: 30, shadowOpacity: 0.3, elevation: 20 }}>
+                        <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+                        
+                        <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={{ flex: 1, backgroundColor: '#050A14' }}>
+                            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 28, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+                                {/* Minimalist Top Header with Original Logo */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.08)', paddingBottom: 16, marginBottom: 24 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Image
+                                            source={require('../assets/logo.png')}
+                                            style={{ width: 24, height: 24 }}
+                                            resizeMode="contain"
+                                        />
+                                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 15, letterSpacing: 2 }}>AMATORA</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: 'rgba(0, 255, 135, 0.12)', borderWidth: 1, borderColor: 'rgba(0, 255, 135, 0.3)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 }}>
+                                        <Text style={{ color: '#00FF87', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>SEASON 2026</Text>
+                                    </View>
+                                </View>
+
+                                {/* Minimalist Player Photo Crest & Rating */}
+                                <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                                    <View style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: '#00FF87', padding: 4, backgroundColor: '#0A1224', shadowColor: '#00FF87', shadowRadius: 20, shadowOpacity: 0.4 }}>
+                                        <Image
+                                            source={{ uri: player?.photo || player?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80' }}
+                                            style={{ width: '100%', height: '100%', borderRadius: 54 }}
+                                            resizeMode="cover"
+                                        />
+                                    </View>
+                                    
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFD700', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20, marginTop: -14, shadowColor: '#FFD700', shadowRadius: 10, shadowOpacity: 0.6 }}>
+                                        <Ionicons name="trending-up" size={14} color="#050A14" />
+                                        <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>
+                                            {player?.rating !== undefined && player?.rating !== null && player?.rating !== 0 ? player.rating : (stats?.rating || 0)} RATING
+                                        </Text>
+                                    </View>
+
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 22, marginTop: 14, letterSpacing: 0.5, textAlign: 'center' }}>
+                                        {(player?.firstName || player?.first_name || 'FUTBOLCHI').toUpperCase()} {(player?.lastName || player?.last_name || '').toUpperCase()}
+                                    </Text>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255, 255, 255, 0.06)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, marginTop: 8 }}>
+                                        {(player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo) ? (
+                                            <Image
+                                                source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }}
+                                                style={{ width: 16, height: 16, borderRadius: 8 }}
+                                                resizeMode="contain"
+                                            />
+                                        ) : (
+                                            <Ionicons name="shield-outline" size={14} color="#00FF87" />
+                                        )}
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontWeight: '700', fontSize: 11, letterSpacing: 1 }}>
+                                            {getLocalizedPosition(player?.position, t)}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Minimalist Grid Stats */}
+                                <View style={{ width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 10 }}>
+                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>GOLLAR</Text>
+                                        <Text style={{ color: '#00FF87', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.goals}</Text>
+                                    </View>
+
+                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>ASSISTLAR</Text>
+                                        <Text style={{ color: '#3B82F6', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.assists}</Text>
+                                    </View>
+
+                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>O'YINLAR</Text>
+                                        <Text style={{ color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.matchesPlayed}</Text>
+                                    </View>
+
+                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>SARIQ / QIZIL</Text>
+                                        <Text style={{ color: '#FACC15', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.yellowCards} / {stats.redCards}</Text>
+                                    </View>
+                                </View>
+
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: 10, fontWeight: '600', marginTop: 14, letterSpacing: 1 }}>
+                                    AMATORA LEAGUE • OFFICIAL MATCHDAY CARD
+                                </Text>
+                            </ScrollView>
+                        </ViewShot>
+
+                        {/* Minimalist Action Buttons */}
+                        <View style={{ flexDirection: 'row', gap: 12, padding: 20, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.08)' }}>
+                            <TouchableOpacity
+                                onPress={() => setShowExportModal(false)}
+                                style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', paddingVertical: 15, borderRadius: 18, alignItems: 'center' }}
+                            >
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: '800', fontSize: 13 }}>YOPISH</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleSharePoster}
+                                style={{ flex: 1.5, backgroundColor: '#00FF87', paddingVertical: 15, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                            >
+                                <Ionicons name="share-social" size={18} color="#050A14" />
+                                <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>STORY'GA ULASHISH</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <PlayerComparisonModal
+                visible={showComparisonModal}
+                onClose={() => setShowComparisonModal(false)}
+                player1={player}
+            />
+
+            <PlayerCardZoomModal
+                visible={showCardZoomModal}
+                onClose={() => setShowCardZoomModal(false)}
+                player={player}
+            />
         </View>
     );
 };

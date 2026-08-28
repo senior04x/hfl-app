@@ -101,9 +101,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-                        <View style={styles.backIconCenter}>
-                            <Ionicons name="chevron-back" size={22} color="#FFFFFF" style={{ marginLeft: -2 }} />
-                        </View>
+                        <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>{t('applications.title')}</Text>
                     <View style={{ width: 40 }} />

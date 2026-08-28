@@ -269,7 +269,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                     {/* TOP PARALLEL ROW: BACK BUTTON & ADMIN ACTIONS */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 20, marginBottom: 16 }}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonBtn}>
-                            <Ionicons name="arrow-back" size={22} color="#FFF" />
+                            <Ionicons name="arrow-back" size={24} color="#FFF" />
                         </TouchableOpacity>
 
                         {/* ACTION BUTTONS (CHAT & TACTICS) */}

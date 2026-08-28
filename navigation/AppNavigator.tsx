@@ -1,6 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, View, TouchableOpacity, Dimensions, Animated, PanResponder, Text, Modal, ActivityIndicator, Image, Alert, ScrollView } from 'react-native';
-import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import {
+    Platform,
+    StyleSheet,
+    View,
+    TouchableOpacity,
+    Dimensions,
+    Animated,
+    PanResponder,
+    Text,
+    Modal,
+    ActivityIndicator,
+    Image,
+    Alert,
+    ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SmartBlurView as BlurView } from '../components/SmartBlurView';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +22,7 @@ import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService, clearApiCache } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 import { useTranslation } from 'react-i18next';
+import { TabSwipeProvider, useTabSwipe } from '../context/TabSwipeContext';
 
 import HomeScreen from '../screens/HomeScreen';
 import TournamentsScreen from '../screens/TournamentsScreen';
@@ -16,16 +30,29 @@ import CalendarScreen from '../screens/CalendarScreen';
 import NewsScreen from '../screens/NewsScreen';
 import AccountScreen from '../screens/AccountScreen';
 
-const { width } = Dimensions.get('window');
-const CAPSULE_WIDTH = width - 72;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CAPSULE_WIDTH = SCREEN_WIDTH - 72;
 const TAB_COUNT = 5;
 const TAB_ITEM_WIDTH = (CAPSULE_WIDTH - 8) / TAB_COUNT;
-const HIGHLIGHT_WIDTH = 48;
-const HIGHLIGHT_OFFSET = (TAB_ITEM_WIDTH - HIGHLIGHT_WIDTH) / 2;
+const HIGHLIGHT_WIDTH = TAB_ITEM_WIDTH - 2;
+const HIGHLIGHT_OFFSET = 1;
 
-const Tab = createBottomTabNavigator();
+const TABS = [
+    { key: 'Asosiy', name: 'Asosiy', icon: 'home-outline' },
+    { key: 'Turnirlar', name: 'Turnirlar', icon: 'trophy-outline' },
+    { key: 'Taqvim', name: 'Taqvim', icon: 'calendar-outline' },
+    { key: 'Yangiliklar', name: 'Yangiliklar', icon: 'newspaper-outline' },
+    { key: 'Profil', name: 'Profil', icon: 'person-outline' },
+];
 
-function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+interface CustomFloatingTabBarProps {
+    activeIndex: number;
+    scrollX: Animated.Value;
+    onTabPress: (index: number) => void;
+    navigation: any;
+}
+
+function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: CustomFloatingTabBarProps) {
     const { user, setAuth, isGuest } = useAuthStore();
     const { t } = useTranslation();
     const userAvatarUri = user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url;
@@ -35,7 +62,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
     const [accountOptions, setAccountOptions] = useState<any[]>([]);
     const [loadingAccounts, setLoadingAccounts] = useState(false);
 
-    // Modal Y displacement for swipe down gesture from anywhere on the screen, header text, margins or card
+    // Modal Y displacement for swipe down gesture
     const modalY = useRef(new Animated.Value(0)).current;
 
     const modalPanResponder = useRef(
@@ -70,23 +97,24 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
         })
     ).current;
 
-    // Animated position for sliding pill highlight
-    const translateX = useRef(new Animated.Value(state.index * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4)).current;
-
-    const startIndexRef = useRef(state.index);
-    const isDraggingRef = useRef(false);
-
-    useEffect(() => {
-        if (!isDraggingRef.current) {
-            startIndexRef.current = state.index;
-            Animated.spring(translateX, {
-                toValue: state.index * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4,
-                useNativeDriver: true,
-                tension: 70,
-                friction: 9,
-            }).start();
-        }
-    }, [state.index]);
+    // Real-time interpolated translateX driven directly by horizontal scroll offset (1:1 with finger swipe)
+    const translateX = scrollX.interpolate({
+        inputRange: [
+            0,
+            SCREEN_WIDTH,
+            SCREEN_WIDTH * 2,
+            SCREEN_WIDTH * 3,
+            SCREEN_WIDTH * 4,
+        ],
+        outputRange: [
+            0 * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4,
+            1 * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4,
+            2 * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4,
+            3 * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4,
+            4 * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4,
+        ],
+        extrapolate: 'clamp',
+    });
 
     const deduplicateAccountsList = (list: any[]) => {
         if (!list || !Array.isArray(list)) return [];
@@ -120,7 +148,6 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
         const cachedAccounts = useAuthStore.getState().userAccounts;
         const cleanCached = deduplicateAccountsList(cachedAccounts || []);
 
-        // 1. Instant 0-second display from persistent local cache
         if (cleanCached && cleanCached.length > 0) {
             setAccountOptions(cleanCached);
             setLoadingAccounts(false);
@@ -131,7 +158,6 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
             setShowSwitcherModal(true);
         }
 
-        // 2. Background silent refresh
         if (userPhone) {
             try {
                 const fullPhone = `+998${userPhone.replace(/\D/g, '').slice(-9)}`;
@@ -165,111 +191,45 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
         setAuth({
             ...acc,
             organizationId: Number(orgId),
-            organization_id: Number(orgId)
+            organization_id: Number(orgId),
         });
         setShowSwitcherModal(false);
     };
 
-    // Ultra-smooth 120fps PanResponder drag gesture
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => false,
-            onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 10,
-            onPanResponderGrant: () => {
-                isDraggingRef.current = true;
-                startIndexRef.current = state.index;
-            },
-            onPanResponderMove: (_, gestureState) => {
-                const startX = startIndexRef.current * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4;
-                const minX = HIGHLIGHT_OFFSET + 4;
-                const maxX = (TAB_COUNT - 1) * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4;
-                const currentX = Math.max(minX, Math.min(maxX, startX + gestureState.dx));
-                translateX.setValue(currentX);
-            },
-            onPanResponderRelease: (_, gestureState) => {
-                isDraggingRef.current = false;
-                const startX = startIndexRef.current * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4;
-                const finalX = startX + gestureState.dx;
-                const targetIndex = Math.max(
-                    0,
-                    Math.min(TAB_COUNT - 1, Math.round((finalX - HIGHLIGHT_OFFSET - 4) / TAB_ITEM_WIDTH))
-                );
-
-                if (targetIndex !== state.index) {
-                    navigation.navigate(state.routes[targetIndex].name);
-                } else {
-                    Animated.spring(translateX, {
-                        toValue: state.index * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4,
-                        useNativeDriver: true,
-                        tension: 70,
-                        friction: 9,
-                    }).start();
-                }
-            },
-            onPanResponderTerminate: () => {
-                isDraggingRef.current = false;
-                Animated.spring(translateX, {
-                    toValue: state.index * TAB_ITEM_WIDTH + HIGHLIGHT_OFFSET + 4,
-                    useNativeDriver: true,
-                    tension: 70,
-                    friction: 9,
-                }).start();
-            },
-        })
-    ).current;
-
     return (
-        <View style={styles.floatingContainer}>
-            <View style={styles.floatingCapsuleWrapper} {...panResponder.panHandlers}>
+        <View style={styles.floatingContainer} pointerEvents="box-none">
+            <View style={styles.floatingCapsuleWrapper}>
                 <BlurView
                     intensity={Platform.OS === 'ios' ? 45 : 55}
                     tint="dark"
                     style={StyleSheet.absoluteFill}
                 />
 
+                {/* Real-time Smooth Sliding Highlight Pill */}
+                <Animated.View
+                    style={[
+                        styles.activeTabIndicator,
+                        { transform: [{ translateX }] },
+                    ]}
+                />
+
                 <View style={styles.tabRow}>
-                    {state.routes.map((route, index) => {
-                        const { options } = descriptors[route.key];
-                        const isFocused = state.index === index;
-
-                        const onPress = () => {
-                            const event = navigation.emit({
-                                type: 'tabPress',
-                                target: route.key,
-                                canPreventDefault: true,
-                            });
-
-                            if (!isFocused && !event.defaultPrevented) {
-                                navigation.navigate(route.name);
-                            }
-                        };
-
-                        let iconName: any = "home-outline";
-                        if (route.name === 'Asosiy') {
-                            iconName = "home-outline";
-                        } else if (route.name === 'Turnirlar') {
-                            iconName = "trophy-outline";
-                        } else if (route.name === 'Taqvim') {
-                            iconName = "calendar-outline";
-                        } else if (route.name === 'Yangiliklar') {
-                            iconName = "newspaper-outline";
-                        }
+                    {TABS.map((tab, index) => {
+                        const isFocused = activeIndex === index;
 
                         return (
                             <TouchableOpacity
-                                key={route.key}
+                                key={tab.key}
                                 accessibilityRole="button"
                                 accessibilityState={isFocused ? { selected: true } : {}}
-                                accessibilityLabel={options.tabBarAccessibilityLabel}
-                                testID={(options as any).tabBarTestID || (options as any).testID}
-                                onPress={onPress}
-                                onLongPress={route.name === 'Profil' ? handleProfilLongPress : undefined}
+                                onPress={() => onTabPress(index)}
+                                onLongPress={tab.key === 'Profil' ? handleProfilLongPress : undefined}
                                 delayLongPress={300}
                                 activeOpacity={0.7}
                                 style={styles.tabItem}
                             >
                                 <View style={styles.iconWrapper}>
-                                    {route.name === 'Profil' ? (
+                                    {tab.key === 'Profil' ? (
                                         userAvatarUri ? (
                                             <SmartImage
                                                 uri={userAvatarUri}
@@ -298,7 +258,7 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                                         )
                                     ) : (
                                         <Ionicons
-                                            name={iconName}
+                                            name={tab.icon as any}
                                             size={isFocused ? 24 : 22}
                                             color={isFocused ? '#00FF9D' : 'rgba(255, 255, 255, 0.40)'}
                                             style={isFocused && Platform.OS === 'ios' ? {
@@ -345,7 +305,6 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
                         </View>
 
                         <View style={{ paddingHorizontal: 22, paddingTop: 2, paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
-
                             {loadingAccounts ? (
                                 <View style={{ paddingVertical: 36, alignItems: 'center' }}>
                                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -409,25 +368,123 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
     );
 }
 
-export default function AppNavigator() {
+function MainSwipeableTabs({ navigation, route }: any) {
+    const { isSwipeDisabled } = useTabSwipe();
+    const scrollX = useRef(new Animated.Value(0)).current;
+    const scrollViewRef = useRef<ScrollView>(null);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const activeIndexRef = useRef(0);
+    const isManualScrolling = useRef(false);
+
+    // Sync external navigation requests (e.g. navigation.navigate('MainTabs', { screen: 'Profil' }))
+    useEffect(() => {
+        const targetScreen = route?.params?.screen || route?.params?.tab;
+        if (targetScreen) {
+            const targetIdx = TABS.findIndex(t => 
+                t.name.toLowerCase() === String(targetScreen).toLowerCase() || 
+                t.key.toLowerCase() === String(targetScreen).toLowerCase()
+            );
+            if (targetIdx !== -1 && targetIdx !== activeIndexRef.current) {
+                handleTabPress(targetIdx);
+            }
+        }
+    }, [route?.params?.screen, route?.params?.tab]);
+
+    const handleTabPress = useCallback((targetIndex: number) => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+        isManualScrolling.current = true;
+        activeIndexRef.current = targetIndex;
+        setActiveIndex(targetIndex);
+        scrollViewRef.current?.scrollTo({
+            x: targetIndex * SCREEN_WIDTH,
+            animated: false,
+        });
+        requestAnimationFrame(() => {
+            isManualScrolling.current = false;
+        });
+    }, []);
+
+    const handleScroll = Animated.event(
+        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+        { useNativeDriver: false }
+    );
+
+    const handleMomentumScrollEnd = (e: any) => {
+        const offsetX = e.nativeEvent.contentOffset.x;
+        const newIndex = Math.max(0, Math.min(TABS.length - 1, Math.round(offsetX / SCREEN_WIDTH)));
+        if (newIndex !== activeIndexRef.current) {
+            activeIndexRef.current = newIndex;
+            setActiveIndex(newIndex);
+            try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch (e) {}
+        }
+        isManualScrolling.current = false;
+    };
+
     return (
-        <Tab.Navigator
-            tabBar={(props) => <CustomFloatingTabBar {...props} />}
-            screenOptions={{
-                headerShown: false,
-                sceneStyle: { backgroundColor: 'transparent' },
-            }}
-        >
-            <Tab.Screen name="Asosiy" component={HomeScreen} />
-            <Tab.Screen name="Turnirlar" component={TournamentsScreen} />
-            <Tab.Screen name="Taqvim" component={CalendarScreen} />
-            <Tab.Screen name="Yangiliklar" component={NewsScreen} />
-            <Tab.Screen name="Profil" component={AccountScreen} />
-        </Tab.Navigator>
+        <View style={styles.mainContainer}>
+            {/* Real-time 60/120fps Instagram-Style Continuous Horizontal Paging */}
+            <Animated.ScrollView
+                ref={scrollViewRef}
+                horizontal
+                pagingEnabled
+                scrollEnabled={!isSwipeDisabled}
+                showsHorizontalScrollIndicator={false}
+                bounces={false}
+                scrollEventThrottle={16}
+                decelerationRate="fast"
+                onScroll={handleScroll}
+                onMomentumScrollEnd={handleMomentumScrollEnd}
+                style={styles.pagerScrollView}
+                contentContainerStyle={{ width: SCREEN_WIDTH * 5 }}
+            >
+                <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
+                    <HomeScreen navigation={navigation} route={route} />
+                </View>
+                <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
+                    <TournamentsScreen navigation={navigation} route={route} />
+                </View>
+                <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
+                    <CalendarScreen navigation={navigation} route={route} />
+                </View>
+                <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
+                    <NewsScreen />
+                </View>
+                <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
+                    <AccountScreen navigation={navigation} route={route} />
+                </View>
+            </Animated.ScrollView>
+
+            {/* Custom Floating Tab Bar with live 1:1 animated highlight */}
+            <CustomFloatingTabBar
+                activeIndex={activeIndex}
+                scrollX={scrollX}
+                onTabPress={handleTabPress}
+                navigation={navigation}
+            />
+        </View>
+    );
+}
+
+export default function AppNavigator(props: any) {
+    return (
+        <TabSwipeProvider>
+            <MainSwipeableTabs {...props} />
+        </TabSwipeProvider>
     );
 }
 
 const styles = StyleSheet.create({
+    mainContainer: {
+        flex: 1,
+        backgroundColor: 'transparent',
+    },
+    pagerScrollView: {
+        flex: 1,
+    },
     floatingContainer: {
         position: 'absolute',
         bottom: Platform.OS === 'ios' ? 36 : 28,
@@ -439,7 +496,7 @@ const styles = StyleSheet.create({
     floatingCapsuleWrapper: {
         width: CAPSULE_WIDTH,
         height: 56,
-        borderRadius: 28,
+        borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.16)',
@@ -450,6 +507,16 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
         elevation: 8,
         position: 'relative',
+    },
+    activeTabIndicator: {
+        position: 'absolute',
+        top: 5,
+        width: HIGHLIGHT_WIDTH,
+        height: 46,
+        borderRadius: 8,
+        backgroundColor: 'rgba(0, 223, 130, 0.16)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 223, 130, 0.38)',
     },
     tabRow: {
         flexDirection: 'row',

@@ -314,7 +314,7 @@ export default function NotificationsScreen({ navigation }: any) {
                         onPress={() => navigation.goBack()}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                        <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
 
                     <View style={{ flex: 1, marginLeft: 12 }}>

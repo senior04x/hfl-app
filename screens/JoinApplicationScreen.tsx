@@ -615,7 +615,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const renderHeader = () => (
         <View style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                <Ionicons name="chevron-back" size={26} color="#FFF" />
+                <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
             <View style={{ flex: 1, alignItems: 'center' }}>
                 <Text style={styles.headerTitle}>{t('applications.submit_app')}</Text>

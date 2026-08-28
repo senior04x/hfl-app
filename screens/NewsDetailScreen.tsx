@@ -148,7 +148,7 @@ export default function NewsDetailScreen({ route, navigation }: any) {
                         activeOpacity={0.7}
                     >
                         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                        <Ionicons name="chevron-back" size={24} color="#FFF" />
+                        <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.headerActionBtn, { right: 20, left: undefined }]} 

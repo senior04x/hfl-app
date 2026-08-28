@@ -8,7 +8,9 @@ import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import SmartImage from './SmartImage';
 import Skeleton from './Skeleton';
-import { formatShortTeamName } from '../utils/stringUtils';
+import { formatShortTeamName, formatLocalizedLeagueName } from '../utils/stringUtils';
+import { useTranslation } from 'react-i18next';
+import { useTabSwipe } from '../context/TabSwipeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth * 0.86;
@@ -62,6 +64,9 @@ interface ApiSliderProps {
 }
 
 const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) => {
+    const { t, i18n } = useTranslation();
+    const currentLang = i18n.language || 'uz';
+    const { setSwipeDisabled } = useTabSwipe();
     const [rawItems, setRawItems] = useState<LeagueSlideItem[]>([]);
     const [infiniteItems, setInfiniteItems] = useState<LeagueSlideItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -179,53 +184,111 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
     const [candidates, setCandidates] = useState<any[]>([]);
     const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
     const [animatedPercentages, setAnimatedPercentages] = useState<{ [key: string]: number }>({});
-    const [deviceId, setDeviceId] = useState<string>('');
+    const [voterId, setVoterId] = useState<string>('');
 
     const modalLeagueAccent = selectedLeagueForVote ? LEAGUE_ACCENTS[selectedLeagueForVote.id] || '#FFE600' : '#FFE600';
 
-    const loadRealCandidates = async () => {
-        if (!selectedLeagueForVote) return;
+    /**
+     * Determines the unique voter identity:
+     * - Authenticated user → "user:<userId>"
+     * - Guest → "ip:<ipAddress>"
+     * These are completely separate identities, so voting as guest
+     * and then logging in gives a fresh independent vote.
+     */
+    const getVoterIdentity = async (): Promise<{ voterId: string; voterType: 'user' | 'guest' }> => {
+        // Check if user is authenticated
+        const { useAuthStore } = require('../store/useAuthStore');
+        const { isAuthenticated, user } = useAuthStore.getState();
+
+        if (isAuthenticated && user) {
+            const uid = String(user.id || user._id || user.userId);
+            const vid = `user:${uid}`;
+            setVoterId(vid);
+            return { voterId: vid, voterType: 'user' };
+        }
+
+        // Guest: use IP address
+        let ip = await AsyncStorage.getItem('@amatora_voter_ip');
+        if (!ip) {
+            try {
+                const res = await fetch('https://api.ipify.org?format=json');
+                const json = await res.json();
+                if (json && json.ip) {
+                    ip = String(json.ip);
+                    await AsyncStorage.setItem('@amatora_voter_ip', ip);
+                }
+            } catch (e) {
+                // Fallback to device id
+                let dId = await AsyncStorage.getItem('poll_voter_device_id');
+                if (!dId) {
+                    dId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    await AsyncStorage.setItem('poll_voter_device_id', dId);
+                }
+                ip = dId;
+            }
+        }
+        const vid = `ip:${ip}`;
+        setVoterId(vid);
+        return { voterId: vid, voterType: 'guest' };
+    };
+
+    /** AsyncStorage key is scoped per voter identity so guest/auth don't collide */
+    const getLocalVoteKey = (vid: string) => `@amatora_votes_${vid}`;
+
+    const loadRealCandidates = async (leagueItem: LeagueSlideItem) => {
+        if (!leagueItem) return;
         setIsLoadingCandidates(true);
         try {
-            let dId = await AsyncStorage.getItem('poll_voter_device_id');
-            if (!dId) {
-                dId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                await AsyncStorage.setItem('poll_voter_device_id', dId);
-            }
-            setDeviceId(dId);
+            const { voterId: vid } = await getVoterIdentity();
+
+            // 1. Check local storage for this voter's own vote
+            let userVotedFor: string | null = null;
+            try {
+                const myVotesRaw = await AsyncStorage.getItem(getLocalVoteKey(vid));
+                if (myVotesRaw) {
+                    const myVotes = JSON.parse(myVotesRaw);
+                    if (myVotes && myVotes[leagueItem.id]) {
+                        userVotedFor = String(myVotes[leagueItem.id]);
+                    }
+                }
+            } catch (e) {}
 
             const [players, votes] = await Promise.all([
-                apiService.getPlayers(1, 5),
-                apiService.getVotesForLeague(selectedLeagueForVote.id)
+                apiService.getLeagueVotingCandidates(leagueItem.id || leagueItem.leagueName),
+                apiService.getVotesForLeague(leagueItem.id, vid)
             ]);
 
             if (players && players.length > 0) {
                 const voteCounts: Record<string, number> = {};
-                let userVotedFor: string | null = null;
                 
-                votes.forEach((v: any) => {
-                    voteCounts[v.player_id] = (voteCounts[v.player_id] || 0) + 1;
-                    if (v.device_id === dId) {
-                        userVotedFor = v.player_id;
+                (votes || []).forEach((v: any) => {
+                    const pId = String(v.player_id);
+                    voteCounts[pId] = (voteCounts[pId] || 0) + 1;
+                    // Match this voter's own vote in DB
+                    if (v.voter_id === vid) {
+                        userVotedFor = pId;
                     }
                 });
 
-                const totalVotes = votes.length;
+                if (userVotedFor && !voteCounts[userVotedFor]) {
+                    voteCounts[userVotedFor] = 1;
+                }
+
+                const totalVotes = Math.max(1, Object.values(voteCounts).reduce((a, b) => a + b, 0));
 
                 let realCandidates = players.slice(0, 5).map((p: any) => {
-                    const cVotes = voteCounts[p.id] || 0;
+                    const cVotes = voteCounts[String(p.id)] || 0;
                     return {
-                        id: p.id,
-                        firstName: p.first_name || p.firstName || '',
-                        lastName: p.last_name || p.lastName || '',
-                        teamName: p.teams?.name || p.teamName || 'Noma\'lum',
-                        photoUrl: p.photo_url || p.photoUrl || `https://ui-avatars.com/api/?name=${p.first_name || 'P'}&background=random`,
+                        id: String(p.id),
+                        firstName: p.firstName || p.first_name || '',
+                        lastName: p.lastName || p.last_name || '',
+                        teamName: p.teamName || p.team_name || 'Jamoa',
+                        photoUrl: p.photoUrl || p.photo_url || `https://ui-avatars.com/api/?name=${p.firstName || 'P'}&background=random`,
                         votes: cVotes,
-                        percentage: totalVotes === 0 ? 0 : Math.round((cVotes / totalVotes) * 100)
+                        percentage: (votes && votes.length === 0 && !userVotedFor) ? 0 : Math.round((cVotes / totalVotes) * 100)
                     };
                 });
                 
-                realCandidates = realCandidates.sort((a: any, b: any) => b.percentage - a.percentage);
                 setCandidates(realCandidates);
 
                 if (userVotedFor) {
@@ -234,7 +297,13 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                     const pcts: any = {};
                     realCandidates.forEach((c: any) => pcts[c.id] = c.percentage);
                     setAnimatedPercentages(pcts);
+                } else {
+                    setHasVoted(false);
+                    setVotedCandidateId(null);
+                    setAnimatedPercentages({});
                 }
+            } else {
+                setCandidates([]);
             }
         } catch (error) {
             console.error("Error loading voting candidates:", error);
@@ -244,56 +313,60 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
     };
 
     useEffect(() => {
-        if (voteModalVisible) {
-            setHasVoted(false);
-            setVotedCandidateId(null);
-            setAnimatedPercentages({});
-            if (candidates.length === 0) {
-                loadRealCandidates();
-            }
+        if (voteModalVisible && selectedLeagueForVote) {
+            loadRealCandidates(selectedLeagueForVote);
         }
-    }, [voteModalVisible]);
+    }, [voteModalVisible, selectedLeagueForVote?.id]);
 
     const handleVote = async (candidateId: string) => {
         if (!selectedLeagueForVote) return;
+        const candIdStr = String(candidateId);
         
-        if (votedCandidateId === candidateId) {
+        if (votedCandidateId === candIdStr) {
+            // Un-vote
             setHasVoted(false);
             setVotedCandidateId(null);
             setAnimatedPercentages({});
             setCandidates(prev => {
                 const newCandidates = prev.map(c => {
-                    if (c.id === candidateId) {
+                    if (c.id === candIdStr) {
                         return { ...c, votes: Math.max(0, c.votes - 1) };
                     }
                     return c;
                 });
-                const totalVotes = newCandidates.reduce((sum, c) => sum + c.votes, 0);
+                const totalVotes = Math.max(1, newCandidates.reduce((sum, c) => sum + c.votes, 0));
                 return newCandidates.map(c => ({
                     ...c,
-                    percentage: totalVotes === 0 ? 0 : Math.round((c.votes / totalVotes) * 100)
+                    percentage: Math.round((c.votes / totalVotes) * 100)
                 }));
             });
-            await apiService.removeVote(candidateId, selectedLeagueForVote.id, deviceId);
+            await apiService.removeVote(candIdStr, selectedLeagueForVote.id, voterId);
+            // Clear local
+            try {
+                const myVotesRaw = await AsyncStorage.getItem(getLocalVoteKey(voterId));
+                const myVotes = myVotesRaw ? JSON.parse(myVotesRaw) : {};
+                delete myVotes[selectedLeagueForVote.id];
+                await AsyncStorage.setItem(getLocalVoteKey(voterId), JSON.stringify(myVotes));
+            } catch (e) {}
             return;
         }
 
         if (hasVoted) return;
         
         setHasVoted(true);
-        setVotedCandidateId(candidateId);
+        setVotedCandidateId(candIdStr);
         
         setCandidates(prev => {
             const newCandidates = prev.map(c => {
-                if (c.id === candidateId) {
+                if (c.id === candIdStr) {
                     return { ...c, votes: c.votes + 1 };
                 }
                 return c;
             });
-            const totalVotes = newCandidates.reduce((sum, c) => sum + c.votes, 0);
+            const totalVotes = Math.max(1, newCandidates.reduce((sum, c) => sum + c.votes, 0));
             const candidatesWithPct = newCandidates.map(c => ({
                 ...c,
-                percentage: totalVotes === 0 ? 0 : Math.round((c.votes / totalVotes) * 100)
+                percentage: Math.round((c.votes / totalVotes) * 100)
             }));
             
             const currentPct: { [key: string]: number } = {};
@@ -305,7 +378,14 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
             return candidatesWithPct;
         });
 
-        await apiService.castVote(candidateId, selectedLeagueForVote.id, deviceId);
+        await apiService.castVote(candIdStr, selectedLeagueForVote.id, voterId);
+        // Save local
+        try {
+            const myVotesRaw = await AsyncStorage.getItem(getLocalVoteKey(voterId));
+            const myVotes = myVotesRaw ? JSON.parse(myVotesRaw) : {};
+            myVotes[selectedLeagueForVote.id] = candIdStr;
+            await AsyncStorage.setItem(getLocalVoteKey(voterId), JSON.stringify(myVotes));
+        } catch (e) {}
     };
 
     if (loading || infiniteItems.length === 0) {
@@ -341,10 +421,18 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
         const topPlayer = item?.topPlayer;
         const leagueAccent = LEAGUE_ACCENTS[item?.id] || item?.theme?.[1] || '#007AFF';
 
+        // 4-Day Top Scorer Rule: Top scorer stays for 4 days, on 5th day and beyond next round teaser appears
+        const updatedTime = (item as any)?.updated_at || (item as any)?.updatedAt || (item as any)?.created_at || (item as any)?.createdAt || (item as any)?.date;
+        const diffDays = updatedTime ? (Date.now() - new Date(updatedTime).getTime()) / (1000 * 60 * 60 * 24) : 0;
+        const isTopPlayerActive = !!topPlayer && diffDays <= 4;
+        const currentRound = Number(item.round) || 1;
+        const nextRound = isTopPlayerActive ? currentRound : (currentRound + 1);
+        const localizedLeagueName = formatLocalizedLeagueName(item.leagueName, currentLang);
+
         return (
             <View style={styles.cardWrapper}>
                 <View style={styles.card}>
-                    {/* CLEAN CRISP BACKGROUND (NO LEAGUE COLOR TINT OVERLAY!) */}
+                    {/* CLEAN CRISP BACKGROUND */}
                     <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0B0E17' }]} pointerEvents="none">
                         {item?.bgImage ? (
                             <Image 
@@ -370,14 +458,14 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                     </View>
 
                     <View style={styles.cardContent} pointerEvents="box-none">
-                        {topPlayer ? (
+                        {isTopPlayerActive && topPlayer ? (
                             <View style={styles.realDataContainer} pointerEvents="box-none">
                                 <View style={styles.realDataLeftColumn} pointerEvents="none">
                                     <View style={styles.realDataLeagueHeader}>
                                         {LEAGUE_LOGOS[item.id] ? (
                                             <Image source={LEAGUE_LOGOS[item.id]} style={styles.slideLeagueLogo} resizeMode="contain" />
                                         ) : (
-                                            <Text style={styles.leagueTitle}>{item.leagueName.toUpperCase()}</Text>
+                                            <Text style={styles.leagueTitle}>{localizedLeagueName.toUpperCase()}</Text>
                                         )}
                                     </View>
 
@@ -419,16 +507,18 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                                     />
                                     <View style={styles.photoOverlayPills}>
                                         <View style={styles.realDataPillHorizontal}>
-                                            <Text style={styles.realDataPillText}>{topPlayer.goals} goal</Text>
+                                            <Text style={styles.realDataPillText}>{topPlayer.goals} {t('slider.goals')}</Text>
                                         </View>
                                         <View style={styles.realDataPillHorizontal}>
-                                            <Text style={styles.realDataPillText}>{topPlayer.assists} asist</Text>
+                                            <Text style={styles.realDataPillText}>{topPlayer.assists} {t('slider.assists')}</Text>
                                         </View>
                                     </View>
                                 </View>
 
                                 <View style={[styles.realDataRoundBadge, { backgroundColor: leagueAccent }]} pointerEvents="none">
-                                    <Text style={styles.realDataRoundBadgeText}>{(item.round || 1)}-TUR</Text>
+                                    <Text style={styles.realDataRoundBadgeText}>
+                                        {t('matches.round_tour', { round: currentRound })}
+                                    </Text>
                                 </View>
                             </View>
                         ) : (
@@ -437,17 +527,19 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                                     {LEAGUE_LOGOS[item.id] ? (
                                         <Image source={LEAGUE_LOGOS[item.id]} style={styles.slideLeagueLogo} resizeMode="contain" />
                                     ) : (
-                                        <Text style={styles.leagueTitle}>{item.leagueName.toUpperCase()}</Text>
+                                        <Text style={styles.leagueTitle}>{localizedLeagueName.toUpperCase()}</Text>
                                     )}
                                     <View style={[styles.roundBadge, { backgroundColor: leagueAccent }]}>
-                                        <Text style={styles.roundBadgeText}>{(item.round || 1)}-TUR</Text>
+                                        <Text style={styles.roundBadgeText}>
+                                            {t('matches.round_tour', { round: nextRound })}
+                                        </Text>
                                     </View>
                                 </View>
                                 <View style={styles.slideBody} pointerEvents="box-none">
                                     <View style={styles.questionContainer} pointerEvents="box-none">
                                         <View style={styles.questionTextWrap} pointerEvents="box-none">
                                             <Text style={[styles.questionTitle, { marginBottom: 12 }]}>
-                                                {item.leagueName} {(item.round || 1)}-tur to'purari kim bo'lishi mumkin?
+                                                {t('slider.top_scorer_question', { league: localizedLeagueName, round: nextRound })}
                                             </Text>
                                             <TouchableOpacity 
                                                 style={[styles.voteButton, { backgroundColor: leagueAccent, zIndex: 50 }]}
@@ -458,7 +550,7 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                                                     setVoteModalVisible(true);
                                                 }}
                                             >
-                                                <Text style={styles.voteButtonText}>OVOZ BERING</Text>
+                                                <Text style={styles.voteButtonText}>{t('slider.vote_now')}</Text>
                                             </TouchableOpacity>
                                         </View>
                                         <View style={{ alignSelf: 'flex-end', marginRight: -16, marginBottom: -14, position: 'relative' }}>
@@ -478,7 +570,12 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
     };
 
     return (
-        <View style={styles.container}>
+        <View 
+            style={styles.container}
+            onTouchStart={() => setSwipeDisabled(true)}
+            onTouchEnd={() => setSwipeDisabled(false)}
+            onTouchCancel={() => setSwipeDisabled(false)}
+        >
             {/* TRULY INFINITE LOOPING 60FPS FLATLIST SLIDER */}
             <FlatList
                 ref={flatListRef}
@@ -488,6 +585,9 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 initialScrollIndex={1}
+                onScrollBeginDrag={() => setSwipeDisabled(true)}
+                onScrollEndDrag={() => setSwipeDisabled(false)}
+                onMomentumScrollBegin={() => setSwipeDisabled(true)}
                 getItemLayout={(_, index) => ({
                     length: CARD_WIDTH + CARD_SPACING,
                     offset: (CARD_WIDTH + CARD_SPACING) * index,
@@ -496,7 +596,10 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                 snapToInterval={CARD_WIDTH + CARD_SPACING}
                 decelerationRate="fast"
                 contentContainerStyle={{ paddingHorizontal: SIDE_PADDING }}
-                onMomentumScrollEnd={handleScrollEnd}
+                onMomentumScrollEnd={(e) => {
+                    setSwipeDisabled(false);
+                    handleScrollEnd(e);
+                }}
             />
 
             {/* Voting Modal */}
@@ -512,7 +615,10 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                             <View style={styles.modalContent}>
                                 <View style={styles.modalHeader}>
                                     <Text style={styles.modalTitle}>
-                                        {selectedLeagueForVote?.leagueName} {selectedLeagueForVote?.round}-tur to'purari kim?
+                                        {t('slider.who_is_top_scorer', { 
+                                            league: formatLocalizedLeagueName(selectedLeagueForVote?.leagueName, currentLang), 
+                                            round: (Number(selectedLeagueForVote?.round) || 1) + 1 
+                                        })}
                                     </Text>
                                     <TouchableOpacity onPress={() => setVoteModalVisible(false)} style={styles.modalCloseBtn}>
                                         <Ionicons name="close" size={24} color="#FFF" />
@@ -533,40 +639,56 @@ const ApiSlider: React.FC<ApiSliderProps> = ({ initialItems, externalLoading }) 
                                             </View>
                                         ))
                                     ) : (
-                                        candidates.map((candidate) => (
-                                            <TouchableOpacity 
-                                                key={candidate.id} 
-                                                style={[styles.candidateCard, hasVoted && votedCandidateId !== candidate.id && styles.candidateCardVoted]}
-                                                onPress={() => handleVote(candidate.id)}
-                                                activeOpacity={0.7}
-                                                disabled={hasVoted && votedCandidateId !== candidate.id}
-                                            >
-                                                <View style={styles.candidateInfoRow}>
-                                                    <Image source={{ uri: candidate.photoUrl }} style={styles.candidatePhoto} />
-                                                    <View style={styles.candidateTextInfo}>
-                                                        <Text style={styles.candidateName}>{candidate.firstName} {candidate.lastName}</Text>
-                                                        <Text style={styles.candidateTeam}>{candidate.teamName}</Text>
-                                                    </View>
-                                                    {hasVoted && (
-                                                        <View style={styles.voteStats}>
-                                                            <Text style={[styles.votePercentage, { color: modalLeagueAccent }]}>
-                                                                {animatedPercentages[candidate.id] !== undefined ? animatedPercentages[candidate.id] : 0}%
+                                        candidates.map((candidate) => {
+                                            const isSelected = votedCandidateId === String(candidate.id);
+                                            return (
+                                                <TouchableOpacity 
+                                                    key={candidate.id} 
+                                                    style={[
+                                                        styles.candidateCard, 
+                                                        hasVoted && !isSelected && styles.candidateCardVoted,
+                                                        isSelected && styles.candidateCardActive
+                                                    ]}
+                                                    onPress={() => handleVote(candidate.id)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <View style={styles.candidateInfoRow}>
+                                                        <Image source={{ uri: candidate.photoUrl }} style={styles.candidatePhoto} />
+                                                        <View style={styles.candidateTextInfo}>
+                                                            <Text style={[styles.candidateName, isSelected && { color: '#00FF9D', fontWeight: '900' }]}>
+                                                                {candidate.firstName} {candidate.lastName}
                                                             </Text>
-                                                            <Text style={styles.voteCount}>{candidate.votes} ovoz</Text>
+                                                            <Text style={styles.candidateTeam}>{candidate.teamName}</Text>
+                                                            {isSelected && (
+                                                                <View style={styles.myVoteBadge}>
+                                                                    <Ionicons name="checkmark-circle" size={13} color="#00FF9D" style={{ marginRight: 4 }} />
+                                                                    <Text style={styles.myVoteBadgeText}>Sizning ovozingiz</Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                        {hasVoted && (
+                                                            <View style={styles.voteStats}>
+                                                                <Text style={[styles.votePercentage, { color: isSelected ? '#00FF9D' : modalLeagueAccent }]}>
+                                                                    {animatedPercentages[candidate.id] !== undefined ? animatedPercentages[candidate.id] : 0}%
+                                                                </Text>
+                                                                <Text style={styles.voteCount}>
+                                                                    {t('slider.votes_count', { count: candidate.votes })}
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    
+                                                    {hasVoted && (
+                                                        <View style={styles.progressBarContainer}>
+                                                            <View style={[styles.progressBarFill, { 
+                                                                width: `${candidate.percentage}%`,
+                                                                backgroundColor: isSelected ? '#00FF9D' : modalLeagueAccent 
+                                                            }]} />
                                                         </View>
                                                     )}
-                                                </View>
-                                                
-                                                {hasVoted && (
-                                                    <View style={styles.progressBarContainer}>
-                                                        <View style={[styles.progressBarFill, { 
-                                                            width: `${candidate.percentage}%`,
-                                                            backgroundColor: modalLeagueAccent 
-                                                        }]} />
-                                                    </View>
-                                                )}
-                                            </TouchableOpacity>
-                                        ))
+                                                </TouchableOpacity>
+                                            );
+                                        })
                                     )}
                                 </ScrollView>
                             </View>
@@ -763,6 +885,23 @@ const styles = StyleSheet.create({
     },
     candidateCardVoted: {
         backgroundColor: 'rgba(255,255,255,0.02)',
+        opacity: 0.85,
+    },
+    candidateCardActive: {
+        backgroundColor: 'rgba(0, 255, 157, 0.12)',
+        borderColor: '#00FF9D',
+        borderWidth: 1.5,
+        opacity: 1,
+    },
+    myVoteBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    myVoteBadgeText: {
+        color: '#00FF9D',
+        fontSize: 11,
+        fontWeight: '800',
     },
     candidateInfoRow: {
         flexDirection: 'row',
