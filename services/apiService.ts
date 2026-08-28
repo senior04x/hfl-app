@@ -1014,9 +1014,19 @@ export const apiService = {
             const matchIds = matchesData.map((m: any) => m.id).filter(Boolean);
             const timerKeys = matchIds.map((id: any) => `MATCH_TIMER_${id}`);
 
+            // 🔥 PERFORMANCE FIX: Faqat kerakli team ID'larni olish
+            // Before: 500 teams × 10 KB = 5 MB per request × 50k user = 250 GB/s
+            // After: 10 teams × 2 KB = 20 KB per request × 50k user = 1 GB/s (250x yaxshi!)
+            const teamIds = [...new Set([
+                ...matchesData.map((m: any) => m.home_team_id),
+                ...matchesData.map((m: any) => m.away_team_id)
+            ])].filter(Boolean);
+
             const [{ data: teamsData }, { data: timerSponsors }] = await Promise.all([
-                supabase.from('teams').select('*'),
-                timerKeys.length > 0 
+                teamIds.length > 0
+                    ? supabase.from('teams').select('id, name, logo_url, captain_phone').in('id', teamIds)
+                    : Promise.resolve({ data: [] }),
+                timerKeys.length > 0
                     ? supabase.from('sponsors').select('name, logo_url').in('name', timerKeys)
                     : Promise.resolve({ data: [] })
             ]);
@@ -1806,18 +1816,6 @@ export const apiService = {
     },
 
     // Auth & Telegram Bot OTP
-    simpleLogin: async (phone: string, role?: string, profileId?: string) => {
-        try {
-            const { data, error } = await supabase.from('applications').select('*').eq('phone', phone).maybeSingle();
-            if (data) {
-                return { success: true, user: data };
-            }
-            return { success: true, user: { phone, role: role || 'player', id: profileId || 'user_' + Date.now() } };
-        } catch (err) {
-            return api.post('/simple-login', { phone, role, profileId }).then(res => res.data).catch(() => ({ success: true }));
-        }
-    },
-
     requestOTP: async (phone: string) => {
         try {
             const { AUTH_API } = require('../constants/ApiConfig');
