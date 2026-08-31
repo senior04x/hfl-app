@@ -27,6 +27,7 @@ import { getLocalizedPosition } from '../utils/localizationUtils';
 import { useFocusEffect } from '@react-navigation/native';
 import { useJuniorStore } from '../store/useJuniorStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
+import { useThemeStore } from '../store/useThemeStore';
 import { Modal, TextInput, Linking } from 'react-native';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
 import AppNavbar from '../components/AppNavbar';
@@ -35,6 +36,7 @@ export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout, unreadCount, isChatMuted } = useAuthStore();
     const { isJuniorMode, setJuniorMode, verifyPin } = useJuniorStore();
     const { selectedOrganizationId, setSelectedOrganizationId, organizations } = useOrganizationStore();
+    const { theme, toggleTheme, isDark, colors } = useThemeStore();
     const { t, i18n } = useTranslation();
 
     const [showPinModal, setShowPinModal] = useState(false);
@@ -325,8 +327,15 @@ export default function AccountScreen({ navigation }: any) {
                                     <SettingItem
                                         icon="shield-outline"
                                         title={t('profile.my_team')}
-                                        onPress={() => navigation.navigate('TeamProfile', { teamId: currentTeamId })}
+                                        onPress={() => navigation.navigate('MyTeam', { teamId: currentTeamId })}
                                     />
+                                    {(user?.role === 'manager' || user?.role === 'coach' || user?.role === 'trainer' || user?.role === 'captain' || user?.role === 'admin' || user?.role === 'team_admin') && (
+                                        <SettingItem
+                                            icon="pencil-outline"
+                                            title="JAMOA MA'LUMOTLARINI TAHRIRLASH"
+                                            onPress={() => navigation.navigate('MyTeam', { teamId: currentTeamId, autoOpenEdit: true })}
+                                        />
+                                    )}
                                     <SettingItem
                                         icon="chatbubbles-outline"
                                         title={t('teams.team_chat')}
@@ -387,6 +396,15 @@ export default function AccountScreen({ navigation }: any) {
                     {/* Settings & Security Navigation */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>{t('settings.title').toUpperCase()}</Text>
+
+                        {/* Theme Switcher (Dark / Light) — iOS va Android */}
+                        <SettingItem
+                            icon={isDark ? "moon" : "sunny"}
+                            title={t('settings.theme', 'Mavzu')}
+                            value={isDark ? "Qorong'u" : "Yorug'"}
+                            onPress={toggleTheme}
+                        />
+
                         <SettingItem
                             icon="language-outline"
                             title={t('settings.language')}
