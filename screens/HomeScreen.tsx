@@ -514,7 +514,11 @@ export default function HomeScreen({ navigation }: any) {
                 key={match._id || Math.random().toString()}
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
-                    { backgroundColor: homeColors.surface },
+                    {
+                        backgroundColor: homeColors.background,
+                        borderWidth: 1,
+                        borderColor: homeColors.border
+                    },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
                 onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
@@ -1260,8 +1264,7 @@ const styles = StyleSheet.create({
         width: CARD_WIDTH,
         borderRadius: 20,
         overflow: 'hidden',
-        // Border OLIB TASHLANDI — soya bilan almashtirildi
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        // backgroundColor inline orqali homeColors.background qo'yiladi
         // Neytral qora soya (rangli soya taqiqlangan)
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 4 },
@@ -1274,8 +1277,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         overflow: 'hidden',
         marginBottom: 6,
-        // Border OLIB TASHLANDI — soya bilan almashtirildi
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        // backgroundColor inline orqali homeColors.background qo'yiladi
         // Neytral qora soya (rangli soya taqiqlangan)
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 4 },
