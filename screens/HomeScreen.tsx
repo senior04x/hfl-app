@@ -578,7 +578,7 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     return (
-        <AnimatedBackground overlayOpacity={0.7} backgroundImage={backgroundImage}>
+        <View style={{ flex: 1, backgroundColor: homeColors.background }}>
             <SafeAreaView style={styles.container} edges={['top']}>
                 <ScrollView
                     showsVerticalScrollIndicator={false}
@@ -913,7 +913,7 @@ export default function HomeScreen({ navigation }: any) {
                     onStoryGroupViewed={handleStoryGroupViewed}
                 />
             </SafeAreaView>
-        </AnimatedBackground>
+        </View>
     );
 }
 
