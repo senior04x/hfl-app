@@ -213,7 +213,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                     style={[
                         styles.activeTabIndicator,
                         {
-                            backgroundColor: isDark ? 'rgba(0, 223, 130, 0.18)' : 'rgba(0, 223, 130, 0.15)',
+                            backgroundColor: isDark ? 'rgba(232, 80, 2, 0.18)' : 'rgba(232, 80, 2, 0.15)',
                             transform: [{ translateX }]
                         },
                     ]}
@@ -531,9 +531,9 @@ const styles = StyleSheet.create({
         width: HIGHLIGHT_WIDTH,
         height: 46,
         borderRadius: 10,
-        backgroundColor: 'rgba(0, 223, 130, 0.16)',
+        backgroundColor: 'rgba(232, 80, 2, 0.16)',
         borderWidth: 1,
-        borderColor: 'rgba(0, 223, 130, 0.38)',
+        borderColor: 'rgba(232, 80, 2, 0.38)',
     },
     tabRow: {
         flexDirection: 'row',
