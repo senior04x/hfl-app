@@ -522,129 +522,55 @@ export default function HomeScreen({ navigation }: any) {
             >
                 {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
 
-                <View style={{ padding: 14 }}>
-                    {/* Header: Minimal League + Status (LaLiga style) */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        {/* Liga nomi — KICHIK, kulrang, pastda */}
-                        <Text style={{ fontSize: 10, fontWeight: '600', color: homeColors.textSecondary, letterSpacing: 0.5 }} numberOfLines={1}>
-                            {(match.tournamentName || match.league || "AMATORA").toUpperCase()}
-                        </Text>
+                <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                    {/* ULTRA MINIMAL: Bitta qator — Team vs Team + Score/Time + Tur */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
 
-                        {/* LIVE yoki Round badge — MINIMAL */}
-                        {Boolean(matchIsLive) ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary }} />
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.primary, letterSpacing: 0.5 }}>{liveBadgeLabel}</Text>
-                            </View>
-                        ) : Boolean(roundTagText) ? (
-                            <Text style={{ fontSize: 10, fontWeight: '600', color: homeColors.textSecondary, letterSpacing: 0.5 }}>
-                                {roundTagText.toUpperCase()}
+                        {/* Chap: Team Names */}
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.2 }} numberOfLines={1}>
+                                {formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'UY', 4)} vs {formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'MEH', 4)}
                             </Text>
-                        ) : null}
-                    </View>
 
-                    {/* Teams & Score Row */}
-                    <View style={styles.hMatchTeamsRow}>
-                        {/* Home Team */}
-                        <View style={styles.hTeamColumn}>
-                            <View style={[styles.hLogoCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
-                                {match.homeTeamLogo || match.homeTeam?.logo ? (
-                                    <SmartImage
-                                        uri={match.homeTeamLogo || match.homeTeam?.logo}
-                                        style={styles.hTeamLogo}
-                                        contentFit="contain"
-                                        fallbackIcon="shield-outline"
-                                    />
-                                ) : (
-                                    <Text style={[styles.hLogoText, { color: homeColors.textPrimary }]}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
-                                )}
-                            </View>
-                            <Text style={[styles.hTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'UY', 4)}</Text>
+                            {/* Tur/Liga pastida kichik */}
+                            <Text style={{ fontSize: 9, fontWeight: '500', color: homeColors.textSecondary, marginTop: 3 }}>
+                                {roundTagText || (match.tournamentName || match.league || "AMATORA").toUpperCase()}
+                            </Text>
                         </View>
 
-                        {/* Center Score / Time Box */}
-                        <View style={styles.hScoreColumn}>
+                        {/* O'ng: Score yoki Vaqt + LIVE */}
+                        <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
                             {Boolean(matchIsLive || matchIsFinished) ? (
-                                <View style={styles.scoreAndTimerCenterBox}>
-                                    {/* Hisob — g'olib JUDA to'q, mag'lub juda kulrang (LaLiga style) */}
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <Text style={[
-                                            styles.hScoreText,
-                                            {
-                                                color: (match.score?.home ?? match.home_score ?? 0) > (match.score?.away ?? match.away_score ?? 0)
-                                                    ? homeColors.textPrimary
-                                                    : homeColors.textSecondary,
-                                                opacity: (match.score?.home ?? match.home_score ?? 0) > (match.score?.away ?? match.away_score ?? 0) ? 1 : 0.5
-                                            }
-                                        ]}>
-                                            {match.score?.home ?? (match.home_score ?? 0)}
-                                        </Text>
-                                        <Text style={[styles.hScoreText, { color: homeColors.textSecondary, opacity: 0.4, fontSize: 22 }]}>-</Text>
-                                        <Text style={[
-                                            styles.hScoreText,
-                                            {
-                                                color: (match.score?.away ?? match.away_score ?? 0) > (match.score?.home ?? match.home_score ?? 0)
-                                                    ? homeColors.textPrimary
-                                                    : homeColors.textSecondary,
-                                                opacity: (match.score?.away ?? match.away_score ?? 0) > (match.score?.home ?? match.home_score ?? 0) ? 1 : 0.5
-                                            }
-                                        ]}>
-                                            {match.score?.away ?? (match.away_score ?? 0)}
-                                        </Text>
-                                    </View>
-                                    {Boolean(matchIsLive) ? (
-                                        <View style={styles.cleanLiveTimerContainer}>
-                                            <Text style={[
-                                                styles.cleanTimerText,
-                                                (isHalfTime || isPaused) && styles.cleanHalftimeText
-                                            ]}>
-                                                {liveTimerTime}
+                                <>
+                                    {/* Score KATTA */}
+                                    <Text style={{ fontSize: 22, fontWeight: '900', color: homeColors.textPrimary, letterSpacing: -0.5 }}>
+                                        {match.score?.home ?? match.home_score ?? 0} - {match.score?.away ?? match.away_score ?? 0}
+                                    </Text>
+
+                                    {/* LIVE badge MINIMAL */}
+                                    {Boolean(matchIsLive) && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                                            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.primary }} />
+                                            <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.primary, letterSpacing: 0.3 }}>
+                                                {liveBadgeLabel}
                                             </Text>
-                                            {!isHalfTime && Boolean(livePeriodLabel) ? (
-                                                <Text style={[
-                                                    styles.cleanPeriodSubText,
-                                                    isPaused && { color: '#FACC15' }
-                                                ]}>
-                                                    {livePeriodLabel}
-                                                </Text>
-                                            ) : null}
                                         </View>
-                                    ) : null}
-                                </View>
+                                    )}
+                                </>
                             ) : (
-                                <View style={styles.vsContainer}>
-                                    <View style={styles.timePillBadge}>
-                                        <Ionicons name="time-outline" size={12} color={homeColors.textSecondary} style={{ marginRight: 4 }} />
-                                        <Text style={styles.hTimeVsText}>{formattedTime}</Text>
-                                    </View>
-                                    <Text style={[styles.vsSubText, { color: homeColors.textSecondary }]}>{t('matches.starts').toUpperCase()}</Text>
-                                </View>
+                                <>
+                                    {/* Vaqt */}
+                                    <Text style={{ fontSize: 18, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
+                                        {formattedTime}
+                                    </Text>
+
+                                    {/* Sana pastida */}
+                                    <Text style={{ fontSize: 9, color: homeColors.textSecondary, marginTop: 2 }}>
+                                        {day} {month}
+                                    </Text>
+                                </>
                             )}
                         </View>
-
-                        {/* Away Team */}
-                        <View style={styles.hTeamColumn}>
-                            <View style={[styles.hLogoCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
-                                {match.awayTeamLogo || match.awayTeam?.logo ? (
-                                    <SmartImage
-                                        uri={match.awayTeamLogo || match.awayTeam?.logo}
-                                        style={styles.hTeamLogo}
-                                        contentFit="contain"
-                                        fallbackIcon="shield-outline"
-                                    />
-                                ) : (
-                                    <Text style={[styles.hLogoText, { color: homeColors.textPrimary }]}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
-                                )}
-                            </View>
-                            <Text style={[styles.hTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'MEH', 4)}</Text>
-                        </View>
-                    </View>
-
-                    {/* Footer: MINIMAL date (LaLiga style — icon'siz, kichik) */}
-                    <View style={{ marginTop: 10, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 9, color: homeColors.textSecondary, fontWeight: '500' }}>
-                            {formattedFullDate}
-                        </Text>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -743,6 +669,65 @@ export default function HomeScreen({ navigation }: any) {
                                     });
                                 }}
                             />
+
+                            {/* Yangiliklar Section (LaLiga style) */}
+                            <View style={styles.sectionContainer}>
+                                <View style={styles.sectionHeader}>
+                                    <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>
+                                        {t('home.news', 'YANGILIKLAR').toUpperCase()}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => navigation.navigate('NewsScreen')} activeOpacity={0.7}>
+                                        <Text style={styles.viewAllText}>{t('home.view_all', 'Barchasi')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Yangilik kartalar HORIZONTAL scroll */}
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+                                >
+                                    {[1, 2, 3].map((item) => (
+                                        <TouchableOpacity
+                                            key={item}
+                                            style={{
+                                                width: 280,
+                                                height: 140,
+                                                borderRadius: 12,
+                                                backgroundColor: homeColors.surface,
+                                                overflow: 'hidden',
+                                                shadowColor: '#000000',
+                                                shadowOffset: { width: 0, height: 4 },
+                                                shadowOpacity: 0.1,
+                                                shadowRadius: 10,
+                                                elevation: 3,
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <View style={{ flex: 1, padding: 14, justifyContent: 'space-between' }}>
+                                                <View>
+                                                    <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.primary, letterSpacing: 0.3, marginBottom: 6 }}>
+                                                        SUPER LIGA
+                                                    </Text>
+                                                    <Text
+                                                        style={{ fontSize: 14, fontWeight: '700', color: homeColors.textPrimary, lineHeight: 18 }}
+                                                        numberOfLines={3}
+                                                    >
+                                                        Yangi mavsum uchun transfer oynasi ochildi
+                                                    </Text>
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <Text style={{ fontSize: 9, color: homeColors.textSecondary }}>
+                                                        2 soat oldin
+                                                    </Text>
+                                                    <Ionicons name="chevron-forward" size={14} color={homeColors.textSecondary} />
+                                                </View>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
 
                             {/* Primary Dynamic Matches Section with Priority: 1. Live -> 2. Upcoming -> 3. Finished */}
                             {loading ? (
