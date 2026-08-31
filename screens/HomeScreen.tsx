@@ -851,7 +851,7 @@ export default function HomeScreen({ navigation }: any) {
                                     <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                         <View style={styles.sectionHeader}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                <Ionicons name="trophy" size={16} color={Colors.primary} />
+                                                <Ionicons name="trophy" size={16} color={colors.textMuted} />
                                                 <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
                                                     {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
                                                 </Text>

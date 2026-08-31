@@ -17,11 +17,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SmartBlurView as BlurView } from '../components/SmartBlurView';
 import * as Haptics from 'expo-haptics';
+import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService, clearApiCache } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeStore } from '../store/useThemeStore';
 import { TabSwipeProvider, useTabSwipe } from '../context/TabSwipeContext';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -31,11 +34,12 @@ import NewsScreen from '../screens/NewsScreen';
 import AccountScreen from '../screens/AccountScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CAPSULE_WIDTH = SCREEN_WIDTH - 72;
+const IS_ANDROID = Platform.OS === 'android';
+const CAPSULE_WIDTH = IS_ANDROID ? SCREEN_WIDTH : SCREEN_WIDTH - 72;
 const TAB_COUNT = 5;
 const TAB_ITEM_WIDTH = (CAPSULE_WIDTH - 8) / TAB_COUNT;
-const HIGHLIGHT_WIDTH = TAB_ITEM_WIDTH - 2;
-const HIGHLIGHT_OFFSET = 1;
+const HIGHLIGHT_WIDTH = TAB_ITEM_WIDTH - (IS_ANDROID ? 4 : 2);
+const HIGHLIGHT_OFFSET = IS_ANDROID ? 2 : 1;
 
 const TABS = [
     { key: 'Asosiy', name: 'Asosiy', icon: 'home-outline' },
@@ -54,8 +58,12 @@ interface CustomFloatingTabBarProps {
 
 function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: CustomFloatingTabBarProps) {
     const { user, setAuth, isGuest } = useAuthStore();
+    const { colors, isDark } = useThemeStore();
+    const insets = useSafeAreaInsets();
     const { t } = useTranslation();
     const userAvatarUri = user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url;
+
+    const inactiveIconColor = isDark ? 'rgba(255, 255, 255, 0.40)' : '#64748B';
 
     // Quick Account Switcher Modal state
     const [showSwitcherModal, setShowSwitcherModal] = useState(false);
@@ -118,61 +126,37 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
 
     const deduplicateAccountsList = (list: any[]) => {
         if (!list || !Array.isArray(list)) return [];
-        const map = new Map<string, any>();
-        list.forEach(acc => {
-            if (acc.comment && typeof acc.comment === 'string' && acc.comment.includes('[PROFILE_UPDATE]')) {
-                return;
-            }
-            const key = acc.role === 'manager'
-                ? `manager_${acc.teamId || acc.id || acc._id}`
-                : `player_${acc.id || acc._id}`;
-            if (!map.has(key)) {
-                map.set(key, acc);
-            }
+        const seen = new Set();
+        return list.filter((item: any) => {
+            const key = `${item.id || item._id}_${item.organizationId || item.organization_id || 1}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
         });
-        return Array.from(map.values());
     };
 
     const handleProfilLongPress = async () => {
         try {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         } catch (e) {}
 
-        if (isGuest) {
-            Alert.alert(t('common.accounts', 'Akkountlar'), t('auth.login_to_view_accounts', "Akkount ro'yxatini ko'rish uchun ilovaga kiring."));
-            return;
-        }
-
-        modalY.setValue(0);
-        const userPhone = user?.phone || user?.phoneNumber || user?.phone_number || user?.tel;
-        const cachedAccounts = useAuthStore.getState().userAccounts;
-        const cleanCached = deduplicateAccountsList(cachedAccounts || []);
-
-        if (cleanCached && cleanCached.length > 0) {
-            setAccountOptions(cleanCached);
-            setLoadingAccounts(false);
-            setShowSwitcherModal(true);
-        } else {
-            setAccountOptions(user ? [user] : []);
-            setLoadingAccounts(true);
-            setShowSwitcherModal(true);
-        }
-
-        if (userPhone) {
-            try {
-                const fullPhone = `+998${userPhone.replace(/\D/g, '').slice(-9)}`;
-                const res = await apiService.findAccountsByPhone(fullPhone);
-                if (res.success && res.accounts && res.accounts.length > 0) {
-                    const cleanRes = deduplicateAccountsList(res.accounts);
-                    setAccountOptions(cleanRes);
-                    useAuthStore.getState().setUserAccounts(cleanRes);
-                }
-            } catch (e) {
-                console.warn('Background account refresh error:', e);
-            } finally {
+        setShowSwitcherModal(true);
+        setLoadingAccounts(true);
+        try {
+            const phone = user?.phone || user?.phoneNumber || user?.phone_number;
+            if (!phone) {
+                setAccountOptions(deduplicateAccountsList([user]));
                 setLoadingAccounts(false);
+                return;
             }
-        } else {
+            const fullPhone = `+998${phone.replace(/\D/g, '').slice(-9)}`;
+            const res = await apiService.findAccountsByPhone(fullPhone).catch(() => ({ success: false, accounts: [] }));
+            const accounts = res?.accounts || [];
+            const validAccounts = Array.isArray(accounts) && accounts.length > 0 ? accounts : [user];
+            setAccountOptions(deduplicateAccountsList(validAccounts));
+        } catch (e) {
+            setAccountOptions(deduplicateAccountsList([user]));
+        } finally {
             setLoadingAccounts(false);
         }
     };
@@ -197,19 +181,41 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
     };
 
     return (
-        <View style={styles.floatingContainer} pointerEvents="box-none">
-            <View style={styles.floatingCapsuleWrapper}>
-                <BlurView
-                    intensity={Platform.OS === 'ios' ? 45 : 55}
-                    tint="dark"
-                    style={StyleSheet.absoluteFill}
-                />
+        <View 
+            style={[
+                styles.floatingContainer,
+                Platform.OS === 'android' && {
+                    paddingBottom: insets.bottom,
+                    backgroundColor: isDark ? '#131F37' : '#FFFFFF',
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border,
+                }
+            ]} 
+            pointerEvents="box-none"
+        >
+            <View style={[
+                styles.floatingCapsuleWrapper,
+                {
+                    backgroundColor: isDark ? 'rgba(19, 31, 55, 0.94)' : 'rgba(255, 255, 255, 0.94)',
+                    borderColor: colors.border,
+                }
+            ]}>
+                {Platform.OS === 'ios' && isDark && (
+                    <BlurView
+                        intensity={Platform.OS === 'ios' ? 45 : 55}
+                        tint="dark"
+                        style={StyleSheet.absoluteFill}
+                    />
+                )}
 
                 {/* Real-time Smooth Sliding Highlight Pill */}
                 <Animated.View
                     style={[
                         styles.activeTabIndicator,
-                        { transform: [{ translateX }] },
+                        {
+                            backgroundColor: isDark ? 'rgba(0, 223, 130, 0.18)' : 'rgba(0, 223, 130, 0.15)',
+                            transform: [{ translateX }]
+                        },
                     ]}
                 />
 
@@ -238,7 +244,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                                                     height: 24,
                                                     borderRadius: 12,
                                                     borderWidth: isFocused ? 2 : 1,
-                                                    borderColor: isFocused ? '#00FF9D' : 'rgba(255, 255, 255, 0.40)',
+                                                    borderColor: isFocused ? '#00FF9D' : inactiveIconColor,
                                                 }}
                                                 contentFit="cover"
                                                 fallbackIcon="person-outline"
@@ -248,9 +254,9 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                                             <Ionicons
                                                 name="person-outline"
                                                 size={isFocused ? 24 : 22}
-                                                color={isFocused ? '#00FF9D' : 'rgba(255, 255, 255, 0.40)'}
+                                                color={isFocused ? Colors.primary : inactiveIconColor}
                                                 style={isFocused && Platform.OS === 'ios' ? {
-                                                    textShadowColor: '#00DF82',
+                                                    textShadowColor: Colors.primary,
                                                     textShadowOffset: { width: 0, height: 0 },
                                                     textShadowRadius: 8,
                                                 } : undefined}
@@ -260,9 +266,9 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                                         <Ionicons
                                             name={tab.icon as any}
                                             size={isFocused ? 24 : 22}
-                                            color={isFocused ? '#00FF9D' : 'rgba(255, 255, 255, 0.40)'}
+                                            color={isFocused ? Colors.primary : inactiveIconColor}
                                             style={isFocused && Platform.OS === 'ios' ? {
-                                                textShadowColor: '#00DF82',
+                                                textShadowColor: Colors.primary,
                                                 textShadowOffset: { width: 0, height: 0 },
                                                 textShadowRadius: 8,
                                             } : undefined}
@@ -291,24 +297,25 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                     <Animated.View
                         style={[
                             styles.switcherModalCard,
+                            { backgroundColor: colors.surface, borderColor: colors.border },
                             { transform: [{ translateY: modalY }] }
                         ]}
                         {...modalPanResponder.panHandlers}
                     >
-                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                        {Platform.OS === 'ios' && isDark && <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
                         
                         <View style={styles.headerDragZone}>
-                            <View style={styles.grabberBar} />
+                            <View style={[styles.grabberBar, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]} />
                             <View style={styles.modalHeaderRow}>
-                                <Text style={styles.switcherTitle}>{t('common.switch_account', 'Akkountni Almashtirish')}</Text>
+                                <Text style={[styles.switcherTitle, { color: colors.text }]}>{t('common.switch_account', 'Akkountni Almashtirish')}</Text>
                             </View>
                         </View>
 
                         <View style={{ paddingHorizontal: 22, paddingTop: 2, paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
                             {loadingAccounts ? (
                                 <View style={{ paddingVertical: 36, alignItems: 'center' }}>
-                                    <ActivityIndicator size="small" color="#FFFFFF" />
-                                    <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 12, fontSize: 13 }}>
+                                    <ActivityIndicator size="small" color={colors.text} />
+                                    <Text style={{ color: colors.textMuted, marginTop: 12, fontSize: 13 }}>
                                         Yuklanmoqda...
                                     </Text>
                                 </View>
@@ -322,7 +329,11 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                                         return (
                                             <TouchableOpacity
                                                 key={idx}
-                                                style={[styles.accountOptionCard, isCurrent && styles.accountOptionCardActive]}
+                                                style={[
+                                                    styles.accountOptionCard,
+                                                    { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)', borderColor: colors.border },
+                                                    isCurrent && [styles.accountOptionCardActive, { borderColor: Colors.primary, backgroundColor: isDark ? 'rgba(232, 80, 2, 0.12)' : 'rgba(232, 80, 2, 0.08)' }]
+                                                ]}
                                                 activeOpacity={0.75}
                                                 onPress={() => handleSwitchAccount(acc)}
                                             >
@@ -335,8 +346,8 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                                                             resizeMode="cover"
                                                         />
                                                     ) : (
-                                                        <View style={styles.accountOptionAvatarFallback}>
-                                                            <Text style={styles.avatarInitial}>
+                                                        <View style={[styles.accountOptionAvatarFallback, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)' }]}>
+                                                            <Text style={[styles.avatarInitial, { color: colors.text }]}>
                                                                 {(acc.name || 'F').charAt(0).toUpperCase()}
                                                             </Text>
                                                         </View>
@@ -345,14 +356,14 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
 
                                                 {/* Name and Organization */}
                                                 <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
-                                                    <Text style={styles.accountOptionName}>{acc.name}</Text>
-                                                    <Text style={styles.accountOptionOrg}>{orgName}</Text>
+                                                    <Text style={[styles.accountOptionName, { color: colors.text }]}>{acc.name}</Text>
+                                                    <Text style={[styles.accountOptionOrg, { color: isDark ? 'rgba(255, 255, 255, 0.55)' : '#64748B' }]}>{orgName}</Text>
                                                 </View>
 
                                                 {/* Active Indicator */}
                                                 {isCurrent && (
-                                                    <View style={styles.activeCheckBadge}>
-                                                        <View style={styles.activeCheckDot} />
+                                                    <View style={[styles.activeCheckBadge, { borderColor: Colors.primary }]}>
+                                                        <View style={[styles.activeCheckDot, { backgroundColor: Colors.primary }]} />
                                                     </View>
                                                 )}
                                             </TouchableOpacity>
@@ -426,12 +437,12 @@ function MainSwipeableTabs({ navigation, route }: any) {
 
     return (
         <View style={styles.mainContainer}>
-            {/* Real-time 60/120fps Instagram-Style Continuous Horizontal Paging */}
+            {/* Real-time 60/120fps Continuous Horizontal Paging on iOS, Click-only on Android */}
             <Animated.ScrollView
                 ref={scrollViewRef}
                 horizontal
                 pagingEnabled
-                scrollEnabled={!isSwipeDisabled}
+                scrollEnabled={Platform.OS === 'android' ? false : !isSwipeDisabled}
                 showsHorizontalScrollIndicator={false}
                 bounces={false}
                 scrollEventThrottle={16}
@@ -487,7 +498,7 @@ const styles = StyleSheet.create({
     },
     floatingContainer: {
         position: 'absolute',
-        bottom: Platform.OS === 'ios' ? 36 : 28,
+        bottom: Platform.OS === 'ios' ? 36 : 0,
         left: 0,
         right: 0,
         alignItems: 'center',
@@ -495,25 +506,31 @@ const styles = StyleSheet.create({
     },
     floatingCapsuleWrapper: {
         width: CAPSULE_WIDTH,
-        height: 56,
-        borderRadius: 16,
+        height: Platform.OS === 'ios' ? 56 : 60,
+        borderRadius: Platform.OS === 'ios' ? 16 : 0,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        borderBottomLeftRadius: Platform.OS === 'ios' ? 16 : 0,
+        borderBottomRightRadius: Platform.OS === 'ios' ? 16 : 0,
         overflow: 'hidden',
-        borderWidth: 1,
+        borderTopWidth: 1,
+        borderLeftWidth: Platform.OS === 'ios' ? 1 : 0,
+        borderRightWidth: Platform.OS === 'ios' ? 1 : 0,
+        borderBottomWidth: Platform.OS === 'ios' ? 1 : 0,
         borderColor: 'rgba(255, 255, 255, 0.16)',
-        backgroundColor: Platform.OS === 'android' ? 'rgba(15, 23, 42, 0.90)' : 'rgba(20, 15, 25, 0.48)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.45,
         shadowRadius: 20,
-        elevation: 8,
+        elevation: 12,
         position: 'relative',
     },
     activeTabIndicator: {
         position: 'absolute',
-        top: 5,
+        top: Platform.OS === 'ios' ? 5 : 7,
         width: HIGHLIGHT_WIDTH,
         height: 46,
-        borderRadius: 8,
+        borderRadius: 10,
         backgroundColor: 'rgba(0, 223, 130, 0.16)',
         borderWidth: 1,
         borderColor: 'rgba(0, 223, 130, 0.38)',
@@ -521,14 +538,15 @@ const styles = StyleSheet.create({
     tabRow: {
         flexDirection: 'row',
         width: '100%',
-        height: 56,
+        height: Platform.OS === 'ios' ? 56 : 60,
         alignItems: 'center',
         justifyContent: 'space-around',
         paddingHorizontal: 4,
+        paddingBottom: Platform.OS === 'ios' ? 0 : 2,
     },
     tabItem: {
         flex: 1,
-        height: 56,
+        height: Platform.OS === 'ios' ? 56 : 60,
         alignItems: 'center',
         justifyContent: 'center',
     },
