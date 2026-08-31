@@ -524,12 +524,12 @@ export default function HomeScreen({ navigation }: any) {
 
                 <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
                     {/* Logo Team1 | Score | Team2 Logo */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
 
                         {/* CHAP: Home Team Name + Logo */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                {formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'UY', 4)}
+                                {match.homeTeamName || match.homeTeam?.name || 'UY'}
                             </Text>
                             <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
                                 {match.homeTeam?.logo || match.home_team_logo ? (
@@ -548,7 +548,7 @@ export default function HomeScreen({ navigation }: any) {
                         </View>
 
                         {/* O'RTA: Score yoki Vaqt */}
-                        <View style={{ alignItems: 'center', paddingHorizontal: 12 }}>
+                        <View style={{ alignItems: 'center', paddingHorizontal: 8 }}>
                             {Boolean(matchIsLive || matchIsFinished) ? (
                                 <View style={{ alignItems: 'center' }}>
                                     {/* Score */}
@@ -580,7 +580,7 @@ export default function HomeScreen({ navigation }: any) {
                         </View>
 
                         {/* O'NG: Away Team Logo + Name */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
                                 {match.awayTeam?.logo || match.away_team_logo ? (
                                     <SmartImage
@@ -596,7 +596,7 @@ export default function HomeScreen({ navigation }: any) {
                                 )}
                             </View>
                             <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                {formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'MEH', 4)}
+                                {match.awayTeamName || match.awayTeam?.name || 'MEH'}
                             </Text>
                         </View>
 
