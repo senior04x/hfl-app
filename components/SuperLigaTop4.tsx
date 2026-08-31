@@ -118,7 +118,7 @@ export default function SuperLigaTop4({ onViewAll }: { onViewAll?: () => void })
                 {onViewAll && (
                     <TouchableOpacity onPress={onViewAll} activeOpacity={0.7}>
                         <Text style={[styles.viewAllText, { color: homeColors.textSecondary }]}>
-                            {t('home.view_all', 'Barchasi')}
+                            {t('common.details', 'BATAFSIL').toUpperCase()}
                         </Text>
                     </TouchableOpacity>
                 )}

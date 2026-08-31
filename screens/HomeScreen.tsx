@@ -677,7 +677,7 @@ export default function HomeScreen({ navigation }: any) {
                                         {t('home.news', 'YANGILIKLAR').toUpperCase()}
                                     </Text>
                                     <TouchableOpacity onPress={() => navigation.navigate('NewsScreen')} activeOpacity={0.7}>
-                                        <Text style={styles.viewAllText}>{t('home.view_all', 'Barchasi')}</Text>
+                                        <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -751,7 +751,7 @@ export default function HomeScreen({ navigation }: any) {
                                                 </Text>
                                             </View>
                                             <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
-                                                <Text style={styles.viewAllText}>{t('home.view_calendar', 'Taqvim')}</Text>
+                                                <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
                                             </TouchableOpacity>
                                         </View>
 
@@ -766,7 +766,7 @@ export default function HomeScreen({ navigation }: any) {
                                             <View style={styles.sectionHeader}>
                                                 <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
                                                 <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
-                                                    <Text style={styles.viewAllText}>{t('home.view_calendar', 'Taqvim')}</Text>
+                                                    <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
                                                 </TouchableOpacity>
                                             </View>
                                             <View style={styles.verticalMatchList}>
@@ -797,7 +797,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         activeOpacity={0.75}
                                                     >
                                                         <Text style={styles.viewAllText}>
-                                                            {t('home.view_league_results', { league: group.leagueName.toUpperCase() })}
+                                                            {t('common.details', 'Batafsil').toUpperCase()}
                                                         </Text>
                                                     </TouchableOpacity>
                                                 </View>
@@ -815,7 +815,7 @@ export default function HomeScreen({ navigation }: any) {
                                         <View style={styles.sectionHeader}>
                                             <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
                                             <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
-                                                <Text style={styles.viewAllText}>{t('home.view_calendar', 'Taqvim')}</Text>
+                                                <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
                                             </TouchableOpacity>
                                         </View>
 
@@ -846,7 +846,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         activeOpacity={0.75}
                                                     >
                                                         <Text style={styles.viewAllText}>
-                                                            {t('home.view_league_results', { league: group.leagueName.toUpperCase() })}
+                                                            {t('common.details', 'Batafsil').toUpperCase()}
                                                         </Text>
                                                     </TouchableOpacity>
                                                 </View>
