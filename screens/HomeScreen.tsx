@@ -865,10 +865,10 @@ export default function HomeScreen({ navigation }: any) {
                                         <View style={styles.sectionHeader}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                                                 <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                    {t('common.details', 'BATAFSIL').toUpperCase()}
+                                                    {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
                                                 </Text>
                                             </View>
-                                            <TouchableOpacity 
+                                            <TouchableOpacity
                                                 onPress={() => {
                                                     navigation.navigate('TournamentDetail', {
                                                         tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
@@ -880,7 +880,7 @@ export default function HomeScreen({ navigation }: any) {
                                                 activeOpacity={0.75}
                                             >
                                                 <Text style={styles.viewAllText}>
-                                                    {t('home.view_league_results', { league: group.leagueName.toUpperCase() })}
+                                                    {t('common.details', 'BATAFSIL').toUpperCase()}
                                                 </Text>
                                             </TouchableOpacity>
                                         </View>
