@@ -782,7 +782,7 @@ export default function HomeScreen({ navigation }: any) {
                                                 <View style={styles.sectionHeader}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                                                         <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                            {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
+                                                            {t('common.details', 'BATAFSIL').toUpperCase()}
                                                         </Text>
                                                     </View>
                                                     <TouchableOpacity 
@@ -831,7 +831,7 @@ export default function HomeScreen({ navigation }: any) {
                                                 <View style={styles.sectionHeader}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                                                         <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                            {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
+                                                            {t('common.details', 'BATAFSIL').toUpperCase()}
                                                         </Text>
                                                     </View>
                                                     <TouchableOpacity 
