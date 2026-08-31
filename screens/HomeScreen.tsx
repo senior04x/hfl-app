@@ -1273,7 +1273,7 @@ const styles = StyleSheet.create({
         width: width - 40,
         borderRadius: 20,
         overflow: 'hidden',
-        marginBottom: 14,
+        marginBottom: 6,
         // Border OLIB TASHLANDI — soya bilan almashtirildi
         backgroundColor: 'rgba(15, 23, 42, 0.45)',
         // Neytral qora soya (rangli soya taqiqlangan)
