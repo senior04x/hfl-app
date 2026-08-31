@@ -95,7 +95,7 @@ export default function SuperLigaTop4({ onViewAll }: { onViewAll?: () => void })
     // Loading holati
     if (loading) {
         return (
-            <View style={[styles.container, { backgroundColor: homeColors.surface }]}>
+            <View style={[styles.container, { backgroundColor: homeColors.background, borderWidth: 1, borderColor: homeColors.border }]}>
                 <View style={styles.header}>
                     <Text style={[styles.title, { color: homeColors.textPrimary }]}>
                         {t('home.super_liga_top4', 'SUPER LIGA — TOP 4').toUpperCase()}
