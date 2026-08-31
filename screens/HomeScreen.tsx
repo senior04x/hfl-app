@@ -718,10 +718,10 @@ export default function HomeScreen({ navigation }: any) {
                                 <ScrollView
                                     horizontal
                                     showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+                                    contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingVertical: 4 }}
                                 >
                                     {[1, 2, 3].map((item) => (
-                                        <TouchableOpacity
+                                        <View
                                             key={item}
                                             style={{
                                                 width: 280,
@@ -730,36 +730,39 @@ export default function HomeScreen({ navigation }: any) {
                                                 backgroundColor: homeColors.background,
                                                 borderWidth: 1,
                                                 borderColor: homeColors.border,
-                                                overflow: 'hidden',
                                                 shadowColor: '#000000',
                                                 shadowOffset: { width: 0, height: 4 },
                                                 shadowOpacity: 0.1,
                                                 shadowRadius: 10,
-                                                elevation: 3,
+                                                elevation: 6,
                                             }}
-                                            activeOpacity={0.8}
                                         >
-                                            <View style={{ flex: 1, padding: 14, justifyContent: 'space-between' }}>
-                                                <View>
-                                                    <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.primary, letterSpacing: 0.3, marginBottom: 6 }}>
-                                                        SUPER LIGA
-                                                    </Text>
-                                                    <Text
-                                                        style={{ fontSize: 14, fontWeight: '700', color: homeColors.textPrimary, lineHeight: 18 }}
-                                                        numberOfLines={3}
-                                                    >
-                                                        Yangi mavsum uchun transfer oynasi ochildi
-                                                    </Text>
-                                                </View>
+                                            <TouchableOpacity
+                                                style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <View style={{ flex: 1, padding: 14, justifyContent: 'space-between' }}>
+                                                    <View>
+                                                        <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.primary, letterSpacing: 0.3, marginBottom: 6 }}>
+                                                            SUPER LIGA
+                                                        </Text>
+                                                        <Text
+                                                            style={{ fontSize: 14, fontWeight: '700', color: homeColors.textPrimary, lineHeight: 18 }}
+                                                            numberOfLines={3}
+                                                        >
+                                                            Yangi mavsum uchun transfer oynasi ochildi
+                                                        </Text>
+                                                    </View>
 
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                    <Text style={{ fontSize: 9, color: homeColors.textSecondary }}>
-                                                        2 soat oldin
-                                                    </Text>
-                                                    <Ionicons name="chevron-forward" size={14} color={homeColors.textSecondary} />
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <Text style={{ fontSize: 9, color: homeColors.textSecondary }}>
+                                                            2 soat oldin
+                                                        </Text>
+                                                        <Ionicons name="chevron-forward" size={14} color={homeColors.textSecondary} />
+                                                    </View>
                                                 </View>
-                                            </View>
-                                        </TouchableOpacity>
+                                            </TouchableOpacity>
+                                        </View>
                                     ))}
                                 </ScrollView>
                             </View>
