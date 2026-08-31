@@ -514,7 +514,7 @@ export default function HomeScreen({ navigation }: any) {
                 key={match._id || Math.random().toString()}
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
-                    { backgroundColor: homeColors.surface, borderColor: homeColors.border },
+                    { backgroundColor: homeColors.surface },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
                 onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
@@ -566,12 +566,30 @@ export default function HomeScreen({ navigation }: any) {
                         <View style={styles.hScoreColumn}>
                             {Boolean(matchIsLive || matchIsFinished) ? (
                                 <View style={styles.scoreAndTimerCenterBox}>
-                                    <Text style={[
-                                        styles.hScoreText,
-                                        { color: homeColors.textPrimary }
-                                    ]}>
-                                        {match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}
-                                    </Text>
+                                    {/* Hisob — g'olib jamoa raqami to'q, boshqasi kulrang */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Text style={[
+                                            styles.hScoreText,
+                                            {
+                                                color: (match.score?.home ?? match.home_score ?? 0) > (match.score?.away ?? match.away_score ?? 0)
+                                                    ? homeColors.textPrimary
+                                                    : homeColors.textSecondary
+                                            }
+                                        ]}>
+                                            {match.score?.home ?? (match.home_score ?? 0)}
+                                        </Text>
+                                        <Text style={[styles.hScoreText, { color: homeColors.textSecondary }]}>-</Text>
+                                        <Text style={[
+                                            styles.hScoreText,
+                                            {
+                                                color: (match.score?.away ?? match.away_score ?? 0) > (match.score?.home ?? match.home_score ?? 0)
+                                                    ? homeColors.textPrimary
+                                                    : homeColors.textSecondary
+                                            }
+                                        ]}>
+                                            {match.score?.away ?? (match.away_score ?? 0)}
+                                        </Text>
+                                    </View>
                                     {Boolean(matchIsLive) ? (
                                         <View style={styles.cleanLiveTimerContainer}>
                                             <Text style={[
@@ -1053,11 +1071,11 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
     },
     hMatchCardLive: {
-        borderColor: 'rgba(232, 80, 2, 0.45)',
+        // Border OLIB TASHLANDI — faqat yengil orange fon qoldirildi
         backgroundColor: 'rgba(232, 80, 2, 0.12)',
     },
     hMatchCardHalftime: {
-        borderColor: 'rgba(250, 204, 21, 0.65)',
+        // Border OLIB TASHLANDI — faqat yengil sariq fon qoldirildi
         backgroundColor: 'rgba(250, 204, 21, 0.1)',
     },
     hMatchHeader: {
@@ -1121,8 +1139,9 @@ const styles = StyleSheet.create({
     },
     hScoreText: {
         color: '#FFF',
-        fontSize: 22,
+        fontSize: 28,
         fontWeight: '900',
+        letterSpacing: -0.5,
     },
     hMatchFooter: {
         alignItems: 'center',
@@ -1210,18 +1229,28 @@ const styles = StyleSheet.create({
         width: CARD_WIDTH,
         borderRadius: 20,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        // Border OLIB TASHLANDI — soya bilan almashtirildi
         backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        // Neytral qora soya (rangli soya taqiqlangan)
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 3,
     },
     vMatchCard: {
         width: width - 40,
         borderRadius: 20,
         overflow: 'hidden',
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        marginBottom: 14,
+        // Border OLIB TASHLANDI — soya bilan almashtirildi
         backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        // Neytral qora soya (rangli soya taqiqlangan)
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 3,
     },
 
     hMatchCardWrapper: {

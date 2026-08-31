@@ -95,7 +95,7 @@ export default function SuperLigaTop4({ onViewAll }: { onViewAll?: () => void })
     // Loading holati
     if (loading) {
         return (
-            <View style={[styles.container, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+            <View style={[styles.container, { backgroundColor: homeColors.surface }]}>
                 <View style={styles.header}>
                     <Text style={[styles.title, { color: homeColors.textPrimary }]}>
                         {t('home.super_liga_top4', 'SUPER LIGA — TOP 4').toUpperCase()}
@@ -109,7 +109,7 @@ export default function SuperLigaTop4({ onViewAll }: { onViewAll?: () => void })
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+        <View style={[styles.container, { backgroundColor: homeColors.surface }]}>
             {/* Header */}
             <View style={styles.header}>
                 <Text style={[styles.title, { color: homeColors.textPrimary }]}>
@@ -214,8 +214,13 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
         marginBottom: 20,
         borderRadius: 12,
-        borderWidth: 1,
         overflow: 'hidden',
+        // Border OLIB TASHLANDI — neytral qora soya bilan almashtirildi
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 3,
     },
     header: {
         flexDirection: 'row',
