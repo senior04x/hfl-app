@@ -92,7 +92,7 @@ export default function SuperLigaTop4({ onViewAll }: { onViewAll?: () => void })
         return null;
     }
 
-    // Loading holati
+    // Loading holati — Skeleton
     if (loading) {
         return (
             <View style={[styles.container, { backgroundColor: homeColors.background, borderWidth: 1, borderColor: homeColors.border }]}>
@@ -101,8 +101,54 @@ export default function SuperLigaTop4({ onViewAll }: { onViewAll?: () => void })
                         {t('home.super_liga_top4', 'SUPER LIGA — TOP 4').toUpperCase()}
                     </Text>
                 </View>
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={homeColors.textSecondary} />
+
+                {/* Skeleton Loading */}
+                <View style={styles.table}>
+                    {/* Table Header */}
+                    <View style={[styles.tableRow, styles.tableHeader, { borderBottomColor: homeColors.border }]}>
+                        <Text style={[styles.headerText, styles.posColumn, { color: homeColors.textSecondary }]}>#</Text>
+                        <Text style={[styles.headerText, styles.teamColumn, { color: homeColors.textSecondary }]}>
+                            {t('standings.team', 'JAMOA').toUpperCase()}
+                        </Text>
+                        <Text style={[styles.headerText, styles.statColumn, { color: homeColors.textSecondary }]}>
+                            {t('standings.played_short', 'O').toUpperCase()}
+                        </Text>
+                        <Text style={[styles.headerText, styles.statColumn, { color: homeColors.textSecondary }]}>
+                            {t('standings.diff_short', 'GF').toUpperCase()}
+                        </Text>
+                        <Text style={[styles.headerText, styles.pointsColumn, { color: homeColors.textSecondary }]}>
+                            {t('home.points_short', 'O').toUpperCase()}
+                        </Text>
+                    </View>
+
+                    {/* 4 ta skeleton qatorlar */}
+                    {[1, 2, 3, 4].map((item) => (
+                        <View key={item} style={[styles.tableRow, { borderBottomColor: homeColors.border }]}>
+                            {/* Position skeleton */}
+                            <View style={[styles.posColumn, { justifyContent: 'center', alignItems: 'center' }]}>
+                                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }} />
+                            </View>
+
+                            {/* Team skeleton */}
+                            <View style={[styles.teamColumn, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+                                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }} />
+                                <View style={{ width: 80, height: 10, borderRadius: 5, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }} />
+                            </View>
+
+                            {/* Stats skeleton */}
+                            <View style={[styles.statColumn, { justifyContent: 'center', alignItems: 'center' }]}>
+                                <View style={{ width: 16, height: 10, borderRadius: 5, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }} />
+                            </View>
+                            <View style={[styles.statColumn, { justifyContent: 'center', alignItems: 'center' }]}>
+                                <View style={{ width: 16, height: 10, borderRadius: 5, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }} />
+                            </View>
+
+                            {/* Points skeleton */}
+                            <View style={[styles.pointsColumn, { justifyContent: 'center', alignItems: 'center' }]}>
+                                <View style={{ width: 20, height: 12, borderRadius: 6, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }} />
+                            </View>
+                        </View>
+                    ))}
                 </View>
             </View>
         );
