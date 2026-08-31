@@ -523,55 +523,89 @@ export default function HomeScreen({ navigation }: any) {
                 {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
 
                 <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                    {/* ULTRA MINIMAL: Bitta qator — Team vs Team + Score/Time + Tur */}
+                    {/* Logo Team1 | Score | Team2 Logo */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
 
-                        {/* Chap: Team Names */}
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.2 }} numberOfLines={1}>
-                                {formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'UY', 4)} vs {formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'MEH', 4)}
-                            </Text>
-
-                            {/* Tur/Liga pastida kichik */}
-                            <Text style={{ fontSize: 9, fontWeight: '500', color: homeColors.textSecondary, marginTop: 3 }}>
-                                {roundTagText || (match.tournamentName || match.league || "AMATORA").toUpperCase()}
+                        {/* CHAP: Home Team Logo + Name */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                                {match.homeTeam?.logo || match.home_team_logo ? (
+                                    <SmartImage
+                                        uri={match.homeTeam?.logo || match.home_team_logo}
+                                        style={{ width: 18, height: 18 }}
+                                        contentFit="contain"
+                                        fallbackIcon="shield-outline"
+                                    />
+                                ) : (
+                                    <Text style={{ fontSize: 9, fontWeight: '700', color: homeColors.textSecondary }}>
+                                        {(match.homeTeamName || match.homeTeam?.name || 'UY').charAt(0).toUpperCase()}
+                                    </Text>
+                                )}
+                            </View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
+                                {formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'UY', 4)}
                             </Text>
                         </View>
 
-                        {/* O'ng: Score yoki Vaqt + LIVE */}
-                        <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                        {/* O'RTA: Score yoki Vaqt */}
+                        <View style={{ alignItems: 'center', paddingHorizontal: 12 }}>
                             {Boolean(matchIsLive || matchIsFinished) ? (
-                                <>
-                                    {/* Score KATTA */}
+                                <View style={{ alignItems: 'center' }}>
+                                    {/* Score */}
                                     <Text style={{ fontSize: 22, fontWeight: '900', color: homeColors.textPrimary, letterSpacing: -0.5 }}>
                                         {match.score?.home ?? match.home_score ?? 0} - {match.score?.away ?? match.away_score ?? 0}
                                     </Text>
-
-                                    {/* LIVE badge MINIMAL */}
+                                    {/* LIVE badge */}
                                     {Boolean(matchIsLive) && (
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
                                             <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.primary }} />
-                                            <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.primary, letterSpacing: 0.3 }}>
+                                            <Text style={{ fontSize: 8, fontWeight: '700', color: Colors.primary, letterSpacing: 0.3 }}>
                                                 {liveBadgeLabel}
                                             </Text>
                                         </View>
                                     )}
-                                </>
+                                </View>
                             ) : (
-                                <>
+                                <View style={{ alignItems: 'center' }}>
                                     {/* Vaqt */}
-                                    <Text style={{ fontSize: 18, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
+                                    <Text style={{ fontSize: 16, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
                                         {formattedTime}
                                     </Text>
-
-                                    {/* Sana pastida */}
-                                    <Text style={{ fontSize: 9, color: homeColors.textSecondary, marginTop: 2 }}>
+                                    {/* Sana */}
+                                    <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 1 }}>
                                         {day} {month}
                                     </Text>
-                                </>
+                                </View>
                             )}
                         </View>
+
+                        {/* O'NG: Away Team Name + Logo */}
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                                {match.awayTeam?.logo || match.away_team_logo ? (
+                                    <SmartImage
+                                        uri={match.awayTeam?.logo || match.away_team_logo}
+                                        style={{ width: 18, height: 18 }}
+                                        contentFit="contain"
+                                        fallbackIcon="shield-outline"
+                                    />
+                                ) : (
+                                    <Text style={{ fontSize: 9, fontWeight: '700', color: homeColors.textSecondary }}>
+                                        {(match.awayTeamName || match.awayTeam?.name || 'MEH').charAt(0).toUpperCase()}
+                                    </Text>
+                                )}
+                            </View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1, textAlign: 'right' }} numberOfLines={1}>
+                                {formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'MEH', 4)}
+                            </Text>
+                        </View>
+
                     </View>
+
+                    {/* Tur/Liga pastida CENTER */}
+                    <Text style={{ fontSize: 9, fontWeight: '500', color: homeColors.textSecondary, marginTop: 6, textAlign: 'center' }}>
+                        {roundTagText || (match.tournamentName || match.league || "AMATORA").toUpperCase()}
+                    </Text>
                 </View>
             </TouchableOpacity>
         );
