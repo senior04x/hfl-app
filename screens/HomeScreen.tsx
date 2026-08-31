@@ -22,6 +22,8 @@ import MatchStoriesTray, { StoryGroup } from '../components/MatchStoriesTray';
 import StoryViewerModal from '../components/StoryViewerModal';
 import { supabase } from '../services/supabase';
 import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
+import SuperLigaTop4 from '../components/SuperLigaTop4';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.88;
@@ -34,6 +36,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minut
 export default function HomeScreen({ navigation }: any) {
     const { t, i18n } = useTranslation();
     const { colors, isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
     const currentLang = i18n.language || 'uz';
     const [matches, setMatches] = useState<any[]>([]);
     const [sliderItems, setSliderItems] = useState<any[]>([]);
@@ -511,20 +514,19 @@ export default function HomeScreen({ navigation }: any) {
                 key={match._id || Math.random().toString()}
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    { backgroundColor: homeColors.surface, borderColor: homeColors.border },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
                 onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
                 activeOpacity={0.85}
             >
                 {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
-                
+
                 <View style={{ padding: 16 }}>
-                    {/* Header: League & Status Badge */}
-                    <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                    {/* Header: League & Status Badge (Trophy icon OLIB TASHLANDI — Brief Bosqich 2) */}
+                    <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader, { borderBottomColor: homeColors.border }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                            <Ionicons name="trophy-outline" size={13} color={colors.textMuted} />
-                            <Text style={[styles.hMatchLeague, { color: isDark ? '#8A94A6' : '#64748B' }]} numberOfLines={1}>
+                            <Text style={[styles.hMatchLeague, { color: homeColors.textSecondary }]} numberOfLines={1}>
                                 {(match.tournamentName || match.league || "O'rtoqlik uchrashuvi").toUpperCase()}
                             </Text>
                         </View>
@@ -554,10 +556,10 @@ export default function HomeScreen({ navigation }: any) {
                                         fallbackIcon="shield-outline"
                                     />
                                 ) : (
-                                    <Text style={[styles.hLogoText, { color: colors.text }]}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
+                                    <Text style={[styles.hLogoText, { color: homeColors.textPrimary }]}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
                                 )}
                             </View>
-                            <Text style={[styles.hTeamName, { color: colors.text }]} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi', 12)}</Text>
+                            <Text style={[styles.hTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi', 12)}</Text>
                         </View>
 
                         {/* Center Score / Time Box */}
@@ -566,7 +568,7 @@ export default function HomeScreen({ navigation }: any) {
                                 <View style={styles.scoreAndTimerCenterBox}>
                                     <Text style={[
                                         styles.hScoreText,
-                                        { color: colors.text }
+                                        { color: homeColors.textPrimary }
                                     ]}>
                                         {match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}
                                     </Text>
@@ -592,10 +594,10 @@ export default function HomeScreen({ navigation }: any) {
                             ) : (
                                 <View style={styles.vsContainer}>
                                     <View style={styles.timePillBadge}>
-                                        <Ionicons name="time-outline" size={12} color={colors.textMuted} style={{ marginRight: 4 }} />
+                                        <Ionicons name="time-outline" size={12} color={homeColors.textSecondary} style={{ marginRight: 4 }} />
                                         <Text style={styles.hTimeVsText}>{formattedTime}</Text>
                                     </View>
-                                    <Text style={[styles.vsSubText, { color: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)' }]}>{t('matches.starts').toUpperCase()}</Text>
+                                    <Text style={[styles.vsSubText, { color: homeColors.textSecondary }]}>{t('matches.starts').toUpperCase()}</Text>
                                 </View>
                             )}
                         </View>
@@ -611,21 +613,21 @@ export default function HomeScreen({ navigation }: any) {
                                         fallbackIcon="shield-outline"
                                     />
                                 ) : (
-                                    <Text style={[styles.hLogoText, { color: colors.text }]}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
+                                    <Text style={[styles.hLogoText, { color: homeColors.textPrimary }]}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
                                 )}
                             </View>
-                            <Text style={[styles.hTeamName, { color: colors.text }]} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12)}</Text>
+                            <Text style={[styles.hTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12)}</Text>
                         </View>
                     </View>
 
                     {/* Footer: Date & Stadium */}
                     <View style={styles.hMatchFooter}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                            <Ionicons name="calendar-outline" size={12} color={isDark ? "rgba(255,255,255,0.4)" : "#64748B"} />
-                            <Text style={[styles.hMatchDate, { color: isDark ? '#8A94A6' : '#64748B' }]}>{formattedFullDate}</Text>
-                            <Text style={{ color: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)', marginHorizontal: 2 }}>•</Text>
-                            <Ionicons name="location-outline" size={12} color={isDark ? "rgba(255,255,255,0.4)" : "#64748B"} />
-                            <Text style={[styles.hMatchDate, { color: isDark ? '#8A94A6' : '#64748B' }]} numberOfLines={1}>{localizedVenue}</Text>
+                            <Ionicons name="calendar-outline" size={12} color={homeColors.textSecondary} />
+                            <Text style={[styles.hMatchDate, { color: homeColors.textSecondary }]}>{formattedFullDate}</Text>
+                            <Text style={{ color: homeColors.border, marginHorizontal: 2 }}>•</Text>
+                            <Ionicons name="location-outline" size={12} color={homeColors.textSecondary} />
+                            <Text style={[styles.hMatchDate, { color: homeColors.textSecondary }]} numberOfLines={1}>{localizedVenue}</Text>
                         </View>
                     </View>
                 </View>
@@ -682,23 +684,23 @@ export default function HomeScreen({ navigation }: any) {
                                                 </View>
                                             </TouchableOpacity>
                                             <View>
-                                                <Text style={[styles.welcomeText, { color: isDark ? 'rgba(255, 255, 255, 0.5)' : '#64748B' }]}>
+                                                <Text style={[styles.welcomeText, { color: homeColors.textSecondary }]}>
                                                     {isGuest ? 'AMATORA' : getGreetingText().toUpperCase()}
                                                 </Text>
-                                                <Text style={[styles.brandText, { color: colors.text }]}>
+                                                <Text style={[styles.brandText, { color: homeColors.textPrimary }]}>
                                                     {isGuest ? getGreetingText().toUpperCase() : displayName.toUpperCase()}
                                                 </Text>
                                             </View>
                                         </View>
 
                                         {/* Right Action: Notifications Button */}
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={styles.profileButton}
                                             onPress={() => navigation.navigate('Notifications')}
                                             activeOpacity={0.75}
                                         >
-                                            <View style={[styles.bellButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                                                <Ionicons name="notifications-outline" size={20} color={colors.text} />
+                                            <View style={[styles.bellButton, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                                <Ionicons name="notifications-outline" size={20} color={homeColors.textPrimary} />
                                                 <View style={styles.unreadBadgeDot} />
                                             </View>
                                         </TouchableOpacity>
@@ -713,6 +715,18 @@ export default function HomeScreen({ navigation }: any) {
                                     onSelectStoryGroup={handleSelectStoryGroup}
                                 />
                             )}
+
+                            {/* Super Liga Top-4 Widget (Bosqich 2) */}
+                            <SuperLigaTop4
+                                onViewAll={() => {
+                                    navigation.navigate('TournamentDetail', {
+                                        tournamentId: 'super',
+                                        tournamentName: 'Super Liga',
+                                        initialTab: 'standings',
+                                        tab: 'standings'
+                                    });
+                                }}
+                            />
 
                             {/* Primary Dynamic Matches Section with Priority: 1. Live -> 2. Upcoming -> 3. Finished */}
                             {loading ? (
@@ -749,7 +763,7 @@ export default function HomeScreen({ navigation }: any) {
                                     {displayUpcomingMatches.length > 0 && (
                                         <View style={styles.sectionContainer}>
                                             <View style={styles.sectionHeader}>
-                                                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
+                                                <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
                                                 <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
                                                     <Text style={styles.viewAllText}>{t('home.view_calendar', 'Taqvim')}</Text>
                                                 </TouchableOpacity>
@@ -766,8 +780,7 @@ export default function HomeScreen({ navigation }: any) {
                                             <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                                 <View style={styles.sectionHeader}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                        <Ionicons name="trophy" size={16} color={colors.textMuted} />
-                                                        <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+                                                        <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
                                                             {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
                                                         </Text>
                                                     </View>
@@ -799,7 +812,7 @@ export default function HomeScreen({ navigation }: any) {
                                 <>
                                     <View style={styles.sectionContainer}>
                                         <View style={styles.sectionHeader}>
-                                            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
+                                            <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
                                             <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
                                                 <Text style={styles.viewAllText}>{t('home.view_calendar', 'Taqvim')}</Text>
                                             </TouchableOpacity>
@@ -816,8 +829,7 @@ export default function HomeScreen({ navigation }: any) {
                                             <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                                 <View style={styles.sectionHeader}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                        <Ionicons name="trophy" size={16} color={colors.textMuted} />
-                                                        <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+                                                        <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
                                                             {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
                                                         </Text>
                                                     </View>
@@ -851,8 +863,7 @@ export default function HomeScreen({ navigation }: any) {
                                     <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                         <View style={styles.sectionHeader}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                <Ionicons name="trophy" size={16} color={colors.textMuted} />
-                                                <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+                                                <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
                                                     {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
                                                 </Text>
                                             </View>
