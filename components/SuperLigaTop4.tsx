@@ -109,7 +109,7 @@ export default function SuperLigaTop4({ onViewAll }: { onViewAll?: () => void })
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: homeColors.surface }]}>
+        <View style={[styles.container, { backgroundColor: homeColors.background, borderWidth: 1, borderColor: homeColors.border }]}>
             {/* Header */}
             <View style={styles.header}>
                 <Text style={[styles.title, { color: homeColors.textPrimary }]}>
