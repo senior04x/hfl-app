@@ -559,32 +559,34 @@ export default function HomeScreen({ navigation }: any) {
                                     <Text style={[styles.hLogoText, { color: homeColors.textPrimary }]}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
                                 )}
                             </View>
-                            <Text style={[styles.hTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi', 12)}</Text>
+                            <Text style={[styles.hTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'UY', 4)}</Text>
                         </View>
 
                         {/* Center Score / Time Box */}
                         <View style={styles.hScoreColumn}>
                             {Boolean(matchIsLive || matchIsFinished) ? (
                                 <View style={styles.scoreAndTimerCenterBox}>
-                                    {/* Hisob — g'olib jamoa raqami to'q, boshqasi kulrang */}
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    {/* Hisob — g'olib JUDA to'q, mag'lub juda kulrang (LaLiga style) */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                         <Text style={[
                                             styles.hScoreText,
                                             {
                                                 color: (match.score?.home ?? match.home_score ?? 0) > (match.score?.away ?? match.away_score ?? 0)
                                                     ? homeColors.textPrimary
-                                                    : homeColors.textSecondary
+                                                    : homeColors.textSecondary,
+                                                opacity: (match.score?.home ?? match.home_score ?? 0) > (match.score?.away ?? match.away_score ?? 0) ? 1 : 0.5
                                             }
                                         ]}>
                                             {match.score?.home ?? (match.home_score ?? 0)}
                                         </Text>
-                                        <Text style={[styles.hScoreText, { color: homeColors.textSecondary }]}>-</Text>
+                                        <Text style={[styles.hScoreText, { color: homeColors.textSecondary, opacity: 0.4, fontSize: 32 }]}>-</Text>
                                         <Text style={[
                                             styles.hScoreText,
                                             {
                                                 color: (match.score?.away ?? match.away_score ?? 0) > (match.score?.home ?? match.home_score ?? 0)
                                                     ? homeColors.textPrimary
-                                                    : homeColors.textSecondary
+                                                    : homeColors.textSecondary,
+                                                opacity: (match.score?.away ?? match.away_score ?? 0) > (match.score?.home ?? match.home_score ?? 0) ? 1 : 0.5
                                             }
                                         ]}>
                                             {match.score?.away ?? (match.away_score ?? 0)}
@@ -634,7 +636,7 @@ export default function HomeScreen({ navigation }: any) {
                                     <Text style={[styles.hLogoText, { color: homeColors.textPrimary }]}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
                                 )}
                             </View>
-                            <Text style={[styles.hTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12)}</Text>
+                            <Text style={[styles.hTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'MEH', 4)}</Text>
                         </View>
                     </View>
 
@@ -1101,9 +1103,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     hLogoCircle: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: 68,
+        height: 68,
+        borderRadius: 34,
         backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
@@ -1112,9 +1114,9 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     hTeamLogo: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
     },
     hLogoText: {
         color: '#FFF',
@@ -1123,10 +1125,11 @@ const styles = StyleSheet.create({
     },
     hTeamName: {
         color: '#FFF',
-        fontSize: 12,
-        fontWeight: 'bold',
+        fontSize: 13,
+        fontWeight: '700',
         textAlign: 'center',
-        marginTop: 4,
+        marginTop: 6,
+        letterSpacing: 0.3,
     },
     hScoreColumn: {
         width: 80,
@@ -1135,9 +1138,9 @@ const styles = StyleSheet.create({
     },
     hScoreText: {
         color: '#FFF',
-        fontSize: 28,
+        fontSize: 38,
         fontWeight: '900',
-        letterSpacing: -0.5,
+        letterSpacing: -1,
     },
     hMatchFooter: {
         alignItems: 'center',
