@@ -601,11 +601,6 @@ export default function HomeScreen({ navigation }: any) {
                         </View>
 
                     </View>
-
-                    {/* Tur/Liga pastida CENTER */}
-                    <Text style={{ fontSize: 9, fontWeight: '500', color: homeColors.textSecondary, marginTop: 6, textAlign: 'center' }}>
-                        {roundTagText || (match.tournamentName || match.league || "AMATORA").toUpperCase()}
-                    </Text>
                 </View>
             </TouchableOpacity>
         );
@@ -811,15 +806,20 @@ export default function HomeScreen({ navigation }: any) {
 
                                     {/* Secondary Finished Results if available */}
                                     {groupedFinishedMatches.length > 0 && (
-                                        groupedFinishedMatches.map((group: any, groupIdx: number) => (
+                                        groupedFinishedMatches.map((group: any, groupIdx: number) => {
+                                            const firstMatch = group.matches?.[0];
+                                            const roundTag = firstMatch?.round_tag || firstMatch?.round || (firstMatch?.round_number ? `${firstMatch.round_number}-tur` : '');
+                                            const titleText = roundTag ? `${group.leagueName.toUpperCase()} (${roundTag})` : group.leagueName.toUpperCase();
+
+                                            return (
                                             <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                                 <View style={styles.sectionHeader}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                                                         <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                            {t('common.details', 'BATAFSIL').toUpperCase()}
+                                                            {titleText}
                                                         </Text>
                                                     </View>
-                                                    <TouchableOpacity 
+                                                    <TouchableOpacity
                                                         onPress={() => {
                                                             navigation.navigate('TournamentDetail', {
                                                                 tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
@@ -831,7 +831,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         activeOpacity={0.75}
                                                     >
                                                         <Text style={styles.viewAllText}>
-                                                            {t('common.details', 'Batafsil').toUpperCase()}
+                                                            {t('common.details', 'BATAFSIL').toUpperCase()}
                                                         </Text>
                                                     </TouchableOpacity>
                                                 </View>
@@ -839,7 +839,8 @@ export default function HomeScreen({ navigation }: any) {
                                                     {group.matches.map((m: any) => renderMatchCard(m, false, true))}
                                                 </View>
                                             </View>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </>
                             ) : displayUpcomingMatches.length > 0 ? (
@@ -860,15 +861,20 @@ export default function HomeScreen({ navigation }: any) {
 
                                     {/* Finished Results Below Upcoming */}
                                     {groupedFinishedMatches.length > 0 && (
-                                        groupedFinishedMatches.map((group: any, groupIdx: number) => (
+                                        groupedFinishedMatches.map((group: any, groupIdx: number) => {
+                                            const firstMatch = group.matches?.[0];
+                                            const roundTag = firstMatch?.round_tag || firstMatch?.round || (firstMatch?.round_number ? `${firstMatch.round_number}-tur` : '');
+                                            const titleText = roundTag ? `${group.leagueName.toUpperCase()} (${roundTag})` : group.leagueName.toUpperCase();
+
+                                            return (
                                             <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                                 <View style={styles.sectionHeader}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                                                         <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                            {t('common.details', 'BATAFSIL').toUpperCase()}
+                                                            {titleText}
                                                         </Text>
                                                     </View>
-                                                    <TouchableOpacity 
+                                                    <TouchableOpacity
                                                         onPress={() => {
                                                             navigation.navigate('TournamentDetail', {
                                                                 tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
@@ -880,7 +886,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         activeOpacity={0.75}
                                                     >
                                                         <Text style={styles.viewAllText}>
-                                                            {t('common.details', 'Batafsil').toUpperCase()}
+                                                            {t('common.details', 'BATAFSIL').toUpperCase()}
                                                         </Text>
                                                     </TouchableOpacity>
                                                 </View>
@@ -889,17 +895,23 @@ export default function HomeScreen({ navigation }: any) {
                                                     {group.matches.map((m: any) => renderMatchCard(m, false, true))}
                                                 </View>
                                             </View>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </>
                             ) : groupedFinishedMatches.length > 0 ? (
                                 /* 3. PRIORITY: RECENT RESULTS (No Live, No Upcoming) */
-                                groupedFinishedMatches.map((group: any, groupIdx: number) => (
+                                groupedFinishedMatches.map((group: any, groupIdx: number) => {
+                                    const firstMatch = group.matches?.[0];
+                                    const roundTag = firstMatch?.round_tag || firstMatch?.round || (firstMatch?.round_number ? `${firstMatch.round_number}-tur` : '');
+                                    const titleText = roundTag ? `${group.leagueName.toUpperCase()} (${roundTag})` : group.leagueName.toUpperCase();
+
+                                    return (
                                     <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                         <View style={styles.sectionHeader}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                                                 <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                    {group.leagueName.toUpperCase()}
+                                                    {titleText}
                                                 </Text>
                                             </View>
                                             <TouchableOpacity
@@ -923,7 +935,8 @@ export default function HomeScreen({ navigation }: any) {
                                             {group.matches.map((m: any) => renderMatchCard(m, false, true))}
                                         </View>
                                     </View>
-                                ))
+                                    );
+                                })
                             ) : (
                                 /* 4. NO MATCHES AT ALL */
                                 <View style={styles.sectionContainer}>
