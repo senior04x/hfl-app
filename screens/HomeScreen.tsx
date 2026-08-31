@@ -522,9 +522,9 @@ export default function HomeScreen({ navigation }: any) {
             >
                 {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
 
-                <View style={{ padding: 20 }}>
+                <View style={{ padding: 14 }}>
                     {/* Header: Minimal League + Status (LaLiga style) */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         {/* Liga nomi — KICHIK, kulrang, pastda */}
                         <Text style={{ fontSize: 10, fontWeight: '600', color: homeColors.textSecondary, letterSpacing: 0.5 }} numberOfLines={1}>
                             {(match.tournamentName || match.league || "AMATORA").toUpperCase()}
@@ -567,7 +567,7 @@ export default function HomeScreen({ navigation }: any) {
                             {Boolean(matchIsLive || matchIsFinished) ? (
                                 <View style={styles.scoreAndTimerCenterBox}>
                                     {/* Hisob — g'olib JUDA to'q, mag'lub juda kulrang (LaLiga style) */}
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <Text style={[
                                             styles.hScoreText,
                                             {
@@ -579,7 +579,7 @@ export default function HomeScreen({ navigation }: any) {
                                         ]}>
                                             {match.score?.home ?? (match.home_score ?? 0)}
                                         </Text>
-                                        <Text style={[styles.hScoreText, { color: homeColors.textSecondary, opacity: 0.4, fontSize: 32 }]}>-</Text>
+                                        <Text style={[styles.hScoreText, { color: homeColors.textSecondary, opacity: 0.4, fontSize: 22 }]}>-</Text>
                                         <Text style={[
                                             styles.hScoreText,
                                             {
@@ -641,8 +641,8 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
 
                     {/* Footer: MINIMAL date (LaLiga style — icon'siz, kichik) */}
-                    <View style={{ marginTop: 12, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 10, color: homeColors.textSecondary, fontWeight: '500' }}>
+                    <View style={{ marginTop: 10, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 9, color: homeColors.textSecondary, fontWeight: '500' }}>
                             {formattedFullDate}
                         </Text>
                     </View>
@@ -1103,20 +1103,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     hLogoCircle: {
-        width: 68,
-        height: 68,
-        borderRadius: 34,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 6,
         borderWidth: 0,
         overflow: 'hidden',
     },
     hTeamLogo: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
     },
     hLogoText: {
         color: '#FFF',
@@ -1125,10 +1125,10 @@ const styles = StyleSheet.create({
     },
     hTeamName: {
         color: '#FFF',
-        fontSize: 13,
+        fontSize: 11,
         fontWeight: '700',
         textAlign: 'center',
-        marginTop: 6,
+        marginTop: 4,
         letterSpacing: 0.3,
     },
     hScoreColumn: {
@@ -1138,9 +1138,9 @@ const styles = StyleSheet.create({
     },
     hScoreText: {
         color: '#FFF',
-        fontSize: 38,
+        fontSize: 26,
         fontWeight: '900',
-        letterSpacing: -1,
+        letterSpacing: -0.5,
     },
     hMatchFooter: {
         alignItems: 'center',
