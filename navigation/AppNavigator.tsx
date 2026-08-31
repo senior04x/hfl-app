@@ -244,7 +244,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                                                     height: 24,
                                                     borderRadius: 12,
                                                     borderWidth: isFocused ? 2 : 1,
-                                                    borderColor: isFocused ? '#00FF9D' : inactiveIconColor,
+                                                    borderColor: isFocused ? Colors.primary : inactiveIconColor,
                                                 }}
                                                 contentFit="cover"
                                                 fallbackIcon="person-outline"
