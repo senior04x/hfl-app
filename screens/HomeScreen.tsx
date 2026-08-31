@@ -522,24 +522,24 @@ export default function HomeScreen({ navigation }: any) {
             >
                 {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
 
-                <View style={{ padding: 16 }}>
-                    {/* Header: League & Status Badge (Trophy icon OLIB TASHLANDI — Brief Bosqich 2) */}
-                    <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader, { borderBottomColor: homeColors.border }]}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                            <Text style={[styles.hMatchLeague, { color: homeColors.textSecondary }]} numberOfLines={1}>
-                                {(match.tournamentName || match.league || "O'rtoqlik uchrashuvi").toUpperCase()}
-                            </Text>
-                        </View>
-                        
+                <View style={{ padding: 20 }}>
+                    {/* Header: Minimal League + Status (LaLiga style) */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        {/* Liga nomi — KICHIK, kulrang, pastda */}
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: homeColors.textSecondary, letterSpacing: 0.5 }} numberOfLines={1}>
+                            {(match.tournamentName || match.league || "AMATORA").toUpperCase()}
+                        </Text>
+
+                        {/* LIVE yoki Round badge — MINIMAL */}
                         {Boolean(matchIsLive) ? (
-                            <View style={[styles.liveBadgeContainer, (isHalfTime || isPaused) && styles.halftimeBadgeContainer]}>
-                                <View style={[styles.liveDot, (isHalfTime || isPaused) && styles.halftimeDot]} />
-                                <Text style={[styles.liveBadgeText, (isHalfTime || isPaused) && styles.halftimeBadgeText]}>{liveBadgeLabel}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary }} />
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.primary, letterSpacing: 0.5 }}>{liveBadgeLabel}</Text>
                             </View>
                         ) : Boolean(roundTagText) ? (
-                            <View style={styles.roundBadgeTag}>
-                                <Text style={styles.roundBadgeText}>{roundTagText.toUpperCase()}</Text>
-                            </View>
+                            <Text style={{ fontSize: 10, fontWeight: '600', color: homeColors.textSecondary, letterSpacing: 0.5 }}>
+                                {roundTagText.toUpperCase()}
+                            </Text>
                         ) : null}
                     </View>
 
@@ -638,15 +638,11 @@ export default function HomeScreen({ navigation }: any) {
                         </View>
                     </View>
 
-                    {/* Footer: Date & Stadium */}
-                    <View style={styles.hMatchFooter}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                            <Ionicons name="calendar-outline" size={12} color={homeColors.textSecondary} />
-                            <Text style={[styles.hMatchDate, { color: homeColors.textSecondary }]}>{formattedFullDate}</Text>
-                            <Text style={{ color: homeColors.border, marginHorizontal: 2 }}>•</Text>
-                            <Ionicons name="location-outline" size={12} color={homeColors.textSecondary} />
-                            <Text style={[styles.hMatchDate, { color: homeColors.textSecondary }]} numberOfLines={1}>{localizedVenue}</Text>
-                        </View>
+                    {/* Footer: MINIMAL date (LaLiga style — icon'siz, kichik) */}
+                    <View style={{ marginTop: 12, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 10, color: homeColors.textSecondary, fontWeight: '500' }}>
+                            {formattedFullDate}
+                        </Text>
                     </View>
                 </View>
             </TouchableOpacity>
