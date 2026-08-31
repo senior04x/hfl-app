@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Dimensions, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Dimensions, RefreshControl, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
-import ApiSlider from '../components/ApiSlider';
 import { apiService } from '../services/apiService';
 import { storyService } from '../services/storyService';
 import { useSocket } from '../context/SocketContext';
@@ -22,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import MatchStoriesTray, { StoryGroup } from '../components/MatchStoriesTray';
 import StoryViewerModal from '../components/StoryViewerModal';
 import { supabase } from '../services/supabase';
+import { useThemeStore } from '../store/useThemeStore';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.88;
@@ -33,6 +33,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minut
 
 export default function HomeScreen({ navigation }: any) {
     const { t, i18n } = useTranslation();
+    const { colors, isDark } = useThemeStore();
     const currentLang = i18n.language || 'uz';
     const [matches, setMatches] = useState<any[]>([]);
     const [sliderItems, setSliderItems] = useState<any[]>([]);
@@ -43,9 +44,11 @@ export default function HomeScreen({ navigation }: any) {
     const selectedOrgId = useOrganizationStore(s => s.selectedOrganizationId);
     const [userProfile, setUserProfile] = useState<any>(null);
 
-    // Determine current org ID from user profile or store
+    // Determine current org ID and user unique identity
     const currentOrgId = user?.organizationId || user?.organization_id || (user?.organization as any)?.id || selectedOrgId || 1;
-    const CACHE_KEY = `${CACHE_KEY_PREFIX}${currentOrgId}`;
+    const userUniqueKey = user ? String(user.id || user._id || user.teamId || user.team_id || user.name || 'user') : 'guest';
+    const userRole = user?.role || (isGuest ? 'guest' : 'user');
+    const CACHE_KEY = `${CACHE_KEY_PREFIX}${currentOrgId}_${userRole}_${userUniqueKey}`;
 
     // Stories state with persistent viewed tracking (@amatora_viewed_stories)
     const [storyModalVisible, setStoryModalVisible] = useState(false);
@@ -53,6 +56,12 @@ export default function HomeScreen({ navigation }: any) {
     const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([]);
     const viewedStoryIdsRef = useRef<string[]>([]);
     const hasCachedDataRef = useRef(false);
+
+    // Refs to eliminate stale closure in realtime listeners
+    const matchesRef = useRef<any[]>([]);
+    const sliderItemsRef = useRef<any[]>([]);
+    useEffect(() => { matchesRef.current = matches; }, [matches]);
+    useEffect(() => { sliderItemsRef.current = sliderItems; }, [sliderItems]);
 
     // 🔥 PERFORMANCE FIX: Timer ticks without re-rendering entire component
     // Before: 50k user × 1 render/s = 50k renders/s = CPU 100%
@@ -102,6 +111,7 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     useEffect(() => {
+        setUserProfile(null);
         const init = async () => {
             const isFresh = await loadCachedData();
             if (!isFresh) {
@@ -110,7 +120,7 @@ export default function HomeScreen({ navigation }: any) {
             }
         };
         init();
-    }, [user?.id]);
+    }, [userUniqueKey, userRole, currentOrgId]);
 
     useEffect(() => {
         // 🔥 PERFORMANCE FIX: Single unified channel instead of 4 separate channels
@@ -119,7 +129,7 @@ export default function HomeScreen({ navigation }: any) {
 
         const orgId = user?.organization_id || user?.organizationId || 1;
 
-        // BITTA unified broadcast channel for barcha updates
+        // BITTA unified broadcast & realtime channel for barcha updates
         const unifiedChannel = supabase
             .channel(`home_updates_org_${orgId}`)
             .on('broadcast', { event: 'match_update' }, (msg: any) => {
@@ -142,6 +152,22 @@ export default function HomeScreen({ navigation }: any) {
                     return m;
                 }));
             })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'match_events',
+            }, async (payload: any) => {
+                const newRow = payload?.new;
+                if (newRow && newRow.replay_video_url) {
+                    const freshStories = await storyService.fetchLatestTourGoalStories(
+                        matchesRef.current,
+                        sliderItemsRef.current,
+                        viewedStoryIdsRef.current,
+                        orgId
+                    );
+                    setStoryGroups(freshStories);
+                }
+            })
             .subscribe();
 
         // Socket fallback faqat Realtime ishlamasa (rare case)
@@ -149,8 +175,7 @@ export default function HomeScreen({ navigation }: any) {
             socket.on('match-update', (updatedMatch: any) => {
                 setMatches(prev => {
                     const updated = prev.map(m => (m._id === updatedMatch.matchId || m.id === updatedMatch.matchId) ? { ...m, ...updatedMatch.match } : m);
-                    const stories = storyService.buildStoriesFromRealData(updated, sliderItems, viewedStoryIdsRef.current);
-                    setStoryGroups(stories);
+                    storyService.fetchLatestTourGoalStories(updated, sliderItemsRef.current, viewedStoryIdsRef.current, orgId).then(setStoryGroups);
                     return updated;
                 });
             });
@@ -163,18 +188,19 @@ export default function HomeScreen({ navigation }: any) {
     }, [socket, isConnected, sliderItems, user]);
 
     const fetchUserProfileData = async () => {
-        if (!user?.id) return null;
+        if (!user) return null;
+        const targetUserId = user.id || user._id;
+        const targetTeamId = user.teamId || user.team_id || targetUserId;
         try {
-            if (user.role === 'player') {
-                return await apiService.getPlayerById(user.id);
-            } else if (user.role === 'manager') {
-                const teamId = user.teamId || user.team_id || user.id || user._id;
-                return await apiService.getTeamById(teamId);
+            if (user.role === 'player' && targetUserId) {
+                return await apiService.getPlayerById(targetUserId);
+            } else if (user.role === 'manager' && targetTeamId) {
+                return await apiService.getTeamById(targetTeamId);
             }
         } catch (e) {
             console.error('Error fetching profile in HomeScreen:', e);
         }
-        return null;
+        return user;
     };
 
     const loadData = async (isRefreshing = false, isSilent = false) => {
@@ -209,11 +235,12 @@ export default function HomeScreen({ navigation }: any) {
                 });
             }
 
-            // Build 100% real stories strictly from Supabase database
-            const realStories = storyService.buildStoriesFromRealData(
+            // Build 100% real stories strictly scoped to currentOrgId and latest tour
+            const realStories = await storyService.fetchLatestTourGoalStories(
                 fetchedMatches,
                 validSlider,
-                viewedStoryIdsRef.current
+                viewedStoryIdsRef.current,
+                currentOrgId
             );
             setStoryGroups(realStories);
 
@@ -484,16 +511,23 @@ export default function HomeScreen({ navigation }: any) {
                 key={match._id || Math.random().toString()}
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
                 onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
                 activeOpacity={0.85}
             >
-                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
                 
-                <View style={{ padding: 18 }}>
-                    <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader]}>
-                        <Text style={styles.hMatchLeague} numberOfLines={1}>{match.tournamentName || "O'rtoqlik uchrashuvi"}</Text>
+                <View style={{ padding: 16 }}>
+                    {/* Header: League & Status Badge */}
+                    <View style={[styles.hMatchHeader, isVertical && styles.vMatchHeader, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                            <Ionicons name="trophy-outline" size={13} color={colors.textMuted} />
+                            <Text style={[styles.hMatchLeague, { color: isDark ? '#8A94A6' : '#64748B' }]} numberOfLines={1}>
+                                {(match.tournamentName || match.league || "O'rtoqlik uchrashuvi").toUpperCase()}
+                            </Text>
+                        </View>
                         
                         {Boolean(matchIsLive) ? (
                             <View style={[styles.liveBadgeContainer, (isHalfTime || isPaused) && styles.halftimeBadgeContainer]}>
@@ -502,14 +536,16 @@ export default function HomeScreen({ navigation }: any) {
                             </View>
                         ) : Boolean(roundTagText) ? (
                             <View style={styles.roundBadgeTag}>
-                                <Text style={styles.roundBadgeText}>{roundTagText}</Text>
+                                <Text style={styles.roundBadgeText}>{roundTagText.toUpperCase()}</Text>
                             </View>
                         ) : null}
                     </View>
 
+                    {/* Teams & Score Row */}
                     <View style={styles.hMatchTeamsRow}>
+                        {/* Home Team */}
                         <View style={styles.hTeamColumn}>
-                            <View style={styles.hLogoCircle}>
+                            <View style={[styles.hLogoCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                                 {match.homeTeamLogo || match.homeTeam?.logo ? (
                                     <SmartImage
                                         uri={match.homeTeamLogo || match.homeTeam?.logo}
@@ -518,16 +554,22 @@ export default function HomeScreen({ navigation }: any) {
                                         fallbackIcon="shield-outline"
                                     />
                                 ) : (
-                                    <Text style={styles.hLogoText}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
+                                    <Text style={[styles.hLogoText, { color: colors.text }]}>{(match.homeTeamName || match.homeTeam?.name)?.charAt(0) || 'U'}</Text>
                                 )}
                             </View>
-                            <Text style={styles.hTeamName} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi', 12)}</Text>
+                            <Text style={[styles.hTeamName, { color: colors.text }]} numberOfLines={1}>{formatShortTeamName(match.homeTeamName || match.homeTeam?.name || 'Uy jamoasi', 12)}</Text>
                         </View>
 
+                        {/* Center Score / Time Box */}
                         <View style={styles.hScoreColumn}>
                             {Boolean(matchIsLive || matchIsFinished) ? (
                                 <View style={styles.scoreAndTimerCenterBox}>
-                                    <Text style={styles.hScoreText}>{match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}</Text>
+                                    <Text style={[
+                                        styles.hScoreText,
+                                        { color: colors.text }
+                                    ]}>
+                                        {match.score?.home ?? (match.home_score ?? 0)} - {match.score?.away ?? (match.away_score ?? 0)}
+                                    </Text>
                                     {Boolean(matchIsLive) ? (
                                         <View style={styles.cleanLiveTimerContainer}>
                                             <Text style={[
@@ -549,14 +591,18 @@ export default function HomeScreen({ navigation }: any) {
                                 </View>
                             ) : (
                                 <View style={styles.vsContainer}>
-                                    <Text style={styles.hTimeVsText}>{formattedTime}</Text>
-                                    <Text style={styles.vsSubText}>{t('matches.starts')}</Text>
+                                    <View style={styles.timePillBadge}>
+                                        <Ionicons name="time-outline" size={12} color={colors.textMuted} style={{ marginRight: 4 }} />
+                                        <Text style={styles.hTimeVsText}>{formattedTime}</Text>
+                                    </View>
+                                    <Text style={[styles.vsSubText, { color: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)' }]}>{t('matches.starts').toUpperCase()}</Text>
                                 </View>
                             )}
                         </View>
 
+                        {/* Away Team */}
                         <View style={styles.hTeamColumn}>
-                            <View style={styles.hLogoCircle}>
+                            <View style={[styles.hLogoCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                                 {match.awayTeamLogo || match.awayTeam?.logo ? (
                                     <SmartImage
                                         uri={match.awayTeamLogo || match.awayTeam?.logo}
@@ -565,15 +611,22 @@ export default function HomeScreen({ navigation }: any) {
                                         fallbackIcon="shield-outline"
                                     />
                                 ) : (
-                                    <Text style={styles.hLogoText}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
+                                    <Text style={[styles.hLogoText, { color: colors.text }]}>{(match.awayTeamName || match.awayTeam?.name)?.charAt(0) || 'M'}</Text>
                                 )}
                             </View>
-                            <Text style={styles.hTeamName} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12)}</Text>
+                            <Text style={[styles.hTeamName, { color: colors.text }]} numberOfLines={1}>{formatShortTeamName(match.awayTeamName || match.awayTeam?.name || 'Mehmon', 12)}</Text>
                         </View>
                     </View>
 
+                    {/* Footer: Date & Stadium */}
                     <View style={styles.hMatchFooter}>
-                        <Text style={styles.hMatchDate}>{`${formattedFullDate} • ${localizedVenue}`}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                            <Ionicons name="calendar-outline" size={12} color={isDark ? "rgba(255,255,255,0.4)" : "#64748B"} />
+                            <Text style={[styles.hMatchDate, { color: isDark ? '#8A94A6' : '#64748B' }]}>{formattedFullDate}</Text>
+                            <Text style={{ color: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)', marginHorizontal: 2 }}>•</Text>
+                            <Ionicons name="location-outline" size={12} color={isDark ? "rgba(255,255,255,0.4)" : "#64748B"} />
+                            <Text style={[styles.hMatchDate, { color: isDark ? '#8A94A6' : '#64748B' }]} numberOfLines={1}>{localizedVenue}</Text>
+                        </View>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -595,8 +648,8 @@ export default function HomeScreen({ navigation }: any) {
                     ) : (
                         <>
                             {(() => {
-                                const avatarUri = userProfile?.photo || userProfile?.photo_url || userProfile?.avatar || userProfile?.logo || userProfile?.logo_url || user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url;
-                                const rawName = userProfile?.firstName || user?.firstName || userProfile?.name || userProfile?.team_name || user?.name || user?.team_name || 'AMATORA';
+                                const avatarUri = user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url || userProfile?.photo || userProfile?.photo_url || userProfile?.avatar || userProfile?.logo || userProfile?.logo_url;
+                                const rawName = user?.firstName || user?.name || user?.team_name || userProfile?.firstName || userProfile?.name || userProfile?.team_name || 'AMATORA';
                                 const displayName = rawName.replace(/\(sardor\)/gi, '').replace(/\(menejer\)/gi, '').trim().split(' ')[0] || 'AMATORA';
 
                                 const getGreetingText = () => {
@@ -614,35 +667,38 @@ export default function HomeScreen({ navigation }: any) {
                                                 onPress={() => navigation.navigate('MainTabs', { screen: 'Profil' })}
                                                 activeOpacity={0.8}
                                             >
-                                                {avatarUri ? (
-                                                    <SmartImage 
-                                                        uri={avatarUri}
-                                                        style={styles.squircleAvatar}
-                                                        fallbackIcon="person"
-                                                    />
-                                                ) : (
-                                                    <View style={styles.squircleAvatarFallback}>
-                                                        <Ionicons name="person" size={22} color="#FFFFFF" />
-                                                    </View>
-                                                )}
+                                                <View style={styles.squircleAvatarContainer}>
+                                                    {avatarUri ? (
+                                                        <SmartImage 
+                                                            uri={avatarUri}
+                                                            style={styles.squircleAvatar}
+                                                            fallbackIcon="person"
+                                                        />
+                                                    ) : (
+                                                        <View style={styles.squircleAvatarFallback}>
+                                                            <Ionicons name="person" size={20} color="#00FF87" />
+                                                        </View>
+                                                    )}
+                                                </View>
                                             </TouchableOpacity>
                                             <View>
-                                                <Text style={styles.welcomeText}>
+                                                <Text style={[styles.welcomeText, { color: isDark ? 'rgba(255, 255, 255, 0.5)' : '#64748B' }]}>
                                                     {isGuest ? 'AMATORA' : getGreetingText().toUpperCase()}
                                                 </Text>
-                                                <Text style={styles.brandText}>
+                                                <Text style={[styles.brandText, { color: colors.text }]}>
                                                     {isGuest ? getGreetingText().toUpperCase() : displayName.toUpperCase()}
                                                 </Text>
                                             </View>
                                         </View>
 
+                                        {/* Right Action: Notifications Button */}
                                         <TouchableOpacity 
                                             style={styles.profileButton}
                                             onPress={() => navigation.navigate('Notifications')}
                                             activeOpacity={0.75}
                                         >
-                                            <View style={styles.bellButton}>
-                                                <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
+                                            <View style={[styles.bellButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                                <Ionicons name="notifications-outline" size={20} color={colors.text} />
                                                 <View style={styles.unreadBadgeDot} />
                                             </View>
                                         </TouchableOpacity>
@@ -650,17 +706,13 @@ export default function HomeScreen({ navigation }: any) {
                                 );
                             })()}
 
-                            {/* Stories & Highlight Reels Bar (Vaqtinchalik commentga olingan)
+                            {/* Stories & Highlight Reels Bar */}
                             {storyGroups && storyGroups.length > 0 && (
                                 <MatchStoriesTray
                                     stories={storyGroups}
                                     onSelectStoryGroup={handleSelectStoryGroup}
                                 />
-                            )} */}
-
-                            <View style={styles.sliderContainer}>
-                                <ApiSlider initialItems={sliderItems} externalLoading={loading} />
-                            </View>
+                            )}
 
                             {/* Primary Dynamic Matches Section with Priority: 1. Live -> 2. Upcoming -> 3. Finished */}
                             {loading ? (
@@ -679,7 +731,7 @@ export default function HomeScreen({ navigation }: any) {
                                         <View style={styles.sectionHeader}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                                 <View style={styles.liveIndicatorDot} />
-                                                <Text style={[styles.sectionTitle, { color: '#FF3B30' }]}>
+                                                <Text style={[styles.sectionTitle, { color: '#E85002' }]}>
                                                     {t('matches.live', 'JONLI O\'YINLAR').toUpperCase()}
                                                 </Text>
                                             </View>
@@ -697,7 +749,7 @@ export default function HomeScreen({ navigation }: any) {
                                     {displayUpcomingMatches.length > 0 && (
                                         <View style={styles.sectionContainer}>
                                             <View style={styles.sectionHeader}>
-                                                <Text style={styles.sectionTitle}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
+                                                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
                                                 <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
                                                     <Text style={styles.viewAllText}>{t('home.view_calendar', 'Taqvim')}</Text>
                                                 </TouchableOpacity>
@@ -714,8 +766,8 @@ export default function HomeScreen({ navigation }: any) {
                                             <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                                 <View style={styles.sectionHeader}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                        <Ionicons name="trophy" size={16} color={Colors.primary} />
-                                                        <Text style={[styles.sectionTitle, { fontSize: 16 }]} numberOfLines={1}>
+                                                        <Ionicons name="trophy" size={16} color={colors.textMuted} />
+                                                        <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
                                                             {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
                                                         </Text>
                                                     </View>
@@ -747,7 +799,7 @@ export default function HomeScreen({ navigation }: any) {
                                 <>
                                     <View style={styles.sectionContainer}>
                                         <View style={styles.sectionHeader}>
-                                            <Text style={styles.sectionTitle}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
+                                            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
                                             <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
                                                 <Text style={styles.viewAllText}>{t('home.view_calendar', 'Taqvim')}</Text>
                                             </TouchableOpacity>
@@ -764,8 +816,8 @@ export default function HomeScreen({ navigation }: any) {
                                             <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
                                                 <View style={styles.sectionHeader}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                        <Ionicons name="trophy" size={16} color={Colors.primary} />
-                                                        <Text style={[styles.sectionTitle, { fontSize: 16 }]} numberOfLines={1}>
+                                                        <Ionicons name="trophy" size={16} color={colors.textMuted} />
+                                                        <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
                                                             {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
                                                         </Text>
                                                     </View>
@@ -800,7 +852,7 @@ export default function HomeScreen({ navigation }: any) {
                                         <View style={styles.sectionHeader}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                                                 <Ionicons name="trophy" size={16} color={Colors.primary} />
-                                                <Text style={[styles.sectionTitle, { fontSize: 16 }]} numberOfLines={1}>
+                                                <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
                                                     {t('home.league_results_title', { league: group.leagueName.toUpperCase() })}
                                                 </Text>
                                             </View>
@@ -839,7 +891,7 @@ export default function HomeScreen({ navigation }: any) {
                     )}
                 </ScrollView>
 
-                {/* Fullscreen Story Viewer Modal (Vaqtinchalik commentga olingan)
+                {/* Fullscreen Story Viewer Modal */}
                 <StoryViewerModal
                     visible={storyModalVisible}
                     storyGroups={storyGroups}
@@ -847,7 +899,7 @@ export default function HomeScreen({ navigation }: any) {
                     onClose={() => setStoryModalVisible(false)}
                     onNavigateMatch={handleNavigateMatchFromStory}
                     onStoryGroupViewed={handleStoryGroupViewed}
-                /> */}
+                />
             </SafeAreaView>
         </AnimatedBackground>
     );
@@ -876,12 +928,57 @@ const styles = StyleSheet.create({
     },
     brandText: {
         color: '#FFFFFF',
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
     profileButton: {
         padding: 0,
+    },
+    squircleAvatarContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 15,
+        borderWidth: 1.5,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    liveConnectionBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    onlinePulseDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255, 255, 255, 0.6)',
+        marginRight: 4,
+    },
+    onlinePulseText: {
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    timePillBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+    },
+    hMatchCardMarkaziy: {
+        borderColor: 'rgba(255, 230, 0, 0.45)',
+        borderWidth: 1.5,
     },
     bellButton: {
         width: 38,
@@ -909,8 +1006,8 @@ const styles = StyleSheet.create({
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: '#FF3B30',
-        shadowColor: '#FF3B30',
+        backgroundColor: '#E85002',
+        shadowColor: '#E85002',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.8,
         shadowRadius: 6,
@@ -945,8 +1042,12 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
     },
     hMatchCardLive: {
-        borderColor: 'rgba(239, 68, 68, 0.45)',
-        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+        borderColor: 'rgba(232, 80, 2, 0.45)',
+        backgroundColor: 'rgba(232, 80, 2, 0.12)',
+    },
+    hMatchCardHalftime: {
+        borderColor: 'rgba(250, 204, 21, 0.65)',
+        backgroundColor: 'rgba(250, 204, 21, 0.1)',
     },
     hMatchHeader: {
         flexDirection: 'row',
@@ -959,7 +1060,7 @@ const styles = StyleSheet.create({
     },
     hMatchLeague: {
         color: '#8A94A6',
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: 'bold',
         flex: 1,
         textTransform: 'uppercase',
@@ -992,12 +1093,12 @@ const styles = StyleSheet.create({
     },
     hLogoText: {
         color: '#FFF',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
     },
     hTeamName: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: 'bold',
         textAlign: 'center',
         marginTop: 4,
@@ -1009,7 +1110,7 @@ const styles = StyleSheet.create({
     },
     hScoreText: {
         color: '#FFF',
-        fontSize: 28,
+        fontSize: 22,
         fontWeight: '900',
     },
     hMatchFooter: {
@@ -1023,7 +1124,7 @@ const styles = StyleSheet.create({
     liveBadgeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        backgroundColor: 'rgba(232, 80, 2, 0.2)',
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 6,
@@ -1037,14 +1138,14 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: Colors.danger,
+        backgroundColor: Colors.primary,
         marginRight: 5,
     },
     halftimeDot: {
         backgroundColor: '#FACC15',
     },
     liveBadgeText: {
-        color: Colors.danger,
+        color: Colors.primary,
         fontSize: 10,
         fontWeight: 'bold',
         letterSpacing: 0.5,
@@ -1081,15 +1182,15 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
     roundBadgeTag: {
-        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 135, 0.3)',
+        borderColor: 'rgba(255, 255, 255, 0.12)',
     },
     roundBadgeText: {
-        color: Colors.primary,
+        color: '#FFFFFF',
         fontSize: 10,
         fontWeight: '900',
         letterSpacing: 0.5,
@@ -1106,7 +1207,7 @@ const styles = StyleSheet.create({
         width: width - 40,
         borderRadius: 20,
         overflow: 'hidden',
-        marginBottom: 14,
+        marginBottom: 10,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.12)',
         backgroundColor: 'rgba(15, 23, 42, 0.45)',
@@ -1158,13 +1259,14 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         color: '#FFF',
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 13.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
     },
     viewAllText: {
         color: Colors.primary,
-        fontSize: 14,
-        fontWeight: 'bold',
+        fontSize: 11,
+        fontWeight: '700',
     },
 
     // Recent Matches Row (List Style)
@@ -1181,7 +1283,7 @@ const styles = StyleSheet.create({
     },
     recentTeams: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '600',
     },
     recentScore: {
@@ -1190,7 +1292,7 @@ const styles = StyleSheet.create({
     },
     recentDate: {
         color: '#8A94A6',
-        fontSize: 12,
+        fontSize: 11,
         minWidth: 50,
         textAlign: 'right',
     },
@@ -1199,8 +1301,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     hTimeVsText: {
-        color: Colors.primary,
-        fontSize: 28,
+        color: '#FFFFFF',
+        fontSize: 22,
         fontWeight: '900',
         fontStyle: 'italic',
         letterSpacing: -1,
@@ -1222,7 +1324,7 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     cleanTimerText: {
-        color: '#FF3B30',
+        color: '#E85002',
         fontSize: 13,
         fontWeight: '900',
         letterSpacing: 0.8,
@@ -1243,16 +1345,16 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     liveMinuteTag: {
-        backgroundColor: 'rgba(255, 59, 48, 0.18)',
+        backgroundColor: 'rgba(232, 80, 2, 0.18)',
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 6,
         marginTop: 4,
         borderWidth: 1,
-        borderColor: 'rgba(255, 59, 48, 0.4)',
+        borderColor: 'rgba(232, 80, 2, 0.4)',
     },
     liveMinuteTagText: {
-        color: '#FF3B30',
+        color: '#E85002',
         fontSize: 10,
         fontWeight: '900',
         letterSpacing: 0.5,
@@ -1263,14 +1365,6 @@ const styles = StyleSheet.create({
     },
     halftimeMinuteTagText: {
         color: '#FACC15',
-    },
-    hMatchCardLive: {
-        borderColor: 'rgba(255, 59, 48, 0.5)',
-        backgroundColor: 'rgba(255, 59, 48, 0.08)',
-    },
-    hMatchCardHalftime: {
-        borderColor: 'rgba(250, 204, 21, 0.65)',
-        backgroundColor: 'rgba(250, 204, 21, 0.1)',
     },
 
     emptyCard: {
@@ -1363,12 +1457,12 @@ const styles = StyleSheet.create({
     },
     finishedLogoFallback: {
         color: '#FFFFFF',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '900',
     },
     finishedTeamName: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
         textAlign: 'center',
     },
@@ -1378,7 +1472,7 @@ const styles = StyleSheet.create({
     },
     finishedScoreText: {
         color: '#FFFFFF',
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '900',
         letterSpacing: 1,
     },
@@ -1410,7 +1504,7 @@ const styles = StyleSheet.create({
     },
     finishedFooterText: {
         color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '600',
     },
     finishedDotSeparator: {

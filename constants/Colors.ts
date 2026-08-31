@@ -11,8 +11,8 @@ export default {
     background: 'transparent',
     surface: 'rgba(18, 23, 34, 0.65)',
     surfaceLight: 'rgba(29, 35, 51, 0.65)',
-    primary: '#00DF82',
-    primaryDark: '#00A862',
+    primary: '#E85002',      // Orange — AMATORA brand accent (LIVE, CTA)
+    primaryDark: '#B83D00',  // Dark orange variant
     secondary: '#3b82f6',
     text: '#ffffff',
     textMuted: '#CBD5E1',    // ✅ WCAG AAA (12.3:1) - o'qilishi oson
