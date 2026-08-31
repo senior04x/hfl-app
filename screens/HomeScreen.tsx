@@ -523,11 +523,11 @@ export default function HomeScreen({ navigation }: any) {
                 {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
 
                 <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                    {/* Logo Team1 | Score | Team2 Logo */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    {/* Score har doim o'rtada, teamlar shunga qarab markazlashsin */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
 
-                        {/* CHAP: Home Team Name + Logo */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        {/* CHAP: Home Team Name + Logo (flex: 1, o'ngga) */}
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 8 }}>
                             <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
                                 {match.homeTeamName || match.homeTeam?.name || 'UY'}
                             </Text>
@@ -547,8 +547,8 @@ export default function HomeScreen({ navigation }: any) {
                             </View>
                         </View>
 
-                        {/* O'RTA: Score yoki Vaqt */}
-                        <View style={{ alignItems: 'center', paddingHorizontal: 8 }}>
+                        {/* O'RTA: Score yoki Vaqt (fixed width, har doim o'rtada) */}
+                        <View style={{ width: 70, alignItems: 'center' }}>
                             {Boolean(matchIsLive || matchIsFinished) ? (
                                 <View style={{ alignItems: 'center' }}>
                                     {/* Score */}
@@ -579,8 +579,8 @@ export default function HomeScreen({ navigation }: any) {
                             )}
                         </View>
 
-                        {/* O'NG: Away Team Logo + Name */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        {/* O'NG: Away Team Logo + Name (flex: 1, chapga) */}
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 4, paddingLeft: 8 }}>
                             <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
                                 {match.awayTeam?.logo || match.away_team_logo ? (
                                     <SmartImage
