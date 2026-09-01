@@ -1,16 +1,21 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Colors from '../constants/Colors';
+import SmartImage from './SmartImage';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const FIELD_WIDTH = SCREEN_WIDTH - 32;
-const FIELD_HEIGHT = FIELD_WIDTH * 1.35;
+// Sostavni tahrirlash (FormationBoard) sahifasi bilan AYNAN bir xil o'lcham —
+// shu bilan ikkala ekranda bir xil % koordinata bir xil piksel joyga tushadi.
+const FIELD_WIDTH = SCREEN_WIDTH - 40;
+const FIELD_HEIGHT = FIELD_WIDTH * 1.3;
 
 interface PlayerPosition {
     id: string;
     name: string;
     number?: string | number;
+    photo?: string | null;
     x: number;
     y: number;
     goals?: number;
@@ -20,77 +25,72 @@ interface PlayerPosition {
 interface TacticsBoardProps {
     players: PlayerPosition[];
     teamColor?: string;
-    formation?: string;
+    formation?: any;
     onPlayerPress?: (player: any) => void;
 }
 
 const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#3B82F6', formation, onPlayerPress }) => {
-    // Pitch stripes
-    const stripes = Array.from({ length: 11 }).map((_, i) => i);
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+    const lineColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)';
 
     return (
         <View style={styles.container}>
-            <View style={styles.pitch}>
-                {/* Grass Stripes */}
-                {stripes.map(i => (
-                    <View 
-                        key={i} 
-                        style={[
-                            styles.stripe, 
-                            { 
-                                top: `${(i * 100) / stripes.length}%` as any, 
-                                height: `${100 / stripes.length}%` as any,
-                                backgroundColor: i % 2 === 0 ? '#2B5425' : '#33632D'
-                            }
-                        ]} 
-                    />
-                ))}
+            <View style={styles.pitchWrapper}>
+                <View style={[styles.pitch, { backgroundColor: homeColors.surface, borderColor: lineColor }]}>
+                    <View style={[styles.outerBorder, { borderColor: lineColor }]} />
+                    <View style={[styles.penaltyArea, styles.topPenalty, { borderColor: lineColor }]} />
+                    <View style={[styles.goalArea, styles.topGoal, { borderColor: lineColor }]} />
+                    <View style={[styles.centerLine, { backgroundColor: lineColor }]} />
+                    <View style={[styles.centerCircle, { borderColor: lineColor }]} />
+                    <View style={[styles.penaltyArea, styles.bottomPenalty, { borderColor: lineColor }]} />
+                    <View style={[styles.goalArea, styles.bottomGoal, { borderColor: lineColor }]} />
 
-                {/* Pitch Markings */}
-                <View style={styles.outerBorder} />
-                <View style={[styles.penaltyArea, styles.topPenalty]} />
-                <View style={[styles.goalArea, styles.topGoal]} />
-                <View style={styles.centerLine} />
-                <View style={styles.centerCircle} />
-                <View style={[styles.penaltyArea, styles.bottomPenalty]} />
-                <View style={[styles.goalArea, styles.bottomGoal]} />
-                
-                {/* Players */}
-                {players.map((player) => {
-                    // Position normalization from 0-100 coordinates to absolute
-                    const left = (player.x / 100) * FIELD_WIDTH;
-                    const top = (player.y / 100) * FIELD_HEIGHT;
+                    {players.map((player) => {
+                        const xPct = Number(player.x);
+                        const yPct = Number(player.y);
+                        const safeX = isNaN(xPct) ? 50 : xPct;
+                        const safeY = isNaN(yPct) ? 50 : yPct;
+                        const left = (safeX / 100) * FIELD_WIDTH;
+                        const top = (safeY / 100) * FIELD_HEIGHT;
 
-                    return (
-                        <View 
-                            key={player.id} 
-                            style={[
-                                styles.playerContainer, 
-                                { left: left - 30, top: top - 35 } // Center the player icon
-                            ]}
-                        >
-                            {/* Player Goal/Badge */}
-                            {((player.goals || 0) > 0) && (
-                                <View style={styles.statBadge}>
-                                    <Ionicons name="football" size={10} color="#000" />
-                                    <Text style={styles.statBadgeText}>x{player.goals}</Text>
+                        return (
+                            <View
+                                key={player.id}
+                                style={[
+                                    styles.playerContainer,
+                                    { left: left - 25, top: top - 30 }
+                                ]}
+                            >
+                                <View style={styles.avatarWrap}>
+                                    <SmartImage
+                                        uri={player.photo}
+                                        style={styles.avatar}
+                                        borderRadius={24}
+                                        fallbackIcon="person"
+                                        fallbackIconSize={20}
+                                    />
+                                    <View style={[styles.numberBadge, { backgroundColor: teamColor, borderColor: homeColors.background }]}>
+                                        <Text style={styles.numberBadgeText}>{player.number || ''}</Text>
+                                    </View>
+                                    {((player.goals || 0) > 0) && (
+                                        <View style={[styles.statBadge, { borderColor: homeColors.background }]}>
+                                            <Ionicons name="football" size={9} color="#000" />
+                                            <Text style={styles.statBadgeText}>{player.goals}</Text>
+                                        </View>
+                                    )}
                                 </View>
-                            )}
 
-                            {/* Football Shirt Icon */}
-                            <View style={[styles.shirtIcon, { backgroundColor: teamColor }]}>
-                                <Text style={styles.shirtNumber}>{player.number || ''}</Text>
-                                <View style={styles.shirtSleeveLeft} />
-                                <View style={styles.shirtSleeveRight} />
+                                <Text
+                                    style={[styles.playerName, { color: homeColors.textPrimary }]}
+                                    numberOfLines={1}
+                                >
+                                    {player.name}
+                                </Text>
                             </View>
-
-                            {/* Player Name */}
-                            <Text style={styles.playerName} numberOfLines={1}>
-                                {player.name}
-                            </Text>
-                        </View>
-                    );
-                })}
+                        );
+                    })}
+                </View>
             </View>
         </View>
     );
@@ -100,27 +100,24 @@ const styles = StyleSheet.create({
     container: {
         width: '100%',
         alignItems: 'center',
-        marginVertical: 15,
-        paddingHorizontal: 16,
+        paddingVertical: 5,
+    },
+    pitchWrapper: {
+        width: FIELD_WIDTH,
+        height: FIELD_HEIGHT,
+        position: 'relative',
     },
     pitch: {
         width: FIELD_WIDTH,
         height: FIELD_HEIGHT,
-        backgroundColor: '#2D5A27',
-        borderRadius: 8,
+        borderRadius: 15,
         borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.6)',
-        position: 'relative',
         overflow: 'hidden',
-    },
-    stripe: {
-        position: 'absolute',
-        width: '100%',
+        position: 'relative',
     },
     outerBorder: {
         ...StyleSheet.absoluteFillObject,
         borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.4)',
         margin: 4,
     },
     centerLine: {
@@ -128,19 +125,17 @@ const styles = StyleSheet.create({
         top: '50%',
         width: '100%',
         height: 1.5,
-        backgroundColor: 'rgba(255,255,255,0.4)',
     },
     centerCircle: {
         position: 'absolute',
         top: '50%',
         left: '50%',
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 90,
+        height: 90,
+        borderRadius: 45,
         borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.4)',
-        marginTop: -40,
-        marginLeft: -40,
+        marginTop: -45,
+        marginLeft: -45,
     },
     penaltyArea: {
         position: 'absolute',
@@ -148,7 +143,6 @@ const styles = StyleSheet.create({
         height: '18%',
         left: '20%',
         borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.4)',
     },
     topPenalty: {
         top: 0,
@@ -164,7 +158,6 @@ const styles = StyleSheet.create({
         height: '6%',
         left: '35%',
         borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.4)',
     },
     topGoal: {
         top: 0,
@@ -177,74 +170,59 @@ const styles = StyleSheet.create({
     playerContainer: {
         position: 'absolute',
         alignItems: 'center',
-        width: 60,
+        width: 50,
         zIndex: 5,
     },
-    shirtIcon: {
-        width: 32,
-        height: 36,
-        backgroundColor: '#F59E0B',
-        borderRadius: 4,
+    avatarWrap: {
+        width: 50,
+        height: 50,
+    },
+    avatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+    },
+    numberBadge: {
+        position: 'absolute',
+        bottom: -3,
+        right: -3,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#FFF',
+        borderWidth: 1.5,
     },
-    shirtNumber: {
-        color: '#FFF',
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-    shirtSleeveLeft: {
-        position: 'absolute',
-        left: -8,
-        top: 0,
-        width: 8,
-        height: 14,
-        backgroundColor: 'inherit',
-        borderTopLeftRadius: 4,
-        borderBottomLeftRadius: 2,
-    },
-    shirtSleeveRight: {
-        position: 'absolute',
-        right: -8,
-        top: 0,
-        width: 8,
-        height: 14,
-        backgroundColor: 'inherit',
-        borderTopRightRadius: 4,
-        borderBottomRightRadius: 2,
+    numberBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 9,
+        fontWeight: '900',
     },
     playerName: {
-        color: '#FFF',
         fontSize: 10,
         fontWeight: 'bold',
-        marginTop: 4,
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: -1, height: 1 },
-        textShadowRadius: 10,
+        marginTop: 3,
         textAlign: 'center',
-        width: 80,
+        width: 68,
     },
     statBadge: {
         position: 'absolute',
-        top: -12,
-        left: -10,
+        top: -6,
+        left: -6,
         backgroundColor: '#FFF',
         borderRadius: 6,
-        paddingHorizontal: 4,
+        paddingHorizontal: 3,
         paddingVertical: 1,
         flexDirection: 'row',
         alignItems: 'center',
         zIndex: 10,
-        borderWidth: 1,
-        borderColor: '#000',
+        borderWidth: 1.5,
     },
     statBadgeText: {
         color: '#000',
-        fontSize: 8,
+        fontSize: 7,
         fontWeight: 'bold',
-        marginLeft: 2,
+        marginLeft: 1,
     },
 });
 

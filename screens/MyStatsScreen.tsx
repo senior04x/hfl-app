@@ -457,9 +457,13 @@ const MyStatsScreen = ({ navigation }: any) => {
 
                 const { data: events, error } = await supabase
                     .from('match_events')
-                    .select('*, match:match_id(*, home_team:home_team_id(id, name, logo_url), away_team:away_team_id(id, name, logo_url)), player:player_id(*)')
+                    .select('*, match:match_id(*)')
                     .in('player_id', targetPlayerIds)
                     .order('created_at', { ascending: false });
+
+                if (error) {
+                    console.warn('Error fetching player replays (query):', error.message || error);
+                }
 
                 if (events && events.length > 0) {
                     const validReplays = events.filter((e: any) =>

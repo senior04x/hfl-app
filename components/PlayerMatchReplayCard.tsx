@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } fr
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { useTranslation } from 'react-i18next';
 import Colors from '../constants/Colors';
 import { getCachedVideoUri } from '../utils/videoCache';
+import { formatLocalizedDate } from '../utils/stringUtils';
 
 interface ReplayEvent {
   id?: string;
@@ -83,6 +85,7 @@ function SingleReplayPlayer({ replay }: { replay: ReplayEvent }) {
 }
 
 export default function PlayerMatchReplayCard({ match, replays, playerName }: PlayerMatchReplayCardProps) {
+  const { t, i18n } = useTranslation();
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   if (!replays || replays.length === 0) return null;
@@ -99,36 +102,20 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
   const homeTeam = match?.home_team || {};
   const awayTeam = match?.away_team || {};
 
-  const homeName = homeTeam.name || match?.home_team_name || 'Uy jamoasi';
+  const homeName = homeTeam.name || match?.home_team_name || t('matches.home_team', 'Uy jamoasi');
   const homeLogo = homeTeam.logo_url || match?.home_team_logo;
 
-  const awayName = awayTeam.name || match?.away_team_name || 'Mehmon jamoasi';
+  const awayName = awayTeam.name || match?.away_team_name || t('matches.away_team', 'Mehmon jamoasi');
   const awayLogo = awayTeam.logo_url || match?.away_team_logo;
 
   const homeScore = match?.home_score !== undefined && match?.home_score !== null ? match?.home_score : '-';
   const awayScore = match?.away_score !== undefined && match?.away_score !== null ? match?.away_score : '-';
 
-  // Format Match Date nicely
-  const formatMatchDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr;
-      const day = String(d.getDate()).padStart(2, '0');
-      const months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
-      const monthName = months[d.getMonth()];
-      const year = d.getFullYear();
-      return `${day}-${monthName}, ${year}`;
-    } catch (e) {
-      return dateStr;
-    }
-  };
-
-  const matchDate = formatMatchDate(match?.match_date || match?.date || match?.created_at);
   const matchTime = match?.match_time ? match.match_time.slice(0, 5) : '';
+  const matchDate = formatLocalizedDate(match?.match_date || match?.date || match?.created_at, i18n.language, matchTime);
   const location = match?.location || '';
   const league = match?.league || '';
-  const round = match?.round ? `${match.round}-tur` : '';
+  const round = match?.round ? t('stories.round_tour', '{{round}}-TUR', { round: match.round }) : '';
 
   return (
     <View style={styles.container}>
@@ -139,19 +126,21 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
         <View style={styles.leagueBadge}>
           <Ionicons name="trophy-outline" size={12} color="#00FF66" />
           <Text style={styles.leagueBadgeText}>
-            {[league, round].filter(Boolean).join(' • ') || "O'YIN REPLAYI"}
+            {[league, round].filter(Boolean).join(' • ') || t('replays.match_replay', "O'YIN REPLAYI")}
           </Text>
         </View>
 
         {sortedReplays.length > 1 ? (
           <View style={styles.multiGoalPill}>
-            <Text style={styles.multiGoalPillText}>{sortedReplays.length} TA GOL</Text>
+            <Text style={styles.multiGoalPillText}>
+              {t('replays.goals_count', '{{count}} TA GOL', { count: sortedReplays.length })}
+            </Text>
           </View>
         ) : (
           <View style={styles.singleGoalPill}>
             <Ionicons name="football" size={11} color="#00FF66" />
             <Text style={styles.singleGoalPillText}>
-              {currentReplay.minute ? `${currentReplay.minute}'-daqiqa` : 'Gol'}
+              {currentReplay.minute ? `${currentReplay.minute}'-${t('common.minute_short', 'daqiqa')}` : t('stories.goal', 'Gol')}
             </Text>
           </View>
         )}
@@ -175,7 +164,7 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
                   color={isSelected ? '#000000' : 'rgba(255,255,255,0.7)'}
                 />
                 <Text style={[styles.goalTabText, isSelected && styles.goalTabTextActive]}>
-                  {i + 1}-gol ({r.minute || '—'}')
+                  {t('replays.goal_number', '{{number}}-gol', { number: i + 1 })} ({r.minute || '—'}')
                 </Text>
               </TouchableOpacity>
             );

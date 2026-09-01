@@ -1,62 +1,87 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Dimensions } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View, StyleSheet, ScrollView, Dimensions, Platform } from 'react-native';
 import Skeleton from './Skeleton';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 const { width } = Dimensions.get('window');
 
+// MyTeamScreen / TeamProfileScreen bilan bir xil oq-qora (homeTheme) skelet —
+// hero (orqaga/chat/taktika tugmalari + logo-nom-rahbariyat) + info karta +
+// tab switcher + tarkib grid — barchasi haqiqiy sahifa bilan bir xil o'lchamda,
+// shu bilan yuklanish paytida "sakrash" (layout shift) bo'lmaydi.
 const TeamProfileSkeleton = () => {
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+
+    const cardSurface = Platform.OS === 'ios'
+        ? { backgroundColor: homeColors.background, borderWidth: 1, borderColor: homeColors.border }
+        : {
+            backgroundColor: homeColors.background,
+            elevation: 3,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+        };
+
+    const skeletonColor = { backgroundColor: homeColors.surface };
+
     return (
-        <View style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* HERO SKELETON WITH BLUR */}
-                <View style={styles.heroSection}>
-                    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-                    <View style={styles.heroContent}>
-                        <View style={styles.mainLogoWrapper}>
-                            <Skeleton width={140} height={140} borderRadius={12} />
-                        </View>
-                        <View style={styles.heroTextContainer}>
-                            <View style={styles.badgeRow}>
-                                <Skeleton width={120} height={24} borderRadius={10} />
-                            </View>
-                            <Skeleton width={220} height={36} borderRadius={10} style={{ marginTop: 16 }} />
-                            <View style={[styles.heroStatsRow, { marginTop: 16 }]}>
-                                <Skeleton width={90} height={16} borderRadius={6} />
-                                <View style={styles.statDot} />
-                                <Skeleton width={80} height={16} borderRadius={6} />
-                            </View>
-                        </View>
+        <View style={[styles.container, { backgroundColor: homeColors.background }]}>
+            {/* FIXED HEADER SKELETON */}
+            <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
+                {/* TOP ROW: orqaga va harakatlar */}
+                <View style={styles.topRow}>
+                    <Skeleton width={38} height={38} borderRadius={12} style={skeletonColor} />
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Skeleton width={38} height={38} borderRadius={12} style={skeletonColor} />
+                        <Skeleton width={38} height={38} borderRadius={12} style={skeletonColor} />
                     </View>
                 </View>
 
-                {/* SQUAD GRID SKELETON (EXACT 1-TO-1 MATCH WITH TEAM DETAIL PLAYER CARDS) */}
-                <View style={styles.mainContent}>
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Skeleton width={160} height={22} borderRadius={6} />
-                            <Skeleton width={100} height={14} borderRadius={6} />
-                        </View>
-
-                        <View style={styles.squadGrid}>
-                            {[1, 2, 3, 4, 5, 6].map((i) => (
-                                <View key={i} style={styles.playerCard}>
-                                    <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                                    <View style={styles.playerPhotoContainer}>
-                                        <Skeleton width="100%" height={160} borderRadius={20} />
-                                        <View style={styles.playerNumberBadgePlaceholder}>
-                                            <Skeleton width={34} height={20} borderRadius={10} />
-                                        </View>
-                                    </View>
-                                    <View style={styles.playerInfo}>
-                                        <Skeleton width="75%" height={14} borderRadius={4} style={{ marginTop: 12, marginBottom: 4 }} />
-                                        <Skeleton width="55%" height={14} borderRadius={4} style={{ marginBottom: 6 }} />
-                                        <Skeleton width="40%" height={10} borderRadius={4} />
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
+                {/* IDENTITY: logo chapda, nom/liga o'ngda */}
+                <View style={styles.identityRowSticky}>
+                    <Skeleton width={56} height={56} borderRadius={16} style={skeletonColor} />
+                    <View style={{ flex: 1, paddingTop: 2, gap: 8 }}>
+                        <Skeleton width="65%" height={16} borderRadius={5} style={skeletonColor} />
+                        <Skeleton width="40%" height={12} borderRadius={4} style={skeletonColor} />
                     </View>
+                </View>
+
+                {/* INFO CARD */}
+                <View style={[styles.infoCard, cardSurface]}>
+                    <View style={styles.infoTopRow}>
+                        {[1, 2, 3, 4, 5].map((i) => (
+                            <Skeleton key={i} width={26} height={16} borderRadius={4} style={skeletonColor} />
+                        ))}
+                    </View>
+                </View>
+
+                {/* TAB SWITCHER */}
+                <View style={styles.switcherWrapper}>
+                    <Skeleton width="30%" height={32} borderRadius={10} style={skeletonColor} />
+                    <Skeleton width="30%" height={32} borderRadius={10} style={skeletonColor} />
+                    <Skeleton width="30%" height={32} borderRadius={10} style={skeletonColor} />
+                </View>
+            </View>
+
+            {/* SCROLLABLE CONTENT SKELETON */}
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* TARKIB GRID — haqiqiy playerCard bilan bir xil o'lcham */}
+                <View style={styles.squadGrid}>
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <View key={i} style={[styles.playerCard, cardSurface]}>
+                            <View style={styles.playerPhotoContainer}>
+                                <Skeleton width="100%" height="100%" borderRadius={12} style={skeletonColor} />
+                            </View>
+                            <View style={styles.playerInfo}>
+                                <Skeleton width="75%" height={12} borderRadius={4} style={{ ...skeletonColor, marginBottom: 6 }} />
+                                <Skeleton width="50%" height={12} borderRadius={4} style={{ ...skeletonColor, marginBottom: 6 }} />
+                                <Skeleton width="40%" height={9} borderRadius={4} style={skeletonColor} />
+                            </View>
+                        </View>
+                    ))}
                 </View>
             </ScrollView>
         </View>
@@ -64,41 +89,23 @@ const TeamProfileSkeleton = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent' },
-    scrollContent: { paddingBottom: 60 },
-    heroSection: {
-        borderBottomLeftRadius: 40,
-        borderBottomRightRadius: 40,
-        overflow: 'hidden',
-        paddingBottom: 40,
-        paddingTop: 60,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderTopWidth: 0,
-        backgroundColor: 'rgba(255,255,255,0.03)',
+    container: { flex: 1 },
+    headerStickySection: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 0,
+        borderBottomWidth: 1,
     },
-    heroContent: { alignItems: 'center', marginTop: 20 },
-    mainLogoWrapper: { width: 140, height: 140, borderRadius: 12, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
-    heroTextContainer: { alignItems: 'center', marginTop: 24, paddingHorizontal: 20 },
-    badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-    heroStatsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 15, gap: 10 },
-    statDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
-    mainContent: { paddingHorizontal: 20, marginTop: 30 },
-    section: { marginBottom: 35 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    squadGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
-    playerCard: {
-        width: (width - 55) / 2,
-        borderRadius: 30,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-        backgroundColor: 'rgba(255,255,255,0.03)',
-        overflow: 'hidden',
-    },
-    playerPhotoContainer: { width: '100%', height: 160, position: 'relative', overflow: 'hidden', borderRadius: 20 },
-    playerNumberBadgePlaceholder: { position: 'absolute', bottom: 8, right: 8 },
-    playerInfo: { paddingHorizontal: 4 },
+    topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 8 },
+    identityRowSticky: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 12 },
+    switcherWrapper: { flexDirection: 'row', justifyContent: 'space-between', height: 44, alignItems: 'center' },
+    scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 60 },
+    infoCard: { borderRadius: 18, padding: 14, marginBottom: 12 },
+    infoTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+    squadGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    playerCard: { width: (width - 44) / 2, borderRadius: 16, padding: 10 },
+    playerPhotoContainer: { width: '100%', aspectRatio: 1, borderRadius: 12, overflow: 'hidden' },
+    playerInfo: { marginTop: 8 },
 });
 
 export default TeamProfileSkeleton;

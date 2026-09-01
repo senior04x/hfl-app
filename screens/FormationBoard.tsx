@@ -4,19 +4,17 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    ImageBackground,
     Dimensions,
     ActivityIndicator,
     Alert,
-    SafeAreaView,
     ScrollView,
-    FlatList,
+    Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiService, supabase } from '../services/apiService';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { 
-    PanGestureHandler, 
+import SmartImage from '../components/SmartImage';
+import {
     GestureHandlerRootView,
     GestureDetector,
     Gesture
@@ -28,10 +26,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSocket } from '../context/SocketContext';
 import { useAuthStore } from '../store/useAuthStore';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 import { useTranslation } from 'react-i18next';
-import Colors from '../constants/Colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// MyTeam sahifasidagi TacticsBoard bilan AYNAN bir xil o'lcham — ikkala ekranda
+// bir xil % koordinata bir xil piksel joyga tushishi uchun.
 const FIELD_WIDTH = SCREEN_WIDTH - 40;
 const FIELD_HEIGHT = FIELD_WIDTH * 1.3;
 
@@ -48,6 +49,20 @@ function FormationBoard({ route, navigation }: any) {
     const { teamId, isReadOnly: initialReadOnly = false } = route.params || {};
     const { user } = useAuthStore();
     const isReadOnly = route.params?.isReadOnly || user?.role === 'player';
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+    const lineColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)';
+
+    const cardSurface = Platform.OS === 'ios'
+        ? { backgroundColor: homeColors.background, borderWidth: 1, borderColor: homeColors.border }
+        : {
+            backgroundColor: homeColors.background,
+            elevation: 3,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+        };
 
     const [loading, setLoading] = useState(true);
     const [playersOnPitch, setPlayersOnPitch] = useState<PlayerPosition[]>([]);
@@ -57,7 +72,7 @@ function FormationBoard({ route, navigation }: any) {
 
     useEffect(() => {
         fetchData();
-        
+
         if (socket && (teamId || user?.teamId)) {
             const activeTeamId = teamId || user?.teamId;
             socket.on('formation-updated', (data: any) => {
@@ -171,8 +186,8 @@ function FormationBoard({ route, navigation }: any) {
         // Convert back to percentages (0-100) for storage
         const xPercent = (x / FIELD_WIDTH) * 100;
         const yPercent = (y / FIELD_HEIGHT) * 100;
-        
-        setPlayersOnPitch(prev => prev.map(p => 
+
+        setPlayersOnPitch(prev => prev.map(p =>
             p.id === id ? { ...p, x: xPercent, y: yPercent } : p
         ));
     };
@@ -201,53 +216,50 @@ function FormationBoard({ route, navigation }: any) {
 
     if (loading) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.primary} />
+            <View style={[styles.loadingContainer, { backgroundColor: homeColors.background }]}>
+                <ActivityIndicator size="large" color={homeColors.accent} />
             </View>
         );
     }
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, cardSurface]}>
+                        <Ionicons name="arrow-back" size={20} color={homeColors.textPrimary} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{isReadOnly ? t('teams.squad') : t('teams.edit_formation')}</Text>
+                    <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]}>{isReadOnly ? t('teams.squad') : t('teams.edit_formation')}</Text>
                     {!isReadOnly ? (
                         <TouchableOpacity onPress={handleSave} disabled={saving}>
                             {saving ? (
-                                <ActivityIndicator size="small" color={Colors.primary} />
+                                <ActivityIndicator size="small" color={homeColors.accent} />
                             ) : (
-                                <Text style={styles.saveText}>{t('common.save').toUpperCase()}</Text>
+                                <Text style={[styles.saveText, { color: homeColors.accent }]}>{t('common.save').toUpperCase()}</Text>
                             )}
                         </TouchableOpacity>
                     ) : (
-                        <View style={{ width: 40 }} /> // Spacer
+                        <View style={{ width: 40 }} />
                     )}
                 </View>
 
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     {/* ASOSIY TARKIB HEADER */}
                     <View style={styles.sectionHeaderRow}>
-                        <Ionicons name="football-outline" size={18} color={Colors.primary} />
-                        <Text style={styles.sectionHeaderTitle}>{t('teams.starting_lineup')}</Text>
-                        <Text style={styles.sectionHeaderCount}>{playersOnPitch.length} / 11</Text>
+                        <Ionicons name="football-outline" size={18} color={homeColors.textSecondary} />
+                        <Text style={[styles.sectionHeaderTitle, { color: homeColors.textPrimary }]}>{t('teams.starting_lineup')}</Text>
+                        <Text style={[styles.sectionHeaderCount, { color: homeColors.accent }]}>{playersOnPitch.length} / 11</Text>
                     </View>
 
                     <View style={styles.fieldWrapper}>
-                        <View style={styles.field}>
-                            {/* Stripes */}
-                            {Array.from({ length: 10 }).map((_, i) => (
-                                <View key={i} style={[styles.stripe, { top: `${i * 10}%`, backgroundColor: i % 2 === 0 ? '#2d5a27' : '#33632d' }]} />
-                            ))}
-                            
-                            {/* Markings */}
-                            <View style={styles.centerCircle} />
-                            <View style={styles.centerLine} />
-                            <View style={styles.penaltyAreaTop} />
-                            <View style={styles.penaltyAreaBottom} />
+                        <View style={[styles.field, { backgroundColor: homeColors.surface, borderColor: lineColor }]}>
+                            <View style={[styles.outerBorder, { borderColor: lineColor }]} />
+                            <View style={[styles.centerCircle, { borderColor: lineColor }]} />
+                            <View style={[styles.centerLine, { backgroundColor: lineColor }]} />
+                            <View style={[styles.penaltyAreaTop, { borderColor: lineColor }]} />
+                            <View style={[styles.penaltyAreaBottom, { borderColor: lineColor }]} />
+                            <View style={[styles.goalAreaTop, { borderColor: lineColor }]} />
+                            <View style={[styles.goalAreaBottom, { borderColor: lineColor }]} />
 
                             {playersOnPitch.map((player) => (
                                 <DraggablePlayer
@@ -256,6 +268,7 @@ function FormationBoard({ route, navigation }: any) {
                                     onPositionChange={updatePlayerPosition}
                                     onRemove={() => removePlayerFromPitch(player.id)}
                                     isReadOnly={isReadOnly}
+                                    homeColors={homeColors}
                                 />
                             ))}
                         </View>
@@ -264,16 +277,16 @@ function FormationBoard({ route, navigation }: any) {
                     {/* ZAXIRA O'YINCHILARI SECTION (Always visible so players & managers can see bench) */}
                     <View style={styles.subsSection}>
                         <View style={styles.subsHeader}>
-                            <Ionicons name="people-outline" size={18} color={Colors.primary} />
-                            <Text style={styles.subsTitle}>{t('teams.substitutes')}</Text>
-                            <Text style={styles.subsCount}>
+                            <Ionicons name="people-outline" size={18} color={homeColors.textSecondary} />
+                            <Text style={[styles.subsTitle, { color: homeColors.textSecondary }]}>{t('teams.substitutes')}</Text>
+                            <Text style={[styles.subsCount, { color: homeColors.accent }]}>
                                 {availablePlayers.filter(p => {
                                     const id = (p._id || p.id).toString();
                                     return !playersOnPitch.some(pitchP => pitchP.id === id);
                                 }).length}
                             </Text>
                         </View>
-                        
+
                         <View style={styles.subsListVertical}>
                             {availablePlayers.map(player => {
                                 const id = (player._id || player.id).toString();
@@ -284,42 +297,36 @@ function FormationBoard({ route, navigation }: any) {
                                 const photo = player.photo_url || player.photo || player.photoUrl;
 
                                 return (
-                                    <TouchableOpacity 
-                                        key={id} 
-                                        style={[styles.subRow, isOnPitch && styles.subRowActive]}
+                                    <TouchableOpacity
+                                        key={id}
+                                        style={[styles.subRow, cardSurface, isOnPitch && { opacity: 0.55 }]}
                                         onPress={() => addPlayerToPitch(player)}
                                         disabled={isReadOnly || isOnPitch}
                                         activeOpacity={0.7}
                                     >
-                                        {/* Player Photo */}
                                         <View style={styles.subRowPhotoContainer}>
-                                            {photo ? (
-                                                <Image 
-                                                    source={{ uri: photo }} 
-                                                    style={styles.subRowPhoto} 
-                                                    contentFit="cover"
-                                                />
-                                            ) : (
-                                                <Ionicons name="person" size={20} color="#666" />
-                                            )}
+                                            <SmartImage
+                                                uri={photo}
+                                                style={styles.subRowPhoto}
+                                                borderRadius={22}
+                                                fallbackIcon="person"
+                                                fallbackIconSize={20}
+                                            />
                                         </View>
 
-                                        {/* Name & Surname (Name bold on top, Surname thin below) */}
                                         <View style={styles.subRowInfo}>
-                                            <Text style={styles.subRowFirstName}>{firstName}</Text>
+                                            <Text style={[styles.subRowFirstName, { color: homeColors.textPrimary }]}>{firstName}</Text>
                                             {lastName ? (
-                                                <Text style={styles.subRowLastName}>{lastName}</Text>
+                                                <Text style={[styles.subRowLastName, { color: homeColors.textSecondary }]}>{lastName}</Text>
                                             ) : null}
                                         </View>
 
-                                        {/* Shirt Number */}
                                         <View style={styles.subRowNumberContainer}>
-                                            <View style={[styles.subRowNumberCircle, { backgroundColor: isOnPitch ? '#333' : Colors.primary }]}>
-                                                <Text style={[styles.subRowNumberText, { color: isOnPitch ? '#AAA' : '#000' }]}>{number}</Text>
+                                            <View style={[styles.subRowNumberCircle, { backgroundColor: isOnPitch ? homeColors.border : homeColors.accent }]}>
+                                                <Text style={[styles.subRowNumberText, { color: isOnPitch ? homeColors.textSecondary : homeColors.background }]}>{number}</Text>
                                             </View>
                                         </View>
 
-                                        {/* Status Badge */}
                                         <View style={styles.subRowBadgeContainer}>
                                             <Text style={[styles.subStatusBadge, isOnPitch ? styles.badgeMain : styles.badgeSub]}>
                                                 {isOnPitch ? 'ASOSIY' : 'ZAXIRA'}
@@ -336,7 +343,7 @@ function FormationBoard({ route, navigation }: any) {
     );
 };
 
-const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly }: any) => {
+const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly, homeColors }: any) => {
     // Shared values use absolute field coordinates for movement
     const translateX = useSharedValue((player.x / 100) * FIELD_WIDTH);
     const translateY = useSharedValue((player.y / 100) * FIELD_HEIGHT);
@@ -355,7 +362,7 @@ const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly }: any
         .onUpdate((event) => {
             let nextX = context.value.x + event.translationX;
             let nextY = context.value.y + event.translationY;
-            
+
             // Constrain
             translateX.value = Math.max(0, Math.min(FIELD_WIDTH, nextX));
             translateY.value = Math.max(0, Math.min(FIELD_HEIGHT, nextY));
@@ -377,11 +384,11 @@ const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly }: any
         <GestureDetector gesture={panGesture}>
             <Animated.View style={[styles.playerMarker, animatedStyle]}>
                 <TouchableOpacity onLongPress={!isReadOnly ? onRemove : undefined} activeOpacity={0.8} disabled={isReadOnly}>
-                    <View style={styles.playerIcon}>
-                        <Text style={styles.playerNumberText}>{player.number || player.name.charAt(0)}</Text>
+                    <View style={[styles.playerIcon, { backgroundColor: homeColors.accent, borderColor: homeColors.background }]}>
+                        <Text style={[styles.playerNumberText, { color: homeColors.background }]}>{player.number || player.name.charAt(0)}</Text>
                     </View>
-                    <View style={styles.nameTag}>
-                        <Text style={styles.playerNameTag} numberOfLines={1}>{player.name}</Text>
+                    <View style={[styles.nameTag, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                        <Text style={[styles.playerNameTag, { color: homeColors.textPrimary }]} numberOfLines={1}>{player.name}</Text>
                     </View>
                 </TouchableOpacity>
             </Animated.View>
@@ -392,11 +399,9 @@ const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly }: any
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0A',
     },
     loadingContainer: {
         flex: 1,
-        backgroundColor: '#0A0A0A',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -404,17 +409,24 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 20,
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 12,
+    },
+    iconBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
-        color: '#FFF',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '900',
         textTransform: 'uppercase',
-        fontStyle: 'italic',
+        letterSpacing: 0.5,
     },
     saveText: {
-        color: Colors.primary,
         fontWeight: '900',
         fontSize: 14,
     },
@@ -429,13 +441,11 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     sectionHeaderTitle: {
-        color: '#FFF',
         fontSize: 12,
         fontWeight: '900',
         letterSpacing: 2,
     },
     sectionHeaderCount: {
-        color: Colors.primary,
         fontSize: 11,
         fontWeight: '900',
         marginLeft: 'auto',
@@ -447,41 +457,32 @@ const styles = StyleSheet.create({
     field: {
         width: FIELD_WIDTH,
         height: FIELD_HEIGHT,
-        backgroundColor: '#2D5A27',
         borderRadius: 15,
-        borderWidth: 3,
-        borderColor: 'rgba(255,255,255,0.4)',
+        borderWidth: 2,
         position: 'relative',
         overflow: 'hidden',
-        elevation: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
     },
-    stripe: {
-        position: 'absolute',
-        width: '100%',
-        height: '10%',
+    outerBorder: {
+        ...StyleSheet.absoluteFillObject,
+        borderWidth: 1.5,
+        margin: 4,
     },
     centerCircle: {
         position: 'absolute',
         top: '50%',
         left: '50%',
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.3)',
-        marginTop: -50,
-        marginLeft: -50,
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        borderWidth: 1.5,
+        marginTop: -45,
+        marginLeft: -45,
     },
     centerLine: {
         position: 'absolute',
         top: '50%',
         width: '100%',
-        height: 2,
-        backgroundColor: 'rgba(255,255,255,0.3)',
+        height: 1.5,
     },
     penaltyAreaTop: {
         position: 'absolute',
@@ -489,8 +490,7 @@ const styles = StyleSheet.create({
         left: '20%',
         width: '60%',
         height: '18%',
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.3)',
+        borderWidth: 1.5,
         borderTopWidth: 0,
     },
     penaltyAreaBottom: {
@@ -499,8 +499,25 @@ const styles = StyleSheet.create({
         left: '20%',
         width: '60%',
         height: '18%',
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.3)',
+        borderWidth: 1.5,
+        borderBottomWidth: 0,
+    },
+    goalAreaTop: {
+        position: 'absolute',
+        top: 0,
+        left: '35%',
+        width: '30%',
+        height: '6%',
+        borderWidth: 1.5,
+        borderTopWidth: 0,
+    },
+    goalAreaBottom: {
+        position: 'absolute',
+        bottom: 0,
+        left: '35%',
+        width: '30%',
+        height: '6%',
+        borderWidth: 1.5,
         borderBottomWidth: 0,
     },
     playerMarker: {
@@ -513,33 +530,27 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: Colors.primary,
         borderWidth: 2,
-        borderColor: '#FFF',
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
+        shadowOpacity: 0.25,
         shadowRadius: 5,
         elevation: 8,
     },
     playerNumberText: {
-        color: '#000',
         fontWeight: '900',
         fontSize: 14,
     },
     nameTag: {
-        backgroundColor: 'rgba(0,0,0,0.8)',
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 10,
         marginTop: 4,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
     },
     playerNameTag: {
-        color: '#FFF',
         fontSize: 9,
         fontWeight: 'bold',
         textAlign: 'center',
@@ -555,13 +566,11 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     subsTitle: {
-        color: 'rgba(255,255,255,0.5)',
         fontSize: 10,
         fontWeight: '900',
         letterSpacing: 2,
     },
     subsCount: {
-        color: Colors.primary,
         fontSize: 10,
         fontWeight: '900',
         marginLeft: 'auto',
@@ -572,31 +581,17 @@ const styles = StyleSheet.create({
     subRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#161616',
         borderRadius: 14,
         padding: 10,
         marginBottom: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.04)',
-    },
-    subRowActive: {
-        opacity: 0.65,
-        backgroundColor: '#0F0F0F',
     },
     subRowPhotoContainer: {
         width: 44,
         height: 44,
-        borderRadius: 22,
-        backgroundColor: '#252525',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
     },
     subRowPhoto: {
-        width: '100%',
-        height: '100%',
+        width: 44,
+        height: 44,
     },
     subRowInfo: {
         flex: 1,
@@ -604,13 +599,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     subRowFirstName: {
-        color: '#FFF',
         fontSize: 14,
         fontWeight: 'bold',
         textTransform: 'uppercase',
     },
     subRowLastName: {
-        color: 'rgba(255,255,255,0.6)',
         fontSize: 12,
         fontWeight: '300',
         marginTop: 1,
@@ -645,11 +638,11 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
     badgeMain: {
-        backgroundColor: 'rgba(0, 255, 102, 0.15)',
-        color: '#00FF66',
+        backgroundColor: 'rgba(0, 200, 90, 0.15)',
+        color: '#00A855',
     },
     badgeSub: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'rgba(128, 128, 128, 0.15)',
         color: '#888',
     },
 });

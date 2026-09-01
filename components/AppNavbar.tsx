@@ -6,8 +6,10 @@ import {
     TextInput,
     TouchableOpacity,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 interface AppNavbarProps {
     title: string;
@@ -26,34 +28,44 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
     showSearch = false,
     searchQuery = '',
     onSearchChange,
-    searchPlaceholder = 'Qidiruv...',
+    searchPlaceholder,
     onBackPress,
     rightElement,
 }) => {
+    const { t } = useTranslation();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+    const resolvedPlaceholder = searchPlaceholder || t('common.search', 'Qidiruv...');
+
     return (
-        <View style={styles.navbarContainer}>
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={[styles.navbarContainer, { backgroundColor: homeColors.background }]}>
             <View style={styles.navbarInner}>
                 {/* Left Section: Back Button (if provided) + Title/Subtitle */}
                 <View style={styles.leftSection}>
                     {onBackPress ? (
                         <TouchableOpacity
-                            style={styles.backButton}
+                            style={[
+                                styles.backButton,
+                                {
+                                    backgroundColor: isDark ? '#181818' : '#F2F2F4',
+                                    borderColor: homeColors.border,
+                                }
+                            ]}
                             onPress={onBackPress}
                             activeOpacity={0.7}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                            <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+                            <Ionicons name="chevron-back" size={20} color={homeColors.textPrimary} />
                         </TouchableOpacity>
                     ) : null}
 
                     <View style={styles.titleColumn}>
                         {subtitle ? (
-                            <Text style={styles.subtitleText} numberOfLines={1}>
+                            <Text style={[styles.subtitleText, { color: homeColors.textSecondary }]} numberOfLines={1}>
                                 {subtitle.toUpperCase()}
                             </Text>
                         ) : null}
-                        <Text style={styles.titleText} numberOfLines={1}>
+                        <Text style={[styles.titleText, { color: homeColors.textPrimary }]} numberOfLines={1}>
                             {title.toUpperCase()}
                         </Text>
                     </View>
@@ -62,11 +74,17 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
                 {/* Right Section: Search Input or Custom Right Element */}
                 <View style={styles.rightSection}>
                     {showSearch ? (
-                        <View style={styles.searchContainer}>
+                        <View style={[
+                            styles.searchContainer,
+                            {
+                                backgroundColor: isDark ? '#181818' : '#F2F2F4',
+                                borderColor: homeColors.border,
+                            }
+                        ]}>
                             <TextInput
-                                style={styles.searchInput}
-                                placeholder={searchPlaceholder}
-                                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                                style={[styles.searchInput, { color: homeColors.textPrimary }]}
+                                placeholder={resolvedPlaceholder}
+                                placeholderTextColor={homeColors.textSecondary}
                                 value={searchQuery}
                                 onChangeText={onSearchChange}
                                 returnKeyType="search"
@@ -79,10 +97,10 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
                                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="close-circle" size={18} color="rgba(255, 255, 255, 0.75)" />
+                                    <Ionicons name="close-circle" size={18} color={homeColors.textSecondary} />
                                 </TouchableOpacity>
                             ) : (
-                                <Ionicons name="search" size={17} color="rgba(255, 255, 255, 0.6)" />
+                                <Ionicons name="search" size={17} color={homeColors.textSecondary} />
                             )}
                         </View>
                     ) : rightElement ? (
@@ -97,10 +115,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
 const styles = StyleSheet.create({
     navbarContainer: {
         width: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.45)',
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-        overflow: 'hidden',
+        borderBottomWidth: 0,
         zIndex: 100,
     },
     navbarInner: {
@@ -121,9 +136,7 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
@@ -133,14 +146,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     subtitleText: {
-        color: 'rgba(255, 255, 255, 0.5)',
         fontSize: 10,
         fontWeight: '900',
         letterSpacing: 2,
         marginBottom: 1,
     },
     titleText: {
-        color: '#FFFFFF',
         fontSize: 20,
         fontWeight: '900',
         letterSpacing: 0.5,
@@ -153,17 +164,14 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
         paddingHorizontal: 12,
         height: 38,
         width: 145,
     },
     searchInput: {
         flex: 1,
-        color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '600',
         padding: 0,
@@ -172,3 +180,4 @@ const styles = StyleSheet.create({
 });
 
 export default AppNavbar;
+

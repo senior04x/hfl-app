@@ -9,7 +9,6 @@ import {
     ScrollView,
     Dimensions
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { supabase } from '../services/apiService';
@@ -17,6 +16,8 @@ import { useOrganizationStore } from '../store/useOrganizationStore';
 import Skeleton from './Skeleton';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 const { width } = Dimensions.get('window');
 
@@ -38,6 +39,9 @@ export default function OrganizationSelectModal({
     subtitle
 }: OrganizationSelectModalProps) {
     const { t } = useTranslation();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+
     const { organizations, selectedOrganizationId, setSelectedOrganizationId, setOrganizations } = useOrganizationStore();
     
     // Instant cache-first state
@@ -112,25 +116,23 @@ export default function OrganizationSelectModal({
                     onPress={onClose}
                 />
                 
-                <View style={styles.modalCard}>
-                    <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
-                    
+                <View style={[styles.modalCard, { backgroundColor: isDark ? '#161616' : '#FFFFFF', borderColor: homeColors.border }]}>
                     {/* Header */}
                     <View style={styles.headerRow}>
                         <View style={styles.headerTitleGroup}>
-                            <View style={styles.iconCircle}>
-                                <Ionicons name={isApplyMode ? "globe-outline" : "business"} size={18} color="#00FF9D" />
+                            <View style={[styles.iconCircle, { backgroundColor: isDark ? '#222222' : '#F0F0F2', borderColor: homeColors.border }]}>
+                                <Ionicons name={isApplyMode ? "globe-outline" : "business"} size={16} color={homeColors.textPrimary} />
                             </View>
-                            <Text style={styles.headerTitle}>
+                            <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]}>
                                 {title || (isApplyMode ? t('auth.select_org_title', 'Tashkilotni tanlang') : t('common.select_organization', 'Tashkilotni tanlang'))}
                             </Text>
                         </View>
-                        <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-                            <Ionicons name="close" size={20} color="rgba(255,255,255,0.7)" />
+                        <TouchableOpacity style={[styles.closeBtn, { backgroundColor: isDark ? '#222222' : '#F0F0F2' }]} onPress={onClose} activeOpacity={0.7}>
+                            <Ionicons name="close" size={18} color={homeColors.textPrimary} />
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.subtitle}>
+                    <Text style={[styles.subtitle, { color: homeColors.textSecondary }]}>
                         {subtitle || (isApplyMode 
                             ? t('auth.select_org_sub', "Ariza topshirish uchun kerakli sport tashkilotini tanlang") 
                             : t('common.select_organization_sub', 'Kerakli sport tashkilotini tanlang va uning barcha ligalarini ko\'ring'))}
@@ -140,11 +142,11 @@ export default function OrganizationSelectModal({
                     {loading ? (
                         <View style={styles.skeletonContainer}>
                             {[1, 2, 3].map((key) => (
-                                <View key={key} style={styles.skeletonItem}>
-                                    <Skeleton circle width={44} height={44} style={{ marginRight: 12 }} />
+                                <View key={key} style={[styles.skeletonItem, { backgroundColor: isDark ? '#1E1E1E' : '#F4F4F6' }]}>
+                                    <Skeleton circle width={40} height={40} style={{ marginRight: 12 }} />
                                     <View style={{ flex: 1 }}>
-                                        <Skeleton width="70%" height={16} borderRadius={4} style={{ marginBottom: 8 }} />
-                                        <Skeleton width="40%" height={12} borderRadius={4} />
+                                        <Skeleton width="70%" height={15} borderRadius={4} style={{ marginBottom: 6 }} />
+                                        <Skeleton width="40%" height={11} borderRadius={4} />
                                     </View>
                                 </View>
                             ))}
@@ -162,15 +164,14 @@ export default function OrganizationSelectModal({
                                         key={org.id}
                                         style={[
                                             styles.orgItem,
-                                            isSelected && styles.selectedOrgItem
+                                            { backgroundColor: isDark ? '#1E1E1E' : '#F5F5F7', borderColor: homeColors.border },
+                                            isSelected && { borderColor: homeColors.textPrimary, backgroundColor: isDark ? '#262626' : '#ECECEE' }
                                         ]}
                                         onPress={() => handleSelectOrg(org)}
                                         activeOpacity={0.8}
                                     >
-                                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                                        
                                         {/* Logo or High-Visibility Initials Badge */}
-                                        <View style={[styles.orgLogoBox, isSelected && styles.selectedOrgLogoBox]}>
+                                        <View style={[styles.orgLogoBox, { backgroundColor: isDark ? '#282828' : '#E8E8EA', borderColor: homeColors.border }]}>
                                             {orgLogo && typeof orgLogo === 'string' && (orgLogo.startsWith('http') || orgLogo.length > 8) ? (
                                                 <Image
                                                     source={{ uri: orgLogo }}
@@ -181,10 +182,10 @@ export default function OrganizationSelectModal({
                                                 <View style={styles.initialsBox}>
                                                     <Ionicons 
                                                         name={isApplyMode ? "globe-outline" : "shield-checkmark"} 
-                                                        size={20} 
-                                                        color={isSelected ? "#00FF9D" : "#00DF82"} 
+                                                        size={18} 
+                                                        color={homeColors.textPrimary} 
                                                     />
-                                                    <Text style={[styles.initialsText, isSelected && { color: '#00FF9D' }]}>
+                                                    <Text style={[styles.initialsText, { color: homeColors.textPrimary }]}>
                                                         {orgInitials}
                                                     </Text>
                                                 </View>
@@ -196,13 +197,14 @@ export default function OrganizationSelectModal({
                                             <Text
                                                 style={[
                                                     styles.orgName,
-                                                    isSelected && { color: '#00FF9D', fontWeight: '900' }
+                                                    { color: homeColors.textPrimary },
+                                                    isSelected && { fontWeight: '800' }
                                                 ]}
                                                 numberOfLines={1}
                                             >
                                                 {(org.name || 'TASHKILOT').toUpperCase()}
                                             </Text>
-                                            <Text style={styles.orgTag}>
+                                            <Text style={[styles.orgTag, { color: homeColors.textSecondary }]}>
                                                 {isApplyMode ? `amatora.uz/${orgSlug}` : (org.slug ? `@${org.slug}` : 'Rasmiy Tashkilot')}
                                             </Text>
                                         </View>
@@ -210,14 +212,14 @@ export default function OrganizationSelectModal({
                                         {/* Browser Redirect Icon OR Selection Checkmark */}
                                         {isApplyMode ? (
                                             <View style={{ paddingHorizontal: 6 }}>
-                                                <Ionicons name="open-outline" size={20} color="#00FF9D" />
+                                                <Ionicons name="open-outline" size={18} color={homeColors.textPrimary} />
                                             </View>
                                         ) : isSelected ? (
-                                            <View style={styles.checkCircleActive}>
-                                                <Ionicons name="checkmark" size={16} color="#000" />
+                                            <View style={[styles.checkCircleActive, { backgroundColor: homeColors.textPrimary }]}>
+                                                <Ionicons name="checkmark" size={14} color={homeColors.background} />
                                             </View>
                                         ) : (
-                                            <View style={styles.checkCircleEmpty} />
+                                            <View style={[styles.checkCircleEmpty, { borderColor: homeColors.border }]} />
                                         )}
                                     </TouchableOpacity>
                                 );
@@ -233,152 +235,127 @@ export default function OrganizationSelectModal({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 20,
     },
     modalCard: {
         width: '100%',
-        maxWidth: 400,
+        maxWidth: 380,
         maxHeight: 480,
-        borderRadius: 24,
+        borderRadius: 18,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.25)',
-        backgroundColor: 'rgba(15, 23, 42, 0.88)',
-        padding: 20,
+        padding: 18,
     },
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     headerTitleGroup: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
     },
     iconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(0, 223, 130, 0.15)',
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(0, 223, 130, 0.3)',
     },
     headerTitle: {
-        color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '900',
-        letterSpacing: 0.3,
+        fontSize: 15,
+        fontWeight: '800',
+        letterSpacing: 0.2,
     },
     closeBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
     },
     subtitle: {
-        color: 'rgba(255, 255, 255, 0.55)',
-        fontSize: 12,
-        marginBottom: 16,
-        lineHeight: 16,
+        fontSize: 11,
+        marginBottom: 14,
+        lineHeight: 15,
     },
     skeletonContainer: {
-        paddingVertical: 10,
+        paddingVertical: 6,
     },
     skeletonItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        marginBottom: 10,
+        padding: 10,
+        borderRadius: 12,
+        marginBottom: 8,
     },
     scrollList: {
-        maxHeight: 320,
+        maxHeight: 300,
     },
     orgItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        borderRadius: 16,
-        overflow: 'hidden',
+        padding: 10,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        marginBottom: 10,
-    },
-    selectedOrgItem: {
-        borderColor: 'rgba(0, 223, 130, 0.5)',
-        backgroundColor: 'rgba(0, 223, 130, 0.08)',
+        marginBottom: 8,
     },
     orgLogoBox: {
-        width: 46,
-        height: 46,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        width: 40,
+        height: 40,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-    },
-    selectedOrgLogoBox: {
-        borderColor: 'rgba(0, 223, 130, 0.45)',
-        backgroundColor: 'rgba(0, 223, 130, 0.12)',
     },
     orgLogoImg: {
-        width: 38,
-        height: 38,
+        width: 32,
+        height: 32,
     },
     initialsBox: {
         alignItems: 'center',
         justifyContent: 'center',
     },
     initialsText: {
-        color: '#FFFFFF',
-        fontSize: 9,
-        fontWeight: '900',
+        fontSize: 8,
+        fontWeight: '800',
         marginTop: 1,
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
     },
     orgInfo: {
         flex: 1,
-        marginLeft: 12,
+        marginLeft: 10,
     },
     orgName: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '800',
+        fontSize: 13,
+        fontWeight: '700',
         marginBottom: 2,
     },
     orgTag: {
-        color: 'rgba(255, 255, 255, 0.45)',
-        fontSize: 11,
-        fontWeight: '600',
+        fontSize: 10,
+        fontWeight: '500',
     },
     checkCircleActive: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#00FF9D',
+        width: 20,
+        height: 20,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 8,
+        marginLeft: 6,
     },
     checkCircleEmpty: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        marginLeft: 8,
+        marginLeft: 6,
     },
 });
+

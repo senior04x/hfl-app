@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import SmartImage from './SmartImage';
 import * as Haptics from 'expo-haptics';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 export interface StoryMediaItem {
   id: string;
@@ -20,6 +23,8 @@ export interface StoryMediaItem {
   subtitle?: string;
   minute?: number | string;
   matchId?: string;
+  teamId?: string | number;
+  eventId?: string | number;
   matchScore?: { home: number; away: number };
   homeTeam?: { name: string; logo?: string };
   awayTeam?: { name: string; logo?: string };
@@ -27,6 +32,16 @@ export interface StoryMediaItem {
   playerPhoto?: string;
   assistantName?: string;
   actionText?: string;
+  round?: number | string;
+  matchTime?: string;
+  matchDate?: string;
+  tournamentName?: string;
+  status?: string;
+  createdAt?: string;
+  expiresAt?: string;
+  likesCount?: number;
+  viewsCount?: number;
+  isLiked?: boolean;
 }
 
 export interface StoryGroup {
@@ -37,6 +52,13 @@ export interface StoryGroup {
   category: 'live_match' | 'goal_highlight' | 'top_moment' | 'league_summary';
   isLive?: boolean;
   isViewed?: boolean;
+  createdAt?: string;
+  expiresAt?: string;
+  // O'zining (hozirgi tizimga kirgan foydalanuvchining) jamoasi — doim
+  // tray'da BIRINCHI o'rinda turadi. Agar `items` bo'sh bo'lsa — bu "+"
+  // ("Story qo'shish") halqasi, tap qilinganda replay-tanlash modal ochiladi.
+  isOwn?: boolean;
+  teamId?: string | number;
   items: StoryMediaItem[];
 }
 
@@ -49,6 +71,9 @@ export default function MatchStoriesTray({
   stories,
   onSelectStoryGroup,
 }: MatchStoriesTrayProps) {
+  const { isDark } = useThemeStore();
+  const homeColors = getHomeScreenColors(isDark);
+
   if (!stories || stories.length === 0) return null;
 
   const handlePress = (group: StoryGroup, index: number) => {
@@ -66,6 +91,7 @@ export default function MatchStoriesTray({
         {stories.map((group, index) => {
           const isLive = group.isLive;
           const isViewed = group.isViewed;
+          const isOwnEmpty = !!group.isOwn && (!group.items || group.items.length === 0);
 
           return (
             <TouchableOpacity
@@ -76,14 +102,29 @@ export default function MatchStoriesTray({
             >
               {/* Outer Ring */}
               <View style={styles.ringWrapper}>
-                {isLive ? (
+                {isOwnEmpty ? (
+                  <View style={[styles.viewedRing, { borderColor: homeColors.border, borderStyle: 'dashed' }]}>
+                    <View style={[styles.innerRing, { backgroundColor: isDark ? homeColors.background : '#FFFFFF' }]}>
+                      <SmartImage
+                        uri={group.avatarUrl}
+                        style={[styles.avatar, styles.viewedAvatar]}
+                        contentFit="cover"
+                        fallbackIcon="shield-outline"
+                        fallbackIconSize={26}
+                      />
+                    </View>
+                    <View style={[styles.addStoryBadge, { backgroundColor: homeColors.accent, borderColor: isDark ? homeColors.background : '#FFFFFF' }]}>
+                      <Ionicons name="add" size={14} color="#FFFFFF" />
+                    </View>
+                  </View>
+                ) : isLive ? (
                   <LinearGradient
                     colors={['#EF4444', '#FF3B30', '#F59E0B']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.gradientRing}
                   >
-                    <View style={styles.innerRing}>
+                    <View style={[styles.innerRing, { backgroundColor: isDark ? homeColors.background : '#FFFFFF' }]}>
                       <SmartImage
                         uri={group.avatarUrl}
                         style={styles.avatar}
@@ -95,12 +136,12 @@ export default function MatchStoriesTray({
                   </LinearGradient>
                 ) : !isViewed ? (
                   <LinearGradient
-                    colors={['#00DF82', '#00A862', '#3B82F6']}
+                    colors={[homeColors.accent, '#3B82F6', '#8B5CF6']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={[styles.gradientRing, styles.glowEffect]}
+                    style={[styles.gradientRing, { shadowColor: homeColors.accent }]}
                   >
-                    <View style={styles.innerRing}>
+                    <View style={[styles.innerRing, { backgroundColor: isDark ? homeColors.background : '#FFFFFF' }]}>
                       <SmartImage
                         uri={group.avatarUrl}
                         style={styles.avatar}
@@ -111,8 +152,8 @@ export default function MatchStoriesTray({
                     </View>
                   </LinearGradient>
                 ) : (
-                  <View style={styles.viewedRing}>
-                    <View style={styles.innerRing}>
+                  <View style={[styles.viewedRing, { borderColor: homeColors.border }]}>
+                    <View style={[styles.innerRing, { backgroundColor: isDark ? homeColors.background : '#FFFFFF' }]}>
                       <SmartImage
                         uri={group.avatarUrl}
                         style={[styles.avatar, styles.viewedAvatar]}
@@ -126,13 +167,13 @@ export default function MatchStoriesTray({
 
                 {/* Badge Overlay */}
                 {isLive ? (
-                  <View style={styles.liveBadge}>
+                  <View style={[styles.liveBadge, { borderColor: isDark ? homeColors.background : '#FFFFFF' }]}>
                     <View style={styles.liveDot} />
                     <Text style={styles.liveBadgeText}>LIVE</Text>
                   </View>
                 ) : group.items?.[0]?.minute ? (
-                  <View style={styles.minuteBadge}>
-                    <Text style={styles.minuteBadgeText}>{group.items[0].minute}'</Text>
+                  <View style={[styles.minuteBadge, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0', borderColor: homeColors.border }]}>
+                    <Text style={[styles.minuteBadgeText, { color: homeColors.accent }]}>{group.items[0].minute}'</Text>
                   </View>
                 ) : null}
               </View>
@@ -141,7 +182,7 @@ export default function MatchStoriesTray({
               <Text
                 style={[
                   styles.storyTitle,
-                  isViewed && styles.viewedTitle,
+                  { color: isViewed ? homeColors.textSecondary : homeColors.textPrimary },
                 ]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
@@ -158,7 +199,8 @@ export default function MatchStoriesTray({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
+    marginTop: 2,
+    marginBottom: 10,
     height: 104,
   },
   scrollContent: {
@@ -185,19 +227,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  glowEffect: {
-    shadowColor: '#00DF82',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    elevation: 4,
-  },
   viewedRing: {
     width: 68,
     height: 68,
     borderRadius: 34,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
     padding: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -206,7 +240,6 @@ const styles = StyleSheet.create({
     width: 61,
     height: 61,
     borderRadius: 30.5,
-    backgroundColor: '#0D111A',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -216,7 +249,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   viewedAvatar: {
-    opacity: 0.8,
+    opacity: 0.75,
   },
   liveBadge: {
     position: 'absolute',
@@ -229,7 +262,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     borderWidth: 1.5,
-    borderColor: '#0D111A',
   },
   liveDot: {
     width: 4,
@@ -246,28 +278,31 @@ const styles = StyleSheet.create({
   minuteBadge: {
     position: 'absolute',
     bottom: -3,
-    backgroundColor: '#1E293B',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   minuteBadgeText: {
-    color: '#00DF82',
     fontSize: 9,
     fontWeight: '800',
+  },
+  addStoryBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   storyTitle: {
     marginTop: 6,
     fontSize: 11,
     fontWeight: '700',
-    color: '#E2E8F0',
     textAlign: 'center',
     width: 72,
-  },
-  viewedTitle: {
-    color: '#64748B',
-    fontWeight: '500',
   },
 });

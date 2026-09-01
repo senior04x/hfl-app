@@ -112,7 +112,34 @@
     "league_results_title": "Результаты {{league}}",
     "view_league_results": "РЕЗУЛЬТАТЫ {{league}} →",
     "view_all_results": "ВСЕ РЕЗУЛЬТАТЫ →",
-    "no_finished_matches": "Завершенных матчей нет"
+    "no_finished_matches": "Завершенных матчей нет",
+    "news": "Новости"
+  },
+  "stories": {
+    "title": "Истории",
+    "top_scorer_leader": "БОМБАРДИР / ЛИДЕР",
+    "league_leader": "Лидер лиги Amatora",
+    "login_to_like": "Чтобы поставить лайк, войдите в систему или зарегистрируйтесь.",
+    "watch_on_amatora": "Смотрите в приложении Amatora!",
+    "add_story": "ДОБАВИТЬ ИСТОРИЮ",
+    "add_story_subtitle": "Выберите видеоповтор гола — он будет виден как история 48 часов",
+    "no_replays": "Пока нет доступных видеоповторов",
+    "minute_goal": "Гол на {{minute}}-й минуте",
+    "goal_replay": "Повтор гола",
+    "goal": "ГОЛ",
+    "round_tour": "{{round}}-Й ТУР",
+    "finished": "ЗАВЕРШЕН",
+    "unknown_player": "Неизвестный игрок"
+  },
+  "replays": {
+    "title": "Повторы",
+    "match_replay": "ПОВТОР МАТЧА",
+    "goals_count": "{{count}} ГОЛ(ОВ)",
+    "goal_number": "{{number}}-й гол",
+    "goal_scorer": "АВТОР ГОЛА",
+    "assistant": "АССИСТЕНТ (ПЕРЕДАЧА)",
+    "unknown_player": "НЕИЗВЕСТНЫЙ ИГРОК",
+    "minute_goal_upper": "ГОЛ НА {{minute}}-Й МИНУТЕ"
   },
   "news": {
     "title": "НОВОСТИ",
@@ -162,6 +189,11 @@
     "search_placeholder": "ПОИСК...",
     "no_data": "ДАННЫЕ НЕ НАЙДЕНЫ",
     "organizer": "Организатор",
+    "organizers": "ОРГАНИЗАТОРЫ",
+    "official_organizer": "ОФИЦИАЛЬНЫЙ ОРГАНИЗАТОР",
+    "co_organizer": "СООРГАНИЗАТОР",
+    "general_info": "ОБЩАЯ ИНФОРМАЦИЯ",
+    "latest_matches": "ПОСЛЕДНИЕ МАТЧИ",
     "total_teams": "Команды",
     "total_players": "Игроки",
     "recent_matches": "Недавние матчи",
@@ -193,6 +225,11 @@
     "home_team": "Хозяева",
     "away_team": "Гости",
     "round_tour": "{{round}}-Й ТУР",
+    "matches_count": "{{count}} МАТЧЕЙ",
+    "final": "ФИНАЛ",
+    "semi_final": "ПОЛУФИНАЛ",
+    "quarter_final": "ЧЕТВЕРТЬФИНАЛ",
+    "round_of_16": "1/8 ФИНАЛА",
     "arena_default": "Amatora Арена"
   },
   "teams": {
@@ -237,6 +274,7 @@
     "edit_profile": "Редактировать профиль",
     "my_stats": "Моя статистика",
     "my_team": "Моя команда",
+    "edit_team_info": "Редактировать данные команды",
     "applications": "Мои заявки",
     "transfer_requests": "Запросы на трансфер",
     "security": "Безопасность",

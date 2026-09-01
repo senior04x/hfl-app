@@ -211,7 +211,6 @@ const styles = StyleSheet.create({
   dot: {
     height: 8,
     borderRadius: 4,
-    transition: 'all 0.3s',
   },
   nextButton: {
     marginHorizontal: 24,

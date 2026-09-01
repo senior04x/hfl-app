@@ -31,12 +31,15 @@ import { useThemeStore } from '../store/useThemeStore';
 import { Modal, TextInput, Linking } from 'react-native';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
 import AppNavbar from '../components/AppNavbar';
+import TeamStoryReplayPickerModal from '../components/TeamStoryReplayPickerModal';
+import { useNavBarScroll } from '../context/NavBarScrollContext';
 
 export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout, unreadCount, isChatMuted } = useAuthStore();
     const { isJuniorMode, setJuniorMode, verifyPin } = useJuniorStore();
     const { selectedOrganizationId, setSelectedOrganizationId, organizations } = useOrganizationStore();
     const { theme, toggleTheme, isDark, colors } = useThemeStore();
+    const { handleScroll: handleNavBarScroll } = useNavBarScroll();
     const { t, i18n } = useTranslation();
 
     const [showPinModal, setShowPinModal] = useState(false);
@@ -49,6 +52,12 @@ export default function AccountScreen({ navigation }: any) {
     const [loading, setLoading] = useState(false);
     const [transferWindowOpen, setTransferWindowOpen] = useState(false);
     const currentTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
+
+    // Story qo'shish (Home ekrandagi bilan bir xil modal, ikkinchi kirish
+    // nuqtasi) — jamoaning hozir faol (48soatlik) story'lari, checkmark
+    // ko'rsatish uchun.
+    const [storyPickerVisible, setStoryPickerVisible] = useState(false);
+    const [ownActiveReplayIds, setOwnActiveReplayIds] = useState<any[]>([]);
 
     // Applications Section State
     const [appTab, setAppTab] = useState<'transfers' | 'profile'>('transfers');
@@ -90,6 +99,28 @@ export default function AccountScreen({ navigation }: any) {
             }
         }, [isGuest, selectedOrganizationId])
     );
+
+    // Jamoaning hozir faol story-replaylari (checkmark uchun) — picker modal
+    // ochilishidan oldin ham, ekran fokusga qaytganda ham yangilanadi.
+    const loadOwnActiveReplayIds = async () => {
+        if (!currentTeamId) return;
+        try {
+            const list = await apiService.getTeamStoryReplays(String(currentTeamId));
+            setOwnActiveReplayIds((list || []).map((row: any) => row.match_event_id));
+        } catch (e) {
+            console.warn('Error loading own active story replays:', e);
+        }
+    };
+
+    useEffect(() => {
+        if (!isGuest && currentTeamId) {
+            loadOwnActiveReplayIds();
+        }
+    }, [isGuest, currentTeamId]);
+
+    const handleStoryPickerAdded = () => {
+        loadOwnActiveReplayIds();
+    };
 
     const loadUserApplications = async () => {
         try {
@@ -206,10 +237,12 @@ export default function AccountScreen({ navigation }: any) {
                     }
                 />
 
-                <ScrollView 
-                    style={styles.container} 
+                <ScrollView
+                    style={styles.container}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 130 }}
+                    onScroll={(e) => handleNavBarScroll('account', e)}
+                    scrollEventThrottle={16}
                 >
                     {/* Profile Header */}
                     <View style={styles.profileHeader}>
@@ -330,11 +363,19 @@ export default function AccountScreen({ navigation }: any) {
                                         onPress={() => navigation.navigate('MyTeam', { teamId: currentTeamId })}
                                     />
                                     {(user?.role === 'manager' || user?.role === 'coach' || user?.role === 'trainer' || user?.role === 'captain' || user?.role === 'admin' || user?.role === 'team_admin') && (
-                                        <SettingItem
-                                            icon="pencil-outline"
-                                            title="JAMOA MA'LUMOTLARINI TAHRIRLASH"
-                                            onPress={() => navigation.navigate('MyTeam', { teamId: currentTeamId, autoOpenEdit: true })}
-                                        />
+                                        <>
+                                            <SettingItem
+                                                icon="pencil-outline"
+                                                title={t('profile.edit_team_info', "JAMOA MA'LUMOTLARINI TAHRIRLASH").toUpperCase()}
+                                                onPress={() => navigation.navigate('MyTeam', { teamId: currentTeamId, autoOpenEdit: true })}
+                                            />
+                                            <SettingItem
+                                                icon="film-outline"
+                                                title={t('stories.add_story', "STORY QO'SHISH")}
+                                                value={ownActiveReplayIds.length > 0 ? `${ownActiveReplayIds.length} ${t('tournaments.active', 'FAOL')}` : ''}
+                                                onPress={() => setStoryPickerVisible(true)}
+                                            />
+                                        </>
                                     )}
                                     <SettingItem
                                         icon="chatbubbles-outline"
@@ -442,6 +483,19 @@ export default function AccountScreen({ navigation }: any) {
                     onClose={() => setShowOrgSelectModal(false)}
                     onSelect={handleSelectOrganizationForApply}
                 />
+
+                {/* Story qo'shish/tanlash — Home ekrandagi bilan bir xil modal */}
+                {currentTeamId && (
+                    <TeamStoryReplayPickerModal
+                        visible={storyPickerVisible}
+                        teamId={currentTeamId}
+                        teamName={detailedData?.name || detailedData?.team_name || user?.teamName || user?.name}
+                        selectedByPhone={user?.phone || user?.phoneNumber || user?.phone_number || user?.tel}
+                        activeReplayEventIds={ownActiveReplayIds}
+                        onClose={() => setStoryPickerVisible(false)}
+                        onAdded={handleStoryPickerAdded}
+                    />
+                )}
 
                 {/* PIN Verification Modal */}
                 <Modal visible={showPinModal} transparent animationType="fade" onRequestClose={() => setShowPinModal(false)}>

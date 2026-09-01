@@ -1,34 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    Image,
+    Pressable,
+    Animated,
+    StatusBar,
     Linking,
     Dimensions,
     ActivityIndicator,
-    TextInput,
     Alert,
-    StatusBar,
     Platform,
-    Modal
+    Modal,
+    TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import VideoBackground from '../components/VideoBackground';
+import { Video, ResizeMode } from 'expo-av';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 import TeamProfileSkeleton from '../components/TeamProfileSkeleton';
 import TacticsBoard from '../components/TacticsBoard';
-import { Player, Team } from '../types';
+import { getCachedVideoUri } from '../utils/videoCache';
+import { getDeduplicatedGoalReplays } from '../utils/replayUtils';
+import { useTranslation } from 'react-i18next';
+import { Player } from '../types';
 import Translations from '../constants/Translations';
 import { useAuthStore } from '../store/useAuthStore';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 import { useSocket } from '../context/SocketContext';
-import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 
 const { width } = Dimensions.get('window');
@@ -36,32 +41,80 @@ const { width } = Dimensions.get('window');
 export default function TeamProfileScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { teamId, team: initialTeam } = route?.params || {};
+    const { user, unreadCount, isChatMuted } = useAuthStore();
+    const { socket } = useSocket();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+
+    const cardSurface = {
+        backgroundColor: homeColors.background,
+        borderWidth: 1,
+        borderColor: homeColors.border,
+    };
+
+    const userTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
+    const activeTeamId = teamId || route?.params?.id || route?.params?.teamId || initialTeam?.id || initialTeam?._id || userTeamId;
+
     const [team, setTeam] = useState<any | null>(initialTeam || null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(!initialTeam);
     const [isPlayersLoading, setIsPlayersLoading] = useState(true);
+
     const [selectedPlayerForPhone, setSelectedPlayerForPhone] = useState<any | null>(null);
     const [phoneInputText, setPhoneInputText] = useState('');
     const [savingPhone, setSavingPhone] = useState(false);
-    const { user, unreadCount, isChatMuted } = useAuthStore();
-    const { socket } = useSocket();
-    
-    const userTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
-    const activeTeamId = teamId || route?.params?.id || route?.params?.teamId || initialTeam?.id || initialTeam?._id || userTeamId;
 
     const isOwnerOrMember = user && activeTeamId && userTeamId && (String(userTeamId) === String(activeTeamId));
     const isSystemAdmin = user && (user.role === 'admin' || user.role === 'trainer');
-
     const canEdit = isSystemAdmin || (isOwnerOrMember && (user?.role === 'manager' || user?.role === 'coach' || user?.role === 'team_admin'));
     const canChat = isSystemAdmin || isOwnerOrMember;
+    const currentUserPhone = user?.phone || user?.phoneNumber || user?.phone_number || user?.tel;
+
+    // Team Story Replay (upload/tanlash) — ENDI bu yerdan olib tashlandi,
+    // Account ekrani va Home ekranidagi story tray orqali qo'shiladi.
+
+    // Match Detail sahifasidagi kabi HAQIQIY bog'langan pager: 3ta panel
+    // (tarkib/taktika/o'yinlar) bir-biriga yopishgan holda gorizontal
+    // ScrollView'da yon-yonma joylashadi — swipe'ni yarim ushlab tursa
+    // ikkala tab bir vaqtda yarim ko'rinadi (single-panel translateX emas).
+    const tabs: ('squad' | 'tactics' | 'matches')[] = ['squad', 'tactics', 'matches'];
+    const TAB_LABELS: Record<string, string> = { squad: 'TARKIB', tactics: 'TAKTIKA', matches: "O'YINLAR" };
+    const [currentTabIndex, setCurrentTabIndex] = useState(0);
+    const currentTabIndexRef = useRef(0);
+    const scrollXPager = useRef(new Animated.Value(0)).current;
+    const isPagerScrolling = useRef(false);
+    const pagerScrollRef = useRef<ScrollView>(null);
+    const [tabLabelWidths, setTabLabelWidths] = useState<number[]>([]);
+
+    const TAB_BAR_WIDTH = width - 32;
+    const TAB_WIDTH = TAB_BAR_WIDTH / tabs.length;
+    const DEFAULT_INDICATOR_WIDTH = TAB_WIDTH * 0.72;
+    const tabIndicatorInputRange = tabs.map((_, i) => i * width);
+    // So'z uzunligiga qarab moslashadigan indikator (Match Detail'dagi bilan bir xil mantiq)
+    const indicatorWidths = tabs.map((_, i) => tabLabelWidths[i] ?? DEFAULT_INDICATOR_WIDTH);
+    const indicatorLefts = tabs.map((_, i) => i * TAB_WIDTH + (TAB_WIDTH - indicatorWidths[i]) / 2);
+    const indicatorTranslateX = scrollXPager.interpolate({
+        inputRange: tabIndicatorInputRange,
+        outputRange: indicatorLefts,
+        extrapolate: 'clamp',
+    });
+    const indicatorWidthAnim = scrollXPager.interpolate({
+        inputRange: tabIndicatorInputRange,
+        outputRange: indicatorWidths,
+        extrapolate: 'clamp',
+    });
 
     const fetchData = async () => {
         try {
             if (!initialTeam && !team) setIsLoading(true);
             setIsPlayersLoading(true);
             const currentId = activeTeamId;
-            if (!currentId) return;
+            if (!currentId) {
+                setIsLoading(false);
+                setIsPlayersLoading(false);
+                return;
+            }
 
             const [teamData, playersData, matchesData] = await Promise.all([
                 apiService.getTeamById(currentId).catch(() => null),
@@ -76,7 +129,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                 return !isArchived && st === 'approved';
             });
             setPlayers(activeTeamPlayers);
-            setMatches(matchesData?.slice(0, 5) || []);
+            setMatches(matchesData?.slice(0, 8) || []);
         } catch (error) {
             console.error('Error fetching team details:', error);
         } finally {
@@ -86,9 +139,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
     };
 
     useEffect(() => {
-        if (activeTeamId) {
-            fetchData();
-        }
+        fetchData();
         if (socket && activeTeamId) {
             socket.emit('join-team', activeTeamId);
             socket.on('formation-updated', (data: any) => {
@@ -102,197 +153,509 @@ export default function TeamProfileScreen({ route, navigation }: any) {
         }
     }, [activeTeamId, socket]);
 
-    const renderHeader = () => (
-        <View style={styles.heroSection}>
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                <Ionicons name="arrow-back" size={24} color="#FFF" />
-            </TouchableOpacity>
+    // Match Detail sahifasidagi haqiqiy pager mexanizmi bilan bir xil:
+    // tab bosilganda animatsiyasiz (instant) scrollTo, aslida silliq slide esa
+    // faqat qo'l bilan swipe/momentum orqali (native ScrollView gesture).
+    const handleTabPress = async (index: number) => {
+        if (index === currentTabIndexRef.current) return;
+        try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+        isPagerScrolling.current = true;
+        currentTabIndexRef.current = index;
+        setCurrentTabIndex(index);
+        pagerScrollRef.current?.scrollTo({
+            x: index * width,
+            animated: false,
+        });
+        requestAnimationFrame(() => {
+            isPagerScrolling.current = false;
+        });
+    };
 
-            <View style={styles.adminActionRow}>
-                {canEdit && (
-                    <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('FormationBoard', { teamId: activeTeamId })}>
-                        <Ionicons name="grid-outline" size={20} color="#FFF" />
-                        <Text style={styles.adminBtnText}>{t('teams.squad').toUpperCase()}</Text>
+    const isExitingRef = useRef(false);
+    const handlePagerScroll = (e: any) => {
+        const offsetX = e.nativeEvent?.contentOffset?.x;
+        if (currentTabIndexRef.current === 0 && typeof offsetX === 'number' && offsetX < -25 && !isExitingRef.current) {
+            isExitingRef.current = true;
+            navigation.goBack();
+        }
+    };
+
+    const handlePagerMomentumScrollEnd = (e: any) => {
+        const offsetX = e.nativeEvent.contentOffset.x;
+        const newIdx = Math.max(0, Math.min(tabs.length - 1, Math.round(offsetX / width)));
+        if (newIdx !== currentTabIndexRef.current) {
+            currentTabIndexRef.current = newIdx;
+            setCurrentTabIndex(newIdx);
+        }
+        isPagerScrolling.current = false;
+    };
+
+    // Tarkib — birinchi tab. Shu yerda o'ngga (orqaga) swipe qilinsa, sahifadan chiqiladi.
+    const handlePagerScrollEndDrag = (e: any) => {
+        const offsetX = e.nativeEvent?.contentOffset?.x;
+        if (currentTabIndexRef.current === 0 && typeof offsetX === 'number' && offsetX < -20 && !isExitingRef.current) {
+            isExitingRef.current = true;
+            navigation.goBack();
+        }
+    };
+
+    if (isLoading && !team) {
+        return (
+            <View style={{ flex: 1, backgroundColor: homeColors.background }}>
+                <TeamProfileSkeleton />
+            </View>
+        );
+    }
+
+    if (!activeTeamId || !team) {
+        return (
+            <SafeAreaView style={[styles.emptyContainer, { backgroundColor: homeColors.background }]}>
+                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+                <View style={styles.emptyContent}>
+                    <Ionicons name="shield-outline" size={64} color={homeColors.textSecondary} />
+                    <Text style={[styles.emptyTitle, { color: homeColors.textPrimary }]}>{t('teams.team_not_found')}</Text>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.loginBtn, { backgroundColor: homeColors.accent }]}>
+                        <Text style={styles.loginBtnText}>{t('common.back', 'Orqaga')}</Text>
                     </TouchableOpacity>
-                )}
-                {canChat && (
-                    <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('TeamChat', { teamId: activeTeamId })}>
-                        <Ionicons name="chatbubbles-outline" size={20} color="#FFF" />
-                        <Text style={styles.adminBtnText}>{t('teams.team_chat').toUpperCase()}</Text>
-                        {unreadCount > 0 && (
-                            <View style={[
-                                styles.badgeContainer,
-                                isChatMuted ? { backgroundColor: 'rgba(255,255,255,0.3)' } : { backgroundColor: Colors.danger }
-                            ]}>
-                                <Text style={styles.badgeText}>{unreadCount}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            <View style={styles.heroContent}>
-                <View style={[styles.mainLogoWrapper, { shadowColor: team?.color || Colors.primary }]}>
-                    <SmartImage uri={team?.logo_url || team?.logo} style={styles.mainLogoImage} contentFit="contain" fallbackIcon="shield-outline" />
                 </View>
+            </SafeAreaView>
+        );
+    }
 
-                <View style={styles.heroTextContainer}>
-                    <View style={styles.badgeRow}>
-                        <View style={styles.premiumBadge}>
-                            <Ionicons name="trophy" size={10} color={Colors.primary} />
-                            <Text style={styles.premiumBadgeText}>{(team?.league || 'HFL LIGA').toUpperCase()}</Text>
-                        </View>
-                    </View>
+    // Faqat bazada real qiymati bor rahbariyat qatorlari ko'rsatiladi (bo'sh joy qoldirilmaydi)
+    const leadershipRows = [
+        { icon: 'ribbon-outline', label: 'Sardor', name: team?.captain_name, phone: team?.captain_phone },
+        { icon: 'clipboard-outline', label: 'Murabbiy', name: team?.coach_name, phone: team?.coach_phone },
+        { icon: 'briefcase-outline', label: 'Rahbar', name: team?.president_name, phone: team?.president_phone },
+    ].filter((row) => !!row.name);
 
-                    <Text style={styles.teamNameHero}>{(team?.name || 'JAMOA').toUpperCase()}</Text>
-
-                    <View style={styles.heroStatsRow}>
-                        <Ionicons name="people" size={14} color={Colors.primary} />
-                        <Text style={styles.heroStatText}>{isPlayersLoading ? '...' : t('teams.players_count', { count: players.length }).toUpperCase()}</Text>
-                        <View style={styles.statDot} />
-                        <Ionicons name="flash" size={14} color={Colors.primary} />
-                        <Text style={styles.heroStatText}>{t('teams.points_count', { count: team?.points || team?.stats?.points || 0 }).toUpperCase()}</Text>
-                    </View>
-                </View>
-            </View>
-
-            {(team?.instagram || team?.facebook || team?.youtube) && (
-                <View style={styles.socialRowHero}>
-                    {['instagram', 'facebook', 'youtube'].map(plat => (
-                        team[plat as keyof Team] && (
-                            <TouchableOpacity key={plat} style={styles.socialBtn} onPress={() => Linking.openURL(team[plat as keyof Team] as string)}>
-                                <Ionicons name={`logo-${plat}` as any} size={18} color="#FFF" />
-                            </TouchableOpacity>
-                        )
-                    ))}
-                </View>
-            )}
-        </View>
-    );
-
-    const renderSquad = () => (
-        <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleRow}>
-                    <Ionicons name="people" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>{t('teams.squad')}</Text>
-                </View>
-                <Text style={styles.sectionCount}>{isPlayersLoading ? t('common.loading') : `${players.length}`}</Text>
-            </View>
-
-            {isPlayersLoading ? (
-                <View style={styles.squadGrid}>
-                    {[1, 2, 3, 4, 5, 6].map((key) => (
-                        <View key={key} style={[styles.playerCard, { opacity: 0.5, backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-                            <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
-                            <View style={styles.playerPhotoContainer}>
-                                <View style={[styles.playerPhoto, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
-                                <View style={[styles.playerNumberBadge, { backgroundColor: 'rgba(0,255,135,0.3)', width: 24, height: 14 }]} />
-                            </View>
-                            <View style={styles.playerInfo}>
-                                <View style={{ width: '80%', height: 12, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 4, marginBottom: 4 }} />
-                                <View style={{ width: '60%', height: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 4, marginBottom: 6 }} />
-                                <View style={{ width: '50%', height: 8, backgroundColor: 'rgba(0,255,135,0.2)', borderRadius: 4 }} />
-                            </View>
-                        </View>
-                    ))}
-                </View>
-            ) : players.length === 0 ? (
-                <View style={styles.emptySquadContainer}>
-                    <Ionicons name="people-outline" size={38} color="rgba(255,255,255,0.2)" />
-                    <Text style={styles.emptySquadText}>{t('teams.no_players')}</Text>
-                </View>
-            ) : (
-                <View style={styles.squadGrid}>
-                    {players.map((player: any, idx: number) => {
-                        const pPhone = player.phone || player.phoneNumber || player.phone_number || player.tel;
-                        return (
-                            <TouchableOpacity
-                                key={player._id || player.id || idx}
-                                style={styles.playerCard}
-                                onPress={() => navigation.navigate('PlayerStats', { playerId: player._id || player.id, player })}
-                            >
-                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                                <View style={styles.playerPhotoContainer}>
-                                    <SmartImage uri={player.photo || player.photo_url || player.avatar} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person" />
-                                    <View style={styles.playerNumberBadge}>
-                                        <Text style={styles.playerNumberText}>#{player.number || player.player_number || player.shirt_number || '10'}</Text>
-                                    </View>
-                                </View>
-                                <View style={styles.playerInfo}>
-                                    <Text style={styles.playerCardName} numberOfLines={1}>{(player.firstName || player.name || player.first_name || t('teams.player_fallback')).toUpperCase()}</Text>
-                                    <Text style={styles.playerCardLastName} numberOfLines={1}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
-                                    <Text style={styles.playerCardPosition}>{getLocalizedPosition(player.position, t).toUpperCase()}</Text>
-
-                                    {/* PHONE BADGE / ADD PHONE BUTTON — ONLY FOR THIS TEAM'S MANAGER */}
-                                    {canEdit && (
-                                        <View style={{ marginTop: 6, width: '100%' }}>
-                                            {pPhone ? (
-                                                <TouchableOpacity
-                                                    style={styles.phoneBadgeContainer}
-                                                    activeOpacity={0.6}
-                                                    onPress={(e) => {
-                                                        e?.stopPropagation?.();
-                                                        Linking.openURL(`tel:${pPhone}`);
-                                                    }}
-                                                >
-                                                    <Ionicons name="call" size={10} color="#00FF87" style={{ marginRight: 4 }} />
-                                                    <Text style={styles.phoneBadgeText} numberOfLines={1}>{pPhone}</Text>
-                                                </TouchableOpacity>
-                                            ) : (
-                                                <TouchableOpacity
-                                                    style={styles.addPhoneBtn}
-                                                    activeOpacity={0.7}
-                                                    onPress={(e) => {
-                                                        e?.stopPropagation?.();
-                                                        setSelectedPlayerForPhone(player);
-                                                        setPhoneInputText('');
-                                                    }}
-                                                >
-                                                    <Ionicons name="call-outline" size={10} color="#FFD700" style={{ marginRight: 3 }} />
-                                                    <Text style={styles.addPhoneBtnText}>+ {t('stats.phone', 'TEL')}</Text>
-                                                </TouchableOpacity>
-                                            )}
-                                        </View>
-                                    )}
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-            )}
-        </View>
-    );
-
-    if (isLoading && !team) return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.8}
-                style={StyleSheet.absoluteFill}
-            />
-            <TeamProfileSkeleton />
-        </View>
-    );
+    const hasStats = team?.stats && team.stats.played > 0;
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                posterSource={require('../assets/images/splash-icon.png')}
-                overlayOpacity={0.7}
-                style={StyleSheet.absoluteFill}
-            />
+        <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {renderHeader()}
-                <View style={styles.mainContent}>
-                    {renderSquad()}
-                    {/* Matches and Tactics can be added/glassified here */}
+            {/* STICKY HEADER: TOP ACTIONS + LOGO + LEADERSHIP + STATS + TABS */}
+            <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
+                {/* TOP ROW: BACK BUTTON & ACTIONS */}
+                <View style={styles.topRow}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, cardSurface]}>
+                        <Ionicons name="arrow-back" size={20} color={homeColors.textPrimary} />
+                    </TouchableOpacity>
+
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {canChat && (
+                            <TouchableOpacity
+                                style={[styles.iconBtn, cardSurface]}
+                                onPress={() => navigation.navigate('TeamChat', { teamId: activeTeamId })}
+                            >
+                                <Ionicons name="chatbubble-outline" size={18} color={homeColors.textPrimary} />
+                                {unreadCount > 0 && (
+                                    <View style={styles.unreadBadge}>
+                                        <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        )}
+
+                        {canEdit && (
+                            <TouchableOpacity
+                                style={[styles.iconBtn, cardSurface]}
+                                onPress={() => navigation.navigate('FormationBoard', { teamId: activeTeamId })}
+                            >
+                                <Ionicons name="grid-outline" size={18} color={homeColors.textPrimary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
-            </ScrollView>
+
+                {/* TEAM IDENTITY — logo chapda, ma'lumotlar o'ng tomonida */}
+                <View style={styles.identityRowSticky}>
+                    <View style={{ position: 'relative' }}>
+                        <View style={[styles.logoBoxSm, cardSurface]}>
+                            <SmartImage
+                                uri={team?.logo_url || team?.logo}
+                                style={{ width: '100%', height: '100%', borderRadius: 16 }}
+                                contentFit="contain"
+                                fallbackIcon="shield-outline"
+                            />
+                        </View>
+                    </View>
+
+                    <View style={{ flex: 1, paddingTop: 2 }}>
+                        <Text style={[styles.teamNameSm, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                            {(team?.name || 'JAMOA').toUpperCase()}
+                        </Text>
+                        {!!team?.league && (
+                            <Text style={[styles.teamLeague, { color: homeColors.textSecondary }]} numberOfLines={1}>
+                                {team.league}
+                            </Text>
+                        )}
+
+                        {leadershipRows.length > 0 && (
+                            <View style={{ marginTop: 4, gap: 3 }}>
+                                {leadershipRows.map((row) => (
+                                    <View key={row.label} style={styles.leadershipRowSm}>
+                                        <Ionicons name={row.icon as any} size={12} color={homeColors.textSecondary} />
+                                        <Text style={[styles.leadershipNameSm, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                            {row.name}
+                                        </Text>
+                                        {canEdit && !!row.phone && (
+                                            <TouchableOpacity onPress={() => Linking.openURL(`tel:${row.phone}`)} hitSlop={8}>
+                                                <Ionicons name="call-outline" size={12} color={homeColors.accent} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                {/* INFO CARD — jamoa statistikasi */}
+                <View style={[styles.infoCard, cardSurface, { marginBottom: 8 }]}>
+                    <View style={styles.infoTopRow}>
+                        <View style={styles.infoStat}>
+                            <Ionicons name="people-outline" size={15} color={homeColors.textSecondary} />
+                            <Text style={[styles.infoStatText, { color: homeColors.textPrimary }]}>{players.length}</Text>
+                        </View>
+                        {hasStats && (
+                            <>
+                                <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{team.stats.played}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>O'YIN</Text>
+                                </View>
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{team.stats.won}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>G'.</Text>
+                                </View>
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{team.stats.drawn}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>D.</Text>
+                                </View>
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{team.stats.lost}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>M.</Text>
+                                </View>
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.accent }]}>{team.stats.points}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>OCHKO</Text>
+                                </View>
+                            </>
+                        )}
+                    </View>
+                </View>
+
+                {/* TAB SWITCHER */}
+                <View style={styles.tabsContainer}>
+                    <Animated.View
+                        style={[
+                            styles.tabActiveLine,
+                            {
+                                width: indicatorWidthAnim,
+                                backgroundColor: homeColors.accent,
+                                shadowColor: homeColors.accent,
+                                transform: [{ translateX: indicatorTranslateX }],
+                            },
+                        ]}
+                    />
+                    <View style={styles.tabsRowContainer}>
+                        {tabs.map((tabKey, idx) => {
+                            const isActive = currentTabIndex === idx;
+                            return (
+                                <TouchableOpacity
+                                    key={tabKey}
+                                    style={styles.tabEqual}
+                                    onPress={() => handleTabPress(idx)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text
+                                        style={[styles.tabText, { color: homeColors.textSecondary }, isActive && { color: homeColors.textPrimary, fontWeight: '900' }]}
+                                        onLayout={(e) => {
+                                            const w = e.nativeEvent.layout.width + 8;
+                                            setTabLabelWidths(prev => {
+                                                if (prev[idx] === w) return prev;
+                                                const next = [...prev];
+                                                next[idx] = w;
+                                                return next;
+                                            });
+                                        }}
+                                    >
+                                        {TAB_LABELS[tabKey]}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </View>
+            </View>
+
+            {/* HORIZONTAL PAGER WITH INDEPENDENT SCROLLVIEWS */}
+            <Animated.ScrollView
+                ref={pagerScrollRef}
+                horizontal
+                pagingEnabled
+                nestedScrollEnabled
+                directionalLockEnabled
+                showsHorizontalScrollIndicator={false}
+                bounces={true}
+                alwaysBounceHorizontal={true}
+                overScrollMode="always"
+                scrollEventThrottle={16}
+                decelerationRate="fast"
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
+                    { useNativeDriver: false, listener: handlePagerScroll }
+                )}
+                onMomentumScrollEnd={handlePagerMomentumScrollEnd}
+                onScrollEndDrag={handlePagerScrollEndDrag}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ width: width * tabs.length }}
+            >
+                {/* TAB 0: TARKIB */}
+                <View style={{ width, flex: 1 }}>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}>
+                        {isPlayersLoading ? (
+                            <View style={styles.squadGrid}>
+                                {[1, 2, 3, 4, 5, 6].map((key) => (
+                                    <View key={key} style={[styles.playerCard, cardSurface, { opacity: 0.5 }]}>
+                                        <View style={styles.playerPhotoContainer}>
+                                            <View style={[styles.playerPhoto, { backgroundColor: homeColors.surface }]} />
+                                        </View>
+                                        <View style={styles.playerInfo}>
+                                            <View style={{ width: '80%', height: 12, backgroundColor: homeColors.surface, borderRadius: 4, marginBottom: 4 }} />
+                                            <View style={{ width: '50%', height: 10, backgroundColor: homeColors.surface, borderRadius: 4 }} />
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        ) : players.length > 0 ? (
+                            <View style={styles.squadGrid}>
+                                {players.map((player: any, idx: number) => {
+                                    const pPhone = player.phone || player.phoneNumber || player.phone_number || player.tel;
+                                    return (
+                                        <View
+                                            key={player._id || player.id || idx}
+                                            style={[styles.playerCard, cardSurface]}
+                                        >
+                                            <TouchableOpacity
+                                                activeOpacity={0.8}
+                                                onPress={() => navigation.navigate('PlayerStats', { playerId: player._id || player.id, player })}
+                                            >
+                                                <View style={styles.playerPhotoContainer}>
+                                                    <SmartImage uri={player.photo || player.photo_url || player.avatar} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person" />
+                                                    <View style={[styles.playerNumberBadge, { backgroundColor: homeColors.accent }]}>
+                                                        <Text style={styles.playerNumberText}>#{player.number || player.player_number || player.shirt_number || '—'}</Text>
+                                                    </View>
+                                                </View>
+                                                <View style={styles.playerInfo}>
+                                                    <Text style={[styles.playerCardName, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                        {(player.firstName || player.name || player.first_name || t('teams.player_fallback')).toUpperCase()}
+                                                    </Text>
+                                                    <Text style={[styles.playerCardLastName, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                        {(player.lastName || player.last_name || '').toUpperCase()}
+                                                    </Text>
+                                                    <Text style={[styles.playerCardPosition, { color: homeColors.textSecondary }]}>{getLocalizedPosition(player.position, t).toUpperCase()}</Text>
+                                                </View>
+                                            </TouchableOpacity>
+                                            {/* PHONE — FAQAT SHU JAMOA MENEJERIGA */}
+                                            {canEdit && (
+                                                <View style={{ marginTop: 8 }}>
+                                                    {pPhone ? (
+                                                        <TouchableOpacity
+                                                            style={[styles.phoneBadgeContainer, { borderColor: homeColors.border }]}
+                                                            activeOpacity={0.6}
+                                                            onPress={() => Linking.openURL(`tel:${pPhone}`)}
+                                                        >
+                                                            <Ionicons name="call" size={12} color={homeColors.accent} style={{ marginRight: 5 }} />
+                                                            <Text style={[styles.phoneBadgeText, { color: homeColors.textPrimary }]} numberOfLines={1}>{pPhone}</Text>
+                                                        </TouchableOpacity>
+                                                    ) : (
+                                                        <TouchableOpacity
+                                                            style={styles.addPhoneBtn}
+                                                            activeOpacity={0.6}
+                                                            onPress={() => {
+                                                                setSelectedPlayerForPhone(player);
+                                                                setPhoneInputText('');
+                                                            }}
+                                                        >
+                                                            <Ionicons name="call-outline" size={10} color={homeColors.accent} style={{ marginRight: 3 }} />
+                                                            <Text style={[styles.addPhoneBtnText, { color: homeColors.accent }]}>+ TEL</Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </View>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        ) : (
+                            <View style={[styles.emptyState, cardSurface]}>
+                                <Ionicons name="people-outline" size={22} color={homeColors.textSecondary} />
+                                <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>{t('teams.no_players')}</Text>
+                            </View>
+                        )}
+                    </ScrollView>
+                </View>
+
+                {/* TAB 1: TAKTIKA */}
+                <View style={{ width, flex: 1 }}>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}>
+                        {(team?.formation?.players && team.formation.players.length > 0) ? (
+                            <TacticsBoard
+                                formation={team?.formation}
+                                players={team.formation.players.map((fp: any) => {
+                                    const rosterMatch = players.find((p: any) => String(p.id) === String(fp.id));
+                                    return {
+                                        ...fp,
+                                        photo: rosterMatch?.photo || (rosterMatch as any)?.photo_url || fp.photo || null,
+                                    };
+                                }) as any}
+                                onPlayerPress={(player: any) => navigation.navigate('PlayerStats', { playerId: player.id || player._id, player })}
+                            />
+                        ) : (
+                            <View style={[styles.emptyState, cardSurface, { marginTop: 10 }]}>
+                                <Ionicons name="grid-outline" size={22} color={homeColors.textSecondary} />
+                                <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>
+                                    {t('teams.no_formation', "Taktika va tarkib hali o'rnatilmagan")}
+                                </Text>
+                                {canEdit && (
+                                    <TouchableOpacity
+                                        style={styles.emptyStateBtn}
+                                        onPress={() => navigation.navigate('FormationBoard', { teamId: activeTeamId })}
+                                    >
+                                        <Text style={styles.emptyStateBtnText}>Sostavni tuzish</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
+                    </ScrollView>
+                </View>
+
+                {/* TAB 2: O'YINLAR */}
+                <View style={{ width, flex: 1 }}>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}>
+                        {matches.length > 0 ? (
+                            matches.map((match: any) => {
+                                const st = String(match.status || '').toLowerCase().trim();
+                                const matchIsLive = ['live', 'first_half', 'second_half', 'half_time', 'halftime', 'ongoing', 'in_progress', '1st_half', '2nd_half', '1-taym', '2-taym', 'tanaffus'].includes(st);
+                                const matchIsFinished = ['finished', 'completed', 'ended', 'tugadi'].includes(st);
+                                const rawDate = match.date || match.match_date;
+                                const matchDate = new Date(rawDate);
+                                const isValidDate = !isNaN(matchDate.getTime());
+                                const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
+                                const day = isValidDate ? matchDate.getDate() : '';
+                                const month = isValidDate ? months[matchDate.getMonth()] : '';
+                                let formattedTime = String(match.match_time || match.time || '').trim();
+                                if (formattedTime.includes(':')) {
+                                    const timeParts = formattedTime.split(':');
+                                    formattedTime = `${timeParts[0].padStart(2, '0')}:${(timeParts[1] || '00').padStart(2, '0')}`;
+                                }
+                                if (!formattedTime && isValidDate) {
+                                    const hrs = String(matchDate.getHours()).padStart(2, '0');
+                                    const mins = String(matchDate.getMinutes()).padStart(2, '0');
+                                    if (hrs !== '00' || mins !== '00') formattedTime = `${hrs}:${mins}`;
+                                }
+                                if (!formattedTime) formattedTime = '18:00';
+
+                                return (
+                                    <TouchableOpacity
+                                        key={match.id || match._id}
+                                        style={[
+                                            styles.hMatchCard,
+                                            {
+                                                backgroundColor: homeColors.background,
+                                                borderWidth: 1,
+                                                borderColor: matchIsLive ? homeColors.accent : homeColors.border,
+                                            },
+                                        ]}
+                                        onPress={() => navigation.navigate('MatchDetail', { matchId: match.id || match._id })}
+                                        activeOpacity={0.85}
+                                    >
+                                        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                {/* CHAP: Uy jamoasi */}
+                                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 8 }}>
+                                                    <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
+                                                        {match.homeTeamName || match.homeTeam?.name || 'UY'}
+                                                    </Text>
+                                                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                                                        <SmartImage
+                                                            uri={match.homeTeamLogo || match.homeTeam?.logo}
+                                                            style={{ width: 18, height: 18 }}
+                                                            contentFit="contain"
+                                                            fallbackIcon="shield-outline"
+                                                        />
+                                                    </View>
+                                                </View>
+
+                                                {/* O'RTA: Hisob yoki vaqt */}
+                                                <View style={{ width: 70, alignItems: 'center' }}>
+                                                    {(matchIsLive || matchIsFinished) ? (
+                                                        <View style={{ alignItems: 'center' }}>
+                                                            <Text style={{ fontSize: 22, fontWeight: '900', color: homeColors.textPrimary, letterSpacing: -0.5 }}>
+                                                                {match.score?.home ?? match.home_score ?? 0} - {match.score?.away ?? match.away_score ?? 0}
+                                                            </Text>
+                                                            {matchIsLive && (
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                                                                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: homeColors.accent }} />
+                                                                    <Text style={{ fontSize: 8, fontWeight: '700', color: homeColors.accent, letterSpacing: 0.3 }}>LIVE</Text>
+                                                                </View>
+                                                            )}
+                                                            {!!(match.round || match.tour) && (
+                                                                <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 2 }}>
+                                                                    {match.round || match.tour}-tur
+                                                                </Text>
+                                                            )}
+                                                        </View>
+                                                    ) : (
+                                                        <View style={{ alignItems: 'center' }}>
+                                                            <Text style={{ fontSize: 16, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
+                                                                {formattedTime}
+                                                            </Text>
+                                                            <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 1 }}>
+                                                                {day} {month}
+                                                            </Text>
+                                                            {!!(match.round || match.tour) && (
+                                                                <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 1 }}>
+                                                                    {match.round || match.tour}-tur
+                                                                </Text>
+                                                            )}
+                                                        </View>
+                                                    )}
+                                                </View>
+
+                                                {/* O'NG: Mehmon jamoa */}
+                                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 4, paddingLeft: 8 }}>
+                                                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                                                        <SmartImage
+                                                            uri={match.awayTeamLogo || match.awayTeam?.logo}
+                                                            style={{ width: 18, height: 18 }}
+                                                            contentFit="contain"
+                                                            fallbackIcon="shield-outline"
+                                                        />
+                                                    </View>
+                                                    <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
+                                                        {match.awayTeamName || match.awayTeam?.name || 'MEH'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        ) : (
+                            <View style={[styles.emptyState, cardSurface]}>
+                                <Ionicons name="football-outline" size={22} color={homeColors.textSecondary} />
+                                <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>O'yinlar tarixi mavjud emas</Text>
+                            </View>
+                        )}
+                    </ScrollView>
+                </View>
+            </Animated.ScrollView>
 
             {/* ADD PHONE MODAL */}
             <Modal
@@ -302,27 +665,26 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                 onRequestClose={() => setSelectedPlayerForPhone(null)}
             >
                 <View style={styles.phoneModalOverlay}>
-                    <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
-                    <View style={styles.phoneModalCard}>
+                    <View style={[styles.phoneModalCard, { backgroundColor: homeColors.background }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                            <Ionicons name="call" size={20} color="#00FF87" style={{ marginRight: 8 }} />
-                            <Text style={styles.phoneModalTitle}>{t('teams.add_phone_title')}</Text>
+                            <Ionicons name="call" size={20} color={homeColors.accent} style={{ marginRight: 8 }} />
+                            <Text style={[styles.phoneModalTitle, { color: homeColors.textPrimary }]}>{t('teams.add_phone_title')}</Text>
                         </View>
 
-                        <Text style={styles.phoneModalSub}>
+                        <Text style={[styles.phoneModalSub, { color: homeColors.textSecondary }]}>
                             {t('teams.add_phone_sub', { name: selectedPlayerForPhone?.firstName || selectedPlayerForPhone?.first_name || selectedPlayerForPhone?.name || t('teams.player_fallback') })}
                         </Text>
 
-                        <View style={styles.phoneInputRow}>
-                            <Text style={styles.phonePrefixText}>+998</Text>
+                        <View style={[styles.phoneInputRow, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                            <Text style={[styles.phonePrefixText, { color: homeColors.accent }]}>+998</Text>
                             <TextInput
-                                style={styles.phoneInput}
+                                style={[styles.phoneInput, { color: homeColors.textPrimary }]}
                                 value={phoneInputText}
                                 onChangeText={setPhoneInputText}
                                 keyboardType="phone-pad"
                                 maxLength={9}
                                 placeholder="901234567"
-                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                placeholderTextColor={homeColors.textSecondary}
                                 autoFocus
                             />
                         </View>
@@ -336,9 +698,14 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={styles.savePhoneBtn}
+                                style={[styles.savePhoneBtn, { backgroundColor: homeColors.accent }]}
                                 disabled={savingPhone}
                                 onPress={async () => {
+                                    if (!canEdit) {
+                                        Alert.alert('Ruxsat berilmadi', "Faqat o'z jamoangiz menejeri o'yinchilar telefon raqamini tahrirlay oladi!");
+                                        setSelectedPlayerForPhone(null);
+                                        return;
+                                    }
                                     if (phoneInputText.length < 9) {
                                         Alert.alert(t('common.error'), t('teams.phone_length_error'));
                                         return;
@@ -364,118 +731,264 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                 }}
                             >
                                 {savingPhone ? (
-                                    <ActivityIndicator size="small" color="#050A14" />
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
                                 ) : (
-                                    <Ionicons name="checkmark" size={18} color="#050A14" />
+                                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
                                 )}
                             </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
-        </View>
+
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    container: { flex: 1 },
+    // MUHIM: gorizontal padding endi shu yerda emas — tabsContainer va pager
+    // (Animated.ScrollView) haqiqiy pager sifatida ekranning to'liq kengligini
+    // egallashi SHART (Match Detail'dagidek). Aks holda pagingEnabled'ning
+    // ichki hisob-kitobi (ScrollView'ning haqiqiy eni) bilan bizning width*index
+    // scrollTo/panel kengligimiz mos kelmay, swipe yarim yo'lda "qotib qoladi"
+    // va indikator chiziqcha ham tugma markazidan siljib qoladi.
+    // Shuning uchun gorizontal padding faqat heroSection va har bir pager
+    // panelining ICHIDA qo'llanadi (pastga qarang).
     scrollContent: { paddingBottom: 60 },
-    heroSection: { borderBottomLeftRadius: 40, borderBottomRightRadius: 40, overflow: 'hidden', paddingBottom: 40, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderTopWidth: 0 },
-    backButton: { width: 44, height: 44, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', marginLeft: 20, marginTop: 50, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    adminActionRow: { position: 'absolute', top: 50, right: 20, flexDirection: 'row', gap: 8 },
-    adminBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    adminBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-    adminBtnText: { color: '#FFF', fontSize: 10, fontWeight: '900' },
-    heroContent: { alignItems: 'center', marginTop: 30 },
-    mainLogoWrapper: { width: 140, height: 140, borderRadius: 12, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
-    mainLogoImage: { width: '100%', height: '100%' },
-    heroTextContainer: { alignItems: 'center', marginTop: 24, paddingHorizontal: 20 },
-    badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 15 },
-    premiumBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,223,130,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(0,223,130,0.2)', gap: 6 },
-    premiumBadgeText: { color: Colors.primary, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-    teamNameHero: { color: '#FFF', fontSize: 36, fontWeight: '900', textAlign: 'center', letterSpacing: -1 },
-    heroStatsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 15, gap: 10 },
-    heroStatText: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-    statDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
-    socialRowHero: { flexDirection: 'row', justifyContent: 'center', gap: 15, marginTop: 25 },
-    socialBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    editForm: { width: '100%', alignItems: 'center', gap: 10 },
-    editInput: { width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', color: '#FFF', paddingHorizontal: 20, paddingVertical: 12, fontSize: 18, fontWeight: '900', textAlign: 'center' },
-    saveBtn: { backgroundColor: Colors.primary, paddingHorizontal: 30, paddingVertical: 12, borderRadius: 15, marginTop: 5 },
-    saveBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
-    mainContent: { paddingHorizontal: 20, marginTop: 30 },
-    section: { marginBottom: 35 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    sectionTitle: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
-    sectionTitleHighlight: { color: Colors.primary },
-    sectionCount: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-    squadGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
-    playerCard: { width: (width - 55) / 2, borderRadius: 30, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-    playerPhotoContainer: { width: '100%', height: 130, position: 'relative', overflow: 'hidden', borderRadius: 20 },
-    playerPhoto: { width: '100%', height: '100%' },
-    playerNumberBadge: { position: 'absolute', bottom: 8, right: 8, backgroundColor: Colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-    playerNumberText: { color: '#000', fontSize: 12, fontWeight: '900' },
-    playerInfo: { marginTop: 12, paddingHorizontal: 4 },
-    playerCardName: { color: '#FFF', fontSize: 14, fontWeight: '900' },
-    playerCardLastName: { color: Colors.primary, fontSize: 14, fontWeight: '900', marginTop: -2 },
-    playerCardPosition: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '900', marginTop: 4, letterSpacing: 0.5 },
-    badgeContainer: {
+    headerStickySection: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 0,
+        borderBottomWidth: 1,
+        zIndex: 100,
+    },
+    topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 8 },
+    identityRowSticky: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 12 },
+    statsSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
+    iconBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    unreadBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: Colors.danger, minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+    unreadBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
+    logoBoxSm: { width: 56, height: 56, borderRadius: 16, padding: 4, overflow: 'hidden' },
+    storyBadgeSm: {
         position: 'absolute',
-        top: -6,
-        right: -8,
-        backgroundColor: Colors.danger,
-        borderRadius: 10,
-        minWidth: 18,
-        height: 18,
+        bottom: -2,
+        right: -2,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 4,
-        borderWidth: 1,
-        borderColor: '#000',
-        zIndex: 10,
+        borderWidth: 2,
     },
-    badgeText: {
-        color: '#FFF',
-        fontSize: 9,
-        fontWeight: '900',
+    teamNameSm: { fontWeight: '900', fontSize: 16, letterSpacing: 0.2 },
+    teamLeague: { fontSize: 12, fontWeight: '600', marginTop: 3 },
+    leadershipRowSm: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    leadershipNameSm: { flex: 1, fontSize: 11, fontWeight: '600' },
+    infoCard: { borderRadius: 18, padding: 14, marginTop: 4 },
+    infoTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+    infoStat: { alignItems: 'center', gap: 2, flexDirection: 'row' },
+    infoStatText: { fontSize: 13, fontWeight: '800' },
+    infoStatValue: { fontSize: 15, fontWeight: '900' },
+    infoStatLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
+    infoDivider: { width: 1, height: 22 },
+    // Tab qatori — Match Detail sahifasidagi tabsContainer/tabActiveLine bilan bir xil
+    tabsContainer: {
+        height: 44,
+        marginTop: 0,
+        marginBottom: 0,
+        overflow: 'hidden',
+        position: 'relative',
+        justifyContent: 'center',
     },
+    tabsRowContainer: { flexDirection: 'row', width: '100%', height: '100%', alignItems: 'center' },
+    tabEqual: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center' },
+    tabActiveLine: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        height: 3,
+        borderRadius: 1.5,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 6,
+        elevation: 4,
+        zIndex: 5,
+    },
+    tabText: { fontSize: 12, fontWeight: '800' },
+    mainContent: { minHeight: 350 },
+    squadGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    playerCard: { width: (width - 44) / 2, borderRadius: 16, padding: 10 },
+    // aspectRatio: 1 — rasm konteyneri qurilma eni qanday bo'lishidan qat'iy nazar
+    // doim 1:1 (kvadrat) bo'lib qoladi, fixed height'dan farqli o'laroq
+    playerPhotoContainer: { width: '100%', aspectRatio: 1, borderRadius: 12, overflow: 'hidden', position: 'relative' },
+    playerPhoto: { width: '100%', height: '100%' },
+    playerNumberBadge: { position: 'absolute', bottom: 6, right: 6, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+    playerNumberText: { color: '#FFFFFF', fontWeight: '900', fontSize: 10 },
+    playerInfo: { marginTop: 8 },
+    playerCardName: { fontWeight: '900', fontSize: 12 },
+    playerCardLastName: { fontWeight: '900', fontSize: 12 },
+    playerCardPosition: { fontWeight: '700', fontSize: 9, marginTop: 2, letterSpacing: 0.3 },
+    hMatchCard: {
+        width: '100%',
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    emptyState: { padding: 24, alignItems: 'center', borderRadius: 16, gap: 8 },
+    emptyStateText: { fontSize: 12, fontWeight: '700' },
+    emptyStateBtn: { marginTop: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
+    emptyStateBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
+    emptyContainer: { flex: 1 },
+    emptyContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 },
+    emptyTitle: { fontSize: 18, fontWeight: '900', marginTop: 16, letterSpacing: 0.5 },
+    loginBtn: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14 },
+    loginBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12 },
     phoneBadgeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 135, 0.3)',
-        paddingHorizontal: 7,
-        paddingVertical: 3,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
         borderRadius: 8,
-        alignSelf: 'flex-start'
+        width: '100%',
     },
     phoneBadgeText: {
-        color: '#00FF87',
-        fontWeight: '900',
+        fontWeight: '800',
         fontSize: 10,
         letterSpacing: 0.3
     },
     addPhoneBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 215, 0, 0.15)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 215, 0, 0.4)',
-        paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 8,
         alignSelf: 'flex-start'
     },
     addPhoneBtnText: {
-        color: '#FFD700',
         fontWeight: '900',
         fontSize: 9,
-        letterSpacing: 0.5
+        letterSpacing: 0.3
+    },
+    replayModalOverlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        padding: 20,
+        paddingBottom: 40,
+        backgroundColor: 'rgba(0,0,0,0.5)'
+    },
+    replaySheet: {
+        width: '100%',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 14
+    },
+    replayRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        gap: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    replayRowIcon: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    replayRowMinute: {
+        fontSize: 13,
+        fontWeight: '700'
+    },
+    replayPlayerOverlay: {
+        flex: 1,
+        backgroundColor: '#000000',
+        justifyContent: 'center',
+        alignItems: 'stretch',
+        paddingHorizontal: 16
+    },
+    replayPlayerVideoBox: {
+        width: '100%',
+        height: 260,
+        borderRadius: 14,
+        overflow: 'hidden',
+        backgroundColor: '#0A0A0A',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    replayPlayerVideo: {
+        width: '100%',
+        height: '100%'
+    },
+    replayInfoCard: {
+        marginTop: 18,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        padding: 16
+    },
+    replayInfoTeamsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+    },
+    replayInfoTeamCol: {
+        flex: 1,
+        alignItems: 'center',
+        gap: 6
+    },
+    replayInfoTeamLogo: {
+        width: 40,
+        height: 40
+    },
+    replayInfoTeamName: {
+        color: '#E2E8F0',
+        fontSize: 12,
+        fontWeight: '700',
+        textAlign: 'center'
+    },
+    replayInfoScore: {
+        color: '#FFFFFF',
+        fontSize: 20,
+        fontWeight: '900',
+        marginHorizontal: 14
+    },
+    replayInfoMetaRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 16,
+        marginTop: 16,
+        paddingTop: 14,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(255,255,255,0.1)'
+    },
+    replayInfoMetaItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5
+    },
+    replayInfoMetaText: {
+        color: '#E2E8F0',
+        fontSize: 12,
+        fontWeight: '600'
+    },
+    replayPlayerClose: {
+        position: 'absolute',
+        top: 56,
+        right: 20,
+        zIndex: 5,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center'
     },
     phoneModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20
@@ -483,21 +996,16 @@ const styles = StyleSheet.create({
     phoneModalCard: {
         width: '100%',
         maxWidth: 320,
-        backgroundColor: '#0F1626',
         borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
         padding: 20,
         alignItems: 'center'
     },
     phoneModalTitle: {
-        color: '#FFF',
         fontSize: 14,
         fontWeight: '900',
         letterSpacing: 0.5
     },
     phoneModalSub: {
-        color: 'rgba(255, 255, 255, 0.6)',
         fontSize: 12,
         textAlign: 'center',
         marginTop: 4,
@@ -506,23 +1014,19 @@ const styles = StyleSheet.create({
     phoneInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.07)',
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
         height: 46,
         paddingHorizontal: 14,
         width: '100%'
     },
     phonePrefixText: {
-        color: '#00FF87',
         fontSize: 15,
         fontWeight: '900',
         marginRight: 8
     },
     phoneInput: {
         flex: 1,
-        color: '#FFF',
         fontSize: 16,
         fontWeight: '800'
     },
@@ -530,7 +1034,7 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 12,
-        backgroundColor: 'rgba(255, 59, 48, 0.15)',
+        backgroundColor: 'rgba(255, 59, 48, 0.12)',
         borderWidth: 1,
         borderColor: 'rgba(255, 59, 48, 0.3)',
         alignItems: 'center',
@@ -540,23 +1044,7 @@ const styles = StyleSheet.create({
         flex: 1,
         height: 44,
         borderRadius: 12,
-        backgroundColor: '#00FF87',
         alignItems: 'center',
         justifyContent: 'center'
-    },
-    emptySquadContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 35,
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
-        gap: 8,
-    },
-    emptySquadText: {
-        color: 'rgba(255, 255, 255, 0.4)',
-        fontSize: 13,
-        fontWeight: '700',
     }
 });

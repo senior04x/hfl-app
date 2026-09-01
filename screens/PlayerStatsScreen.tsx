@@ -594,9 +594,13 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
 
                 const { data: events, error } = await supabase
                     .from('match_events')
-                    .select('*, match:match_id(*, home_team:home_team_id(id, name, logo_url), away_team:away_team_id(id, name, logo_url)), player:player_id(*)')
+                    .select('*, match:match_id(*)')
                     .in('player_id', targetPlayerIds)
                     .order('created_at', { ascending: false });
+
+                if (error) {
+                    console.warn('Error fetching player replays (query):', error.message || error);
+                }
 
                 if (events && events.length > 0) {
                     const validReplays = events.filter((e: any) =>
@@ -1638,6 +1642,33 @@ const styles = StyleSheet.create({
         color: Colors.primary,
         fontWeight: '900',
         fontSize: 13,
+    },
+    exportBtn: {
+        backgroundColor: '#00FF87',
+        borderRadius: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        gap: 8,
+        shadowColor: '#00FF87',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    exportBtnText: {
+        color: '#000',
+        fontSize: 14,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 

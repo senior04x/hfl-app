@@ -24,6 +24,7 @@ import SmartImage from '../components/SmartImage';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
+import { useNavBarScroll } from '../context/NavBarScrollContext';
 
 // ─── Skeleton Shimmer ────────────────────────────────────────────────────────
 const SkeletonBox: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({
@@ -80,6 +81,7 @@ export default function NewsScreen() {
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const navigation = useNavigation<any>();
+    const { handleScroll: handleNavBarScroll } = useNavBarScroll();
 
     const categories = [
         { id: 'all', label: t('news.category_all'), rawKey: 'Barchasi' },
@@ -234,6 +236,8 @@ export default function NewsScreen() {
                         </View>
                     }
                     contentContainerStyle={styles.listContent}
+                    onScroll={(e) => handleNavBarScroll('news', e)}
+                    scrollEventThrottle={16}
                     refreshControl={
                         <RefreshControl refreshing={isLoading} onRefresh={fetchNews} tintColor={Colors.primary} />
                     }

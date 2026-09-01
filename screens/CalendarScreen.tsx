@@ -22,6 +22,7 @@ import backgroundImage from '../assets/images/backroud-image.png';
 import CustomRefreshControl from '../components/CustomRefreshControl';
 import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
+import { useNavBarScroll } from '../context/NavBarScrollContext';
 
 // ─── Skeleton Components ────────────────────────────────────────────────────
 const SkeletonBox: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({
@@ -150,6 +151,7 @@ const formatMonthHeader = (vDate: Date, lang: string) => {
 export default function CalendarScreen({ navigation }: any) {
     const { t, i18n } = useTranslation();
     const currentLang = i18n.language || 'uz';
+    const { handleScroll: handleNavBarScroll } = useNavBarScroll();
     const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
     const [calendarData, setCalendarData] = useState<any[]>([]);
     const [displayData, setDisplayData] = useState<any[]>([]);
@@ -398,6 +400,8 @@ export default function CalendarScreen({ navigation }: any) {
                     keyExtractor={(item, index) => item.id || item.date || String(index)}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 110 }}
+                    onScroll={(e) => handleNavBarScroll('calendar', e)}
+                    scrollEventThrottle={16}
                     refreshControl={
                         <CustomRefreshControl
                             refreshing={refreshing}

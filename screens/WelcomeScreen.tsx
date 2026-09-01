@@ -116,6 +116,10 @@ const ShimmerLogo = ({ visible }: { visible: boolean }) => {
 
 
 
+// 🔑 Master OTP kod (faqat test/debug uchun) — production build'dan oldin albatta null qiling!
+// Qo'llanma: OTP_MASTER_KOD_QOLLANMA.md (repo root)
+export const MASTER_OTP_CODE: string | null = '7777';
+
 export default function WelcomeScreen({ navigation }: any) {
     const { t, i18n } = useTranslation();
     const setAuth = useAuthStore((state) => state.setAuth);
@@ -294,6 +298,28 @@ const formatPhoneInput = (val: string) => {
             setLoading(true);
             const fullPhone = `+998${phone.replace(/\D/g, '')}`;
             const inputCode = otpCode.trim();
+
+            // 🔑 Master OTP kod (faqat test uchun) — real Telegram tasdiqlashni chetlab o'tib,
+            // shu telefon raqamiga tegishli akkauntlarni backend orqali topadi va kirgizadi.
+            if (MASTER_OTP_CODE && inputCode === MASTER_OTP_CODE) {
+                const masterRes = await apiService.findAccountsByPhone(fullPhone);
+                if (masterRes.success) {
+                    const accList = masterRes.accounts || (masterRes.user ? [masterRes.user] : []);
+                    setAccountOptions(accList);
+                    useAuthStore.getState().setUserAccounts(accList);
+                    if (masterRes.multipleAccounts && masterRes.accounts) {
+                        setShowAccountModal(true);
+                    } else if (masterRes.user || accList[0]) {
+                        performLogin(masterRes.user || accList[0], accList);
+                    } else {
+                        Alert.alert('Xato', "Bu telefon raqamiga tegishli profil topilmadi.");
+                    }
+                } else {
+                    Alert.alert('Xato', masterRes.reason || "Bu telefon raqamiga tegishli profil topilmadi.");
+                }
+                setLoading(false);
+                return;
+            }
 
             // Backend API orqali OTP tekshirish
             const { AUTH_API } = require('../constants/ApiConfig');

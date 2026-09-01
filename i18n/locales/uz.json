@@ -50,7 +50,7 @@
     "copy": "Nusxalash"
   },
   "nav": {
-    "home": "Bosh sahifa",
+    "home": "Asosiy",
     "matches": "O'yinlar",
     "tournaments": "Turnirlar",
     "teams": "Jamoalar",
@@ -112,7 +112,34 @@
     "league_results_title": "{{league}} natijalari",
     "view_league_results": "{{league}} NATIJALARI →",
     "view_all_results": "BARCHA NATIJALAR →",
-    "no_finished_matches": "Tugallangan o'yinlar mavjud emas"
+    "no_finished_matches": "Tugallangan o'yinlar mavjud emas",
+    "news": "Yangiliklar"
+  },
+  "stories": {
+    "title": "Storislar",
+    "top_scorer_leader": "TOP TO'PURAR / YETAKCHI",
+    "league_leader": "Amatora Liga Yetakchisi",
+    "login_to_like": "Storisga layk bosish uchun avval tizimga kiring yoki ro'yxatdan o'ting.",
+    "watch_on_amatora": "Amatora ilovasida tomosha qiling!",
+    "add_story": "STORY QO'SHISH",
+    "add_story_subtitle": "Gol replaylardan birini tanlang — 48 soat davomida story sifatida ko'rinadi",
+    "no_replays": "Hozircha tanlash uchun replay topilmadi",
+    "minute_goal": "{{minute}}-daqiqa gol",
+    "goal_replay": "Gol replay",
+    "goal": "GOL",
+    "round_tour": "{{round}}-TUR",
+    "finished": "YAKUNLANGAN",
+    "unknown_player": "Noma'lum o'yinchi"
+  },
+  "replays": {
+    "title": "Replaylar",
+    "match_replay": "O'YIN REPLAYI",
+    "goals_count": "{{count}} TA GOL",
+    "goal_number": "{{number}}-gol",
+    "goal_scorer": "GOL MUALLIFI",
+    "assistant": "ASSISTENT (UZATMALAR)",
+    "unknown_player": "NOMA'LUM FUTBOLCHI",
+    "minute_goal_upper": "{{minute}}-DAQIQADA GOL"
   },
   "news": {
     "title": "YANGILIKLAR",
@@ -162,6 +189,11 @@
     "search_placeholder": "QIDIRUV...",
     "no_data": "MA'LUMOT TOPILMADI",
     "organizer": "Tashkilotchi",
+    "organizers": "TASHKILOTCHILAR",
+    "official_organizer": "RASMIY TASHKILOTCHI",
+    "co_organizer": "HAMKOR TASHKILOTCHI",
+    "general_info": "UMUMIY MA'LUMOT",
+    "latest_matches": "SO'NGGI O'YINLAR",
     "total_teams": "Jamoalar",
     "total_players": "O'yinchilar",
     "recent_matches": "So'nggi o'yinlar",
@@ -193,6 +225,11 @@
     "home_team": "Mezbon",
     "away_team": "Mehmon",
     "round_tour": "{{round}}-TUR",
+    "matches_count": "{{count}} TA O'YIN",
+    "final": "FINAL",
+    "semi_final": "YARIM FINAL",
+    "quarter_final": "CHORAK FINAL",
+    "round_of_16": "1/8 FINAL",
     "arena_default": "Amatora Arena"
   },
   "teams": {
@@ -238,6 +275,7 @@
     "edit_profile": "Profilni tahrirlash",
     "my_stats": "Mening statistikam",
     "my_team": "Mening jamoam",
+    "edit_team_info": "Jamoa ma'lumotlarini tahrirlash",
     "applications": "Mening arizalarim",
     "transfer_requests": "Transfer so'rovlari",
     "security": "Xavfsizlik",

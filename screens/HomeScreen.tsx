@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIn
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import { storyService } from '../services/storyService';
@@ -18,12 +19,17 @@ import backgroundImage from '../assets/images/backroud-image.png';
 import { formatShortTeamName, formatLocalizedVenue, formatLocalizedDate } from '../utils/stringUtils';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import Svg, { Path } from 'react-native-svg';
 import MatchStoriesTray, { StoryGroup } from '../components/MatchStoriesTray';
 import StoryViewerModal from '../components/StoryViewerModal';
+import TeamStoryReplayPickerModal from '../components/TeamStoryReplayPickerModal';
 import { supabase } from '../services/supabase';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import SuperLigaTop4 from '../components/SuperLigaTop4';
+import { useNavBarScroll } from '../context/NavBarScrollContext';
+import { getLocalizedNewsField, getLocalizedNewsCategory } from '../utils/localizationUtils';
+import { formatLocalizedRelativeTime } from '../utils/dateLocalization';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.88;
@@ -38,8 +44,11 @@ export default function HomeScreen({ navigation }: any) {
     const { colors, isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
     const currentLang = i18n.language || 'uz';
+    const isAndroidLight = Platform.OS === 'android' && !isDark;
+    const { handleScroll: handleNavBarScroll } = useNavBarScroll();
     const [matches, setMatches] = useState<any[]>([]);
     const [sliderItems, setSliderItems] = useState<any[]>([]);
+    const [newsItems, setNewsItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const { socket, isConnected } = useSocket();
@@ -53,10 +62,16 @@ export default function HomeScreen({ navigation }: any) {
     const userRole = user?.role || (isGuest ? 'guest' : 'user');
     const CACHE_KEY = `${CACHE_KEY_PREFIX}${currentOrgId}_${userRole}_${userUniqueKey}`;
 
+    // O'zining (agar jamoa/trener akkaunti bo'lsa) team ID'si — story tray'da
+    // HAR DOIM birinchi o'rinda ko'rsatish va "+" (story qo'shish) halqasi
+    // uchun kerak. MyTeamScreen'dagi bilan bir xil mantiq.
+    const ownTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
+
     // Stories state with persistent viewed tracking (@amatora_viewed_stories)
     const [storyModalVisible, setStoryModalVisible] = useState(false);
     const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
     const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([]);
+    const [storyPickerVisible, setStoryPickerVisible] = useState(false);
     const viewedStoryIdsRef = useRef<string[]>([]);
     const hasCachedDataRef = useRef(false);
 
@@ -96,6 +111,9 @@ export default function HomeScreen({ navigation }: any) {
                     }
                     if (Array.isArray(cached.storyGroups) && cached.storyGroups.length > 0) {
                         setStoryGroups(cached.storyGroups);
+                    }
+                    if (Array.isArray(cached.newsItems) && cached.newsItems.length > 0) {
+                        setNewsItems(cached.newsItems);
                     }
                     if (cached.userProfile) {
                         setUserProfile(cached.userProfile);
@@ -166,7 +184,8 @@ export default function HomeScreen({ navigation }: any) {
                         matchesRef.current,
                         sliderItemsRef.current,
                         viewedStoryIdsRef.current,
-                        orgId
+                        orgId,
+                        ownTeamId
                     );
                     setStoryGroups(freshStories);
                 }
@@ -178,7 +197,7 @@ export default function HomeScreen({ navigation }: any) {
             socket.on('match-update', (updatedMatch: any) => {
                 setMatches(prev => {
                     const updated = prev.map(m => (m._id === updatedMatch.matchId || m.id === updatedMatch.matchId) ? { ...m, ...updatedMatch.match } : m);
-                    storyService.fetchLatestTourGoalStories(updated, sliderItemsRef.current, viewedStoryIdsRef.current, orgId).then(setStoryGroups);
+                    storyService.fetchLatestTourGoalStories(updated, sliderItemsRef.current, viewedStoryIdsRef.current, orgId, ownTeamId).then(setStoryGroups);
                     return updated;
                 });
             });
@@ -214,18 +233,22 @@ export default function HomeScreen({ navigation }: any) {
                 setLoading(true);
             }
             
-            // Parallelize matches, slider items, user profile, and viewed stories fetching
-            const [matchesData, sliderData, profileData, viewedIds] = await Promise.all([
+            // Parallelize matches, slider items, user profile, viewed stories, and news fetching
+            const [matchesData, sliderData, profileData, viewedIds, fetchedNewsData] = await Promise.all([
                 apiService.getMatches().catch(err => { console.error('Matches fetch err:', err); return []; }),
                 apiService.getSliderItems().catch(err => { console.error('Slider fetch err:', err); return []; }),
                 fetchUserProfileData().catch(err => { console.error('Profile fetch err:', err); return null; }),
-                storyService.getViewedStoryIds().catch(() => [] as string[])
+                storyService.getViewedStoryIds().catch(() => [] as string[]),
+                apiService.getNews(1, 10).catch(err => { console.error('News fetch err:', err); return []; }),
             ]);
 
             viewedStoryIdsRef.current = viewedIds || [];
 
             const fetchedMatches = (matchesData && Array.isArray(matchesData)) ? matchesData : [];
             setMatches(fetchedMatches);
+
+            const realNews = Array.isArray(fetchedNewsData) ? fetchedNewsData : [];
+            setNewsItems(realNews);
 
             let validSlider: any[] = [];
             if (sliderData && Array.isArray(sliderData)) {
@@ -243,7 +266,8 @@ export default function HomeScreen({ navigation }: any) {
                 fetchedMatches,
                 validSlider,
                 viewedStoryIdsRef.current,
-                currentOrgId
+                currentOrgId,
+                ownTeamId
             );
             setStoryGroups(realStories);
 
@@ -260,6 +284,7 @@ export default function HomeScreen({ navigation }: any) {
                 matches: fetchedMatches,
                 sliderItems: validSlider,
                 storyGroups: realStories,
+                newsItems: realNews,
                 userProfile: profileData || null,
                 timestamp: Date.now()
             }));
@@ -276,9 +301,34 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     const handleSelectStoryGroup = async (group: StoryGroup, index: number) => {
+        // O'zining jamoasi halqasi, lekin hali birorta story qo'yilmagan bo'lsa
+        // ("+" holati) — viewer o'rniga to'g'ridan-to'g'ri replay-tanlash
+        // modal'ini ochamiz.
+        if (group.isOwn && (!group.items || group.items.length === 0)) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            setStoryPickerVisible(true);
+            return;
+        }
         setSelectedStoryIndex(index);
         setStoryModalVisible(true);
         await handleStoryGroupViewed(group.id);
+    };
+
+    // Story qo'shilgandan keyin (yangi tanlangan replay orqali) tray/viewer'ni
+    // yangilash uchun story ro'yxatini qaytadan quradi.
+    const handleStoryAdded = async () => {
+        try {
+            const freshStories = await storyService.fetchLatestTourGoalStories(
+                matchesRef.current,
+                sliderItemsRef.current,
+                viewedStoryIdsRef.current,
+                currentOrgId,
+                ownTeamId
+            );
+            setStoryGroups(freshStories);
+        } catch (e) {
+            console.warn('Error refreshing stories after add:', e);
+        }
     };
 
     const handleStoryGroupViewed = async (groupId: string) => {
@@ -327,26 +377,36 @@ export default function HomeScreen({ navigation }: any) {
         return 3;
     };
 
-    // Filter upcoming matches: strictly markaziy & ortacha (max 4)
-    const allUpcoming = matches.filter(m => isMatchUpcoming(m.status));
-    const featuredUpcoming = allUpcoming.filter(m => m.importance === 'markaziy' || m.importance === 'ortacha');
-    const displayUpcomingMatches = (featuredUpcoming.length > 0 ? featuredUpcoming : allUpcoming)
-        .sort((a, b) => {
-            const rankDiff = getImportanceRank(a.importance) - getImportanceRank(b.importance);
-            if (rankDiff !== 0) return rankDiff;
-            return new Date(a.date || a.createdAt || 0).getTime() - new Date(b.date || b.createdAt || 0).getTime();
-        })
-        .slice(0, 4);
+    // Yordamchi: match tur/bosqich nomini to'g'ri olish
+    const getMatchTourKey = (m: any): string => {
+        if (!m) return '';
+        const raw = m.round_tag || m.round_name || m.round_number || m.round || m.tour || m.tourNumber;
+        if (!raw) return '';
+        return String(raw).trim();
+    };
 
-    // Filter finished matches: grouped by League (only markaziy & ortacha, max 3 per league)
-    const groupedFinishedMatches = useMemo(() => {
-        const allFinished = matches.filter(m => isMatchFinished(m.status));
-        const featuredFinished = allFinished.filter(m => m.importance === 'markaziy' || m.importance === 'ortacha');
-        const sourceMatches = featuredFinished.length > 0 ? featuredFinished : allFinished;
+    const parseMatchTourNumber = (m: any): number => {
+        const raw = getMatchTourKey(m);
+        if (!raw) return 0;
+        const numMatch = raw.match(/\d+/);
+        return numMatch ? parseInt(numMatch[0], 10) : 0;
+    };
 
+    const formatRoundName = (m: any): string => {
+        const s = getMatchTourKey(m);
+        if (!s) return '';
+        if (s.toLowerCase().includes('tur') || s.toLowerCase().includes('round') || s.toLowerCase().includes('final')) {
+            return s.toUpperCase();
+        }
+        return `${s}-TUR`.toUpperCase();
+    };
+
+    // Group upcoming matches by League (faqat eng yaqin kutilayotgan tur o'yinlari)
+    const groupedUpcomingMatches = useMemo(() => {
+        const allUpcoming = matches.filter(m => isMatchUpcoming(m.status));
         const groupsMap: Record<string, { leagueId: string; leagueName: string; matches: any[] }> = {};
 
-        sourceMatches.forEach(m => {
+        allUpcoming.forEach(m => {
             const leagueId = String(m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.league || 'amatora_default');
             const leagueName = m.tournamentName || m.league || "Amatora Liga";
 
@@ -360,16 +420,86 @@ export default function HomeScreen({ navigation }: any) {
             groupsMap[leagueId].matches.push(m);
         });
 
-        return Object.values(groupsMap).map(group => ({
-            ...group,
-            matches: group.matches
-                .sort((a, b) => {
-                    const rankDiff = getImportanceRank(a.importance) - getImportanceRank(b.importance);
-                    if (rankDiff !== 0) return rankDiff;
-                    return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
-                })
-                .slice(0, 3)
-        }));
+        return Object.values(groupsMap).map(group => {
+            const sortedByDate = [...group.matches].sort((a, b) => {
+                const dateA = new Date(a.date || a.match_date || a.createdAt || 0).getTime();
+                const dateB = new Date(b.date || b.match_date || b.createdAt || 0).getTime();
+                return dateA - dateB;
+            });
+
+            // Eng yaqin bo'lajak tur
+            const tourNums = sortedByDate.map(parseMatchTourNumber).filter(n => n > 0);
+            let upcomingTourMatches: any[] = [];
+
+            if (tourNums.length > 0) {
+                const minTourNum = Math.min(...tourNums);
+                upcomingTourMatches = sortedByDate.filter(m => parseMatchTourNumber(m) === minTourNum);
+            } else {
+                const earliestKey = getMatchTourKey(sortedByDate[0]);
+                if (earliestKey) {
+                    upcomingTourMatches = sortedByDate.filter(m => getMatchTourKey(m) === earliestKey);
+                } else {
+                    upcomingTourMatches = sortedByDate;
+                }
+            }
+
+            return {
+                ...group,
+                matches: upcomingTourMatches
+            };
+        }).filter(group => group.matches.length > 0);
+    }, [matches]);
+
+    // Group finished matches by League (FAQAT SO'NGGI TUR NATIJALARI)
+    const groupedFinishedMatches = useMemo(() => {
+        const allFinished = matches.filter(m => isMatchFinished(m.status));
+        const groupsMap: Record<string, { leagueId: string; leagueName: string; matches: any[] }> = {};
+
+        allFinished.forEach(m => {
+            const leagueId = String(m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.league || 'amatora_default');
+            const leagueName = m.tournamentName || m.league || "Amatora Liga";
+
+            if (!groupsMap[leagueId]) {
+                groupsMap[leagueId] = {
+                    leagueId,
+                    leagueName,
+                    matches: []
+                };
+            }
+            groupsMap[leagueId].matches.push(m);
+        });
+
+        return Object.values(groupsMap).map(group => {
+            // Sort matches by date descending (eng oxirgi o'yinlar boshida)
+            const sortedByDate = [...group.matches].sort((a, b) => {
+                const dateA = new Date(a.date || a.match_date || a.createdAt || 0).getTime();
+                const dateB = new Date(b.date || b.match_date || b.createdAt || 0).getTime();
+                return dateB - dateA;
+            });
+
+            // 1. Agar raqamli turlar bo'lsa (masalan: 1-tur, 2-tur, 3-tur), eng kattasini (so'nggi turini) olamiz:
+            const tourNums = sortedByDate.map(parseMatchTourNumber).filter(n => n > 0);
+            let latestTourMatches: any[] = [];
+
+            if (tourNums.length > 0) {
+                const maxTourNum = Math.max(...tourNums);
+                latestTourMatches = sortedByDate.filter(m => parseMatchTourNumber(m) === maxTourNum);
+            } else {
+                // 2. Agar matnli tur bo'lsa (masalan: "Final", "Yarim final"):
+                const latestKey = getMatchTourKey(sortedByDate[0]);
+                if (latestKey) {
+                    latestTourMatches = sortedByDate.filter(m => getMatchTourKey(m) === latestKey);
+                } else {
+                    // 3. Agar tur ma'lumoti umuman bo'lmasa, eng oxirgi 4 ta o'yin
+                    latestTourMatches = sortedByDate.slice(0, 4);
+                }
+            }
+
+            return {
+                ...group,
+                matches: latestTourMatches
+            };
+        }).filter(group => group.matches.length > 0);
     }, [matches]);
 
     const handleViewAllResults = async () => {
@@ -509,6 +639,149 @@ export default function HomeScreen({ navigation }: any) {
             ? t('matches.round_tour', { round: match.round }) 
             : (match.tour ? t('matches.round_tour', { round: match.tour }) : '');
 
+        const isAndroidLight = Platform.OS === 'android' && !isDark;
+
+        const cardContent = (
+            <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                {/* Score har doim o'rtada, teamlar shunga qarab markazlashsin */}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+                    {/* CHAP: Home Team Name + Logo (flex: 1, o'ngga) */}
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 8 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
+                            {match.homeTeamName || match.homeTeam?.name || 'UY'}
+                        </Text>
+                        <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                            {match.homeTeam?.logo || match.home_team_logo ? (
+                                <SmartImage
+                                    uri={match.homeTeam?.logo || match.home_team_logo}
+                                    style={{ width: 18, height: 18 }}
+                                    contentFit="contain"
+                                    fallbackIcon="shield-outline"
+                                />
+                            ) : (
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: homeColors.textSecondary }}>
+                                    {(match.homeTeamName || match.homeTeam?.name || 'UY').charAt(0).toUpperCase()}
+                                </Text>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* O'RTA: Score yoki Vaqt (fixed width, har doim o'rtada) */}
+                    <View style={{ width: 70, alignItems: 'center', justifyContent: 'center' }}>
+                        {matchIsLive ? (
+                            <View style={{ alignItems: 'center' }}>
+                                {/* Live Score */}
+                                <Text style={{ fontSize: 16, fontWeight: '900', color: homeColors.textPrimary, letterSpacing: 0.5 }}>
+                                    {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
+                                </Text>
+                                {/* LIVE badge */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.primary }} />
+                                    <Text style={{ fontSize: 8, fontWeight: '800', color: Colors.primary, letterSpacing: 0.3 }}>
+                                        {liveBadgeLabel}
+                                    </Text>
+                                </View>
+                            </View>
+                        ) : matchIsFinished ? (
+                            <View style={{ alignItems: 'center' }}>
+                                {/* Natija sho't — rejalashtirilgan match vaqti o'lchamida */}
+                                <Text style={{ fontSize: 16, fontWeight: '800', color: homeColors.textPrimary, letterSpacing: 0.5 }}>
+                                    {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
+                                </Text>
+                                {/* Bo'lib o'tgan sanasi */}
+                                <Text style={{ fontSize: 8.5, color: homeColors.textSecondary, marginTop: 1, fontWeight: '600' }}>
+                                    {day} {month}
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={{ alignItems: 'center' }}>
+                                {/* Rejalashtirilgan o'yin vaqti */}
+                                <Text style={{ fontSize: 16, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
+                                    {formattedTime}
+                                </Text>
+                                {/* Rejalashtirilgan o'yin sanasi */}
+                                <Text style={{ fontSize: 8.5, color: homeColors.textSecondary, marginTop: 1, fontWeight: '600' }}>
+                                    {day} {month}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* O'NG: Away Team Logo + Name (flex: 1, chapga) */}
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 4, paddingLeft: 8 }}>
+                        <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                            {match.awayTeam?.logo || match.away_team_logo ? (
+                                <SmartImage
+                                    uri={match.awayTeam?.logo || match.away_team_logo}
+                                    style={{ width: 18, height: 18 }}
+                                    contentFit="contain"
+                                    fallbackIcon="shield-outline"
+                                />
+                            ) : (
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: homeColors.textSecondary }}>
+                                    {(match.awayTeamName || match.awayTeam?.name || 'MEH').charAt(0).toUpperCase()}
+                                </Text>
+                            )}
+                        </View>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
+                            {match.awayTeamName || match.awayTeam?.name || 'MEH'}
+                        </Text>
+                    </View>
+
+                </View>
+            </View>
+        );
+
+        if (isAndroidLight) {
+            return (
+                <View
+                    key={match._id || Math.random().toString()}
+                    style={[
+                        isVertical ? styles.vMatchCard : styles.hMatchCard,
+                        {
+                            marginBottom: 8,
+                        }
+                    ]}
+                >
+                    <TouchableOpacity
+                        style={[
+                            {
+                                width: '100%',
+                                backgroundColor: '#FFFFFF',
+                                borderTopLeftRadius: 0,
+                                borderTopRightRadius: 0,
+                                borderBottomLeftRadius: 18,
+                                borderBottomRightRadius: 18,
+                            },
+                            matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
+                        ]}
+                        onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
+                        activeOpacity={0.85}
+                    >
+                        {cardContent}
+                    </TouchableOpacity>
+
+                    {/* Haqiqiy mayin, tarqoq gradient soya — qattiq chiziq/border umuman yo'q */}
+                    <LinearGradient
+                        colors={[
+                            'rgba(0, 0, 0, 0.16)',
+                            'rgba(0, 0, 0, 0.09)',
+                            'rgba(0, 0, 0, 0.03)',
+                            'transparent'
+                        ]}
+                        style={{
+                            height: 12,
+                            width: '94%',
+                            alignSelf: 'center',
+                            borderBottomLeftRadius: 18,
+                            borderBottomRightRadius: 18,
+                        }}
+                    />
+                </View>
+            );
+        }
+
         return (
             <TouchableOpacity
                 key={match._id || Math.random().toString()}
@@ -517,7 +790,13 @@ export default function HomeScreen({ navigation }: any) {
                     {
                         backgroundColor: homeColors.background,
                         borderWidth: 1,
-                        borderColor: homeColors.border
+                        borderColor: homeColors.border,
+                        borderTopColor: 'transparent',
+                        borderBottomLeftRadius: 22,
+                        borderBottomRightRadius: 22,
+                        borderTopLeftRadius: 0,
+                        borderTopRightRadius: 0,
+                        marginBottom: 8,
                     },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
@@ -525,87 +804,7 @@ export default function HomeScreen({ navigation }: any) {
                 activeOpacity={0.85}
             >
                 {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
-
-                <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                    {/* Score har doim o'rtada, teamlar shunga qarab markazlashsin */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                        {/* CHAP: Home Team Name + Logo (flex: 1, o'ngga) */}
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 8 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                {match.homeTeamName || match.homeTeam?.name || 'UY'}
-                            </Text>
-                            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                                {match.homeTeam?.logo || match.home_team_logo ? (
-                                    <SmartImage
-                                        uri={match.homeTeam?.logo || match.home_team_logo}
-                                        style={{ width: 18, height: 18 }}
-                                        contentFit="contain"
-                                        fallbackIcon="shield-outline"
-                                    />
-                                ) : (
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: homeColors.textSecondary }}>
-                                        {(match.homeTeamName || match.homeTeam?.name || 'UY').charAt(0).toUpperCase()}
-                                    </Text>
-                                )}
-                            </View>
-                        </View>
-
-                        {/* O'RTA: Score yoki Vaqt (fixed width, har doim o'rtada) */}
-                        <View style={{ width: 70, alignItems: 'center' }}>
-                            {Boolean(matchIsLive || matchIsFinished) ? (
-                                <View style={{ alignItems: 'center' }}>
-                                    {/* Score */}
-                                    <Text style={{ fontSize: 22, fontWeight: '900', color: homeColors.textPrimary, letterSpacing: -0.5 }}>
-                                        {match.score?.home ?? match.home_score ?? 0} - {match.score?.away ?? match.away_score ?? 0}
-                                    </Text>
-                                    {/* LIVE badge */}
-                                    {Boolean(matchIsLive) && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                                            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.primary }} />
-                                            <Text style={{ fontSize: 8, fontWeight: '700', color: Colors.primary, letterSpacing: 0.3 }}>
-                                                {liveBadgeLabel}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            ) : (
-                                <View style={{ alignItems: 'center' }}>
-                                    {/* Vaqt */}
-                                    <Text style={{ fontSize: 16, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
-                                        {formattedTime}
-                                    </Text>
-                                    {/* Sana */}
-                                    <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 1 }}>
-                                        {day} {month}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-
-                        {/* O'NG: Away Team Logo + Name (flex: 1, chapga) */}
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 4, paddingLeft: 8 }}>
-                            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                                {match.awayTeam?.logo || match.away_team_logo ? (
-                                    <SmartImage
-                                        uri={match.awayTeam?.logo || match.away_team_logo}
-                                        style={{ width: 18, height: 18 }}
-                                        contentFit="contain"
-                                        fallbackIcon="shield-outline"
-                                    />
-                                ) : (
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: homeColors.textSecondary }}>
-                                        {(match.awayTeamName || match.awayTeam?.name || 'MEH').charAt(0).toUpperCase()}
-                                    </Text>
-                                )}
-                            </View>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                {match.awayTeamName || match.awayTeam?.name || 'MEH'}
-                            </Text>
-                        </View>
-
-                    </View>
-                </View>
+                {cardContent}
             </TouchableOpacity>
         );
     };
@@ -616,6 +815,8 @@ export default function HomeScreen({ navigation }: any) {
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 130 }}
+                    onScroll={(e) => handleNavBarScroll('home', e)}
+                    scrollEventThrottle={16}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
                     }
@@ -636,28 +837,36 @@ export default function HomeScreen({ navigation }: any) {
                                     return t('home.good_evening');
                                 };
 
+                                // Jamoa/trener akkaunti ("manager") uchun bu yerdagi avatar aslida
+                                // jamoa logotipi bilan bir xil edi — endi o'sha logotip pastdagi
+                                // story tray'da (birinchi halqa sifatida) ko'rsatiladi, shuning
+                                // uchun bu yerda TAKROR ko'rsatilmaydi (headerni yengillashtiradi).
+                                const showHeaderAvatar = userRole !== 'manager';
+
                                 return (
-                                    <View style={styles.header}>
+                                    <View style={[styles.header, !showHeaderAvatar && styles.headerCompact]}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                            <TouchableOpacity 
-                                                style={styles.profileButton}
-                                                onPress={() => navigation.navigate('MainTabs', { screen: 'Profil' })}
-                                                activeOpacity={0.8}
-                                            >
-                                                <View style={styles.squircleAvatarContainer}>
-                                                    {avatarUri ? (
-                                                        <SmartImage 
-                                                            uri={avatarUri}
-                                                            style={styles.squircleAvatar}
-                                                            fallbackIcon="person"
-                                                        />
-                                                    ) : (
-                                                        <View style={styles.squircleAvatarFallback}>
-                                                            <Ionicons name="person" size={20} color="#00FF87" />
-                                                        </View>
-                                                    )}
-                                                </View>
-                                            </TouchableOpacity>
+                                            {showHeaderAvatar && (
+                                                <TouchableOpacity
+                                                    style={styles.profileButton}
+                                                    onPress={() => navigation.navigate('MainTabs', { screen: 'Profil' })}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <View style={styles.squircleAvatarContainer}>
+                                                        {avatarUri ? (
+                                                            <SmartImage
+                                                                uri={avatarUri}
+                                                                style={styles.squircleAvatar}
+                                                                fallbackIcon="person"
+                                                            />
+                                                        ) : (
+                                                            <View style={styles.squircleAvatarFallback}>
+                                                                <Ionicons name="person" size={20} color="#00FF87" />
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                </TouchableOpacity>
+                                            )}
                                             <View>
                                                 <Text style={[styles.welcomeText, { color: homeColors.textSecondary }]}>
                                                     {isGuest ? 'AMATORA' : getGreetingText().toUpperCase()}
@@ -703,13 +912,16 @@ export default function HomeScreen({ navigation }: any) {
                                 }}
                             />
 
-                            {/* Yangiliklar Section (LaLiga style) */}
+                            {/* Yangiliklar Section */}
                             <View style={styles.sectionContainer}>
                                 <View style={styles.sectionHeader}>
                                     <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>
                                         {t('home.news', 'YANGILIKLAR').toUpperCase()}
                                     </Text>
-                                    <TouchableOpacity onPress={() => navigation.navigate('NewsScreen')} activeOpacity={0.7}>
+                                    <TouchableOpacity 
+                                        onPress={() => navigation.navigate('MainTabs', { screen: 'Yangiliklar' })} 
+                                        activeOpacity={0.7}
+                                    >
                                         <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -720,54 +932,83 @@ export default function HomeScreen({ navigation }: any) {
                                     showsHorizontalScrollIndicator={false}
                                     contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingVertical: 4 }}
                                 >
-                                    {[1, 2, 3].map((item) => (
+                                    {newsItems && newsItems.length > 0 ? (
+                                        newsItems.map((item: any, idx: number) => {
+                                            const categoryText = getLocalizedNewsCategory(item.category || item.type || item.newsType, t);
+                                            const titleText = getLocalizedNewsField(item, 'title', i18n.language) || item.title || '';
+                                            const timeAgo = formatLocalizedRelativeTime(item.createdAt || item.created_at, i18n.language);
+
+                                            return (
+                                                <View
+                                                    key={item._id || item.id || idx}
+                                                    style={{
+                                                        width: 280,
+                                                        minHeight: 140,
+                                                        borderRadius: 14,
+                                                        backgroundColor: isAndroidLight ? '#FFFFFF' : homeColors.background,
+                                                        borderWidth: isAndroidLight ? 0 : 1,
+                                                        borderColor: homeColors.border,
+                                                        shadowColor: '#000000',
+                                                        shadowOffset: { width: 0, height: 4 },
+                                                        shadowOpacity: isAndroidLight ? 0.08 : 0.1,
+                                                        shadowRadius: 10,
+                                                        elevation: isAndroidLight ? 3 : 6,
+                                                    }}
+                                                >
+                                                    <TouchableOpacity
+                                                        style={{ flex: 1, borderRadius: 14, overflow: 'hidden' }}
+                                                        activeOpacity={0.8}
+                                                        onPress={() => {
+                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                                                            navigation.navigate('NewsDetail', { newsId: item._id || item.id, news: item });
+                                                        }}
+                                                    >
+                                                        <View style={{ flex: 1, padding: 14, justifyContent: 'space-between' }}>
+                                                            <View>
+                                                                <Text style={{ fontSize: 10, fontWeight: '800', color: Colors.primary, letterSpacing: 0.5, marginBottom: 6 }}>
+                                                                    {categoryText.toUpperCase()}
+                                                                </Text>
+                                                                <Text
+                                                                    style={{ fontSize: 13.5, fontWeight: '700', color: homeColors.textPrimary, lineHeight: 18 }}
+                                                                    numberOfLines={3}
+                                                                >
+                                                                    {titleText}
+                                                                </Text>
+                                                            </View>
+
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                                                                <Text style={{ fontSize: 10, color: homeColors.textSecondary, fontWeight: '600' }}>
+                                                                    {timeAgo}
+                                                                </Text>
+                                                                <Ionicons name="chevron-forward" size={14} color={homeColors.textSecondary} />
+                                                            </View>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            );
+                                        })
+                                    ) : (
                                         <View
-                                            key={item}
                                             style={{
-                                                width: 280,
-                                                height: 140,
-                                                borderRadius: 12,
+                                                width: width - 40,
+                                                padding: 20,
+                                                borderRadius: 14,
                                                 backgroundColor: homeColors.background,
                                                 borderWidth: 1,
                                                 borderColor: homeColors.border,
-                                                shadowColor: '#000000',
-                                                shadowOffset: { width: 0, height: 4 },
-                                                shadowOpacity: 0.1,
-                                                shadowRadius: 10,
-                                                elevation: 6,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
                                             }}
                                         >
-                                            <TouchableOpacity
-                                                style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}
-                                                activeOpacity={0.8}
-                                            >
-                                                <View style={{ flex: 1, padding: 14, justifyContent: 'space-between' }}>
-                                                    <View>
-                                                        <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.primary, letterSpacing: 0.3, marginBottom: 6 }}>
-                                                            SUPER LIGA
-                                                        </Text>
-                                                        <Text
-                                                            style={{ fontSize: 14, fontWeight: '700', color: homeColors.textPrimary, lineHeight: 18 }}
-                                                            numberOfLines={3}
-                                                        >
-                                                            Yangi mavsum uchun transfer oynasi ochildi
-                                                        </Text>
-                                                    </View>
-
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                        <Text style={{ fontSize: 9, color: homeColors.textSecondary }}>
-                                                            2 soat oldin
-                                                        </Text>
-                                                        <Ionicons name="chevron-forward" size={14} color={homeColors.textSecondary} />
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
+                                            <Text style={{ fontSize: 12, color: homeColors.textSecondary, fontWeight: '600' }}>
+                                                {t('news.loading', 'YANGILIKLAR YUKLANMOQDA...')}
+                                            </Text>
                                         </View>
-                                    ))}
+                                    )}
                                 </ScrollView>
                             </View>
 
-                            {/* Primary Dynamic Matches Section with Priority: 1. Live -> 2. Upcoming -> 3. Finished */}
+                            {/* Primary Dynamic Matches Section */}
                             {loading ? (
                                 <View style={styles.sectionContainer}>
                                     <View style={styles.sectionHeader}>
@@ -777,183 +1018,119 @@ export default function HomeScreen({ navigation }: any) {
                                         <Skeleton width="100%" height={180} borderRadius={20} />
                                     </View>
                                 </View>
-                            ) : liveMatches.length > 0 ? (
-                                /* 1. PRIORITY: LIVE MATCHES */
+                            ) : (
                                 <>
-                                    <View style={styles.sectionContainer}>
-                                        <View style={styles.sectionHeader}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                <View style={styles.liveIndicatorDot} />
-                                                <Text style={[styles.sectionTitle, { color: '#E85002' }]}>
-                                                    {t('matches.live', 'JONLI O\'YINLAR').toUpperCase()}
-                                                </Text>
-                                            </View>
-                                            <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
-                                                <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
-                                            </TouchableOpacity>
-                                        </View>
-
-                                        <View style={styles.verticalMatchList}>
-                                            {liveMatches.map(m => renderMatchCard(m, true, true))}
-                                        </View>
-                                    </View>
-
-                                    {/* Secondary Upcoming if available */}
-                                    {displayUpcomingMatches.length > 0 && (
+                                    {/* 1. JONLI O'YINLAR */}
+                                    {liveMatches.length > 0 && (
                                         <View style={styles.sectionContainer}>
                                             <View style={styles.sectionHeader}>
-                                                <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <View style={styles.liveIndicatorDot} />
+                                                    <Text style={[styles.sectionTitle, { color: '#E85002' }]}>
+                                                        {t('matches.live', 'JONLI O\'YINLAR').toUpperCase()}
+                                                    </Text>
+                                                </View>
                                                 <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
                                                     <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
                                                 </TouchableOpacity>
                                             </View>
+
                                             <View style={styles.verticalMatchList}>
-                                                {displayUpcomingMatches.map(m => renderMatchCard(m, false, true))}
+                                                {liveMatches.map(m => renderMatchCard(m, true, true))}
                                             </View>
                                         </View>
                                     )}
 
-                                    {/* Secondary Finished Results if available */}
-                                    {groupedFinishedMatches.length > 0 && (
-                                        groupedFinishedMatches.map((group: any, groupIdx: number) => {
+                                    {/* 2. BO'LAJAK / ENG YAQIN O'YINLAR (Liga nomi bo'yicha) */}
+                                    {groupedUpcomingMatches.length > 0 && (
+                                        groupedUpcomingMatches.map((group: any, groupIdx: number) => {
                                             const firstMatch = group.matches?.[0];
-                                            const roundTag = firstMatch?.round_tag || firstMatch?.round || (firstMatch?.round_number ? `${firstMatch.round_number}-tur` : '');
+                                            const roundTag = formatRoundName(firstMatch);
                                             const titleText = roundTag ? `${group.leagueName.toUpperCase()} (${roundTag})` : group.leagueName.toUpperCase();
 
                                             return (
-                                            <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
-                                                <View style={styles.sectionHeader}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                        <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                            {titleText}
-                                                        </Text>
+                                                <View key={`upcoming_${group.leagueId || groupIdx}`} style={styles.sectionContainer}>
+                                                    <View style={styles.sectionHeader}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                                                            <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                                {titleText}
+                                                            </Text>
+                                                        </View>
+                                                        <TouchableOpacity
+                                                            onPress={() => {
+                                                                navigation.navigate('TournamentDetail', {
+                                                                    tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
+                                                                    tournamentName: group.leagueName,
+                                                                    initialTab: 'matches',
+                                                                    tab: 'matches'
+                                                                });
+                                                            }}
+                                                            activeOpacity={0.75}
+                                                        >
+                                                            <Text style={styles.viewAllText}>
+                                                                {t('common.details', 'BATAFSIL').toUpperCase()}
+                                                            </Text>
+                                                        </TouchableOpacity>
                                                     </View>
-                                                    <TouchableOpacity
-                                                        onPress={() => {
-                                                            navigation.navigate('TournamentDetail', {
-                                                                tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
-                                                                tournamentName: group.leagueName,
-                                                                initialTab: 'matches',
-                                                                tab: 'matches'
-                                                            });
-                                                        }}
-                                                        activeOpacity={0.75}
-                                                    >
-                                                        <Text style={styles.viewAllText}>
-                                                            {t('common.details', 'BATAFSIL').toUpperCase()}
-                                                        </Text>
-                                                    </TouchableOpacity>
+
+                                                    <View style={styles.verticalMatchList}>
+                                                        {group.matches.map((m: any) => renderMatchCard(m, false, true))}
+                                                    </View>
                                                 </View>
-                                                <View style={styles.verticalMatchList}>
-                                                    {group.matches.map((m: any) => renderMatchCard(m, false, true))}
-                                                </View>
-                                            </View>
                                             );
                                         })
                                     )}
-                                </>
-                            ) : displayUpcomingMatches.length > 0 ? (
-                                /* 2. PRIORITY: UPCOMING / FEATURED MATCHES (No Live Matches) */
-                                <>
-                                    <View style={styles.sectionContainer}>
-                                        <View style={styles.sectionHeader}>
-                                            <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>{t('home.featured_matches', 'Markaziy o\'yinlar')}</Text>
-                                            <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })}>
-                                                <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
-                                            </TouchableOpacity>
-                                        </View>
 
-                                        <View style={styles.verticalMatchList}>
-                                            {displayUpcomingMatches.map(m => renderMatchCard(m, false, true))}
-                                        </View>
-                                    </View>
-
-                                    {/* Finished Results Below Upcoming */}
+                                    {/* 3. BO'LIB O'TGAN NATIJALAR (Liga nomi bo'yicha) */}
                                     {groupedFinishedMatches.length > 0 && (
                                         groupedFinishedMatches.map((group: any, groupIdx: number) => {
                                             const firstMatch = group.matches?.[0];
-                                            const roundTag = firstMatch?.round_tag || firstMatch?.round || (firstMatch?.round_number ? `${firstMatch.round_number}-tur` : '');
+                                            const roundTag = formatRoundName(firstMatch);
                                             const titleText = roundTag ? `${group.leagueName.toUpperCase()} (${roundTag})` : group.leagueName.toUpperCase();
 
                                             return (
-                                            <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
-                                                <View style={styles.sectionHeader}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                        <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                            {titleText}
-                                                        </Text>
+                                                <View key={`finished_${group.leagueId || groupIdx}`} style={styles.sectionContainer}>
+                                                    <View style={styles.sectionHeader}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                                                            <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                                {titleText}
+                                                            </Text>
+                                                        </View>
+                                                        <TouchableOpacity
+                                                            onPress={() => {
+                                                                navigation.navigate('TournamentDetail', {
+                                                                    tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
+                                                                    tournamentName: group.leagueName,
+                                                                    initialTab: 'matches',
+                                                                    tab: 'matches'
+                                                                });
+                                                            }}
+                                                            activeOpacity={0.75}
+                                                        >
+                                                            <Text style={styles.viewAllText}>
+                                                                {t('common.details', 'BATAFSIL').toUpperCase()}
+                                                            </Text>
+                                                        </TouchableOpacity>
                                                     </View>
-                                                    <TouchableOpacity
-                                                        onPress={() => {
-                                                            navigation.navigate('TournamentDetail', {
-                                                                tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
-                                                                tournamentName: group.leagueName,
-                                                                initialTab: 'matches',
-                                                                tab: 'matches'
-                                                            });
-                                                        }}
-                                                        activeOpacity={0.75}
-                                                    >
-                                                        <Text style={styles.viewAllText}>
-                                                            {t('common.details', 'BATAFSIL').toUpperCase()}
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                </View>
 
-                                                <View style={styles.verticalMatchList}>
-                                                    {group.matches.map((m: any) => renderMatchCard(m, false, true))}
+                                                    <View style={styles.verticalMatchList}>
+                                                        {group.matches.map((m: any) => renderMatchCard(m, false, true))}
+                                                    </View>
                                                 </View>
-                                            </View>
                                             );
                                         })
                                     )}
-                                </>
-                            ) : groupedFinishedMatches.length > 0 ? (
-                                /* 3. PRIORITY: RECENT RESULTS (No Live, No Upcoming) */
-                                groupedFinishedMatches.map((group: any, groupIdx: number) => {
-                                    const firstMatch = group.matches?.[0];
-                                    const roundTag = firstMatch?.round_tag || firstMatch?.round || (firstMatch?.round_number ? `${firstMatch.round_number}-tur` : '');
-                                    const titleText = roundTag ? `${group.leagueName.toUpperCase()} (${roundTag})` : group.leagueName.toUpperCase();
 
-                                    return (
-                                    <View key={group.leagueId || groupIdx} style={styles.sectionContainer}>
-                                        <View style={styles.sectionHeader}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                    {titleText}
-                                                </Text>
+                                    {/* 4. HECH QANDAY O'YIN MAVJUD BO'LMASA */}
+                                    {liveMatches.length === 0 && groupedUpcomingMatches.length === 0 && groupedFinishedMatches.length === 0 && (
+                                        <View style={styles.sectionContainer}>
+                                            <View style={styles.emptyCard}>
+                                                <Ionicons name="football-outline" size={36} color={Colors.textMuted} />
+                                                <Text style={styles.emptyText}>{t('home.no_matches', 'Hozircha o\'yinlar mavjud emas')}</Text>
                                             </View>
-                                            <TouchableOpacity
-                                                onPress={() => {
-                                                    navigation.navigate('TournamentDetail', {
-                                                        tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
-                                                        tournamentName: group.leagueName,
-                                                        initialTab: 'matches',
-                                                        tab: 'matches'
-                                                    });
-                                                }}
-                                                activeOpacity={0.75}
-                                            >
-                                                <Text style={styles.viewAllText}>
-                                                    {t('common.details', 'BATAFSIL').toUpperCase()}
-                                                </Text>
-                                            </TouchableOpacity>
                                         </View>
-
-                                        <View style={styles.verticalMatchList}>
-                                            {group.matches.map((m: any) => renderMatchCard(m, false, true))}
-                                        </View>
-                                    </View>
-                                    );
-                                })
-                            ) : (
-                                /* 4. NO MATCHES AT ALL */
-                                <View style={styles.sectionContainer}>
-                                    <View style={styles.emptyCard}>
-                                        <Ionicons name="football-outline" size={36} color={Colors.textMuted} />
-                                        <Text style={styles.emptyText}>{t('home.no_matches', 'Hozircha o\'yinlar mavjud emas')}</Text>
-                                    </View>
-                                </View>
+                                    )}
+                                </>
                             )}
                         </>
                     )}
@@ -967,6 +1144,18 @@ export default function HomeScreen({ navigation }: any) {
                     onClose={() => setStoryModalVisible(false)}
                     onNavigateMatch={handleNavigateMatchFromStory}
                     onStoryGroupViewed={handleStoryGroupViewed}
+                    onStoryAdded={handleStoryAdded}
+                />
+
+                {/* Story qo'shish/tanlash — Home ekrandagi bo'sh "+" halqasi bosilganda ochiladi */}
+                <TeamStoryReplayPickerModal
+                    visible={storyPickerVisible}
+                    teamId={ownTeamId}
+                    teamName={storyGroups.find(g => g.isOwn)?.title || userProfile?.name || userProfile?.team_name}
+                    selectedByPhone={user?.phone || user?.phoneNumber || user?.phone_number || user?.tel}
+                    activeReplayEventIds={(storyGroups.find(g => g.isOwn)?.items || []).map(i => i.eventId).filter(Boolean) as any[]}
+                    onClose={() => setStoryPickerVisible(false)}
+                    onAdded={handleStoryAdded}
                 />
             </SafeAreaView>
         </View>
@@ -986,6 +1175,12 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         marginBottom: 10,
         marginTop: 5,
+    },
+    // Avatar (jamoa logotipi) ko'rsatilmaganda header bilan story tray
+    // orasidagi bo'sh joy ortiqcha ochiq ko'rinmasligi uchun torroq qilingan.
+    headerCompact: {
+        marginBottom: 2,
+        paddingVertical: 6,
     },
     welcomeText: {
         color: 'rgba(255, 255, 255, 0.5)',
@@ -1267,28 +1462,11 @@ const styles = StyleSheet.create({
     },
     hMatchCard: {
         width: CARD_WIDTH,
-        borderRadius: 20,
         overflow: 'hidden',
-        // backgroundColor inline orqali homeColors.background qo'yiladi
-        // Neytral qora soya (rangli soya taqiqlangan)
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 3,
     },
     vMatchCard: {
         width: width - 40,
-        borderRadius: 20,
         overflow: 'hidden',
-        marginBottom: 6,
-        // backgroundColor inline orqali homeColors.background qo'yiladi
-        // Neytral qora soya (rangli soya taqiqlangan)
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 3,
     },
 
     hMatchCardWrapper: {

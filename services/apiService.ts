@@ -646,30 +646,24 @@ export const apiService = {
     updateFormation: async (id: string, formationData: any) => {
         try {
             if (!id) return { success: false };
-            
-            const { data, error } = await supabase
-                .from('teams')
-                .update({ formation: formationData })
-                .eq('id', id)
-                .select();
+
+            // teams jadvalida anon rol uchun UPDATE ruxsati yo'q (faqat "formation"
+            // ustunini yangilaydigan SECURITY DEFINER funksiya orqali saqlanadi —
+            // supabase_update_team_formation.sql ga qarang).
+            const { error } = await supabase.rpc('update_team_formation', {
+                p_team_id: id,
+                p_formation: formationData,
+            });
 
             if (error) {
-                console.error('updateFormation error:', error);
+                console.error('updateFormation RPC error:', error);
                 return { success: false, error };
             }
 
-            if (!data || data.length === 0) {
-                console.warn('updateFormation: 0 rows updated, RLS may be blocking update.');
-                await supabase
-                    .from('teams')
-                    .update({ telegram_message_id: 'FORMATION_' + JSON.stringify(formationData) })
-                    .eq('id', id);
-            }
-
-            return { success: true, data };
+            return { success: true };
         } catch (err) {
             console.error('updateFormation catch error:', err);
-            return { success: false };
+            return { success: false, error: err };
         }
     },
 
@@ -1007,6 +1001,10 @@ export const apiService = {
                 }
             }
 
+            if (params?.teamId) {
+                query = query.or(`home_team_id.eq.${params.teamId},away_team_id.eq.${params.teamId}`);
+            }
+
             const { data: matchesData, error: mErr } = await query;
 
             if (mErr || !matchesData) throw mErr;
@@ -1152,11 +1150,13 @@ export const apiService = {
                     Math.abs((ae.minute || 0) - (e.minute || 0)) <= 1
                 );
 
+                // FAQAT bazadagi haqiqiy bog'langan video (replay_video_url/video_url) ishlatiladi.
+                // ESKI KOD storageReplays'dan "idx % length" orqali TASODIFIY klipni har qanday
+                // golga bog'lardi — bu goldan boshqa golga bir xil video takrorlanishi (video ko'p
+                // ko'rinishi) va noto'g'ri gol muallifi/vaqt bilan ko'rsatilishi (muallif yo'q) kabi
+                // xatolarga sabab bo'lgan. Haqiqiy bog'lanmagan storage fayllar pastda alohida,
+                // "Boshqa video parchalari" sifatida (o'z gol muallifisiz) ko'rsatiladi.
                 let videoUrl = e.replay_video_url || e.video_url || null;
-                // If replay_video_url is missing but storageReplays has a video file, fallback to it
-                if (!videoUrl && normalizedType === 'goal' && storageReplays.length > 0) {
-                    videoUrl = storageReplays[idx % storageReplays.length]?.publicUrl || storageReplays[0]?.publicUrl;
-                }
 
                 return {
                     id: e.id,
@@ -1239,6 +1239,214 @@ export const apiService = {
         } catch (err) {
             console.warn('getMatchById fallback:', err);
             return api.get(`/matches/${id}`).then(res => res.data.data).catch(() => null);
+        }
+    },
+
+    // Bosh sahifa "jamoa replay" story'lari uchun: berilgan match_id'lar ichidan
+    // replay videosi bor gol voqealarini oladi. Faqat kerakli ustunlar so'raladi
+    // va faqat berilgan (chegaralangan) match_id ro'yxati bo'yicha — butun
+    // match_events jadvaliga emas.
+    getTeamGoalReplays: async (matchIds: Array<string | number>) => {
+        if (!matchIds || matchIds.length === 0) return [];
+        try {
+            const { data, error } = await supabase
+                .from('match_events')
+                .select('id, match_id, team_id, minute, event_type, replay_video_url, created_at')
+                .in('match_id', matchIds)
+                .order('created_at', { ascending: false });
+
+            if (error) console.warn('getTeamGoalReplays query error:', error.message || error);
+            if (error || !data) return [];
+
+            return data.filter((e: any) => e.replay_video_url && e.event_type !== 'yellow_card' && e.event_type !== 'red_card');
+        } catch (err) {
+            console.warn('getTeamGoalReplays error:', err);
+            return [];
+        }
+    },
+
+    // --- Team Story Replay: jamoaning mavjud (allaqachon bazadagi) replaylaridan
+    // treneri/rahbari birini "story" sifatida tanlaydi. Yangi video yuklanmaydi,
+    // faqat mavjud match_events'dagi replayga havola saqlanadi.
+    // v2 (ko'p-storyli, Instagram-uslubida): bitta jamoa bir vaqtning o'zida bir
+    // nechta faol story'ga ega bo'lishi mumkin, har biri yaratilgandan 48 soat o'tgach
+    // avtomatik "eskiradi" (team_story_replays.id PRIMARY KEY,
+    // UNIQUE(team_id, match_event_id), expires_at). Xuddi shu replay qayta tanlansa —
+    // upsert shu yozuvning expires_at'ini yangilaydi (xato bermaydi, duplikat yaratmaydi).
+
+    // Jamoaning story uchun tanlash mumkin bo'lgan mavjud gol-replaylari
+    getTeamAvailableReplays: async (teamId: string) => {
+        if (!teamId) return [];
+        try {
+            const { data, error } = await supabase
+                .from('match_events')
+                .select('id, match_id, team_id, minute, event_type, replay_video_url, created_at')
+                .eq('team_id', teamId)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            if (error) console.warn('getTeamAvailableReplays query error:', error.message || error);
+            if (error || !data) return [];
+
+            return data.filter((e: any) => e.replay_video_url && e.event_type !== 'yellow_card' && e.event_type !== 'red_card');
+        } catch (err) {
+            console.warn('getTeamAvailableReplays error:', err);
+            return [];
+        }
+    },
+
+    // Trener/rahbar mavjud replaylardan birini jamoa story'si sifatida qo'shadi.
+    // ESKI (eng yangi bittasi bilan almashtirish) EMAS — endi mavjud storylar
+    // yonига YANGI story sifatida QO'SHADI (UNIQUE(team_id, match_event_id) tufayli
+    // xuddi shu replay qayta tanlansa, xatolik bermay, o'sha yozuvning muddatini
+    // 48 soatga yangilaydi).
+    setTeamStoryReplay: async (teamId: string, matchEventId: string, selectedByPhone?: string) => {
+        if (!teamId || !matchEventId) return { success: false, error: "team yoki replay tanlanmagan" };
+        try {
+            const nowIso = new Date().toISOString();
+            const expiresAtIso = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+            const { data, error } = await supabase
+                .from('team_story_replays')
+                .upsert(
+                    {
+                        team_id: teamId,
+                        match_event_id: matchEventId,
+                        selected_by_phone: selectedByPhone || null,
+                        created_at: nowIso,
+                        expires_at: expiresAtIso,
+                    },
+                    { onConflict: 'team_id,match_event_id' }
+                )
+                .select()
+                .single();
+
+            if (error) {
+                console.warn('setTeamStoryReplay error:', error);
+                return { success: false, error: error.message };
+            }
+            return { success: true, data };
+        } catch (err: any) {
+            console.warn('setTeamStoryReplay error:', err);
+            return { success: false, error: err?.message || 'Xatolik yuz berdi' };
+        }
+    },
+
+    // Jamoaning HOZIRGI FAOL (muddati o'tmagan, expires_at > now()) barcha
+    // story-replaylari — eng yangisi birinchi. Ko'p-storyli UI (keyingi bosqich)
+    // shu funksiyadan foydalanadi.
+    getTeamStoryReplays: async (teamId: string) => {
+        if (!teamId) return [];
+        try {
+            const { data, error } = await supabase
+                .from('team_story_replays')
+                .select('id, team_id, match_event_id, created_at, expires_at, match_events(id, match_id, team_id, minute, replay_video_url)')
+                .eq('team_id', teamId)
+                .gt('expires_at', new Date().toISOString())
+                .order('created_at', { ascending: false });
+
+            if (error) console.warn('getTeamStoryReplays query error:', error.message || error);
+            if (error || !data) return [];
+            return data;
+        } catch (err) {
+            console.warn('getTeamStoryReplays error:', err);
+            return [];
+        }
+    },
+
+    // ORQAGA MOSLIK UCHUN: jamoaning eng yangi faol story'si (bitta yoki null).
+    // Hozirgi MyTeam/TeamProfile ekranlari hali shu "bitta story" ko'rinishi bilan
+    // ishlaydi — ular keyingi bosqichda to'g'ridan-to'g'ri getTeamStoryReplays()
+    // (ko'plik) ga o'tkaziladi.
+    getTeamStoryReplay: async (teamId: string) => {
+        const list = await apiService.getTeamStoryReplays(teamId);
+        return list.length > 0 ? list[0] : null;
+    },
+
+    // Home screen story tray uchun: barcha jamoalarning HOZIRGI FAOL (muddati
+    // o'tmagan) story-replaylari. Bitta jamoada bir nechta faol story bo'lishi
+    // mumkin — UI bularni team_id bo'yicha guruhlab ko'rsatishi kerak.
+    getAllTeamStoryReplays: async () => {
+        try {
+            const { data, error } = await supabase
+                .from('team_story_replays')
+                .select('id, team_id, match_event_id, created_at, expires_at, match_events(id, match_id, team_id, minute, replay_video_url)')
+                .gt('expires_at', new Date().toISOString())
+                .order('created_at', { ascending: false });
+
+            if (error || !data) return [];
+            return data;
+        } catch (err) {
+            console.warn('getAllTeamStoryReplays error:', err);
+            return [];
+        }
+    },
+
+    // Story replay to'liq ko'rinishi uchun: video + o'yin konteksti (raqib, hisob, gol muallifi, tur, liga).
+    // matchEventId berilmasa — jamoaning eng yangi faol story'si olinadi (orqaga
+    // moslik, hozirgi bitta-story UI uchun). Ko'p-storyli viewer (keyingi bosqich)
+    // aniq matchEventId uzatib, xohlagan story'sining tafsilotini so'raydi.
+    getTeamStoryReplayDetail: async (teamId: string, matchEventId?: string) => {
+        if (!teamId) return null;
+        try {
+            let targetMatchEventId = matchEventId;
+            if (!targetMatchEventId) {
+                const storyRef: any = await apiService.getTeamStoryReplay(teamId);
+                if (!storyRef?.match_event_id) {
+                    console.warn('getTeamStoryReplayDetail: no active story for team', teamId);
+                    return null;
+                }
+                targetMatchEventId = storyRef.match_event_id;
+            }
+
+            const { data: ev, error: evErr } = await supabase
+                .from('match_events')
+                .select('id, match_id, team_id, minute, replay_video_url, player:player_id(first_name, last_name)')
+                .eq('id', targetMatchEventId)
+                .single();
+            if (evErr) console.warn('getTeamStoryReplayDetail event query error:', evErr.message || evErr);
+            if (evErr || !ev) return null;
+
+            const { data: match, error: matchErr } = await supabase
+                .from('matches')
+                .select('id, match_date, round, tour, league, home_team_id, away_team_id, home_score, away_score')
+                .eq('id', ev.match_id)
+                .single();
+            if (matchErr) console.warn('getTeamStoryReplayDetail match query error:', matchErr.message || matchErr);
+
+            let homeTeam: any = null;
+            let awayTeam: any = null;
+            if (match) {
+                const { data: teams, error: teamsErr } = await supabase
+                    .from('teams')
+                    .select('id, name, logo_url')
+                    .in('id', [match.home_team_id, match.away_team_id].filter(Boolean));
+                if (teamsErr) console.warn('getTeamStoryReplayDetail teams query error:', teamsErr.message || teamsErr);
+                homeTeam = (teams || []).find((t: any) => String(t.id) === String(match.home_team_id)) || null;
+                awayTeam = (teams || []).find((t: any) => String(t.id) === String(match.away_team_id)) || null;
+            }
+
+            const isHome = match ? String(ev.team_id) === String(match.home_team_id) : true;
+            const ownTeam = isHome ? homeTeam : awayTeam;
+            const opponentTeam = isHome ? awayTeam : homeTeam;
+            const player: any = ev.player;
+
+            return {
+                replayUrl: ev.replay_video_url,
+                minute: ev.minute,
+                scorerName: player ? `${player.first_name || ''} ${player.last_name || ''}`.trim() : null,
+                ownTeamName: ownTeam?.name || null,
+                ownTeamLogo: ownTeam?.logo_url || null,
+                opponentName: opponentTeam?.name || null,
+                opponentLogo: opponentTeam?.logo_url || null,
+                homeScore: match?.home_score ?? null,
+                awayScore: match?.away_score ?? null,
+                round: match?.round || match?.tour || null,
+                league: match?.league || null,
+                matchDate: match?.match_date || null,
+            };
+        } catch (err) {
+            console.warn('getTeamStoryReplayDetail error:', err);
+            return null;
         }
     },
 
