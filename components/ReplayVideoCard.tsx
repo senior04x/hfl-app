@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } fr
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useTranslation } from 'react-i18next';
 import Colors from '../constants/Colors';
 import { getCachedVideoUri } from '../utils/videoCache';
 
@@ -40,7 +39,6 @@ export default function ReplayVideoCard({
   onPlay,
   onPause
 }: ReplayVideoCardProps) {
-  const { t } = useTranslation();
   const cardId = id || videoUrl;
   const isCurrentActive = activePlayingId === cardId;
   const videoRef = useRef<Video>(null);
@@ -108,9 +106,7 @@ export default function ReplayVideoCard({
       <View style={styles.headerRow}>
         <View style={styles.badge}>
           <Ionicons name="football" size={14} color="#00FF66" />
-          <Text style={styles.badgeText}>
-            {minute ? t('replays.minute_goal_upper', '{{minute}}-DAQIQADA GOL', { minute }) : '20s REPLAY'}
-          </Text>
+          <Text style={styles.badgeText}>{minute ? `${minute}-DAQIQADA GOL` : '20s REPLAY'}</Text>
         </View>
 
         {teamName && (
@@ -154,16 +150,22 @@ export default function ReplayVideoCard({
         {/* Scorer Info with Player Avatar Photo (No Ball Icon) */}
         <View style={styles.detailRow}>
           <View style={styles.playerPhotoCircle}>
-            <Image 
-              source={getPlayerPhotoSource(scorerPhoto)} 
-              style={styles.playerAvatarImage} 
+            <Image
+              source={getPlayerPhotoSource(scorerName ? scorerPhoto : (scorerPhoto || teamLogo))}
+              style={styles.playerAvatarImage}
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.detailLabel}>{t('replays.goal_scorer', 'GOL MUALLIFI')}</Text>
-            <Text style={styles.detailValue}>{scorerName ? scorerName.toUpperCase() : t('replays.unknown_player', "NOMA'LUM FUTBOLCHI")}</Text>
+            {/* O'yinchisiz (jersey raqamsiz o'ynagan futbolchi uchun) qo'shilgan
+                "jamoa goli" — bunday holatda muallif ko'rsatilmaydi, buning o'rniga
+                "JAMOA GOLI" va jamoa nomi ko'rsatiladi (avval "NOMA'LUM FUTBOLCHI"
+                deb chiqib, xatodek ko'rinar edi). */}
+            <Text style={styles.detailLabel}>{scorerName ? 'GOL MUALLIFI' : 'JAMOA GOLI'}</Text>
+            <Text style={styles.detailValue}>
+              {scorerName ? scorerName.toUpperCase() : (teamName ? teamName.toUpperCase() : 'JAMOA GOLI')}
+            </Text>
           </View>
-          {minute ? <Text style={styles.minuteBadge}>{minute}-{t('common.minute_short', 'daq.')}</Text> : null}
+          {minute ? <Text style={styles.minuteBadge}>{minute}-daqiqa</Text> : null}
         </View>
 
         {/* Assistant Info with Player Avatar Photo (No Ball Icon) */}
@@ -176,7 +178,7 @@ export default function ReplayVideoCard({
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.detailLabel}>{t('replays.assistant', 'ASSISTENT (UZATMALAR)')}</Text>
+              <Text style={styles.detailLabel}>ASSISTENT (UZATMALAR)</Text>
               <Text style={styles.detailValueAssist}>{assistantName.toUpperCase()}</Text>
             </View>
           </View>
