@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import Colors from '../constants/Colors';
@@ -158,6 +159,8 @@ export default function TeamProfileScreen({ route, navigation }: any) {
         extrapolate: 'clamp',
     });
 
+    const getTeamCacheKey = (tId: string) => `@amatora_team_cache_${tId}`;
+
     const fetchData = async () => {
         const currentId = activeTeamId;
         if (!currentId) {
@@ -167,18 +170,47 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             return;
         }
 
-        // 1. HERO QISMI: Jamoa ma'lumotlarini birinchi tezkor yuklash
+        // 0. INSTANT CACHE LOAD: Keshdan jamoa ma'lumotlarini darhol o'qish (0ms)
+        try {
+            const cachedStr = await AsyncStorage.getItem(getTeamCacheKey(currentId));
+            if (cachedStr) {
+                const cached = JSON.parse(cachedStr);
+                if (cached.team) {
+                    setTeam(cached.team);
+                    setIsLoading(false);
+                }
+                if (cached.players && Array.isArray(cached.players) && cached.players.length > 0) {
+                    setPlayers(cached.players);
+                    setIsPlayersLoading(false);
+                }
+                if (cached.matches && Array.isArray(cached.matches)) {
+                    setMatches(cached.matches);
+                    setIsMatchesLoading(false);
+                }
+            }
+        } catch (e) {
+            console.log('TeamProfile cache read error:', e);
+        }
+
+        // 1-BOSQICH (HERO QISMI): Jamoa ma'lumotlarini birinchi tezkor yuklash
         if (!team) setIsLoading(true);
         apiService.getTeamById(currentId)
             .then((teamData) => {
-                if (teamData) setTeam(teamData);
+                if (teamData) {
+                    setTeam(teamData);
+                    // Keshga saqlash
+                    AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
+                        const existing = cStr ? JSON.parse(cStr) : {};
+                        AsyncStorage.setItem(getTeamCacheKey(currentId), JSON.stringify({ ...existing, team: teamData })).catch(() => {});
+                    }).catch(() => {});
+                }
             })
             .catch((err) => console.log('TeamProfileScreen team fetch error:', err))
             .finally(() => {
                 setIsLoading(false);
             });
 
-        // 2. TABLAR: Tarkib va o'yinlar ma'lumotlarini fonda parallel yuklash
+        // 2-BOSQICH (TABLAR): Tarkib va o'yinlar ma'lumotlarini fonda parallel yuklash
         setIsPlayersLoading(true);
         setIsMatchesLoading(true);
 
@@ -190,6 +222,11 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                     return !isArchived && st === 'approved';
                 });
                 setPlayers(activeTeamPlayers);
+                // Keshga saqlash
+                AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
+                    const existing = cStr ? JSON.parse(cStr) : {};
+                    AsyncStorage.setItem(getTeamCacheKey(currentId), JSON.stringify({ ...existing, players: activeTeamPlayers })).catch(() => {});
+                }).catch(() => {});
             })
             .catch(() => {})
             .finally(() => {
@@ -198,7 +235,13 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
         apiService.getMatches({ teamId: currentId })
             .then((matchesData) => {
-                setMatches(matchesData?.slice(0, 8) || []);
+                const sliced = matchesData?.slice(0, 8) || [];
+                setMatches(sliced);
+                // Keshga saqlash
+                AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
+                    const existing = cStr ? JSON.parse(cStr) : {};
+                    AsyncStorage.setItem(getTeamCacheKey(currentId), JSON.stringify({ ...existing, matches: sliced })).catch(() => {});
+                }).catch(() => {});
             })
             .catch(() => {})
             .finally(() => {
