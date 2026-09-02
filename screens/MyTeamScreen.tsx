@@ -36,6 +36,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { useSocket } from '../context/SocketContext';
+import { getLocalizedPosition } from '../utils/localizationUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -81,7 +82,11 @@ export default function MyTeamScreen({ route, navigation }: any) {
     // ScrollView'da yon-yonma joylashadi — swipe'ni yarim ushlab tursa
     // ikkala tab bir vaqtda yarim ko'rinadi (single-panel translateX emas).
     const tabs: ('squad' | 'tactics' | 'matches')[] = ['squad', 'tactics', 'matches'];
-    const TAB_LABELS: Record<string, string> = { squad: 'TARKIB', tactics: 'TAKTIKA', matches: "O'YINLAR" };
+    const TAB_LABELS: Record<string, string> = {
+        squad: t('teams.squad', 'TARKIB').toUpperCase(),
+        tactics: t('teams.tactics', 'TAKTIKA').toUpperCase(),
+        matches: t('teams.matches', "O'YINLAR").toUpperCase()
+    };
     const [currentTabIndex, setCurrentTabIndex] = useState(0);
     const currentTabIndexRef = useRef(0);
     const scrollXPager = useRef(new Animated.Value(0)).current;
@@ -276,9 +281,9 @@ export default function MyTeamScreen({ route, navigation }: any) {
 
     // Faqat bazada real qiymati bor rahbariyat qatorlari ko'rsatiladi (bo'sh joy qoldirilmaydi)
     const leadershipRows = [
-        { icon: 'ribbon-outline', label: 'Sardor', name: team?.captain_name, phone: team?.captain_phone },
-        { icon: 'clipboard-outline', label: 'Murabbiy', name: team?.coach_name, phone: team?.coach_phone },
-        { icon: 'briefcase-outline', label: 'Rahbar', name: team?.president_name, phone: team?.president_phone },
+        { icon: 'ribbon-outline', label: t('teams.captain', 'Sardor'), name: team?.captain_name, phone: team?.captain_phone },
+        { icon: 'clipboard-outline', label: t('teams.coach', 'Murabbiy'), name: team?.coach_name, phone: team?.coach_phone },
+        { icon: 'briefcase-outline', label: t('teams.president', 'Rahbar'), name: team?.president_name, phone: team?.president_phone },
     ].filter((row) => !!row.name);
 
     const hasStats = team?.stats && team.stats.played > 0;
@@ -361,7 +366,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
 
                     <View style={{ flex: 1, paddingTop: 2 }}>
                         <Text style={[styles.teamNameSm, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                            {(team?.name || 'JAMOA').toUpperCase()}
+                            {(team?.name || t('teams.team_fallback', 'JAMOA')).toUpperCase()}
                         </Text>
                         {!!team?.league && (
                             <Text style={[styles.teamLeague, { color: homeColors.textSecondary }]} numberOfLines={1}>
@@ -401,23 +406,23 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                 <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
                                 <View style={styles.infoStat}>
                                     <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{team.stats.played}</Text>
-                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>O'YIN</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('teams.games_short', "O'YIN")}</Text>
                                 </View>
                                 <View style={styles.infoStat}>
                                     <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{team.stats.won}</Text>
-                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>G'.</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('teams.won_short', "G'.")}</Text>
                                 </View>
                                 <View style={styles.infoStat}>
                                     <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{team.stats.drawn}</Text>
-                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>D.</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('teams.drawn_short', "D.")}</Text>
                                 </View>
                                 <View style={styles.infoStat}>
                                     <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{team.stats.lost}</Text>
-                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>M.</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('teams.lost_short', "M.")}</Text>
                                 </View>
                                 <View style={styles.infoStat}>
                                     <Text style={[styles.infoStatValue, { color: homeColors.accent }]}>{team.stats.points}</Text>
-                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>OCHKO</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('teams.pts_short', 'OCHKO')}</Text>
                                 </View>
                             </>
                         )}
@@ -529,7 +534,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                     <Text style={[styles.playerCardLastName, { color: homeColors.textPrimary }]} numberOfLines={1}>
                                                         {(player.lastName || player.last_name || '').toUpperCase()}
                                                     </Text>
-                                                    <Text style={[styles.playerCardPosition, { color: homeColors.textSecondary }]}>{Translations.translatePosition(player.position || "O'yinchi").toUpperCase()}</Text>
+                                                    <Text style={[styles.playerCardPosition, { color: homeColors.textSecondary }]}>{getLocalizedPosition(player.position, t).toUpperCase()}</Text>
                                                 </View>
                                             </TouchableOpacity>
                                             {/* PHONE — FAQAT SHU JAMOA MENEJERIGA */}
@@ -554,7 +559,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                             }}
                                                         >
                                                             <Ionicons name="call-outline" size={10} color={homeColors.accent} style={{ marginRight: 3 }} />
-                                                            <Text style={[styles.addPhoneBtnText, { color: homeColors.accent }]}>+ TEL</Text>
+                                                            <Text style={[styles.addPhoneBtnText, { color: homeColors.accent }]}>{t('teams.add_phone_short', '+ TEL')}</Text>
                                                         </TouchableOpacity>
                                                     )}
                                                 </View>
@@ -591,14 +596,14 @@ export default function MyTeamScreen({ route, navigation }: any) {
                             <View style={[styles.emptyState, cardSurface, { marginTop: 10 }]}>
                                 <Ionicons name="grid-outline" size={22} color={homeColors.textSecondary} />
                                 <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>
-                                    Sostav hali belgilanmagan
+                                    {t('teams.no_formation', 'Sostav hali belgilanmagan')}
                                 </Text>
                                 {canEdit && (
                                     <TouchableOpacity
                                         style={[styles.emptyStateBtn, { backgroundColor: homeColors.accent }]}
                                         onPress={() => navigation.navigate('FormationBoard', { teamId: activeTeamId })}
                                     >
-                                        <Text style={styles.emptyStateBtnText}>Sostavni tuzish</Text>
+                                        <Text style={styles.emptyStateBtnText}>{t('teams.create_formation', 'Sostavni tuzish')}</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -672,7 +677,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                 {/* CHAP: Uy jamoasi */}
                                                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 8 }}>
                                                     <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                                        {match.homeTeamName || match.homeTeam?.name || 'UY'}
+                                                        {match.homeTeamName || match.homeTeam?.name || t('matches.home_short', 'UY')}
                                                     </Text>
                                                     <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
                                                         <SmartImage
@@ -699,7 +704,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                             )}
                                                             {!!(match.round || match.tour) && (
                                                                 <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 2 }}>
-                                                                    {match.round || match.tour}-tur
+                                                                    {match.round || match.tour}-{t('teams.tour_short', 'tur')}
                                                                 </Text>
                                                             )}
                                                         </View>
@@ -713,7 +718,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                             </Text>
                                                             {!!(match.round || match.tour) && (
                                                                 <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 1 }}>
-                                                                    {match.round || match.tour}-tur
+                                                                    {match.round || match.tour}-{t('teams.tour_short', 'tur')}
                                                                 </Text>
                                                             )}
                                                         </View>
@@ -731,7 +736,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                         />
                                                     </View>
                                                     <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                                        {match.awayTeamName || match.awayTeam?.name || 'MEH'}
+                                                        {match.awayTeamName || match.awayTeam?.name || t('matches.away_short', 'MEH')}
                                                     </Text>
                                                 </View>
                                             </View>
@@ -742,7 +747,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                         ) : (
                             <View style={[styles.emptyState, cardSurface]}>
                                 <Ionicons name="football-outline" size={22} color={homeColors.textSecondary} />
-                                <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>O'yinlar tarixi mavjud emas</Text>
+                                <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>{t('teams.no_matches', "O'yinlar tarixi mavjud emas")}</Text>
                             </View>
                         )}
                     </ScrollView>
@@ -761,11 +766,11 @@ export default function MyTeamScreen({ route, navigation }: any) {
                     <View style={[styles.phoneModalCard, { backgroundColor: homeColors.background }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                             <Ionicons name="call" size={20} color={homeColors.accent} style={{ marginRight: 8 }} />
-                            <Text style={[styles.phoneModalTitle, { color: homeColors.textPrimary }]}>TEL RAQAM QO'SHISH</Text>
+                            <Text style={[styles.phoneModalTitle, { color: homeColors.textPrimary }]}>{t('teams.add_phone_title', "TEL RAQAM QO'SHISH")}</Text>
                         </View>
 
                         <Text style={[styles.phoneModalSub, { color: homeColors.textSecondary }]}>
-                            {(selectedPlayerForPhone?.firstName || selectedPlayerForPhone?.first_name || selectedPlayerForPhone?.name || "O'yinchi")} uchun 9 xonali telefon raqam:
+                            {t('teams.add_phone_sub', { name: selectedPlayerForPhone?.firstName || selectedPlayerForPhone?.first_name || selectedPlayerForPhone?.name || t('teams.player_fallback', "O'yinchi") })}
                         </Text>
 
                         <View style={[styles.phoneInputRow, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
@@ -795,12 +800,12 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                 disabled={savingPhone}
                                 onPress={async () => {
                                     if (!canEdit) {
-                                        Alert.alert('Ruxsat berilmadi', "Faqat o'z jamoangiz menejeri o'yinchilar telefon raqamini tahrirlay oladi!");
+                                        Alert.alert(t('common.error', 'Xato'), "Faqat o'z jamoangiz menejeri o'yinchilar telefon raqamini tahrirlay oladi!");
                                         setSelectedPlayerForPhone(null);
                                         return;
                                     }
                                     if (phoneInputText.length < 9) {
-                                        Alert.alert('Xato', 'Iltimos, 9 xonali telefon raqamini kiriting.');
+                                        Alert.alert(t('common.error', 'Xato'), t('teams.phone_length_error', 'Iltimos, 9 xonali telefon raqamini kiriting.'));
                                         return;
                                     }
                                     try {
@@ -812,12 +817,12 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                             setPlayers((prev: any[]) => prev.map((p: any) => (p.id === pId || p._id === pId) ? { ...p, phone: fullPhone } : p));
                                             setSelectedPlayerForPhone(null);
                                             setPhoneInputText('');
-                                            Alert.alert('Muvaffaqiyatli', 'Telefon raqami saqlandi!');
+                                            Alert.alert(t('common.success', 'Muvaffaqiyatli'), t('teams.phone_saved_success', 'Telefon raqami saqlandi!'));
                                         } else {
-                                            Alert.alert('Xato', res.error || 'Saqlashda xatolik');
+                                            Alert.alert(t('common.error', 'Xato'), res.error || 'Saqlashda xatolik');
                                         }
                                     } catch (err: any) {
-                                        Alert.alert('Xato', "Server bilan bog'lanishda xatolik");
+                                        Alert.alert(t('common.error', 'Xato'), "Server bilan bog'lanishda xatolik");
                                     } finally {
                                         setSavingPhone(false);
                                     }
