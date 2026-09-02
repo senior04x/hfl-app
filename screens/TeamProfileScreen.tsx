@@ -587,14 +587,14 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                             <View style={[styles.emptyState, cardSurface, { marginTop: 10 }]}>
                                 <Ionicons name="grid-outline" size={22} color={homeColors.textSecondary} />
                                 <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>
-                                    {t('teams.no_formation', 'Sostav hali belgilanmagan')}
+                                    {t('teams.no_formation', 'Tarkib hali belgilanmagan')}
                                 </Text>
                                 {canEdit && (
                                     <TouchableOpacity
                                         style={[styles.emptyStateBtn, { backgroundColor: homeColors.accent }]}
                                         onPress={() => navigation.navigate('FormationBoard', { teamId: activeTeamId })}
                                     >
-                                        <Text style={styles.emptyStateBtnText}>{t('teams.create_formation', 'Sostavni tuzish')}</Text>
+                                        <Text style={styles.emptyStateBtnText}>{t('teams.create_formation', 'Tarkibni tuzish')}</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
