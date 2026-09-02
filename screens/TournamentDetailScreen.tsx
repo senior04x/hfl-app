@@ -12,7 +12,9 @@ import {
     Linking,
     Animated,
     Dimensions,
-    Platform
+    Platform,
+    PanResponder,
+    StatusBar
 } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -64,6 +66,54 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const pagerRef = useRef<FlatList>(null);
     const scrollXPager = useRef(new Animated.Value(0)).current;
     const isTabPressRef = useRef(false);
+
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+
+    // 1-tabda (overview) turib o'ngga surilganda real-vaqtda interaktiv orqaga qaytish:
+    const swipeBackPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                if (activeTabRef.current !== 'overview') return false;
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > SCREEN_WIDTH * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: SCREEN_WIDTH,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            },
+            onPanResponderTerminationRequest: () => true,
+        })
+    ).current;
 
     // Sync if route params change or initialTab is passed
     useEffect(() => {
@@ -844,6 +894,82 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         return numMatch ? parseInt(numMatch[0], 10) : 0;
     };
 
+    const getShortFieldDisplay = (match: any): string => {
+        if (!match) return '1-M';
+        
+        const rawField = match.field_number || match.fieldNumber || match.pitch_number || match.pitchNumber || match.field || match.pitch || match.maydon;
+        if (rawField) {
+            const numMatch = String(rawField).match(/\d+/);
+            if (numMatch) return `${numMatch[0]}-M`;
+            if (typeof rawField === 'string' && rawField.trim().length <= 6) return rawField.trim().toUpperCase();
+        }
+
+        const venueStr = match.venue || match.location || match.stadium_name || match.stadium || '';
+        if (venueStr) {
+            const numMatch = String(venueStr).match(/\d+/);
+            if (numMatch) return `${numMatch[0]}-M`;
+            
+            const vLower = venueStr.toLowerCase();
+            if (vLower.includes('zal') || vLower.includes('indoor')) return 'ZAL';
+            if (vLower.includes('markaziy') || vLower.includes('central')) return '1-M';
+        }
+
+        return '1-M';
+    };
+
+    const getMatchFieldNum = (m: any): number => {
+        if (!m) return 999;
+        const raw = m.field_number || m.fieldNumber || m.pitch_number || m.pitchNumber || m.field || m.pitch || m.maydon;
+        if (raw !== undefined && raw !== null) {
+            const match = String(raw).match(/\d+/);
+            if (match) return parseInt(match[0], 10);
+        }
+        const venue = m.venue || m.location || m.stadium_name || m.stadium || '';
+        if (venue) {
+            const match = String(venue).match(/\d+/);
+            if (match) return parseInt(match[0], 10);
+        }
+        return 999;
+    };
+
+    const getMatchTimeInMinutes = (m: any): number => {
+        if (!m) return 0;
+        const rawTime = m.match_time || m.time || m.matchTime || m.scheduled_time || m.start_time;
+        if (rawTime && String(rawTime).includes(':')) {
+            const parts = String(rawTime).split(':');
+            const h = parseInt(parts[0], 10) || 0;
+            const min = parseInt(parts[1], 10) || 0;
+            return h * 60 + min;
+        }
+        const rawDate = m.date || m.scheduledAt || m.match_date;
+        if (rawDate) {
+            const d = new Date(rawDate);
+            if (!isNaN(d.getTime())) {
+                return d.getHours() * 60 + d.getMinutes();
+            }
+        }
+        return 18 * 60;
+    };
+
+    const compareMatchesByTimeAndField = (a: any, b: any): number => {
+        const timeA = getMatchTimeInMinutes(a);
+        const timeB = getMatchTimeInMinutes(b);
+
+        if (timeA !== timeB) {
+            return timeA - timeB;
+        }
+
+        const fieldA = getMatchFieldNum(a);
+        const fieldB = getMatchFieldNum(b);
+        if (fieldA !== fieldB) {
+            return fieldA - fieldB;
+        }
+
+        const dateA = new Date(a.date || a.scheduledAt || a.match_date || a.createdAt || 0).getTime();
+        const dateB = new Date(b.date || b.scheduledAt || b.match_date || b.createdAt || 0).getTime();
+        return dateA - dateB;
+    };
+
     const formatTourTitle = useCallback((rawTour: string): string => {
         const s = String(rawTour || '').trim();
         if (!s) return t('matches.round_tour', { round: 1 });
@@ -888,11 +1014,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
         return Object.values(groupsMap).map(group => ({
             ...group,
-            matches: group.matches.sort((a, b) => {
-                const dateA = new Date(a.date || a.match_date || a.createdAt || 0).getTime();
-                const dateB = new Date(b.date || b.match_date || b.createdAt || 0).getTime();
-                return dateA - dateB;
-            })
+            matches: group.matches.sort(compareMatchesByTimeAndField)
         })).sort((a, b) => {
             // Eng oxirgi (eng katta raqamli) tur eng boshida chiqsin
             if (a.tourNum > 0 && b.tourNum > 0) return b.tourNum - a.tourNum;
@@ -949,14 +1071,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             setActiveTab(tab);
             pagerRef.current?.scrollToOffset({ offset: idx * SCREEN_WIDTH, animated: false });
             requestAnimationFrame(() => { isTabPressRef.current = false; });
-        }
-    };
-
-    const handlePagerScroll = (e: any) => {
-        const offsetX = e.nativeEvent?.contentOffset?.x;
-        if (activeTabRef.current === 'overview' && typeof offsetX === 'number' && offsetX < -25 && !isExitingRef.current) {
-            isExitingRef.current = true;
-            navigation.goBack();
         }
     };
 
@@ -1566,16 +1680,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                             timeStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
                                         }
 
-                                        const rawDate = match.date || match.match_date;
-                                        const matchDate = new Date(rawDate);
-                                        const isValidDate = !isNaN(matchDate.getTime());
-                                        const months = [
-                                            'Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 
-                                            'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'
-                                        ];
-                                        const day = isValidDate ? matchDate.getDate() : '';
-                                        const month = isValidDate ? months[matchDate.getMonth()] : '';
-                                        const dateDisplay = isValidDate ? `${day} ${month}` : (match.date_str || '');
+                                        const fieldDisplay = getShortFieldDisplay(match);
 
                                         return (
                                             <TouchableOpacity
@@ -1642,9 +1747,9 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                                                 <Text style={{ fontSize: 15, fontWeight: '800', color: homeColors.textPrimary, letterSpacing: 0.5 }}>
                                                                     {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
                                                                 </Text>
-                                                                {dateDisplay ? (
+                                                                {fieldDisplay ? (
                                                                     <Text style={{ fontSize: 8.5, color: homeColors.textSecondary, marginTop: 1, fontWeight: '600' }}>
-                                                                        {dateDisplay}
+                                                                        {fieldDisplay}
                                                                     </Text>
                                                                 ) : null}
                                                             </View>
@@ -1653,9 +1758,9 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                                                 <Text style={{ fontSize: 14.5, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
                                                                     {timeStr || '18:00'}
                                                                 </Text>
-                                                                {dateDisplay ? (
+                                                                {fieldDisplay ? (
                                                                     <Text style={{ fontSize: 8.5, color: homeColors.textSecondary, marginTop: 1, fontWeight: '600' }}>
-                                                                        {dateDisplay}
+                                                                        {fieldDisplay}
                                                                     </Text>
                                                                 ) : null}
                                                             </View>
@@ -1717,51 +1822,78 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         { key: 'matches', render: renderMatches },
     ];
 
-    return (
-        <View style={[styles.container, { backgroundColor: homeColors.background }]}>
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
-                {renderHeader()}
-                {renderTabs()}
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, SCREEN_WIDTH * 0.8, SCREEN_WIDTH],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
 
-                {isLoading ? (
-                    <TournamentDetailSkeleton />
-                ) : (
-                    <FlatList
-                        ref={pagerRef}
-                        data={pagerPages}
-                        keyExtractor={(item) => item.key}
-                        horizontal
-                        pagingEnabled
-                        showsHorizontalScrollIndicator={false}
-                        bounces={true}
-                        alwaysBounceHorizontal={true}
-                        overScrollMode="always"
-                        onScroll={Animated.event(
-                            [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
-                            { useNativeDriver: false, listener: handlePagerScroll }
-                        )}
-                        scrollEventThrottle={16}
-                        onMomentumScrollEnd={onPagerMomentumEnd}
-                        onScrollEndDrag={(e) => {
-                            const offsetX = e.nativeEvent?.contentOffset?.x;
-                            if (activeTabRef.current === 'overview' && typeof offsetX === 'number' && offsetX < -20 && !isExitingRef.current) {
-                                isExitingRef.current = true;
-                                navigation.goBack();
-                            }
-                        }}
-                        getItemLayout={(_, index) => ({
-                            length: SCREEN_WIDTH,
-                            offset: SCREEN_WIDTH * index,
-                            index,
-                        })}
-                        renderItem={({ item }) => (
-                            <View style={{ width: SCREEN_WIDTH, flex: 1 }}>
-                                {item.render()}
-                            </View>
-                        )}
-                    />
-                )}
-            </SafeAreaView>
+    return (
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
+            />
+
+            <Animated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
+            >
+                <SafeAreaView style={styles.safeArea} edges={['top']}>
+                    {renderHeader()}
+                    {renderTabs()}
+
+                    {isLoading ? (
+                        <TournamentDetailSkeleton />
+                    ) : (
+                        <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                            <FlatList
+                                ref={pagerRef}
+                                data={pagerPages}
+                                keyExtractor={(item) => item.key}
+                                horizontal
+                                pagingEnabled
+                                showsHorizontalScrollIndicator={false}
+                                bounces={false}
+                                overScrollMode="never"
+                                onScroll={Animated.event(
+                                    [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
+                                    { useNativeDriver: false }
+                                )}
+                                scrollEventThrottle={16}
+                                onMomentumScrollEnd={onPagerMomentumEnd}
+                                getItemLayout={(_, index) => ({
+                                    length: SCREEN_WIDTH,
+                                    offset: SCREEN_WIDTH * index,
+                                    index,
+                                })}
+                                renderItem={({ item }) => (
+                                    <View style={{ width: SCREEN_WIDTH, flex: 1 }}>
+                                        {item.render()}
+                                    </View>
+                                )}
+                            />
+                        </View>
+                    )}
+                </SafeAreaView>
+            </Animated.View>
         </View>
     );
 }

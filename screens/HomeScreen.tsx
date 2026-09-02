@@ -756,7 +756,7 @@ export default function HomeScreen({ navigation }: any) {
                             },
                             matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                         ]}
-                        onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
+                        onPress={() => navigation.navigate('MatchDetail', { matchId: match._id || match.id, matchData: match })}
                         activeOpacity={0.85}
                     >
                         {cardContent}
@@ -800,7 +800,7 @@ export default function HomeScreen({ navigation }: any) {
                     },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
-                onPress={() => navigation.navigate('MatchDetail', { matchId: match._id })}
+                onPress={() => navigation.navigate('MatchDetail', { matchId: match._id || match.id, matchData: match })}
                 activeOpacity={0.85}
             >
                 {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}

@@ -959,28 +959,32 @@ export const apiService = {
 
     // Tournaments & Leagues
     getTournaments: async () => {
-        try {
-            const { data } = await supabase.from('leagues').select('*');
-            if (data && data.length > 0) return data;
-        } catch (e) {}
-        return [{ id: 'super', name: 'Super liga' }, { id: 'pro', name: 'Pro liga' }, { id: '3liga', name: '3-liga' }, { id: '7x7', name: '7x7 liga' }];
+        return getCachedData('tournaments_all', async () => {
+            try {
+                const { data } = await supabase.from('leagues').select('*');
+                if (data && data.length > 0) return data;
+            } catch (e) {}
+            return [{ id: 'super', name: 'Super liga' }, { id: 'pro', name: 'Pro liga' }, { id: '3liga', name: '3-liga' }, { id: '7x7', name: '7x7 liga' }];
+        });
     },
     getTournamentById: async (idOrName: string) => {
-        try {
-            if (!idOrName) return null;
-            // 1. Query leagues by ID
-            const { data: lById } = await supabase.from('leagues').select('*, organizations(*)').eq('id', idOrName).maybeSingle();
-            if (lById) return lById;
+        if (!idOrName) return null;
+        return getCachedData(`tournament_${idOrName}`, async () => {
+            try {
+                // 1. Query leagues by ID
+                const { data: lById } = await supabase.from('leagues').select('*, organizations(*)').eq('id', idOrName).maybeSingle();
+                if (lById) return lById;
 
-            // 2. Query leagues by Name
-            const { data: lByName } = await supabase.from('leagues').select('*, organizations(*)').ilike('name', `%${idOrName}%`).maybeSingle();
-            if (lByName) return lByName;
+                // 2. Query leagues by Name
+                const { data: lByName } = await supabase.from('leagues').select('*, organizations(*)').ilike('name', `%${idOrName}%`).maybeSingle();
+                if (lByName) return lByName;
 
-            return { id: idOrName, name: idOrName };
-        } catch (err) {
-            console.warn('getTournamentById error:', err);
-            return { id: idOrName, name: idOrName };
-        }
+                return { id: idOrName, name: idOrName };
+            } catch (err) {
+                console.warn('getTournamentById error:', err);
+                return { id: idOrName, name: idOrName };
+            }
+        });
     },
 
     // Matches (Direct from Supabase 'matches' table)
@@ -1097,45 +1101,30 @@ export const apiService = {
             const { data: m, error: mErr } = await supabase.from('matches').select('*').eq('id', id).single();
             if (mErr || !m) throw mErr;
 
-            const { data: teamsData } = await supabase.from('teams').select('*');
-            const teamsMap: Record<string, any> = {};
-            if (teamsData) {
-                teamsData.forEach((t: any) => {
-                    if (t.id) teamsMap[String(t.id)] = t;
-                    if (t._id) teamsMap[String(t._id)] = t;
-                });
-            }
+            const homeTeamId = String(m.home_team_id || m.homeTeamId || '');
+            const awayTeamId = String(m.away_team_id || m.awayTeamId || '');
+            const targetTeamIds = [homeTeamId, awayTeamId].filter(Boolean);
 
-            const homeTeam = teamsMap[String(m.home_team_id || m.homeTeamId || '')];
-            const awayTeam = teamsMap[String(m.away_team_id || m.awayTeamId || '')];
+            const [teamsRes, eventsRes] = await Promise.all([
+                targetTeamIds.length > 0 
+                    ? supabase.from('teams').select('*').in('id', targetTeamIds)
+                    : Promise.resolve({ data: [] }),
+                supabase.from('match_events').select('*, player:player_id(*)').eq('match_id', id)
+            ]);
+
+            const teamsData = teamsRes.data || [];
+            const teamsMap: Record<string, any> = {};
+            teamsData.forEach((t: any) => {
+                if (t.id) teamsMap[String(t.id)] = t;
+            });
+
+            const homeTeam = teamsMap[homeTeamId];
+            const awayTeam = teamsMap[awayTeamId];
 
             const orgId = m.organization_id || 1;
 
-            // Fetch storage files for fallback / supplemental media under replays/<org_id>/<match_id>/
-            let storageReplays: any[] = [];
-            try {
-                const { data: files } = await supabase.storage
-                    .from('replays')
-                    .list(`${orgId}/${id}`, { limit: 50, sortBy: { column: 'name', order: 'desc' } });
-
-                if (files && files.length > 0) {
-                    const baseUrl = "https://xzzyhfyazwohdqqbjiiy.supabase.co/storage/v1/object/public/replays";
-                    storageReplays = files
-                        .filter((f: any) => f.name && (f.name.endsWith('.mp4') || f.name.endsWith('.mkv') || f.name.endsWith('.mov')))
-                        .map((f: any) => ({
-                            id: f.id || f.name,
-                            name: f.name,
-                            publicUrl: `${baseUrl}/${orgId}/${id}/${f.name}`
-                        }));
-                }
-            } catch (sErr) {}
-
-            const { data: eventsData } = await supabase
-                .from('match_events')
-                .select('*, player:player_id(*)')
-                .eq('match_id', id);
-
-            const events = (eventsData || []).map((e: any, idx: number) => {
+            const eventsData = eventsRes.data || [];
+            const events = eventsData.map((e: any, idx: number) => {
                 const eType = String(e.event_type || e.type || '').toLowerCase();
                 let normalizedType = 'goal';
                 if (eType.includes('yellow')) normalizedType = 'yellowCard';
@@ -1144,18 +1133,12 @@ export const apiService = {
                 else if (eType.includes('goal')) normalizedType = 'goal';
 
                 // Look for assist event recorded for the same team at the same minute
-                const assistEvent = (eventsData || []).find((ae: any) => 
+                const assistEvent = eventsData.find((ae: any) => 
                     String(ae.event_type || '').toLowerCase().includes('assist') && 
                     String(ae.team_id) === String(e.team_id) && 
                     Math.abs((ae.minute || 0) - (e.minute || 0)) <= 1
                 );
 
-                // FAQAT bazadagi haqiqiy bog'langan video (replay_video_url/video_url) ishlatiladi.
-                // ESKI KOD storageReplays'dan "idx % length" orqali TASODIFIY klipni har qanday
-                // golga bog'lardi — bu goldan boshqa golga bir xil video takrorlanishi (video ko'p
-                // ko'rinishi) va noto'g'ri gol muallifi/vaqt bilan ko'rsatilishi (muallif yo'q) kabi
-                // xatolarga sabab bo'lgan. Haqiqiy bog'lanmagan storage fayllar pastda alohida,
-                // "Boshqa video parchalari" sifatida (o'z gol muallifisiz) ko'rsatiladi.
                 let videoUrl = e.replay_video_url || e.video_url || null;
 
                 return {
@@ -1202,16 +1185,6 @@ export const apiService = {
                 };
 
                 let form = extractForm(teamObj);
-                if (!form && teamObj.captain_phone && teamsData) {
-                    const cleanPhone = String(teamObj.captain_phone).replace(/\D/g, '').slice(-9);
-                    if (cleanPhone.length === 9) {
-                        const sibling = teamsData.find((t: any) => t.captain_phone && String(t.captain_phone).replace(/\D/g, '').slice(-9) === cleanPhone && extractForm(t));
-                        if (sibling) {
-                            form = extractForm(sibling);
-                        }
-                    }
-                }
-
                 return form || { players: [] };
             };
 
@@ -1229,16 +1202,18 @@ export const apiService = {
                 homeTeam: homeTeam ? { ...homeTeam, name: homeTeam.name, logo: homeTeam.logo_url || homeTeam.logo, formation: parseTeamFormation(homeTeam) } : { name: m.home_team_name, logo: m.home_team_logo, formation: { players: [] } },
                 awayTeam: awayTeam ? { ...awayTeam, name: awayTeam.name, logo: awayTeam.logo_url || awayTeam.logo, formation: parseTeamFormation(awayTeam) } : { name: m.away_team_name, logo: m.away_team_logo, formation: { players: [] } },
                 score: { home: m.home_score ?? 0, away: m.away_score ?? 0 },
+                home_score: m.home_score ?? 0,
+                away_score: m.away_score ?? 0,
                 match_time: m.match_time || m.time || '',
                 time: m.match_time || m.time || '',
                 tournamentName: m.league || 'HFL Liga',
-                venue: m.venue || m.location || m.stadium || '',
-                events,
-                storageReplays
+                venue: m.venue || m.location || m.stadium || 'Amatora Arena',
+                events: events,
+                storageReplays: []
             };
         } catch (err) {
-            console.warn('getMatchById fallback:', err);
-            return api.get(`/matches/${id}`).then(res => res.data.data).catch(() => null);
+            console.error('getMatchById error:', err);
+            return null;
         }
     },
 
@@ -1795,52 +1770,57 @@ export const apiService = {
 
     // News System (Supabase 'news' table)
     getNews: async (page = 1, limit = 40, category?: string) => {
-        try {
-            let query = supabase.from('news').select('*').order('created_at', { ascending: false });
-            if (category && category !== 'Barchasi') {
-                query = query.ilike('category', `%${category}%`);
-            }
-            const { data, error } = await query;
-            if (error) {
-                console.warn('getNews DB error:', error);
+        const cacheKey = `news_${page}_${limit}_${category || 'all'}`;
+        return getCachedData(cacheKey, async () => {
+            try {
+                let query = supabase.from('news').select('*').order('created_at', { ascending: false });
+                if (category && category !== 'Barchasi') {
+                    query = query.ilike('category', `%${category}%`);
+                }
+                const { data, error } = await query;
+                if (error) {
+                    console.warn('getNews DB error:', error);
+                    return [];
+                }
+                if (!data || data.length === 0) return [];
+
+                return data.map((n: any) => ({
+                    ...n,
+                    _id: n.id || n._id,
+                    id: n.id || n._id,
+                    title: n.title || 'Sarlavhasiz yangilik',
+                    content: n.content || n.body || '',
+                    category: n.category || 'O\'yinlar',
+                    imageUrl: n.image_url || n.imageUrl || 'https://images.unsplash.com/photo-1574629810360-7efbb6b6973f?q=80&w=1000',
+                    views: n.views || 0,
+                    createdAt: n.created_at || n.createdAt || new Date().toISOString()
+                }));
+            } catch (err) {
+                console.warn('getNews catch error:', err);
                 return [];
             }
-            if (!data || data.length === 0) return [];
-
-            return data.map((n: any) => ({
-                ...n,
-                _id: n.id || n._id,
-                id: n.id || n._id,
-                title: n.title || 'Sarlavhasiz yangilik',
-                content: n.content || n.body || '',
-                category: n.category || 'O\'yinlar',
-                imageUrl: n.image_url || n.imageUrl || 'https://images.unsplash.com/photo-1574629810360-7efbb6b6973f?q=80&w=1000',
-                views: n.views || 0,
-                createdAt: n.created_at || n.createdAt || new Date().toISOString()
-            }));
-        } catch (err) {
-            console.warn('getNews catch error:', err);
-            return [];
-        }
+        });
     },
 
     getNewsById: async (id: string) => {
-        try {
-            const { data, error } = await supabase.from('news').select('*').eq('id', id).single();
-            if (error || !data) return null;
-            return {
-                ...data,
-                _id: data.id,
-                title: data.title,
-                content: data.content,
-                category: data.category || "O'yinlar",
-                imageUrl: data.image_url || data.imageUrl,
-                views: data.views || 0,
-                createdAt: data.created_at || data.createdAt
-            };
-        } catch (e) {
-            return null;
-        }
+        return getCachedData(`news_${id}`, async () => {
+            try {
+                const { data, error } = await supabase.from('news').select('*').eq('id', id).single();
+                if (error || !data) return null;
+                return {
+                    ...data,
+                    _id: data.id,
+                    title: data.title,
+                    content: data.content,
+                    category: data.category || "O'yinlar",
+                    imageUrl: data.image_url || data.imageUrl,
+                    views: data.views || 0,
+                    createdAt: data.created_at || data.createdAt
+                };
+            } catch (e) {
+                return null;
+            }
+        });
     },
 
     createNews: async (newsData: any) => {
