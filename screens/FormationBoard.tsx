@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService, supabase } from '../services/apiService';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import SmartImage from '../components/SmartImage';
@@ -135,34 +136,65 @@ export default function FormationBoard({ route, navigation }: any) {
         }
     }, [teamId, user, socket]);
 
+    const getFormationCacheKey = (tId: string) => `@amatora_formation_cache_${tId}`;
+
     const fetchData = async () => {
-        try {
-            setLoading(true);
-            let targetTeamId = teamId || user?.team_id || user?.teamId;
+        let targetTeamId = teamId || user?.team_id || user?.teamId;
 
-            if (!targetTeamId && user) {
-                const phoneVal = user.phone || user.captain_phone;
-                if (phoneVal) {
-                    const cleanPhone = String(phoneVal).replace(/\D/g, '').slice(-9);
-                    const { data: teamRow } = await supabase
-                        .from('teams')
-                        .select('id')
-                        .ilike('captain_phone', `%${cleanPhone}%`)
+        if (!targetTeamId && user) {
+            const phoneVal = user.phone || user.captain_phone;
+            if (phoneVal) {
+                const cleanPhone = String(phoneVal).replace(/\D/g, '').slice(-9);
+                const { data: teamRow } = await supabase
+                    .from('teams')
+                    .select('id')
+                    .ilike('captain_phone', `%${cleanPhone}%`)
+                    .limit(1);
+
+                if (teamRow && teamRow.length > 0) {
+                    targetTeamId = teamRow[0].id;
+                } else {
+                    const { data: appRow } = await supabase
+                        .from('applications')
+                        .select('team_id')
+                        .ilike('phone', `%${cleanPhone}%`)
                         .limit(1);
-
-                    if (teamRow && teamRow.length > 0) {
-                        targetTeamId = teamRow[0].id;
-                    } else {
-                        const { data: appRow } = await supabase
-                            .from('applications')
-                            .select('team_id')
-                            .ilike('phone', `%${cleanPhone}%`)
-                            .limit(1);
-                        if (appRow && appRow.length > 0) {
-                            targetTeamId = appRow[0].team_id;
-                        }
+                    if (appRow && appRow.length > 0) {
+                        targetTeamId = appRow[0].team_id;
                     }
                 }
+            }
+        }
+
+        // 1. TEZKOR KESHNI O'QISH (Instant Cache Load)
+        if (targetTeamId) {
+            try {
+                const cachedStr = await AsyncStorage.getItem(getFormationCacheKey(targetTeamId));
+                if (cachedStr) {
+                    const cached = JSON.parse(cachedStr);
+                    if (cached.players && Array.isArray(cached.players)) {
+                        setPlayersOnPitch(cached.players);
+                    }
+                    if (cached.availablePlayers && Array.isArray(cached.availablePlayers)) {
+                        setAvailablePlayers(cached.availablePlayers);
+                    }
+                    if (cached.format) {
+                        setSelectedFormat(cached.format);
+                    }
+                    if (cached.presetId) {
+                        setSelectedPresetId(cached.presetId);
+                    }
+                    // Kesh topilganda yuklash indikatorini darhol o'chirish
+                    setLoading(false);
+                }
+            } catch (e) {
+                console.log('Formation cache read error:', e);
+            }
+        }
+
+        try {
+            if (!playersOnPitch || playersOnPitch.length === 0) {
+                setLoading(true);
             }
 
             let teamPlayers: any[] = [];
@@ -185,24 +217,35 @@ export default function FormationBoard({ route, navigation }: any) {
 
             setAvailablePlayers(activeTeamPlayers);
 
+            let detectedFormat: MatchFormat = '8v8';
+            let detectedPresetId = '8v8_2-3-2';
+
             // Auto-detect best format based on player count if not set
             if (activeTeamPlayers.length <= 6 && activeTeamPlayers.length > 0) {
-                setSelectedFormat('6v6');
-                setSelectedPresetId('6v6_2-2-1');
+                detectedFormat = '6v6';
+                detectedPresetId = '6v6_2-2-1';
             } else if (activeTeamPlayers.length === 7) {
-                setSelectedFormat('7v7');
-                setSelectedPresetId('7v7_2-3-1');
+                detectedFormat = '7v7';
+                detectedPresetId = '7v7_2-3-1';
             } else if (activeTeamPlayers.length >= 12) {
-                setSelectedFormat('11v11');
-                setSelectedPresetId('11v11_4-3-3');
+                detectedFormat = '11v11';
+                detectedPresetId = '11v11_4-3-3';
             } else {
-                setSelectedFormat('8v8');
-                setSelectedPresetId('8v8_2-3-2');
+                detectedFormat = '8v8';
+                detectedPresetId = '8v8_2-3-2';
             }
 
+            if (team?.formation?.format) {
+                detectedFormat = team.formation.format;
+            }
+
+            setSelectedFormat(detectedFormat);
+            setSelectedPresetId(detectedPresetId);
+
+            let finalEnrichedFormation: PitchPlayer[] = [];
+
             if (team?.formation?.players && Array.isArray(team.formation.players) && team.formation.players.length > 0) {
-                // Enrich existing formation players with photos, ovr and latest info
-                const enrichedFormation = team.formation.players.map((fp: any) => {
+                finalEnrichedFormation = team.formation.players.map((fp: any) => {
                     const matchedRoster = activeTeamPlayers.find((p: any) => String(p.id || p._id) === String(fp.id));
                     const ovr = matchedRoster ? calculateFifaAttributes(matchedRoster).ovr : (fp.ovr || 65);
                     return {
@@ -213,7 +256,17 @@ export default function FormationBoard({ route, navigation }: any) {
                         role: fp.role || getPositionCategory(matchedRoster?.position || fp.position),
                     };
                 });
-                setPlayersOnPitch(enrichedFormation);
+                setPlayersOnPitch(finalEnrichedFormation);
+            }
+
+            // 2. KESHNI YANGILASH (Save fetched data to cache)
+            if (targetTeamId) {
+                AsyncStorage.setItem(getFormationCacheKey(targetTeamId), JSON.stringify({
+                    players: finalEnrichedFormation.length > 0 ? finalEnrichedFormation : playersOnPitch,
+                    availablePlayers: activeTeamPlayers,
+                    format: detectedFormat,
+                    presetId: detectedPresetId,
+                })).catch(() => {});
             }
         } catch (error) {
             console.error('Error fetching formation data:', error);
@@ -306,6 +359,15 @@ export default function FormationBoard({ route, navigation }: any) {
             });
 
             if (response.success) {
+                // 3. KESHNI DARHOL YANGILASH (Update Cache Immediately on Save)
+                AsyncStorage.setItem(getFormationCacheKey(targetId), JSON.stringify({
+                    players: playersOnPitch,
+                    availablePlayers,
+                    format: selectedFormat,
+                    presetId: selectedPresetId,
+                    preset: activePreset.name,
+                })).catch(() => {});
+
                 if (socket) {
                     socket.emit('update-formation', {
                         teamId: targetId,
@@ -316,7 +378,13 @@ export default function FormationBoard({ route, navigation }: any) {
                         },
                     });
                 }
-                Alert.alert('🎉 ' + t('common.success', 'Muvaffaqiyatli'), 'Sostav bazaga muvaffaqiyatli saqlandi va profilda yangilandi!');
+
+                // 4. Muvaffaqiyatli saqlanganda Alert chiqarmasdan Haptic berish va orqaga qaytish
+                try {
+                    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                } catch (e) {}
+
+                navigation.goBack();
             } else {
                 Alert.alert(t('common.error', 'Xato'), response.error || 'Sostavni saqlashda xatolik yuz berdi.');
             }
