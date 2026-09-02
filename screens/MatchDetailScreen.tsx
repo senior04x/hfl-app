@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../constants/Colors';
+import Skeleton from '../components/Skeleton';
 import MatchDetailSkeleton from '../components/MatchDetailSkeleton';
 import YoutubePlayerCard from '../components/YoutubePlayerCard';
 import TacticsBoard from '../components/TacticsBoard';
@@ -53,15 +54,18 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const scrollXPager = useRef(new Animated.Value(0)).current;
     const isPagerScrolling = useRef(false);
     const pagerScrollRef = useRef<ScrollView>(null);
-    const [loading, setLoading] = useState(true);
     const [match, setMatch] = useState<any>(matchData);
+    const initialHomeId = matchData?.homeTeamId || matchData?.home_team_id || matchData?.homeTeam?.id || matchData?.homeTeam?._id || null;
+    const [selectedTeamId, setSelectedTeamId] = useState<string | null>(initialHomeId);
+    const [matchLoading, setMatchLoading] = useState(!matchData);
+    const [eventsLoading, setEventsLoading] = useState(!matchData?.events);
+    const [playersLoading, setPlayersLoading] = useState(true);
+    const [previewLoading, setPreviewLoading] = useState(true);
     const [homePlayers, setHomePlayers] = useState<any[]>([]);
     const [awayPlayers, setAwayPlayers] = useState<any[]>([]);
     const [homeForm, setHomeForm] = useState<string[]>([]);
     const [awayForm, setAwayForm] = useState<string[]>([]);
     const [h2hMatches, setH2hMatches] = useState<any[]>([]);
-    const [playersLoading, setPlayersLoading] = useState(false);
-    const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
     const [activePlayingVideoId, setActivePlayingVideoId] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const { socket, isConnected } = useSocket();
@@ -96,7 +100,10 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
     const initMatchDetail = async () => {
         if (!currentId) {
-            setLoading(false);
+            setMatchLoading(false);
+            setEventsLoading(false);
+            setPlayersLoading(false);
+            setPreviewLoading(false);
             return;
         }
 
@@ -107,8 +114,19 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                 const cached = JSON.parse(cachedJson);
                 if (cached) {
                     if (cached.match) initialData = { ...initialData, ...cached.match };
-                    if (cached.homePlayers) setHomePlayers(cached.homePlayers);
-                    if (cached.awayPlayers) setAwayPlayers(cached.awayPlayers);
+                    if (cached.homePlayers && cached.homePlayers.length > 0) {
+                        setHomePlayers(cached.homePlayers);
+                        setPlayersLoading(false);
+                    }
+                    if (cached.awayPlayers && cached.awayPlayers.length > 0) {
+                        setAwayPlayers(cached.awayPlayers);
+                    }
+                    if (cached.homeForm || cached.h2hMatches) {
+                        if (cached.homeForm) setHomeForm(cached.homeForm);
+                        if (cached.awayForm) setAwayForm(cached.awayForm);
+                        if (cached.h2hMatches) setH2hMatches(cached.h2hMatches);
+                        setPreviewLoading(false);
+                    }
                 }
             }
         } catch (e) {}
@@ -116,108 +134,118 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         if (initialData) {
             setMatch(initialData);
             const hId = initialData?.homeTeamId || initialData?.home_team_id || initialData?.homeTeam?.id || initialData?.homeTeam?._id;
-            if (hId) setSelectedTeamId(hId);
-            setLoading(false);
-        } else {
-            setLoading(true);
+            if (hId && !selectedTeamId) setSelectedTeamId(hId);
+            setMatchLoading(false);
+            if (initialData?.events && initialData.events.length > 0) {
+                setEventsLoading(false);
+            }
         }
 
-        await fetchMatch(false);
+        await fetchAllData(initialData);
     };
 
-    const fetchMatch = async (isSilentOrRefreshing = false) => {
-        if (!currentId) {
-            setLoading(false);
-            return;
-        }
-        try {
-            if (isSilentOrRefreshing && refreshing) setRefreshing(true);
-            else if (!match && !matchData) setLoading(true);
+    const fetchAllData = async (currentMatchObj: any) => {
+        if (!currentId) return;
 
-            const data = await apiService.getMatchById(currentId);
-            if (data) {
-                setMatch((prev: any) => ({ ...prev, ...data }));
-                
-                const hId = data?.homeTeamId || data?.home_team_id || data?.homeTeam?.id || data?.homeTeam?._id;
-                const aId = data?.awayTeamId || data?.away_team_id || data?.awayTeam?.id || data?.awayTeam?._id;
+        try {
+            const matchDetail = await apiService.getMatchById(currentId);
+            if (matchDetail) {
+                setMatch((prev: any) => ({ ...prev, ...matchDetail }));
+                setEventsLoading(false);
+                setMatchLoading(false);
+
+                const hId = matchDetail?.homeTeamId || matchDetail?.home_team_id || matchDetail?.homeTeam?.id || matchDetail?.homeTeam?._id || currentMatchObj?.homeTeamId || currentMatchObj?.home_team_id;
+                const aId = matchDetail?.awayTeamId || matchDetail?.away_team_id || matchDetail?.awayTeam?.id || matchDetail?.awayTeam?._id || currentMatchObj?.awayTeamId || currentMatchObj?.away_team_id;
 
                 if (hId && !selectedTeamId) setSelectedTeamId(hId);
 
-                let homeData: any[] = [];
-                let awayData: any[] = [];
-
                 if (hId && aId) {
-                    setPlayersLoading(true);
-                    // 🔥 PERFORMANCE FIX: SELECT faqat kerakli columns (not *)
-                    // Before: 50+ columns × 6 queries = 125 GB/s network bandwidth
-                    // After: 10 columns × 6 queries = 2.5 GB/s (50x yaxshi!)
-                    const [hRes, aRes, hMatchesRes, aMatchesRes, allGoalEventsRes, h2hRes] = await Promise.all([
-                        apiService.getPlayers(1, 100, hId),
-                        apiService.getPlayers(1, 100, aId),
-                        supabase.from('matches').select('id, home_team_id, away_team_id, home_score, away_score, status, match_date, league').or(`home_team_id.eq.${hId},away_team_id.eq.${hId}`).eq('status', 'finished').order('created_at', { ascending: false }).limit(5),
-                        supabase.from('matches').select('id, home_team_id, away_team_id, home_score, away_score, status, match_date, league').or(`home_team_id.eq.${aId},away_team_id.eq.${aId}`).eq('status', 'finished').order('created_at', { ascending: false }).limit(5),
-                        supabase.from('match_events').select('player_id, event_type').ilike('event_type', '%goal%'),
-                        supabase.from('matches').select('id, home_team_id, away_team_id, home_score, away_score, status, match_date, league').or(`and(home_team_id.eq.${hId},away_team_id.eq.${aId}),and(home_team_id.eq.${aId},away_team_id.eq.${hId})`).eq('status', 'finished').neq('id', currentId).order('created_at', { ascending: false }).limit(5)
-                    ]);
-
-                    homeData = hRes || [];
-                    awayData = aRes || [];
-                    setH2hMatches(h2hRes.data || []);
-
-                    // Calculate real W/D/L form guide
-                    const getFormArray = (matches: any[], teamId: string) => {
-                        if (!matches || matches.length === 0) return [];
-                        return matches.map((m: any) => {
-                            const isHome = String(m.home_team_id) === String(teamId);
-                            const myScore = parseInt(isHome ? (m.home_score || 0) : (m.away_score || 0));
-                            const oppScore = parseInt(isHome ? (m.away_score || 0) : (m.home_score || 0));
-                            if (myScore > oppScore) return 'W';
-                            if (myScore === oppScore) return 'D';
-                            return 'L';
-                        });
-                    };
-
-                    const computedHForm = getFormArray(hMatchesRes.data || [], hId);
-                    const computedAForm = getFormArray(aMatchesRes.data || [], aId);
-                    setHomeForm(computedHForm);
-                    setAwayForm(computedAForm);
-
-                    // Count goals per player for Top Goalscorer spotlight
-                    const goalCounts: Record<string, number> = {};
-                    if (allGoalEventsRes.data) {
-                        allGoalEventsRes.data.forEach((e: any) => {
-                            const pId = String(e.player_id);
-                            if (pId) goalCounts[pId] = (goalCounts[pId] || 0) + 1;
-                        });
-                    }
-
-                    const enrichedHome = homeData.map((p: any) => {
-                        const pId = String(p.id || p._id);
-                        return { ...p, goalCount: goalCounts[pId] || p.goals || p.stats?.goals || 0 };
-                    }).sort((a, b) => b.goalCount - a.goalCount);
-
-                    const enrichedAway = awayData.map((p: any) => {
-                        const pId = String(p.id || p._id);
-                        return { ...p, goalCount: goalCounts[pId] || p.goals || p.stats?.goals || 0 };
-                    }).sort((a, b) => b.goalCount - a.goalCount);
-
-                    setHomePlayers(enrichedHome);
-                    setAwayPlayers(enrichedAway);
+                    fetchTabAuxiliaryData(hId, aId, matchDetail);
+                } else {
+                    setPlayersLoading(false);
+                    setPreviewLoading(false);
                 }
-
-                await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
-                    match: data,
-                    homePlayers: homeData,
-                    awayPlayers: awayData,
-                    timestamp: Date.now()
-                }));
             }
         } catch (error) {
             console.error('Error fetching match detail:', error);
-        } finally {
-            setLoading(false);
+            setEventsLoading(false);
+            setMatchLoading(false);
             setPlayersLoading(false);
-            setRefreshing(false);
+            setPreviewLoading(false);
+        }
+    };
+
+    const fetchTabAuxiliaryData = async (hId: string, aId: string, currentMatch: any) => {
+        try {
+            const [hRes, aRes, hMatchesRes, aMatchesRes, allGoalEventsRes, h2hRes] = await Promise.all([
+                apiService.getPlayers(1, 100, hId).catch(() => []),
+                apiService.getPlayers(1, 100, aId).catch(() => []),
+                supabase.from('matches').select('id, home_team_id, away_team_id, home_score, away_score, status, match_date, league').or(`home_team_id.eq.${hId},away_team_id.eq.${hId}`).eq('status', 'finished').order('created_at', { ascending: false }).limit(5),
+                supabase.from('matches').select('id, home_team_id, away_team_id, home_score, away_score, status, match_date, league').or(`home_team_id.eq.${aId},away_team_id.eq.${aId}`).eq('status', 'finished').order('created_at', { ascending: false }).limit(5),
+                supabase.from('match_events').select('player_id, event_type').ilike('event_type', '%goal%'),
+                supabase.from('matches').select('id, home_team_id, away_team_id, home_score, away_score, status, match_date, league').or(`and(home_team_id.eq.${hId},away_team_id.eq.${aId}),and(home_team_id.eq.${aId},away_team_id.eq.${hId})`).eq('status', 'finished').neq('id', currentId).order('created_at', { ascending: false }).limit(5)
+            ]);
+
+            const homeData = hRes || [];
+            const awayData = aRes || [];
+            const h2hData = h2hRes?.data || [];
+            setH2hMatches(h2hData);
+
+            // Calculate real W/D/L form guide
+            const getFormArray = (matches: any[], teamId: string) => {
+                if (!matches || matches.length === 0) return [];
+                return matches.map((m: any) => {
+                    const isHome = String(m.home_team_id) === String(teamId);
+                    const myScore = parseInt(isHome ? (m.home_score || 0) : (m.away_score || 0));
+                    const oppScore = parseInt(isHome ? (m.away_score || 0) : (m.home_score || 0));
+                    if (myScore > oppScore) return 'W';
+                    if (myScore === oppScore) return 'D';
+                    return 'L';
+                });
+            };
+
+            const computedHForm = getFormArray(hMatchesRes?.data || [], hId);
+            const computedAForm = getFormArray(aMatchesRes?.data || [], aId);
+            setHomeForm(computedHForm);
+            setAwayForm(computedAForm);
+            setPreviewLoading(false);
+
+            // Count goals per player for Top Goalscorer spotlight
+            const goalCounts: Record<string, number> = {};
+            if (allGoalEventsRes?.data) {
+                allGoalEventsRes.data.forEach((e: any) => {
+                    const pId = String(e.player_id);
+                    if (pId) goalCounts[pId] = (goalCounts[pId] || 0) + 1;
+                });
+            }
+
+            const enrichedHome = homeData.map((p: any) => {
+                const pId = String(p.id || p._id);
+                return { ...p, goalCount: goalCounts[pId] || p.goals || p.stats?.goals || 0 };
+            }).sort((a, b) => b.goalCount - a.goalCount);
+
+            const enrichedAway = awayData.map((p: any) => {
+                const pId = String(p.id || p._id);
+                return { ...p, goalCount: goalCounts[pId] || p.goals || p.stats?.goals || 0 };
+            }).sort((a, b) => b.goalCount - a.goalCount);
+
+            setHomePlayers(enrichedHome);
+            setAwayPlayers(enrichedAway);
+            setPlayersLoading(false);
+
+            await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+                match: currentMatch,
+                homePlayers: enrichedHome,
+                awayPlayers: enrichedAway,
+                homeForm: computedHForm,
+                awayForm: computedAForm,
+                h2hMatches: h2hData,
+                timestamp: Date.now()
+            }));
+        } catch (err) {
+            console.error('Error fetching tab auxiliary data:', err);
+            setPlayersLoading(false);
+            setPreviewLoading(false);
         }
     };
 
@@ -234,14 +262,18 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     if (payload.new) {
                         setMatch((prev: any) => ({ ...prev, ...payload.new }));
                     }
-                    fetchMatch(true);
                 }
             )
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'match_events', filter: `match_id=eq.${currentId}` },
-                () => {
-                    fetchMatch(true);
+                async () => {
+                    try {
+                        const updatedMatch = await apiService.getMatchById(currentId);
+                        if (updatedMatch) {
+                            setMatch((prev: any) => ({ ...prev, ...updatedMatch }));
+                        }
+                    } catch (e) {}
                 }
             )
             .subscribe();
@@ -250,7 +282,6 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             socket.on('match-update', (data: any) => {
                 if (data.matchId === currentId || data.id === currentId || data.match?.id === currentId) {
                     if (data.match) setMatch((prev: any) => ({ ...prev, ...data.match }));
-                    fetchMatch(true);
                 }
             });
         }
@@ -261,8 +292,10 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         };
     }, [socket, isConnected, currentId]);
 
-    const onRefresh = () => {
-        fetchMatch(true);
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await fetchAllData(match);
+        setRefreshing(false);
     };
 
     const switchTeam = async () => {
@@ -290,7 +323,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         });
     };
 
-    const formatDate = (dateString: string) => {
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return '...';
         return formatLocalizedDate(dateString, currentLang, match?.match_time || match?.time);
     };
 
@@ -405,9 +439,6 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
     const handleMatchTabPress = async (index: number) => {
         if (index === currentTabIndexRef.current) return;
-        try {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        } catch (e) {}
         isPagerScrolling.current = true;
         currentTabIndexRef.current = index;
         setCurrentTabIndex(index);
@@ -428,31 +459,56 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             currentTabIndexRef.current = newIdx;
             setCurrentTabIndex(newIdx);
             setActiveTab(MATCH_TABS[newIdx].key);
-            try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            } catch (e) {}
         }
         isPagerScrolling.current = false;
     };
 
-    // Eng birinchi tabda (index 0 — 'overview'/Obzor) turib o'ngga (forward) surilganda sahifani
-    // tark etish (navigation.goBack()). Bu tab pager'dagi ENG BIRINCHI (index 0) sahifa bo'lgani
-    // uchun, o'ngga qat'iy harakatda gesture pager'dan olinadi va ekran yopiladi.
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+
+    // 1-tabda (overview) turib o'ngga surilganda real-vaqtda interaktiv orqaga qaytish:
+    // Barmoq bilan tortganda sahifa barmoq ketidan suriladi, yarimda ushlab tursa
+    // yarim holatda turadi, qo'yib yuborilganda esa ostonadan (width * 0.35) o'tgan bo'lsa
+    // silliq chiqib ketadi, yetmagan bo'lsa silliq o'z joyiga qaytadi.
     const matchDetailExitPanResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponderCapture: () => false,
             onMoveShouldSetPanResponderCapture: (_, gestureState) => {
                 if (currentTabIndexRef.current !== 0) return false;
-                return gestureState.dx > 14 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
             },
-            onPanResponderMove: () => {},
-            onPanResponderRelease: (_, gestureState) => {
-                if (currentTabIndexRef.current === 0 && (gestureState.dx > 70 || gestureState.vx > 0.5)) {
-                    try {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    } catch (e) {}
-                    navigation.goBack();
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
                 }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: width,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
             },
             onPanResponderTerminationRequest: () => true,
         })
@@ -558,7 +614,32 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         );
     };
 
+    const renderOverviewSkeleton = () => (
+        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+            {[1, 2, 3, 4, 5].map((i) => (
+                <View key={i} style={styles.timelineRow}>
+                    <View style={styles.timelineLeftColumn}>
+                        <Skeleton width={20} height={20} borderRadius={10} style={{ backgroundColor: homeColors.surface }} />
+                        <Skeleton width={22} height={10} borderRadius={3} style={{ marginTop: 4, backgroundColor: homeColors.surface }} />
+                        <View style={[styles.timelineLine, { backgroundColor: homeColors.border }]} />
+                    </View>
+                    <View style={[styles.timelineEventCard, cardSurface]}>
+                        <View style={{ flex: 1, padding: 12 }}>
+                            <Skeleton width="45%" height={14} borderRadius={4} style={{ marginBottom: 8, backgroundColor: homeColors.surface }} />
+                            <Skeleton width="75%" height={12} borderRadius={4} style={{ backgroundColor: homeColors.surface }} />
+                        </View>
+                        <Skeleton width={28} height={28} borderRadius={14} style={{ margin: 12, backgroundColor: homeColors.surface }} />
+                    </View>
+                </View>
+            ))}
+        </ScrollView>
+    );
+
     const renderOverview = () => {
+        if (eventsLoading && (!match?.events || match.events.length === 0)) {
+            return renderOverviewSkeleton();
+        }
+
         if (match?.status === 'scheduled') {
             return (
                 <View style={styles.notStartedContainer}>
@@ -593,7 +674,71 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         );
     };
 
+    const renderPreviewSkeleton = () => (
+        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+            {/* 1. Pre-Match Overview Header Skeleton */}
+            <View style={[styles.previewSectionCard, cardSurface]}>
+                <View style={{ padding: 16 }}>
+                    <Skeleton width={120} height={16} borderRadius={4} style={{ marginBottom: 16, backgroundColor: homeColors.surface }} />
+                    {[1, 2, 3, 4].map(i => (
+                        <View key={i} style={[styles.previewInfoRow, { borderBottomColor: homeColors.border }]}>
+                            <Skeleton width={90} height={13} borderRadius={4} style={{ backgroundColor: homeColors.surface }} />
+                            <Skeleton width={110} height={13} borderRadius={4} style={{ backgroundColor: homeColors.surface }} />
+                        </View>
+                    ))}
+                </View>
+            </View>
+
+            {/* 2. Team Form Guide Skeleton */}
+            <View style={[styles.previewSectionCard, cardSurface]}>
+                <View style={{ padding: 16 }}>
+                    <Skeleton width={110} height={16} borderRadius={4} style={{ marginBottom: 16, backgroundColor: homeColors.surface }} />
+                    <View style={{ marginBottom: 14 }}>
+                        <Skeleton width={120} height={14} borderRadius={4} style={{ marginBottom: 8, backgroundColor: homeColors.surface }} />
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                            {[1, 2, 3, 4, 5].map(i => (
+                                <Skeleton key={i} width={28} height={28} borderRadius={8} style={{ backgroundColor: homeColors.surface }} />
+                            ))}
+                        </View>
+                    </View>
+                    <View>
+                        <Skeleton width={120} height={14} borderRadius={4} style={{ marginBottom: 8, backgroundColor: homeColors.surface }} />
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                            {[1, 2, 3, 4, 5].map(i => (
+                                <Skeleton key={i} width={28} height={28} borderRadius={8} style={{ backgroundColor: homeColors.surface }} />
+                            ))}
+                        </View>
+                    </View>
+                </View>
+            </View>
+
+            {/* 3. H2H History Skeleton */}
+            <View style={[styles.previewSectionCard, cardSurface]}>
+                <View style={{ padding: 16 }}>
+                    <Skeleton width={130} height={16} borderRadius={4} style={{ marginBottom: 16, backgroundColor: homeColors.surface }} />
+                    {[1, 2].map(i => (
+                        <View key={i} style={[styles.h2hMatchCard, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <Skeleton width={60} height={16} borderRadius={4} style={{ backgroundColor: homeColors.background }} />
+                                <Skeleton width={120} height={12} borderRadius={4} style={{ backgroundColor: homeColors.background }} />
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Skeleton width={75} height={14} borderRadius={4} style={{ backgroundColor: homeColors.background }} />
+                                <Skeleton width={40} height={22} borderRadius={6} style={{ backgroundColor: homeColors.background }} />
+                                <Skeleton width={75} height={14} borderRadius={4} style={{ backgroundColor: homeColors.background }} />
+                            </View>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        </ScrollView>
+    );
+
     const renderPreview = () => {
+        if (previewLoading && homeForm.length === 0 && h2hMatches.length === 0) {
+            return renderPreviewSkeleton();
+        }
+
         const homeName = match?.homeTeamName || match?.homeTeam?.name || 'UY JAMOA';
         const awayName = match?.awayTeamName || match?.awayTeam?.name || 'MEHMON';
         const homeLogo = match?.homeTeamLogo || match?.homeTeam?.logo;
@@ -832,11 +977,55 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         );
     };
 
+    const renderLineupsSkeleton = () => (
+        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+            {/* Team Carousel skeleton */}
+            <View style={[styles.carouselContainer, { backgroundColor: homeColors.background, paddingHorizontal: 0, marginBottom: 12 }]}>
+                <View style={[styles.teamCarouselCard, cardSurface, { flex: 1, padding: 8, flexDirection: 'row', alignItems: 'center' }]}>
+                    <Skeleton width={34} height={34} borderRadius={17} style={{ backgroundColor: homeColors.surface, marginRight: 10 }} />
+                    <View style={{ flex: 1 }}>
+                        <Skeleton width={60} height={10} borderRadius={3} style={{ marginBottom: 6, backgroundColor: homeColors.surface }} />
+                        <Skeleton width={120} height={14} borderRadius={4} style={{ backgroundColor: homeColors.surface }} />
+                    </View>
+                </View>
+                <View style={[styles.navArrowBtnOneSide, cardSurface]}>
+                    <Skeleton width={22} height={22} borderRadius={6} style={{ backgroundColor: homeColors.surface }} />
+                </View>
+            </View>
+
+            {/* Tactics card skeleton */}
+            <View style={[styles.tacticsSectionCard, cardSurface, { marginBottom: 20, height: 220, justifyContent: 'center', alignItems: 'center' }]}>
+                <Skeleton width="100%" height="100%" borderRadius={14} style={{ backgroundColor: homeColors.surface }} />
+            </View>
+
+            {/* List Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                <Skeleton width={160} height={16} borderRadius={4} style={{ backgroundColor: homeColors.surface }} />
+            </View>
+
+            {/* Player Items Skeleton */}
+            {[1, 2, 3, 4, 5, 6].map(i => (
+                <View key={i} style={[styles.playerCardCompact, cardSurface, { padding: 12, flexDirection: 'row', alignItems: 'center' }]}>
+                    <Skeleton width={44} height={44} borderRadius={22} style={{ marginRight: 12, backgroundColor: homeColors.surface }} />
+                    <View style={{ flex: 1 }}>
+                        <Skeleton width="60%" height={14} borderRadius={4} style={{ marginBottom: 6, backgroundColor: homeColors.surface }} />
+                        <Skeleton width="35%" height={11} borderRadius={4} style={{ backgroundColor: homeColors.surface }} />
+                    </View>
+                    <Skeleton width={16} height={16} borderRadius={4} style={{ backgroundColor: homeColors.surface }} />
+                </View>
+            ))}
+        </ScrollView>
+    );
+
     const renderLineups = () => {
         const isHome = selectedTeamId === match?.homeTeamId;
         const currentPlayers = isHome ? homePlayers : awayPlayers;
         const currentTeamName = isHome ? (match?.homeTeamName || 'UY JAMOA') : (match?.awayTeamName || 'MEHMON');
         const currentLogo = isHome ? (match?.homeTeamLogo || match?.homeTeam?.logo) : (match?.awayTeamLogo || match?.awayTeam?.logo);
+
+        if (playersLoading && currentPlayers.length === 0) {
+            return renderLineupsSkeleton();
+        }
 
         const targetTeamObject = isHome ? match?.homeTeam : match?.awayTeam;
         const rawFormationPlayers = targetTeamObject?.formation?.players || targetTeamObject?.players || [];
@@ -1164,13 +1353,26 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     const renderStaff = () => {
-        const refereeName = match?.referee || match?.referee_name || match?.main_referee || "Rasmiy Hakam (HFL)";
-        const assistant1 = match?.assistant_referee_1 || match?.linesman_1 || "Yo'l-yo'riq Hakami 1";
-        const assistant2 = match?.assistant_referee_2 || match?.linesman_2 || "Yo'l-yo'riq Hakami 2";
-        const commissioner = match?.commissioner || match?.inspector || "HFL Maydon Inspektori";
+        const rawReferee = (match?.referee || match?.referee_name || match?.main_referee || '').trim();
+        const refereeName = rawReferee ? rawReferee.toUpperCase() : t('match_detail.referee_not_appointed');
 
-        const homeCaptain = match?.homeTeam?.captain_name || match?.home_team_captain || (homePlayers[0] ? `${homePlayers[0].firstName || homePlayers[0].first_name || ''} ${homePlayers[0].lastName || homePlayers[0].last_name || ''}`.trim() : "Menejer / Sardor");
-        const awayCaptain = match?.awayTeam?.captain_name || match?.away_team_captain || (awayPlayers[0] ? `${awayPlayers[0].firstName || awayPlayers[0].first_name || ''} ${awayPlayers[0].lastName || awayPlayers[0].last_name || ''}`.trim() : "Menejer / Sardor");
+        const rawCommissioner = (match?.commissioner || match?.inspector || '').trim();
+        const commissionerName = rawCommissioner ? rawCommissioner.toUpperCase() : t('match_detail.commissioner_not_appointed');
+
+        const homeName = (match?.homeTeamName || match?.homeTeam?.name || 'UY JAMOA').toUpperCase();
+        const awayName = (match?.awayTeamName || match?.awayTeam?.name || 'MEHMON JAMOA').toUpperCase();
+
+        const rawHomeManager = (match?.homeTeam?.manager_name || match?.homeTeam?.coach_name || match?.homeTeam?.trainer_name || match?.homeTeam?.owner_name || '').trim();
+        const homeManager = rawHomeManager ? rawHomeManager.toUpperCase() : t('match_detail.not_appointed');
+
+        const rawHomeCaptain = (match?.homeTeam?.captain_name || match?.home_team_captain || '').trim();
+        const homeCaptain = rawHomeCaptain ? rawHomeCaptain.toUpperCase() : t('match_detail.not_appointed');
+
+        const rawAwayManager = (match?.awayTeam?.manager_name || match?.awayTeam?.coach_name || match?.awayTeam?.trainer_name || match?.awayTeam?.owner_name || '').trim();
+        const awayManager = rawAwayManager ? rawAwayManager.toUpperCase() : t('match_detail.not_appointed');
+
+        const rawAwayCaptain = (match?.awayTeam?.captain_name || match?.away_team_captain || '').trim();
+        const awayCaptain = rawAwayCaptain ? rawAwayCaptain.toUpperCase() : t('match_detail.not_appointed');
 
         return (
             <ScrollView 
@@ -1185,7 +1387,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     />
                 }
             >
-                {/* 1. Hakamlar Brigadasi */}
+                {/* 1. Hakam */}
                 <View style={[styles.staffSectionCard, cardSurface]}>
                     <View style={{ padding: 16 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
@@ -1194,35 +1396,15 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         </View>
 
                         {/* Main Referee */}
-                        <View style={[styles.staffItemRow, { borderBottomColor: homeColors.border }]}>
+                        <View style={[styles.staffItemRow, { borderBottomWidth: 0 }]}>
                             <View style={[styles.staffIconCircle, { backgroundColor: 'rgba(250, 204, 21, 0.15)' }]}>
                                 <Ionicons name="shirt-outline" size={20} color="#FACC15" />
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
                                 <Text style={[styles.staffItemRole, { color: homeColors.textSecondary }]}>{t('match_detail.main_referee')}</Text>
-                                <Text style={[styles.staffItemName, { color: homeColors.textPrimary }]}>{refereeName.toUpperCase()}</Text>
-                            </View>
-                        </View>
-
-                        {/* Assistant 1 */}
-                        <View style={[styles.staffItemRow, { borderBottomColor: homeColors.border }]}>
-                            <View style={[styles.staffIconCircle, { backgroundColor: homeColors.surface }]}>
-                                <Ionicons name="flag-outline" size={18} color={Colors.primary} />
-                            </View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                                <Text style={[styles.staffItemRole, { color: homeColors.textSecondary }]}>{t('match_detail.linesman_1')}</Text>
-                                <Text style={[styles.staffItemName, { color: homeColors.textPrimary }]}>{assistant1.toUpperCase()}</Text>
-                            </View>
-                        </View>
-
-                        {/* Assistant 2 */}
-                        <View style={[styles.staffItemRow, { borderBottomWidth: 0 }]}>
-                            <View style={[styles.staffIconCircle, { backgroundColor: homeColors.surface }]}>
-                                <Ionicons name="flag-outline" size={18} color={Colors.primary} />
-                            </View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                                <Text style={[styles.staffItemRole, { color: homeColors.textSecondary }]}>{t('match_detail.linesman_2')}</Text>
-                                <Text style={[styles.staffItemName, { color: homeColors.textPrimary }]}>{assistant2.toUpperCase()}</Text>
+                                <Text style={[styles.staffItemName, { color: rawReferee ? homeColors.textPrimary : homeColors.textSecondary, fontStyle: rawReferee ? 'normal' : 'italic' }]}>
+                                    {refereeName}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -1243,22 +1425,56 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
                                 <Text style={[styles.staffItemRole, { color: homeColors.textSecondary }]}>
-                                    {t('match_detail.team_captain', { team: (match?.homeTeamName || 'UY JAMOA').toUpperCase() })}
+                                    {t('match_detail.team_manager', { team: homeName })}
                                 </Text>
-                                <Text style={[styles.staffItemName, { color: homeColors.textPrimary }]}>{homeCaptain.toUpperCase()}</Text>
+                                <Text style={[styles.staffItemName, { color: rawHomeManager ? homeColors.textPrimary : homeColors.textSecondary, fontStyle: rawHomeManager ? 'normal' : 'italic' }]}>
+                                    {homeManager}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Home Captain */}
+                        <View style={[styles.staffItemRow, { borderBottomColor: homeColors.border }]}>
+                            <View style={[styles.staffIconCircle, { backgroundColor: homeColors.surface }]}>
+                                <Ionicons name="person-outline" size={18} color="#3B82F6" />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={[styles.staffItemRole, { color: homeColors.textSecondary }]}>
+                                    {t('match_detail.team_captain', { team: homeName })}
+                                </Text>
+                                <Text style={[styles.staffItemName, { color: rawHomeCaptain ? homeColors.textPrimary : homeColors.textSecondary, fontStyle: rawHomeCaptain ? 'normal' : 'italic' }]}>
+                                    {homeCaptain}
+                                </Text>
                             </View>
                         </View>
 
                         {/* Away Manager */}
-                        <View style={[styles.staffItemRow, { borderBottomWidth: 0 }]}>
+                        <View style={[styles.staffItemRow, { borderBottomColor: homeColors.border }]}>
                             <View style={[styles.staffIconCircle, { backgroundColor: homeColors.surface }]}>
                                 <Ionicons name="briefcase-outline" size={18} color="#EF4444" />
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
                                 <Text style={[styles.staffItemRole, { color: homeColors.textSecondary }]}>
-                                    {t('match_detail.team_captain', { team: (match?.awayTeamName || 'MEHMON JAMOA').toUpperCase() })}
+                                    {t('match_detail.team_manager', { team: awayName })}
                                 </Text>
-                                <Text style={[styles.staffItemName, { color: homeColors.textPrimary }]}>{awayCaptain.toUpperCase()}</Text>
+                                <Text style={[styles.staffItemName, { color: rawAwayManager ? homeColors.textPrimary : homeColors.textSecondary, fontStyle: rawAwayManager ? 'normal' : 'italic' }]}>
+                                    {awayManager}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Away Captain */}
+                        <View style={[styles.staffItemRow, { borderBottomWidth: 0 }]}>
+                            <View style={[styles.staffIconCircle, { backgroundColor: homeColors.surface }]}>
+                                <Ionicons name="person-outline" size={18} color="#EF4444" />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={[styles.staffItemRole, { color: homeColors.textSecondary }]}>
+                                    {t('match_detail.team_captain', { team: awayName })}
+                                </Text>
+                                <Text style={[styles.staffItemName, { color: rawAwayCaptain ? homeColors.textPrimary : homeColors.textSecondary, fontStyle: rawAwayCaptain ? 'normal' : 'italic' }]}>
+                                    {awayCaptain}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -1278,7 +1494,9 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
                                 <Text style={[styles.staffItemRole, { color: homeColors.textSecondary }]}>{t('match_detail.league_commissioner')}</Text>
-                                <Text style={[styles.staffItemName, { color: homeColors.textPrimary }]}>{commissioner.toUpperCase()}</Text>
+                                <Text style={[styles.staffItemName, { color: rawCommissioner ? homeColors.textPrimary : homeColors.textSecondary, fontStyle: rawCommissioner ? 'normal' : 'italic' }]}>
+                                    {commissionerName}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -1287,54 +1505,81 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         );
     };
 
-    if (loading && !match) {
-        return <MatchDetailSkeleton />;
-    }
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, width * 0.8, width],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
 
     return (
-        <View style={{ flex: 1, backgroundColor: homeColors.background }}>
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
             <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-            <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
-                {renderHeader()}
-                {renderTabs()}
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
+            />
 
-                {/* 1:1 Instagram-Style Real-Time Interactive Horizontal Pager */}
-                <View style={{ flex: 1 }} {...matchDetailExitPanResponder.panHandlers}>
-                <Animated.ScrollView
-                    ref={pagerScrollRef}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    bounces={false}
-                    scrollEventThrottle={16}
-                    decelerationRate="fast"
-                    onScroll={Animated.event(
-                        [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
-                        { useNativeDriver: false }
-                    )}
-                    onMomentumScrollEnd={handlePagerMomentumScrollEnd}
-                    style={{ flex: 1 }}
-                    contentContainerStyle={{ width: width * 5 }}
-                >
-                    <View style={{ width, height: '100%' }}>
-                        {renderOverview()}
+            <Animated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
+            >
+                <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                    {renderHeader()}
+                    {renderTabs()}
+
+                    {/* 1:1 Instagram-Style Real-Time Interactive Horizontal Pager */}
+                    <View style={{ flex: 1 }} {...matchDetailExitPanResponder.panHandlers}>
+                        <Animated.ScrollView
+                            ref={pagerScrollRef}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            bounces={false}
+                            scrollEventThrottle={16}
+                            decelerationRate="fast"
+                            onScroll={Animated.event(
+                                [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
+                                { useNativeDriver: false }
+                            )}
+                            onMomentumScrollEnd={handlePagerMomentumScrollEnd}
+                            style={{ flex: 1 }}
+                            contentContainerStyle={{ width: width * 5 }}
+                        >
+                            <View style={{ width, height: '100%' }}>
+                                {renderOverview()}
+                            </View>
+                            <View style={{ width, height: '100%' }}>
+                                {renderPreview()}
+                            </View>
+                            <View style={{ width, height: '100%' }}>
+                                {renderLineups()}
+                            </View>
+                            <View style={{ width, height: '100%' }}>
+                                {renderMedia()}
+                            </View>
+                            <View style={{ width, height: '100%' }}>
+                                {renderStaff()}
+                            </View>
+                        </Animated.ScrollView>
                     </View>
-                    <View style={{ width, height: '100%' }}>
-                        {renderPreview()}
-                    </View>
-                    <View style={{ width, height: '100%' }}>
-                        {renderLineups()}
-                    </View>
-                    <View style={{ width, height: '100%' }}>
-                        {renderMedia()}
-                    </View>
-                    <View style={{ width, height: '100%' }}>
-                        {renderStaff()}
-                    </View>
-                </Animated.ScrollView>
-                </View>
-            </SafeAreaView>
+                </SafeAreaView>
+            </Animated.View>
         </View>
     );
 }

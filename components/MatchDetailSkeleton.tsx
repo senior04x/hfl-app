@@ -1,75 +1,115 @@
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, ScrollView, Dimensions, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Skeleton from './Skeleton';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
+
+const { width } = Dimensions.get('window');
 
 const MatchDetailSkeleton = () => {
-    return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Header Container */}
-            <View style={styles.headerContainer}>
-                <View style={styles.topNav}>
-                    <Skeleton width={30} height={30} borderRadius={15} />
-                    <Skeleton width={150} height={20} />
-                    <View style={{ width: 30 }} />
-                </View>
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
 
-                {/* Score Card */}
-                <View style={styles.matchScoreCard}>
-                    <Skeleton width={140} height={12} style={{ marginBottom: 15 }} />
-                    <View style={styles.teamsScoreRow}>
-                        <View style={styles.teamBlockRight}>
-                            <Skeleton width={80} height={20} style={{ marginRight: 12 }} />
-                            <Skeleton width={36} height={36} borderRadius={18} />
+    const cardSurface = Platform.OS === 'ios'
+        ? { backgroundColor: homeColors.background, borderWidth: 1, borderColor: homeColors.border }
+        : {
+            backgroundColor: homeColors.background,
+            elevation: 3,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+        };
+
+    const skeletonBg = { backgroundColor: homeColors.surface };
+
+    return (
+        <View style={[styles.root, { backgroundColor: homeColors.background }]}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+            <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                {/* Header Container */}
+                <View style={[styles.headerContainer, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
+                    <View style={styles.topNav}>
+                        <View style={[styles.backBtn, cardSurface]}>
+                            <Skeleton width={18} height={18} borderRadius={4} style={skeletonBg} />
                         </View>
-                        <Skeleton width={80} height={40} style={{ marginHorizontal: 20 }} />
-                        <View style={styles.teamBlockLeft}>
-                            <Skeleton width={36} height={36} borderRadius={18} style={{ marginRight: 12 }} />
-                            <Skeleton width={80} height={20} />
+                        <Skeleton width={140} height={18} borderRadius={6} style={skeletonBg} />
+                        <Skeleton width={44} height={20} borderRadius={6} style={skeletonBg} />
+                    </View>
+
+                    {/* Score Card */}
+                    <View style={styles.matchScoreCard}>
+                        {/* Date row */}
+                        <View style={styles.dateRow}>
+                            <Skeleton width={14} height={14} borderRadius={7} style={{ marginRight: 6, ...skeletonBg }} />
+                            <Skeleton width={130} height={12} borderRadius={4} style={skeletonBg} />
+                        </View>
+
+                        {/* Teams Score row */}
+                        <View style={styles.teamsScoreRow}>
+                            <View style={styles.teamBlockRight}>
+                                <Skeleton width={75} height={16} borderRadius={4} style={{ marginRight: 10, ...skeletonBg }} />
+                                <Skeleton width={36} height={36} borderRadius={18} style={skeletonBg} />
+                            </View>
+
+                            <Skeleton width={54} height={34} borderRadius={8} style={{ marginHorizontal: 16, ...skeletonBg }} />
+
+                            <View style={styles.teamBlockLeft}>
+                                <Skeleton width={36} height={36} borderRadius={18} style={{ marginRight: 10, ...skeletonBg }} />
+                                <Skeleton width={75} height={16} borderRadius={4} style={skeletonBg} />
+                            </View>
+                        </View>
+
+                        {/* Location row */}
+                        <View style={styles.locationRow}>
+                            <Skeleton width={14} height={14} borderRadius={7} style={{ marginRight: 6, ...skeletonBg }} />
+                            <Skeleton width={120} height={12} borderRadius={4} style={skeletonBg} />
                         </View>
                     </View>
-                    <Skeleton width={120} height={12} />
                 </View>
-            </View>
 
-            {/* Tabs */}
-            <View style={styles.tabsContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {[1, 2, 3, 4, 5].map(i => (
-                        <Skeleton key={i} width={80} height={15} style={{ marginHorizontal: 20, marginVertical: 18 }} />
+                {/* Tabs */}
+                <View style={[styles.tabsContainer, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
+                    <View style={styles.tabsRowContainer}>
+                        {[1, 2, 3, 4, 5].map((i) => (
+                            <View key={i} style={styles.tabEqual}>
+                                <Skeleton width={50} height={12} borderRadius={4} style={skeletonBg} />
+                            </View>
+                        ))}
+                    </View>
+                </View>
+
+                {/* Timeline Events Feed */}
+                <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <View key={i} style={styles.timelineRow}>
+                            <View style={styles.timelineLeftColumn}>
+                                <Skeleton width={20} height={20} borderRadius={10} style={skeletonBg} />
+                                <Skeleton width={22} height={10} borderRadius={3} style={{ marginTop: 4, ...skeletonBg }} />
+                                <View style={[styles.timelineLine, { backgroundColor: homeColors.border }]} />
+                            </View>
+                            <View style={[styles.timelineEventCard, cardSurface]}>
+                                <View style={{ flex: 1 }}>
+                                    <Skeleton width="45%" height={14} borderRadius={4} style={{ marginBottom: 8, ...skeletonBg }} />
+                                    <Skeleton width="75%" height={12} borderRadius={4} style={skeletonBg} />
+                                </View>
+                                <Skeleton width={28} height={28} borderRadius={14} style={skeletonBg} />
+                            </View>
+                        </View>
                     ))}
                 </ScrollView>
-            </View>
-
-            {/* Timeline Events */}
-            <ScrollView style={{ flex: 1, padding: 16 }}>
-                {[1, 2, 3, 4, 5].map(i => (
-                    <View key={i} style={styles.timelineRow}>
-                        <View style={styles.timelineLeftColumn}>
-                            <Skeleton width={20} height={20} borderRadius={10} />
-                            <Skeleton width={20} height={10} style={{ marginTop: 4 }} />
-                            <View style={styles.timelineLine} />
-                        </View>
-                        <View style={styles.timelineEventCard}>
-                            <View style={{ flex: 1 }}>
-                                <Skeleton width="40%" height={15} style={{ marginBottom: 6 }} />
-                                <Skeleton width="70%" height={12} />
-                            </View>
-                            <Skeleton width={20} height={20} borderRadius={4} />
-                        </View>
-                    </View>
-                ))}
-            </ScrollView>
-        </SafeAreaView>
+            </SafeAreaView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent' },
+    root: { flex: 1 },
+    container: { flex: 1 },
     headerContainer: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
         paddingBottom: 20,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.05)',
     },
     topNav: {
         flexDirection: 'row',
@@ -79,9 +119,21 @@ const styles = StyleSheet.create({
         paddingTop: 10,
         marginBottom: 20,
     },
+    backBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     matchScoreCard: {
         alignItems: 'center',
         paddingHorizontal: 20,
+    },
+    dateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
     },
     teamsScoreRow: {
         flexDirection: 'row',
@@ -90,31 +142,58 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 15,
     },
-    teamBlockRight: { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end' },
-    teamBlockLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-start' },
-    tabsContainer: {
+    teamBlockRight: {
         flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.05)',
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        alignItems: 'center',
+        flex: 1,
+        justifyContent: 'flex-end',
     },
-    timelineRow: { flexDirection: 'row', marginBottom: 16 },
-    timelineLeftColumn: { width: 40, alignItems: 'center' },
+    teamBlockLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        justifyContent: 'flex-start',
+    },
+    locationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    tabsContainer: {
+        height: 48,
+        borderBottomWidth: 1,
+        justifyContent: 'center',
+    },
+    tabsRowContainer: {
+        flexDirection: 'row',
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+    },
+    tabEqual: {
+        flex: 1,
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    timelineRow: {
+        flexDirection: 'row',
+        marginBottom: 16,
+    },
+    timelineLeftColumn: {
+        width: 45,
+        alignItems: 'center',
+    },
     timelineLine: {
         width: 1,
         flex: 1,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        marginTop: 5,
+        marginTop: 6,
         minHeight: 30,
     },
     timelineEventCard: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 12,
-        padding: 16,
+        padding: 14,
         marginLeft: 8,
         flex: 1,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
         flexDirection: 'row',
         alignItems: 'center',
     },

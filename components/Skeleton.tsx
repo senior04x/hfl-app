@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, ViewStyle } from 'react-native';
-import Colors from '../constants/Colors';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 interface SkeletonProps {
     width?: number | string;
@@ -18,6 +19,8 @@ const Skeleton: React.FC<SkeletonProps> = ({
     circle = false,
 }) => {
     const opacity = useRef(new Animated.Value(0.3)).current;
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
 
     useEffect(() => {
         const animation = Animated.loop(
@@ -40,11 +43,13 @@ const Skeleton: React.FC<SkeletonProps> = ({
         return () => animation.stop();
     }, [opacity]);
 
+    const defaultBg = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
+
     const skeletonStyle: ViewStyle = {
         width: width as any,
         height: height as any,
         borderRadius: circle ? (typeof height === 'number' ? height / 2 : 50) : borderRadius,
-        backgroundColor: Colors.surfaceLight,
+        backgroundColor: defaultBg,
         opacity: opacity as any,
     };
 
