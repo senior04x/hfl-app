@@ -518,6 +518,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
             </View>
 
             {/* PAGER WITH 3 ATTACHED PANELS */}
+            <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
             <Animated.ScrollView
                 ref={pagerScrollRef}
                 horizontal
@@ -796,6 +797,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                     </ScrollView>
                 </View>
             </Animated.ScrollView>
+            </View>
 
             {/* ADD PHONE MODAL */}
             <Modal
