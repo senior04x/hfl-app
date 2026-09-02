@@ -1,21 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SmartImage from './SmartImage';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
+import { getPositionCategory, PES_POSITION_THEMES } from '../utils/formationPresets';
+import { calculateFifaAttributes } from '../utils/playerCardUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-// Sostavni tahrirlash (FormationBoard) sahifasi bilan AYNAN bir xil o'lcham —
-// shu bilan ikkala ekranda bir xil % koordinata bir xil piksel joyga tushadi.
-const FIELD_WIDTH = SCREEN_WIDTH - 40;
-const FIELD_HEIGHT = FIELD_WIDTH * 1.3;
+const FIELD_WIDTH = SCREEN_WIDTH - 32;
+const FIELD_HEIGHT = FIELD_WIDTH * 1.34;
 
 interface PlayerPosition {
     id: string;
     name: string;
     number?: string | number;
     photo?: string | null;
+    position?: string;
+    role?: string;
+    ovr?: number;
     x: number;
     y: number;
     goals?: number;
@@ -29,22 +32,35 @@ interface TacticsBoardProps {
     onPlayerPress?: (player: any) => void;
 }
 
-const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#3B82F6', formation, onPlayerPress }) => {
+const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#00DF82', formation, onPlayerPress }) => {
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
-    const lineColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)';
+    const lineColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.25)';
+    const grassStripeColor = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)';
 
     return (
         <View style={styles.container}>
             <View style={styles.pitchWrapper}>
-                <View style={[styles.pitch, { backgroundColor: homeColors.surface, borderColor: lineColor }]}>
+                <View style={[styles.pitch, { backgroundColor: isDark ? '#0F1A15' : '#E6F4EA', borderColor: lineColor }]}>
+                    {/* GRASS STRIPES */}
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <View
+                            key={i}
+                            style={[
+                                styles.grassStripe,
+                                { top: `${i * 16.66}%`, backgroundColor: i % 2 === 0 ? grassStripeColor : 'transparent' }
+                            ]}
+                        />
+                    ))}
+
+                    {/* PITCH MARKINGS */}
                     <View style={[styles.outerBorder, { borderColor: lineColor }]} />
-                    <View style={[styles.penaltyArea, styles.topPenalty, { borderColor: lineColor }]} />
-                    <View style={[styles.goalArea, styles.topGoal, { borderColor: lineColor }]} />
+                    <View style={[styles.penaltyAreaTop, { borderColor: lineColor }]} />
+                    <View style={[styles.goalAreaTop, { borderColor: lineColor }]} />
                     <View style={[styles.centerLine, { backgroundColor: lineColor }]} />
                     <View style={[styles.centerCircle, { borderColor: lineColor }]} />
-                    <View style={[styles.penaltyArea, styles.bottomPenalty, { borderColor: lineColor }]} />
-                    <View style={[styles.goalArea, styles.bottomGoal, { borderColor: lineColor }]} />
+                    <View style={[styles.penaltyAreaBottom, { borderColor: lineColor }]} />
+                    <View style={[styles.goalAreaBottom, { borderColor: lineColor }]} />
 
                     {players.map((player) => {
                         const xPct = Number(player.x);
@@ -54,40 +70,58 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#3B82
                         const left = (safeX / 100) * FIELD_WIDTH;
                         const top = (safeY / 100) * FIELD_HEIGHT;
 
+                        const cat = getPositionCategory(player.position || player.role);
+                        const posStyle = PES_POSITION_THEMES[cat];
+                        const ovr = player.ovr || calculateFifaAttributes(player).ovr || 65;
+
                         return (
-                            <View
+                            <TouchableOpacity
                                 key={player.id}
                                 style={[
                                     styles.playerContainer,
-                                    { left: left - 25, top: top - 30 }
+                                    { left: left - 28, top: top - 32 }
                                 ]}
+                                activeOpacity={0.85}
+                                onPress={() => onPlayerPress && onPlayerPress(player)}
                             >
-                                <View style={styles.avatarWrap}>
+                                <View style={[styles.pesAvatarBox, { borderColor: posStyle.bg, backgroundColor: homeColors.surface }]}>
                                     <SmartImage
                                         uri={player.photo}
-                                        style={styles.avatar}
-                                        borderRadius={24}
+                                        style={styles.pesAvatar}
+                                        borderRadius={20}
                                         fallbackIcon="person"
                                         fallbackIconSize={20}
                                     />
-                                    <View style={[styles.numberBadge, { backgroundColor: teamColor, borderColor: homeColors.background }]}>
-                                        <Text style={styles.numberBadgeText}>{player.number || ''}</Text>
+
+                                    {/* PES ROLE BADGE */}
+                                    <View style={[styles.pesRoleBadge, { backgroundColor: posStyle.bg }]}>
+                                        <Text style={[styles.pesRoleBadgeText, { color: posStyle.text }]}>
+                                            {player.role || posStyle.label}
+                                        </Text>
                                     </View>
-                                    {((player.goals || 0) > 0) && (
-                                        <View style={[styles.statBadge, { borderColor: homeColors.background }]}>
-                                            <Ionicons name="football" size={9} color="#000" />
-                                            <Text style={styles.statBadgeText}>{player.goals}</Text>
+
+                                    {/* OVR BADGE */}
+                                    {!!ovr && (
+                                        <View style={[styles.pesOvrBadge, { backgroundColor: '#111827', borderColor: posStyle.bg }]}>
+                                            <Text style={styles.pesOvrBadgeText}>{ovr}</Text>
+                                        </View>
+                                    )}
+
+                                    {/* NUMBER BADGE */}
+                                    {!!player.number && (
+                                        <View style={[styles.pesNumberBadge, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                                            <Text style={[styles.pesNumberBadgeText, { color: homeColors.textPrimary }]}>{player.number}</Text>
                                         </View>
                                     )}
                                 </View>
 
-                                <Text
-                                    style={[styles.playerName, { color: homeColors.textPrimary }]}
-                                    numberOfLines={1}
-                                >
-                                    {player.name}
-                                </Text>
-                            </View>
+                                {/* PLAYER NAME */}
+                                <View style={[styles.pesNameTag, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                                    <Text style={[styles.pesNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                        {(player.name || '').toUpperCase()}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
                         );
                     })}
                 </View>
@@ -110,15 +144,21 @@ const styles = StyleSheet.create({
     pitch: {
         width: FIELD_WIDTH,
         height: FIELD_HEIGHT,
-        borderRadius: 15,
+        borderRadius: 16,
         borderWidth: 2,
         overflow: 'hidden',
         position: 'relative',
     },
+    grassStripe: {
+        position: 'absolute',
+        width: '100%',
+        height: '16.66%',
+    },
     outerBorder: {
         ...StyleSheet.absoluteFillObject,
         borderWidth: 1.5,
-        margin: 4,
+        margin: 5,
+        borderRadius: 12,
     },
     centerLine: {
         position: 'absolute',
@@ -130,99 +170,124 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: '50%',
         left: '50%',
-        width: 90,
-        height: 90,
-        borderRadius: 45,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
         borderWidth: 1.5,
-        marginTop: -45,
-        marginLeft: -45,
+        marginTop: -40,
+        marginLeft: -40,
     },
-    penaltyArea: {
+    penaltyAreaTop: {
         position: 'absolute',
-        width: '60%',
+        top: 5,
+        width: '56%',
         height: '18%',
-        left: '20%',
+        left: '22%',
         borderWidth: 1.5,
-    },
-    topPenalty: {
-        top: 0,
         borderTopWidth: 0,
     },
-    bottomPenalty: {
-        bottom: 0,
+    goalAreaTop: {
+        position: 'absolute',
+        top: 5,
+        width: '28%',
+        height: '6%',
+        left: '36%',
+        borderWidth: 1.5,
+        borderTopWidth: 0,
+    },
+    penaltyAreaBottom: {
+        position: 'absolute',
+        bottom: 5,
+        width: '56%',
+        height: '18%',
+        left: '22%',
+        borderWidth: 1.5,
         borderBottomWidth: 0,
     },
-    goalArea: {
+    goalAreaBottom: {
         position: 'absolute',
-        width: '30%',
+        bottom: 5,
+        width: '28%',
         height: '6%',
-        left: '35%',
+        left: '36%',
         borderWidth: 1.5,
-    },
-    topGoal: {
-        top: 0,
-        borderTopWidth: 0,
-    },
-    bottomGoal: {
-        bottom: 0,
         borderBottomWidth: 0,
     },
     playerContainer: {
         position: 'absolute',
         alignItems: 'center',
-        width: 50,
+        width: 56,
         zIndex: 5,
     },
-    avatarWrap: {
-        width: 50,
-        height: 50,
-    },
-    avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-    },
-    numberBadge: {
-        position: 'absolute',
-        bottom: -3,
-        right: -3,
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        justifyContent: 'center',
+    pesAvatarBox: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 2,
+        position: 'relative',
         alignItems: 'center',
-        borderWidth: 1.5,
+        justifyContent: 'center',
     },
-    numberBadgeText: {
-        color: '#FFFFFF',
-        fontSize: 9,
-        fontWeight: '900',
+    pesAvatar: {
+        width: 40,
+        height: 40,
     },
-    playerName: {
-        fontSize: 10,
-        fontWeight: 'bold',
-        marginTop: 3,
-        textAlign: 'center',
-        width: 68,
-    },
-    statBadge: {
+    pesRoleBadge: {
         position: 'absolute',
         top: -6,
         left: -6,
-        backgroundColor: '#FFF',
-        borderRadius: 6,
-        paddingHorizontal: 3,
+        paddingHorizontal: 4,
         paddingVertical: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        zIndex: 10,
-        borderWidth: 1.5,
+        borderRadius: 4,
+        zIndex: 12,
     },
-    statBadgeText: {
-        color: '#000',
-        fontSize: 7,
-        fontWeight: 'bold',
-        marginLeft: 1,
+    pesRoleBadgeText: {
+        fontSize: 7.5,
+        fontWeight: '900',
+    },
+    pesOvrBadge: {
+        position: 'absolute',
+        top: -6,
+        right: -6,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 1,
+        zIndex: 12,
+    },
+    pesOvrBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 7.5,
+        fontWeight: '900',
+    },
+    pesNumberBadge: {
+        position: 'absolute',
+        bottom: -3,
+        right: -3,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 12,
+    },
+    pesNumberBadgeText: {
+        fontSize: 8,
+        fontWeight: '900',
+    },
+    pesNameTag: {
+        marginTop: 3,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 0.5,
+        maxWidth: 62,
+    },
+    pesNameText: {
+        fontSize: 8.5,
+        fontWeight: '800',
+        textAlign: 'center',
     },
 });
 

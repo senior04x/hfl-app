@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     View,
     Text,
@@ -11,8 +11,9 @@ import {
     Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { apiService, supabase } from '../services/apiService';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import SmartImage from '../components/SmartImage';
 import {
     GestureHandlerRootView,
@@ -23,35 +24,52 @@ import Animated, {
     useAnimatedStyle,
     useSharedValue,
     runOnJS,
+    withSpring,
 } from 'react-native-reanimated';
 import { useSocket } from '../context/SocketContext';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { useTranslation } from 'react-i18next';
+import {
+    MatchFormat,
+    FORMATION_PRESETS,
+    FormationPreset,
+    getPositionCategory,
+    getPesPositionStyle,
+    PES_POSITION_THEMES,
+} from '../utils/formationPresets';
+import { autoPickLineup, AssignedPitchPlayer } from '../utils/formationAutoPicker';
+import { calculateFifaAttributes } from '../utils/playerCardUtils';
+import { getLocalizedPosition } from '../utils/localizationUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-// MyTeam sahifasidagi TacticsBoard bilan AYNAN bir xil o'lcham — ikkala ekranda
-// bir xil % koordinata bir xil piksel joyga tushishi uchun.
-const FIELD_WIDTH = SCREEN_WIDTH - 40;
-const FIELD_HEIGHT = FIELD_WIDTH * 1.3;
+const FIELD_WIDTH = SCREEN_WIDTH - 32;
+const FIELD_HEIGHT = FIELD_WIDTH * 1.34;
 
-interface PlayerPosition {
+export interface PitchPlayer {
     id: string;
     name: string;
+    firstName?: string;
+    lastName?: string;
     number?: string | number;
-    x: number;
-    y: number;
+    photo?: string | null;
+    position?: string;
+    role?: string;
+    ovr?: number;
+    x: number; // 0 to 100 percentage
+    y: number; // 0 to 100 percentage
 }
 
-function FormationBoard({ route, navigation }: any) {
+export default function FormationBoard({ route, navigation }: any) {
     const { t } = useTranslation();
     const { teamId, isReadOnly: initialReadOnly = false } = route.params || {};
     const { user } = useAuthStore();
     const isReadOnly = route.params?.isReadOnly || user?.role === 'player';
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
-    const lineColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)';
+    const lineColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.25)';
+    const grassStripeColor = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)';
 
     const cardSurface = Platform.OS === 'ios'
         ? { backgroundColor: homeColors.background, borderWidth: 1, borderColor: homeColors.border }
@@ -65,10 +83,41 @@ function FormationBoard({ route, navigation }: any) {
         };
 
     const [loading, setLoading] = useState(true);
-    const [playersOnPitch, setPlayersOnPitch] = useState<PlayerPosition[]>([]);
+    const [playersOnPitch, setPlayersOnPitch] = useState<PitchPlayer[]>([]);
     const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
     const [saving, setSaving] = useState(false);
+    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+
+    // Format & Preset State
+    const [selectedFormat, setSelectedFormat] = useState<MatchFormat>('8v8');
+    const [selectedPresetId, setSelectedPresetId] = useState<string>('8v8_2-3-2');
     const { socket } = useSocket();
+
+    const currentPresets = useMemo(() => {
+        return FORMATION_PRESETS[selectedFormat] || FORMATION_PRESETS['8v8'];
+    }, [selectedFormat]);
+
+    const activePreset = useMemo(() => {
+        return currentPresets.find(p => p.id === selectedPresetId) || currentPresets[0];
+    }, [currentPresets, selectedPresetId]);
+
+    // Average Team OVR Rating on pitch
+    const averagePitchOvr = useMemo(() => {
+        if (playersOnPitch.length === 0) return 0;
+        const total = playersOnPitch.reduce((sum, p) => sum + (p.ovr || 60), 0);
+        return Math.round(total / playersOnPitch.length);
+    }, [playersOnPitch]);
+
+    const maxPitchPlayers = useMemo(() => {
+        switch (selectedFormat) {
+            case '5v5': return 5;
+            case '6v6': return 6;
+            case '7v7': return 7;
+            case '8v8': return 8;
+            case '11v11': return 11;
+            default: return 8;
+        }
+    }, [selectedFormat]);
 
     useEffect(() => {
         fetchData();
@@ -76,7 +125,7 @@ function FormationBoard({ route, navigation }: any) {
         if (socket && (teamId || user?.teamId)) {
             const activeTeamId = teamId || user?.teamId;
             socket.on('formation-updated', (data: any) => {
-                if (data.teamId === activeTeamId) {
+                if (data.teamId === activeTeamId && data.formation?.players) {
                     setPlayersOnPitch(data.formation.players);
                 }
             });
@@ -128,15 +177,100 @@ function FormationBoard({ route, navigation }: any) {
                 teamPlayers = pRes || [];
             }
 
-            setAvailablePlayers(teamPlayers || []);
+            const activeTeamPlayers = (teamPlayers || []).filter((p: any) => {
+                const st = String(p.status || '').toLowerCase().trim();
+                const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
+                return !isArchived && st === 'approved';
+            });
 
-            if (team?.formation?.players && Array.isArray(team.formation.players)) {
-                setPlayersOnPitch(team.formation.players);
+            setAvailablePlayers(activeTeamPlayers);
+
+            // Auto-detect best format based on player count if not set
+            if (activeTeamPlayers.length <= 6 && activeTeamPlayers.length > 0) {
+                setSelectedFormat('6v6');
+                setSelectedPresetId('6v6_2-2-1');
+            } else if (activeTeamPlayers.length === 7) {
+                setSelectedFormat('7v7');
+                setSelectedPresetId('7v7_2-3-1');
+            } else if (activeTeamPlayers.length >= 12) {
+                setSelectedFormat('11v11');
+                setSelectedPresetId('11v11_4-3-3');
+            } else {
+                setSelectedFormat('8v8');
+                setSelectedPresetId('8v8_2-3-2');
+            }
+
+            if (team?.formation?.players && Array.isArray(team.formation.players) && team.formation.players.length > 0) {
+                // Enrich existing formation players with photos, ovr and latest info
+                const enrichedFormation = team.formation.players.map((fp: any) => {
+                    const matchedRoster = activeTeamPlayers.find((p: any) => String(p.id || p._id) === String(fp.id));
+                    const ovr = matchedRoster ? calculateFifaAttributes(matchedRoster).ovr : (fp.ovr || 65);
+                    return {
+                        ...fp,
+                        photo: matchedRoster?.photo || matchedRoster?.photo_url || matchedRoster?.avatar || fp.photo || null,
+                        number: matchedRoster?.number || matchedRoster?.player_number || fp.number || '',
+                        ovr,
+                        role: fp.role || getPositionCategory(matchedRoster?.position || fp.position),
+                    };
+                });
+                setPlayersOnPitch(enrichedFormation);
             }
         } catch (error) {
-            console.error('Error fetching data:', error);
+            console.error('Error fetching formation data:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // ⚡ AVTO-SOSTAV (Auto-Lineup) Action
+    const handleAutoPick = () => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } catch (e) {}
+
+        if (!availablePlayers || availablePlayers.length === 0) {
+            Alert.alert(t('common.error', 'Xato'), t('teams.no_players', 'Tarkibda o\'yinchilar mavjud emas'));
+            return;
+        }
+
+        const picked = autoPickLineup(availablePlayers, activePreset);
+        setPlayersOnPitch(picked);
+        setSelectedPlayerId(null);
+    };
+
+    // Switch Preset Scheme
+    const handleSelectPreset = (preset: FormationPreset) => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+
+        setSelectedPresetId(preset.id);
+
+        // If there are players already on pitch, smoothly remap their coordinates to the new slots
+        if (playersOnPitch.length > 0) {
+            const remapped = playersOnPitch.map((player, idx) => {
+                const slot = preset.slots[idx] || preset.slots[preset.slots.length - 1];
+                return {
+                    ...player,
+                    role: slot?.role || player.role,
+                    x: slot ? slot.x : player.x,
+                    y: slot ? slot.y : player.y,
+                };
+            });
+            setPlayersOnPitch(remapped);
+        }
+    };
+
+    // Switch Format (e.g. 5v5 -> 8v8)
+    const handleSelectFormat = (fmt: MatchFormat) => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+
+        setSelectedFormat(fmt);
+        const presets = FORMATION_PRESETS[fmt] || [];
+        if (presets.length > 0) {
+            setSelectedPresetId(presets[0].id);
         }
     };
 
@@ -161,29 +295,40 @@ function FormationBoard({ route, navigation }: any) {
             }
 
             if (!targetId) {
-                Alert.alert('Xatolik', 'Jamoa aniqlanmadi.');
+                Alert.alert(t('common.error', 'Xato'), 'Jamoa aniqlanmadi.');
                 return;
             }
 
-            const response = await apiService.updateFormation(targetId, { players: playersOnPitch });
+            const response = await apiService.updateFormation(targetId, {
+                players: playersOnPitch,
+                format: selectedFormat,
+                preset: activePreset.name,
+            });
+
             if (response.success) {
                 if (socket) {
-                    socket.emit('update-formation', { teamId: targetId, formation: { players: playersOnPitch } });
+                    socket.emit('update-formation', {
+                        teamId: targetId,
+                        formation: {
+                            players: playersOnPitch,
+                            format: selectedFormat,
+                            preset: activePreset.name,
+                        },
+                    });
                 }
-                Alert.alert('🎉 Muvaffaqiyat!', 'Sostav bazaga muvaffaqiyatli saqlandi va o\'yin obzorida ko\'rinadi!');
+                Alert.alert('🎉 ' + t('common.success', 'Muvaffaqiyatli'), 'Sostav bazaga muvaffaqiyatli saqlandi va profilda yangilandi!');
             } else {
-                Alert.alert('Xatolik', 'Sostavni saqlashda xatolik yuz berdi.');
+                Alert.alert(t('common.error', 'Xato'), response.error || 'Sostavni saqlashda xatolik yuz berdi.');
             }
         } catch (error) {
             console.error('Error saving formation:', error);
-            Alert.alert('Xatolik', 'Sostavni saqlab bo\'lmadi');
+            Alert.alert(t('common.error', 'Xato'), "Server bilan bog'lanishda xatolik");
         } finally {
             setSaving(false);
         }
     };
 
     const updatePlayerPosition = (id: string, x: number, y: number) => {
-        // Convert back to percentages (0-100) for storage
         const xPercent = (x / FIELD_WIDTH) * 100;
         const yPercent = (y / FIELD_HEIGHT) * 100;
 
@@ -192,26 +337,94 @@ function FormationBoard({ route, navigation }: any) {
         ));
     };
 
-    const addPlayerToPitch = (player: any) => {
-        const id = (player._id || player.id).toString();
-        if (playersOnPitch.find(p => p.id === id)) {
-            Alert.alert('Xatolik', 'Bu o\'yinchi allaqachon maydonda');
-            return;
+    const handlePlayerPress = (player: PitchPlayer) => {
+        if (isReadOnly) return;
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+
+        if (selectedPlayerId === player.id) {
+            setSelectedPlayerId(null);
+        } else {
+            setSelectedPlayerId(player.id);
         }
+    };
 
-        const newPlayer: PlayerPosition = {
-            id,
-            name: player.firstName || player.name || 'O\'yinchi',
-            number: player.number,
-            x: 50, // Center
-            y: 80  // Bottom
-        };
+    // Swap or Add Bench Player
+    const handleBenchPlayerPress = (benchPlayer: any) => {
+        if (isReadOnly) return;
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } catch (e) {}
 
-        setPlayersOnPitch([...playersOnPitch, newPlayer]);
+        const bId = String(benchPlayer._id || benchPlayer.id);
+        const isOnPitch = playersOnPitch.some(p => p.id === bId);
+        if (isOnPitch) return;
+
+        const ovr = calculateFifaAttributes(benchPlayer).ovr || 60;
+        const cat = getPositionCategory(benchPlayer.position);
+        const name = (benchPlayer.firstName || benchPlayer.name || 'O\'yinchi').trim();
+        const photo = benchPlayer.photo || benchPlayer.photo_url || benchPlayer.avatar || null;
+        const number = benchPlayer.number || benchPlayer.player_number || benchPlayer.shirt_number || '-';
+
+        if (selectedPlayerId) {
+            // SWAP selected pitch player with this bench player
+            setPlayersOnPitch(prev => prev.map(p => {
+                if (p.id === selectedPlayerId) {
+                    return {
+                        ...p,
+                        id: bId,
+                        name,
+                        firstName: name,
+                        lastName: benchPlayer.lastName || benchPlayer.last_name || '',
+                        number,
+                        photo,
+                        position: benchPlayer.position,
+                        role: p.role || cat,
+                        ovr,
+                    };
+                }
+                return p;
+            }));
+            setSelectedPlayerId(null);
+        } else {
+            // ADD to pitch if under max
+            if (playersOnPitch.length >= maxPitchPlayers) {
+                Alert.alert(
+                    'Maydon to\'la',
+                    `Maydonda maksimal ${maxPitchPlayers} ta o'yinchi bo'lishi mumkin. O'yinchi almashtirish uchun maydondagi o'yinchini tanlang.`
+                );
+                return;
+            }
+
+            // Find an open slot coordinate from preset
+            const nextSlotIndex = playersOnPitch.length;
+            const slot = activePreset.slots[nextSlotIndex] || { role: cat, x: 50, y: 50 };
+
+            const newPitchPlayer: PitchPlayer = {
+                id: bId,
+                name,
+                firstName: name,
+                lastName: benchPlayer.lastName || benchPlayer.last_name || '',
+                number,
+                photo,
+                position: benchPlayer.position,
+                role: slot.role,
+                ovr,
+                x: slot.x,
+                y: slot.y,
+            };
+
+            setPlayersOnPitch([...playersOnPitch, newPitchPlayer]);
+        }
     };
 
     const removePlayerFromPitch = (id: string) => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } catch (e) {}
         setPlayersOnPitch(playersOnPitch.filter(p => p.id !== id));
+        if (selectedPlayerId === id) setSelectedPlayerId(null);
     };
 
     if (loading) {
@@ -225,17 +438,31 @@ function FormationBoard({ route, navigation }: any) {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                {/* HEADER */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, cardSurface]}>
                         <Ionicons name="arrow-back" size={20} color={homeColors.textPrimary} />
                     </TouchableOpacity>
-                    <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]}>{isReadOnly ? t('teams.squad') : t('teams.edit_formation')}</Text>
+
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]}>
+                            {isReadOnly ? t('teams.squad') : t('teams.edit_formation')}
+                        </Text>
+                        <Text style={[styles.headerSub, { color: homeColors.textSecondary }]}>
+                            {activePreset.name} • {selectedFormat}
+                        </Text>
+                    </View>
+
                     {!isReadOnly ? (
-                        <TouchableOpacity onPress={handleSave} disabled={saving}>
+                        <TouchableOpacity
+                            onPress={handleSave}
+                            disabled={saving}
+                            style={[styles.saveBtn, { backgroundColor: homeColors.accent }]}
+                        >
                             {saving ? (
-                                <ActivityIndicator size="small" color={homeColors.accent} />
+                                <ActivityIndicator size="small" color="#000000" />
                             ) : (
-                                <Text style={[styles.saveText, { color: homeColors.accent }]}>{t('common.save').toUpperCase()}</Text>
+                                <Text style={styles.saveBtnText}>{t('common.save', 'Saqlash')}</Text>
                             )}
                         </TouchableOpacity>
                     ) : (
@@ -243,29 +470,121 @@ function FormationBoard({ route, navigation }: any) {
                     )}
                 </View>
 
-                <ScrollView contentContainerStyle={styles.scrollContent}>
-                    {/* ASOSIY TARKIB HEADER */}
-                    <View style={styles.sectionHeaderRow}>
-                        <Ionicons name="football-outline" size={18} color={homeColors.textSecondary} />
-                        <Text style={[styles.sectionHeaderTitle, { color: homeColors.textPrimary }]}>{t('teams.starting_lineup')}</Text>
-                        <Text style={[styles.sectionHeaderCount, { color: homeColors.accent }]}>{playersOnPitch.length} / 11</Text>
-                    </View>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    {/* FORMAT & AUTO-PICK CONTROLS BAR */}
+                    {!isReadOnly && (
+                        <View style={styles.controlBarContainer}>
+                            {/* MATCH FORMAT PICKER PILLS */}
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.formatScroll}
+                            >
+                                {(['5v5', '6v6', '7v7', '8v8', '11v11'] as MatchFormat[]).map((fmt) => {
+                                    const isSelected = selectedFormat === fmt;
+                                    return (
+                                        <TouchableOpacity
+                                            key={fmt}
+                                            style={[
+                                                styles.formatPill,
+                                                { borderColor: isSelected ? homeColors.accent : homeColors.border },
+                                                isSelected && { backgroundColor: isDark ? 'rgba(0, 223, 130, 0.15)' : 'rgba(0, 223, 130, 0.2)' }
+                                            ]}
+                                            onPress={() => handleSelectFormat(fmt)}
+                                        >
+                                            <Text style={[styles.formatPillText, { color: isSelected ? homeColors.accent : homeColors.textSecondary }]}>
+                                                {fmt}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
 
+                            {/* AUTO LINEUP (AVTO-SOSTAV) BUTTON */}
+                            <TouchableOpacity
+                                style={[styles.autoPickBtn, { backgroundColor: isDark ? '#1C2520' : '#E8F8F0', borderColor: homeColors.accent }]}
+                                onPress={handleAutoPick}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="flash" size={15} color={homeColors.accent} style={{ marginRight: 6 }} />
+                                <Text style={[styles.autoPickBtnText, { color: homeColors.accent }]}>
+                                    {t('teams.auto_formation', 'AVTO-SOSTAV').toUpperCase()}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* FORMATION PRESETS HORIZONTAL TRAY */}
+                    {!isReadOnly && (
+                        <View style={styles.presetsTrayContainer}>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.presetsScroll}
+                            >
+                                {currentPresets.map((preset) => {
+                                    const isSelected = selectedPresetId === preset.id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={preset.id}
+                                            style={[
+                                                styles.presetChip,
+                                                cardSurface,
+                                                isSelected && {
+                                                    borderColor: homeColors.accent,
+                                                    backgroundColor: isDark ? 'rgba(0, 223, 130, 0.12)' : 'rgba(0, 223, 130, 0.15)',
+                                                }
+                                            ]}
+                                            onPress={() => handleSelectPreset(preset)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name="soccer-field"
+                                                size={16}
+                                                color={isSelected ? homeColors.accent : homeColors.textSecondary}
+                                                style={{ marginRight: 5 }}
+                                            />
+                                            <Text style={[styles.presetChipText, { color: isSelected ? homeColors.accent : homeColors.textPrimary }]}>
+                                                {preset.name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                    )}
+
+                    {/* PES 2013 TACTICAL PITCH */}
                     <View style={styles.fieldWrapper}>
-                        <View style={[styles.field, { backgroundColor: homeColors.surface, borderColor: lineColor }]}>
+                        <View style={[styles.field, { backgroundColor: isDark ? '#0F1A15' : '#E6F4EA', borderColor: lineColor }]}>
+                            {/* GRASS STRIPES */}
+                            {[0, 1, 2, 3, 4, 5].map((i) => (
+                                <View
+                                    key={i}
+                                    style={[
+                                        styles.grassStripe,
+                                        { top: `${i * 16.66}%`, backgroundColor: i % 2 === 0 ? grassStripeColor : 'transparent' }
+                                    ]}
+                                />
+                            ))}
+
+                            {/* PITCH MARKINGS */}
                             <View style={[styles.outerBorder, { borderColor: lineColor }]} />
-                            <View style={[styles.centerCircle, { borderColor: lineColor }]} />
-                            <View style={[styles.centerLine, { backgroundColor: lineColor }]} />
                             <View style={[styles.penaltyAreaTop, { borderColor: lineColor }]} />
-                            <View style={[styles.penaltyAreaBottom, { borderColor: lineColor }]} />
                             <View style={[styles.goalAreaTop, { borderColor: lineColor }]} />
+                            <View style={[styles.centerLine, { backgroundColor: lineColor }]} />
+                            <View style={[styles.centerCircle, { borderColor: lineColor }]} />
+                            <View style={[styles.penaltyAreaBottom, { borderColor: lineColor }]} />
                             <View style={[styles.goalAreaBottom, { borderColor: lineColor }]} />
 
+                            {/* DRAGGABLE TACTICAL PLAYERS */}
                             {playersOnPitch.map((player) => (
-                                <DraggablePlayer
+                                <PesDraggablePlayer
                                     key={player.id}
                                     player={player}
+                                    isSelected={selectedPlayerId === player.id}
                                     onPositionChange={updatePlayerPosition}
+                                    onPress={() => handlePlayerPress(player)}
                                     onRemove={() => removePlayerFromPitch(player.id)}
                                     isReadOnly={isReadOnly}
                                     homeColors={homeColors}
@@ -274,63 +593,132 @@ function FormationBoard({ route, navigation }: any) {
                         </View>
                     </View>
 
-                    {/* ZAXIRA O'YINCHILARI SECTION (Always visible so players & managers can see bench) */}
+                    {/* SQUAD INFO & SWAP HINT BAR */}
+                    <View style={[styles.squadStatusBar, cardSurface]}>
+                        <View style={styles.statusItem}>
+                            <Text style={[styles.statusLabel, { color: homeColors.textSecondary }]}>O'YINCHILAR</Text>
+                            <Text style={[styles.statusValue, { color: homeColors.textPrimary }]}>
+                                {playersOnPitch.length} / {maxPitchPlayers}
+                            </Text>
+                        </View>
+
+                        <View style={[styles.statusDivider, { backgroundColor: homeColors.border }]} />
+
+                        <View style={styles.statusItem}>
+                            <Text style={[styles.statusLabel, { color: homeColors.textSecondary }]}>O'RTACHA REYTING</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Ionicons name="star" size={13} color="#F59E0B" />
+                                <Text style={[styles.statusValue, { color: homeColors.accent }]}>{averagePitchOvr}</Text>
+                            </View>
+                        </View>
+
+                        <View style={[styles.statusDivider, { backgroundColor: homeColors.border }]} />
+
+                        <View style={styles.statusItem}>
+                            <Text style={[styles.statusLabel, { color: homeColors.textSecondary }]}>SXEMA</Text>
+                            <Text style={[styles.statusValue, { color: homeColors.textPrimary }]}>{activePreset.name}</Text>
+                        </View>
+                    </View>
+
+                    {selectedPlayerId && (
+                        <View style={[styles.swapHintBanner, { backgroundColor: isDark ? 'rgba(0, 223, 130, 0.12)' : 'rgba(0, 223, 130, 0.18)', borderColor: homeColors.accent }]}>
+                            <Ionicons name="swap-horizontal" size={16} color={homeColors.accent} />
+                            <Text style={[styles.swapHintText, { color: homeColors.textPrimary }]}>
+                                {t('teams.swap_hint', "Almashtirish uchun pastdan zaxira o'yinchisini bosing")}
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* BENCH / SUBSTITUTES SECTION (PES 2013 STYLE) */}
                     <View style={styles.subsSection}>
                         <View style={styles.subsHeader}>
-                            <Ionicons name="people-outline" size={18} color={homeColors.textSecondary} />
-                            <Text style={[styles.subsTitle, { color: homeColors.textSecondary }]}>{t('teams.substitutes')}</Text>
-                            <Text style={[styles.subsCount, { color: homeColors.accent }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="people-outline" size={18} color={homeColors.textSecondary} />
+                                <Text style={[styles.subsTitle, { color: homeColors.textPrimary }]}>{t('teams.substitutes')}</Text>
+                            </View>
+                            <Text style={[styles.subsCountBadge, { backgroundColor: homeColors.surface, color: homeColors.accent }]}>
                                 {availablePlayers.filter(p => {
-                                    const id = (p._id || p.id).toString();
+                                    const id = String(p._id || p.id);
                                     return !playersOnPitch.some(pitchP => pitchP.id === id);
-                                }).length}
+                                }).length} {t('teams.bench_count', { count: '' }).trim()}
                             </Text>
                         </View>
 
                         <View style={styles.subsListVertical}>
                             {availablePlayers.map(player => {
-                                const id = (player._id || player.id).toString();
-                                const isOnPitch = !!playersOnPitch.find(p => p.id === id);
+                                const id = String(player._id || player.id);
+                                const isOnPitch = playersOnPitch.some(p => p.id === id);
                                 const firstName = player.firstName || player.first_name || player.name || 'O\'yinchi';
                                 const lastName = player.lastName || player.last_name || '';
                                 const number = player.number || player.player_number || player.shirt_number || '-';
-                                const photo = player.photo_url || player.photo || player.photoUrl;
+                                const photo = player.photo_url || player.photo || player.photoUrl || player.avatar;
+                                const ovr = calculateFifaAttributes(player).ovr || 60;
+                                const cat = getPositionCategory(player.position);
+                                const posStyle = PES_POSITION_THEMES[cat];
 
                                 return (
                                     <TouchableOpacity
                                         key={id}
-                                        style={[styles.subRow, cardSurface, isOnPitch && { opacity: 0.55 }]}
-                                        onPress={() => addPlayerToPitch(player)}
+                                        style={[
+                                            styles.subRowCard,
+                                            cardSurface,
+                                            isOnPitch && { opacity: 0.55 },
+                                            selectedPlayerId && !isOnPitch && { borderColor: homeColors.accent, borderWidth: 1.5 }
+                                        ]}
+                                        onPress={() => handleBenchPlayerPress(player)}
                                         disabled={isReadOnly || isOnPitch}
                                         activeOpacity={0.7}
                                     >
+                                        {/* PHOTO & NUMBER */}
                                         <View style={styles.subRowPhotoContainer}>
                                             <SmartImage
                                                 uri={photo}
                                                 style={styles.subRowPhoto}
-                                                borderRadius={22}
+                                                borderRadius={20}
                                                 fallbackIcon="person"
                                                 fallbackIconSize={20}
                                             />
-                                        </View>
-
-                                        <View style={styles.subRowInfo}>
-                                            <Text style={[styles.subRowFirstName, { color: homeColors.textPrimary }]}>{firstName}</Text>
-                                            {lastName ? (
-                                                <Text style={[styles.subRowLastName, { color: homeColors.textSecondary }]}>{lastName}</Text>
-                                            ) : null}
-                                        </View>
-
-                                        <View style={styles.subRowNumberContainer}>
-                                            <View style={[styles.subRowNumberCircle, { backgroundColor: isOnPitch ? homeColors.border : homeColors.accent }]}>
-                                                <Text style={[styles.subRowNumberText, { color: isOnPitch ? homeColors.textSecondary : homeColors.background }]}>{number}</Text>
+                                            <View style={[styles.subNumberBadge, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                                                <Text style={[styles.subNumberText, { color: homeColors.textPrimary }]}>{number}</Text>
                                             </View>
                                         </View>
 
-                                        <View style={styles.subRowBadgeContainer}>
-                                            <Text style={[styles.subStatusBadge, isOnPitch ? styles.badgeMain : styles.badgeSub]}>
-                                                {isOnPitch ? 'ASOSIY' : 'ZAXIRA'}
+                                        {/* NAME & LOCALIZED POSITION */}
+                                        <View style={styles.subRowInfo}>
+                                            <Text style={[styles.subRowFirstName, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                {firstName} {lastName}
                                             </Text>
+                                            <Text style={[styles.subRowPosText, { color: homeColors.textSecondary }]}>
+                                                {getLocalizedPosition(player.position, t)}
+                                            </Text>
+                                        </View>
+
+                                        {/* PES POSITION CATEGORY BADGE */}
+                                        <View style={[styles.pesCategoryPill, { backgroundColor: posStyle.bg }]}>
+                                            <Text style={[styles.pesCategoryPillText, { color: posStyle.text }]}>{posStyle.label}</Text>
+                                        </View>
+
+                                        {/* OVR RATING BADGE */}
+                                        <View style={[styles.ovrBadgeCircle, { borderColor: homeColors.border, backgroundColor: homeColors.surface }]}>
+                                            <Text style={[styles.ovrBadgeText, { color: homeColors.accent }]}>{ovr}</Text>
+                                        </View>
+
+                                        {/* ACTION STATUS BUTTON */}
+                                        <View style={{ marginLeft: 8 }}>
+                                            {isOnPitch ? (
+                                                <View style={styles.badgeMainPill}>
+                                                    <Text style={styles.badgeMainPillText}>ASOSIY</Text>
+                                                </View>
+                                            ) : selectedPlayerId ? (
+                                                <View style={[styles.badgeSwapPill, { backgroundColor: homeColors.accent }]}>
+                                                    <Ionicons name="swap-horizontal" size={13} color="#000000" />
+                                                    <Text style={styles.badgeSwapPillText}>ALMASH</Text>
+                                                </View>
+                                            ) : (
+                                                <View style={[styles.badgeAddPill, { borderColor: homeColors.accent }]}>
+                                                    <Ionicons name="add" size={14} color={homeColors.accent} />
+                                                </View>
+                                            )}
                                         </View>
                                     </TouchableOpacity>
                                 );
@@ -341,17 +729,28 @@ function FormationBoard({ route, navigation }: any) {
             </SafeAreaView>
         </GestureHandlerRootView>
     );
-};
+}
 
-const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly, homeColors }: any) => {
-    // Shared values use absolute field coordinates for movement
+// 🎮 PES 2013 TACTICAL DRAGGABLE PLAYER MARKER
+const PesDraggablePlayer = ({
+    player,
+    isSelected,
+    onPositionChange,
+    onPress,
+    onRemove,
+    isReadOnly,
+    homeColors
+}: any) => {
+    const cat = getPositionCategory(player.position || player.role);
+    const posStyle = PES_POSITION_THEMES[cat];
+
     const translateX = useSharedValue((player.x / 100) * FIELD_WIDTH);
     const translateY = useSharedValue((player.y / 100) * FIELD_HEIGHT);
     const context = useSharedValue({ x: 0, y: 0 });
 
     useEffect(() => {
-        translateX.value = (player.x / 100) * FIELD_WIDTH;
-        translateY.value = (player.y / 100) * FIELD_HEIGHT;
+        translateX.value = withSpring((player.x / 100) * FIELD_WIDTH, { damping: 15 });
+        translateY.value = withSpring((player.y / 100) * FIELD_HEIGHT, { damping: 15 });
     }, [player.x, player.y]);
 
     const panGesture = Gesture.Pan()
@@ -363,9 +762,8 @@ const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly, homeC
             let nextX = context.value.x + event.translationX;
             let nextY = context.value.y + event.translationY;
 
-            // Constrain
-            translateX.value = Math.max(0, Math.min(FIELD_WIDTH, nextX));
-            translateY.value = Math.max(0, Math.min(FIELD_HEIGHT, nextY));
+            translateX.value = Math.max(20, Math.min(FIELD_WIDTH - 20, nextX));
+            translateY.value = Math.max(20, Math.min(FIELD_HEIGHT - 20, nextY));
         })
         .onEnd(() => {
             runOnJS(onPositionChange)(player.id, translateX.value, translateY.value);
@@ -374,21 +772,65 @@ const DraggablePlayer = ({ player, onPositionChange, onRemove, isReadOnly, homeC
     const animatedStyle = useAnimatedStyle(() => {
         return {
             transform: [
-                { translateX: translateX.value - 25 }, // Center icon (width=50)
-                { translateY: translateY.value - 25 }, // Center icon (height=50)
+                { translateX: translateX.value - 28 },
+                { translateY: translateY.value - 32 },
             ],
         };
     });
 
     return (
         <GestureDetector gesture={panGesture}>
-            <Animated.View style={[styles.playerMarker, animatedStyle]}>
-                <TouchableOpacity onLongPress={!isReadOnly ? onRemove : undefined} activeOpacity={0.8} disabled={isReadOnly}>
-                    <View style={[styles.playerIcon, { backgroundColor: homeColors.accent, borderColor: homeColors.background }]}>
-                        <Text style={[styles.playerNumberText, { color: homeColors.background }]}>{player.number || player.name.charAt(0)}</Text>
+            <Animated.View style={[styles.pesPlayerMarker, animatedStyle]}>
+                <TouchableOpacity
+                    onPress={onPress}
+                    onLongPress={!isReadOnly ? onRemove : undefined}
+                    activeOpacity={0.85}
+                    disabled={isReadOnly}
+                    style={styles.playerTouchable}
+                >
+                    {/* AVATAR WRAPPER WITH PES BORDER */}
+                    <View
+                        style={[
+                            styles.pesAvatarBox,
+                            { borderColor: posStyle.bg, backgroundColor: homeColors.surface },
+                            isSelected && { borderColor: homeColors.accent, borderWidth: 2.5, transform: [{ scale: 1.1 }] }
+                        ]}
+                    >
+                        <SmartImage
+                            uri={player.photo}
+                            style={styles.pesAvatar}
+                            borderRadius={22}
+                            fallbackIcon="person"
+                            fallbackIconSize={20}
+                        />
+
+                        {/* POSITION ROLE BADGE (TOP LEFT) */}
+                        <View style={[styles.pesRoleBadge, { backgroundColor: posStyle.bg }]}>
+                            <Text style={[styles.pesRoleBadgeText, { color: posStyle.text }]}>
+                                {player.role || posStyle.label}
+                            </Text>
+                        </View>
+
+                        {/* OVR RATING BADGE (TOP RIGHT) */}
+                        {!!player.ovr && (
+                            <View style={[styles.pesOvrBadge, { backgroundColor: '#111827', borderColor: posStyle.bg }]}>
+                                <Text style={styles.pesOvrBadgeText}>{player.ovr}</Text>
+                            </View>
+                        )}
+
+                        {/* NUMBER BADGE (BOTTOM RIGHT) */}
+                        {!!player.number && (
+                            <View style={[styles.pesNumberBadge, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                                <Text style={[styles.pesNumberBadgeText, { color: homeColors.textPrimary }]}>{player.number}</Text>
+                            </View>
+                        )}
                     </View>
-                    <View style={[styles.nameTag, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
-                        <Text style={[styles.playerNameTag, { color: homeColors.textPrimary }]} numberOfLines={1}>{player.name}</Text>
+
+                    {/* NAME TAG BADGE */}
+                    <View style={[styles.pesNameTag, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                        <Text style={[styles.pesNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                            {(player.firstName || player.name || '').toUpperCase()}
+                        </Text>
                     </View>
                 </TouchableOpacity>
             </Animated.View>
@@ -409,74 +851,118 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         paddingTop: 8,
-        paddingBottom: 12,
+        paddingBottom: 10,
     },
     iconBtn: {
-        width: 40,
-        height: 40,
+        width: 38,
+        height: 38,
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '900',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
-    saveText: {
+    headerSub: {
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: 1,
+    },
+    saveBtn: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 10,
+    },
+    saveBtnText: {
+        color: '#000000',
         fontWeight: '900',
-        fontSize: 14,
+        fontSize: 12,
+        letterSpacing: 0.3,
     },
     scrollContent: {
         paddingBottom: 40,
     },
-    sectionHeaderRow: {
+    controlBarContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        marginVertical: 10,
-        gap: 8,
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        marginBottom: 8,
+        gap: 10,
     },
-    sectionHeaderTitle: {
-        fontSize: 12,
-        fontWeight: '900',
-        letterSpacing: 2,
+    formatScroll: {
+        flexDirection: 'row',
+        gap: 6,
     },
-    sectionHeaderCount: {
+    formatPill: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    formatPillText: {
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    autoPickBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    autoPickBtnText: {
         fontSize: 11,
         fontWeight: '900',
-        marginLeft: 'auto',
+        letterSpacing: 0.3,
+    },
+    presetsTrayContainer: {
+        marginBottom: 10,
+    },
+    presetsScroll: {
+        paddingHorizontal: 16,
+        gap: 8,
+    },
+    presetChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
+    },
+    presetChipText: {
+        fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 0.2,
     },
     fieldWrapper: {
-        alignItems: 'center',
-        paddingVertical: 5,
+        paddingHorizontal: 16,
+        marginBottom: 12,
     },
     field: {
         width: FIELD_WIDTH,
         height: FIELD_HEIGHT,
-        borderRadius: 15,
+        borderRadius: 16,
         borderWidth: 2,
-        position: 'relative',
         overflow: 'hidden',
+        position: 'relative',
+    },
+    grassStripe: {
+        position: 'absolute',
+        width: '100%',
+        height: '16.66%',
     },
     outerBorder: {
         ...StyleSheet.absoluteFillObject,
         borderWidth: 1.5,
-        margin: 4,
-    },
-    centerCircle: {
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        width: 90,
-        height: 90,
-        borderRadius: 45,
-        borderWidth: 1.5,
-        marginTop: -45,
-        marginLeft: -45,
+        margin: 5,
+        borderRadius: 12,
     },
     centerLine: {
         position: 'absolute',
@@ -484,167 +970,294 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 1.5,
     },
+    centerCircle: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        borderWidth: 1.5,
+        marginTop: -40,
+        marginLeft: -40,
+    },
     penaltyAreaTop: {
         position: 'absolute',
-        top: 0,
-        left: '20%',
-        width: '60%',
+        top: 5,
+        width: '56%',
         height: '18%',
+        left: '22%',
+        borderWidth: 1.5,
+        borderTopWidth: 0,
+    },
+    goalAreaTop: {
+        position: 'absolute',
+        top: 5,
+        width: '28%',
+        height: '6%',
+        left: '36%',
         borderWidth: 1.5,
         borderTopWidth: 0,
     },
     penaltyAreaBottom: {
         position: 'absolute',
-        bottom: 0,
-        left: '20%',
-        width: '60%',
+        bottom: 5,
+        width: '56%',
         height: '18%',
+        left: '22%',
         borderWidth: 1.5,
         borderBottomWidth: 0,
-    },
-    goalAreaTop: {
-        position: 'absolute',
-        top: 0,
-        left: '35%',
-        width: '30%',
-        height: '6%',
-        borderWidth: 1.5,
-        borderTopWidth: 0,
     },
     goalAreaBottom: {
         position: 'absolute',
-        bottom: 0,
-        left: '35%',
-        width: '30%',
+        bottom: 5,
+        width: '28%',
         height: '6%',
+        left: '36%',
         borderWidth: 1.5,
         borderBottomWidth: 0,
     },
-    playerMarker: {
-        position: 'absolute',
+    squadStatusBar: {
+        flexDirection: 'row',
         alignItems: 'center',
-        width: 50,
-        zIndex: 50,
+        justifyContent: 'space-around',
+        marginHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        marginBottom: 10,
     },
-    playerIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        borderWidth: 2,
+    statusItem: {
+        alignItems: 'center',
+    },
+    statusLabel: {
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 0.4,
+    },
+    statusValue: {
+        fontSize: 13,
+        fontWeight: '900',
+        marginTop: 2,
+    },
+    statusDivider: {
+        width: 1,
+        height: 22,
+    },
+    swapHintBanner: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 5,
-        elevation: 8,
-    },
-    playerNumberText: {
-        fontWeight: '900',
-        fontSize: 14,
-    },
-    nameTag: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
+        gap: 8,
+        marginHorizontal: 16,
+        marginBottom: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
         borderRadius: 10,
-        marginTop: 4,
         borderWidth: 1,
     },
-    playerNameTag: {
-        fontSize: 9,
-        fontWeight: 'bold',
-        textAlign: 'center',
+    swapHintText: {
+        fontSize: 11.5,
+        fontWeight: '700',
     },
     subsSection: {
-        marginTop: 20,
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
     },
     subsHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 15,
-        gap: 10,
+        justifyContent: 'space-between',
+        marginBottom: 10,
     },
     subsTitle: {
-        fontSize: 10,
-        fontWeight: '900',
-        letterSpacing: 2,
-    },
-    subsCount: {
-        fontSize: 10,
-        fontWeight: '900',
-        marginLeft: 'auto',
-    },
-    subsListVertical: {
-        flexDirection: 'column',
-    },
-    subRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 14,
-        padding: 10,
-        marginBottom: 8,
-    },
-    subRowPhotoContainer: {
-        width: 44,
-        height: 44,
-    },
-    subRowPhoto: {
-        width: 44,
-        height: 44,
-    },
-    subRowInfo: {
-        flex: 1,
-        marginLeft: 12,
-        justifyContent: 'center',
-    },
-    subRowFirstName: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-    },
-    subRowLastName: {
-        fontSize: 12,
-        fontWeight: '300',
-        marginTop: 1,
-    },
-    subRowNumberContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    subRowNumberCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    subRowNumberText: {
-        fontWeight: '900',
         fontSize: 13,
-    },
-    subRowBadgeContainer: {
-        justifyContent: 'center',
-        alignItems: 'flex-end',
-    },
-    subStatusBadge: {
-        fontSize: 9,
         fontWeight: '900',
+        letterSpacing: 0.4,
+    },
+    subsCountBadge: {
+        fontSize: 11,
+        fontWeight: '800',
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 6,
-        overflow: 'hidden',
-        letterSpacing: 0.5,
     },
-    badgeMain: {
-        backgroundColor: 'rgba(0, 200, 90, 0.15)',
-        color: '#00A855',
+    subsListVertical: {
+        gap: 8,
     },
-    badgeSub: {
-        backgroundColor: 'rgba(128, 128, 128, 0.15)',
-        color: '#888',
+    subRowCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 14,
+    },
+    subRowPhotoContainer: {
+        position: 'relative',
+        marginRight: 10,
+    },
+    subRowPhoto: {
+        width: 42,
+        height: 42,
+    },
+    subNumberBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+    },
+    subNumberText: {
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    subRowInfo: {
+        flex: 1,
+    },
+    subRowFirstName: {
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    subRowPosText: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginTop: 1,
+    },
+    pesCategoryPill: {
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 6,
+        marginRight: 8,
+    },
+    pesCategoryPillText: {
+        fontSize: 9.5,
+        fontWeight: '900',
+    },
+    ovrBadgeCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    ovrBadgeText: {
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    badgeMainPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+    },
+    badgeMainPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: '#888888',
+    },
+    badgeSwapPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    badgeSwapPillText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#000000',
+    },
+    badgeAddPill: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    // PES PLAYER MARKER STYLES
+    pesPlayerMarker: {
+        position: 'absolute',
+        width: 56,
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    playerTouchable: {
+        alignItems: 'center',
+        width: '100%',
+    },
+    pesAvatarBox: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 2,
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pesAvatar: {
+        width: 40,
+        height: 40,
+    },
+    pesRoleBadge: {
+        position: 'absolute',
+        top: -6,
+        left: -6,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        zIndex: 12,
+    },
+    pesRoleBadgeText: {
+        fontSize: 7.5,
+        fontWeight: '900',
+    },
+    pesOvrBadge: {
+        position: 'absolute',
+        top: -6,
+        right: -6,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 1,
+        zIndex: 12,
+    },
+    pesOvrBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 7.5,
+        fontWeight: '900',
+    },
+    pesNumberBadge: {
+        position: 'absolute',
+        bottom: -3,
+        right: -3,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 12,
+    },
+    pesNumberBadgeText: {
+        fontSize: 8,
+        fontWeight: '900',
+    },
+    pesNameTag: {
+        marginTop: 3,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 0.5,
+        maxWidth: 62,
+    },
+    pesNameText: {
+        fontSize: 8.5,
+        fontWeight: '800',
+        textAlign: 'center',
     },
 });
-
-export default FormationBoard;
