@@ -814,13 +814,9 @@ export default function FormationBoard({ route, navigation }: any) {
                                             <Text style={[styles.subRowFirstName, { color: homeColors.textPrimary }]} numberOfLines={1}>
                                                 {firstName} {lastName}
                                             </Text>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
-                                                <View style={[styles.positionBadgeTag, { backgroundColor: posStyle.bg }]}>
-                                                    <Text style={[styles.positionBadgeTagText, { color: posStyle.text }]}>
-                                                        {getLocalizedPosition(player.position, t).toUpperCase()}
-                                                    </Text>
-                                                </View>
-                                            </View>
+                                            <Text style={[styles.positionBadgeTagText, { color: posStyle.bg }]} numberOfLines={1}>
+                                                {getLocalizedPosition(player.position, t).toUpperCase()}
+                                            </Text>
                                         </View>
 
                                         {/* REAL DECIMAL RATING (e.g. 7.5, 8.5) */}
@@ -1263,15 +1259,11 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '800',
     },
-    positionBadgeTag: {
-        paddingHorizontal: 6,
-        paddingVertical: 1.5,
-        borderRadius: 4,
-    },
     positionBadgeTagText: {
-        fontSize: 9,
-        fontWeight: '900',
+        fontSize: 10,
+        fontWeight: '800',
         letterSpacing: 0.3,
+        marginTop: 2,
     },
     ratingBadgePill: {
         flexDirection: 'row',
