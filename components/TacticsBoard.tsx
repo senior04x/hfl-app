@@ -5,7 +5,9 @@ import SmartImage from './SmartImage';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { getPositionCategory, PES_POSITION_THEMES } from '../utils/formationPresets';
-import { calculateFifaAttributes } from '../utils/playerCardUtils';
+import { getPlayerRatingScore } from '../screens/FormationBoard';
+import { getLocalizedPosition } from '../utils/localizationUtils';
+import { useTranslation } from 'react-i18next';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const FIELD_WIDTH = SCREEN_WIDTH - 32;
@@ -18,6 +20,7 @@ interface PlayerPosition {
     photo?: string | null;
     position?: string;
     role?: string;
+    rating?: string | number;
     ovr?: number;
     x: number;
     y: number;
@@ -32,16 +35,17 @@ interface TacticsBoardProps {
     onPlayerPress?: (player: any) => void;
 }
 
-const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#00DF82', formation, onPlayerPress }) => {
+const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, onPlayerPress }) => {
+    const { t } = useTranslation();
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
-    const lineColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.25)';
-    const grassStripeColor = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)';
+    const lineColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.22)';
+    const grassStripeColor = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)';
 
     return (
         <View style={styles.container}>
             <View style={styles.pitchWrapper}>
-                <View style={[styles.pitch, { backgroundColor: isDark ? '#0F1A15' : '#E6F4EA', borderColor: lineColor }]}>
+                <View style={[styles.pitch, { backgroundColor: isDark ? '#0D151E' : '#E8EEF5', borderColor: lineColor }]}>
                     {/* GRASS STRIPES */}
                     {[0, 1, 2, 3, 4, 5].map((i) => (
                         <View
@@ -72,14 +76,14 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#00DF
 
                         const cat = getPositionCategory(player.position || player.role);
                         const posStyle = PES_POSITION_THEMES[cat];
-                        const ovr = player.ovr || calculateFifaAttributes(player).ovr || 65;
+                        const ratingVal = player.rating || getPlayerRatingScore(player);
 
                         return (
                             <TouchableOpacity
                                 key={player.id}
                                 style={[
                                     styles.playerContainer,
-                                    { left: left - 28, top: top - 32 }
+                                    { left: left - 32, top: top - 34 }
                                 ]}
                                 activeOpacity={0.85}
                                 onPress={() => onPlayerPress && onPlayerPress(player)}
@@ -88,22 +92,16 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#00DF
                                     <SmartImage
                                         uri={player.photo}
                                         style={styles.pesAvatar}
-                                        borderRadius={20}
+                                        borderRadius={21}
                                         fallbackIcon="person"
                                         fallbackIconSize={20}
                                     />
 
-                                    {/* PES ROLE BADGE */}
-                                    <View style={[styles.pesRoleBadge, { backgroundColor: posStyle.bg }]}>
-                                        <Text style={[styles.pesRoleBadgeText, { color: posStyle.text }]}>
-                                            {player.role || posStyle.label}
-                                        </Text>
-                                    </View>
-
-                                    {/* OVR BADGE */}
-                                    {!!ovr && (
-                                        <View style={[styles.pesOvrBadge, { backgroundColor: '#111827', borderColor: posStyle.bg }]}>
-                                            <Text style={styles.pesOvrBadgeText}>{ovr}</Text>
+                                    {/* REAL RATING PILL */}
+                                    {!!ratingVal && (
+                                        <View style={[styles.pesRatingPill, { backgroundColor: '#111827', borderColor: posStyle.bg }]}>
+                                            <Ionicons name="star" size={9} color="#F59E0B" style={{ marginRight: 1.5 }} />
+                                            <Text style={styles.pesRatingPillText}>{ratingVal}</Text>
                                         </View>
                                     )}
 
@@ -115,11 +113,16 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teamColor = '#00DF
                                     )}
                                 </View>
 
-                                {/* PLAYER NAME */}
+                                {/* NAME & POSITION TAG */}
                                 <View style={[styles.pesNameTag, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
                                     <Text style={[styles.pesNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
                                         {(player.name || '').toUpperCase()}
                                     </Text>
+                                    <View style={[styles.pesPositionBadge, { backgroundColor: posStyle.bg }]}>
+                                        <Text style={[styles.pesPositionBadgeText, { color: posStyle.text }]} numberOfLines={1}>
+                                            {getLocalizedPosition(player.position, t).toUpperCase()}
+                                        </Text>
+                                    </View>
                                 </View>
                             </TouchableOpacity>
                         );
@@ -215,62 +218,47 @@ const styles = StyleSheet.create({
     },
     playerContainer: {
         position: 'absolute',
+        width: 64,
         alignItems: 'center',
-        width: 56,
-        zIndex: 5,
     },
     pesAvatarBox: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 46,
+        height: 46,
+        borderRadius: 23,
         borderWidth: 2,
-        position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
     },
     pesAvatar: {
-        width: 40,
-        height: 40,
+        width: 42,
+        height: 42,
+        borderRadius: 21,
     },
-    pesRoleBadge: {
+    pesRatingPill: {
         position: 'absolute',
         top: -6,
-        left: -6,
+        right: -8,
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 4,
         paddingVertical: 1,
-        borderRadius: 4,
-        zIndex: 12,
-    },
-    pesRoleBadgeText: {
-        fontSize: 7.5,
-        fontWeight: '900',
-    },
-    pesOvrBadge: {
-        position: 'absolute',
-        top: -6,
-        right: -6,
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 4,
+        borderRadius: 6,
         borderWidth: 1,
-        zIndex: 12,
     },
-    pesOvrBadgeText: {
+    pesRatingPillText: {
         color: '#FFFFFF',
-        fontSize: 7.5,
+        fontSize: 9,
         fontWeight: '900',
     },
     pesNumberBadge: {
         position: 'absolute',
-        bottom: -3,
-        right: -3,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
+        bottom: -4,
+        right: -6,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 6,
         borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 12,
     },
     pesNumberBadgeText: {
         fontSize: 8,
@@ -279,14 +267,27 @@ const styles = StyleSheet.create({
     pesNameTag: {
         marginTop: 3,
         paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 4,
-        borderWidth: 0.5,
-        maxWidth: 62,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        alignItems: 'center',
+        maxWidth: 64,
     },
     pesNameText: {
-        fontSize: 8.5,
-        fontWeight: '800',
+        fontSize: 8,
+        fontWeight: '900',
+        letterSpacing: 0.2,
+    },
+    pesPositionBadge: {
+        marginTop: 1.5,
+        paddingHorizontal: 3,
+        paddingVertical: 1,
+        borderRadius: 3,
+        maxWidth: 58,
+    },
+    pesPositionBadgeText: {
+        fontSize: 6.5,
+        fontWeight: '900',
         textAlign: 'center',
     },
 });

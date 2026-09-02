@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -37,16 +37,27 @@ import {
     FORMATION_PRESETS,
     FormationPreset,
     getPositionCategory,
-    getPesPositionStyle,
     PES_POSITION_THEMES,
 } from '../utils/formationPresets';
-import { autoPickLineup, AssignedPitchPlayer } from '../utils/formationAutoPicker';
 import { calculateFifaAttributes } from '../utils/playerCardUtils';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const FIELD_WIDTH = SCREEN_WIDTH - 32;
 const FIELD_HEIGHT = FIELD_WIDTH * 1.34;
+
+export const getPlayerRatingScore = (player: any): string => {
+    const raw = player?.rating ?? player?.stats?.rating ?? player?.avg_rating ?? player?.stats?.avg_rating ?? player?.match_rating ?? player?.score;
+    if (raw !== undefined && raw !== null && raw !== '') {
+        const num = Number(raw);
+        if (!isNaN(num) && num > 0) {
+            if (num <= 10) return num.toFixed(1);
+            return (num / 10).toFixed(1);
+        }
+    }
+    const ovr = calculateFifaAttributes(player).ovr || 72;
+    return (ovr / 10).toFixed(1);
+};
 
 export interface PitchPlayer {
     id: string;
@@ -57,6 +68,7 @@ export interface PitchPlayer {
     photo?: string | null;
     position?: string;
     role?: string;
+    rating?: string | number;
     ovr?: number;
     x: number; // 0 to 100 percentage
     y: number; // 0 to 100 percentage
@@ -69,8 +81,8 @@ export default function FormationBoard({ route, navigation }: any) {
     const isReadOnly = route.params?.isReadOnly || user?.role === 'player';
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
-    const lineColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.25)';
-    const grassStripeColor = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)';
+    const lineColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.22)';
+    const grassStripeColor = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)';
 
     const cardSurface = Platform.OS === 'ios'
         ? { backgroundColor: homeColors.background, borderWidth: 1, borderColor: homeColors.border }
@@ -102,11 +114,11 @@ export default function FormationBoard({ route, navigation }: any) {
         return currentPresets.find(p => p.id === selectedPresetId) || currentPresets[0];
     }, [currentPresets, selectedPresetId]);
 
-    // Average Team OVR Rating on pitch
-    const averagePitchOvr = useMemo(() => {
-        if (playersOnPitch.length === 0) return 0;
-        const total = playersOnPitch.reduce((sum, p) => sum + (p.ovr || 60), 0);
-        return Math.round(total / playersOnPitch.length);
+    // Average Team Rating on pitch (10-scale)
+    const averagePitchRating = useMemo(() => {
+        if (playersOnPitch.length === 0) return '0.0';
+        const total = playersOnPitch.reduce((sum, p) => sum + parseFloat(String(p.rating || 7.0)), 0);
+        return (total / playersOnPitch.length).toFixed(1);
     }, [playersOnPitch]);
 
     const maxPitchPlayers = useMemo(() => {
@@ -184,7 +196,6 @@ export default function FormationBoard({ route, navigation }: any) {
                     if (cached.presetId) {
                         setSelectedPresetId(cached.presetId);
                     }
-                    // Kesh topilganda yuklash indikatorini darhol o'chirish
                     setLoading(false);
                 }
             } catch (e) {
@@ -220,7 +231,6 @@ export default function FormationBoard({ route, navigation }: any) {
             let detectedFormat: MatchFormat = '8v8';
             let detectedPresetId = '8v8_2-3-2';
 
-            // Auto-detect best format based on player count if not set
             if (activeTeamPlayers.length <= 6 && activeTeamPlayers.length > 0) {
                 detectedFormat = '6v6';
                 detectedPresetId = '6v6_2-2-1';
@@ -247,12 +257,13 @@ export default function FormationBoard({ route, navigation }: any) {
             if (team?.formation?.players && Array.isArray(team.formation.players) && team.formation.players.length > 0) {
                 finalEnrichedFormation = team.formation.players.map((fp: any) => {
                     const matchedRoster = activeTeamPlayers.find((p: any) => String(p.id || p._id) === String(fp.id));
-                    const ovr = matchedRoster ? calculateFifaAttributes(matchedRoster).ovr : (fp.ovr || 65);
+                    const ratingScore = matchedRoster ? getPlayerRatingScore(matchedRoster) : (fp.rating || '7.5');
                     return {
                         ...fp,
                         photo: matchedRoster?.photo || matchedRoster?.photo_url || matchedRoster?.avatar || fp.photo || null,
                         number: matchedRoster?.number || matchedRoster?.player_number || fp.number || '',
-                        ovr,
+                        rating: ratingScore,
+                        position: matchedRoster?.position || fp.position,
                         role: fp.role || getPositionCategory(matchedRoster?.position || fp.position),
                     };
                 });
@@ -275,22 +286,6 @@ export default function FormationBoard({ route, navigation }: any) {
         }
     };
 
-    // ⚡ AVTO-SOSTAV (Auto-Lineup) Action
-    const handleAutoPick = () => {
-        try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        } catch (e) {}
-
-        if (!availablePlayers || availablePlayers.length === 0) {
-            Alert.alert(t('common.error', 'Xato'), t('teams.no_players', 'Tarkibda o\'yinchilar mavjud emas'));
-            return;
-        }
-
-        const picked = autoPickLineup(availablePlayers, activePreset);
-        setPlayersOnPitch(picked);
-        setSelectedPlayerId(null);
-    };
-
     // Switch Preset Scheme
     const handleSelectPreset = (preset: FormationPreset) => {
         try {
@@ -299,7 +294,6 @@ export default function FormationBoard({ route, navigation }: any) {
 
         setSelectedPresetId(preset.id);
 
-        // If there are players already on pitch, smoothly remap their coordinates to the new slots
         if (playersOnPitch.length > 0) {
             const remapped = playersOnPitch.map((player, idx) => {
                 const slot = preset.slots[idx] || preset.slots[preset.slots.length - 1];
@@ -359,7 +353,6 @@ export default function FormationBoard({ route, navigation }: any) {
             });
 
             if (response.success) {
-                // 3. KESHNI DARHOL YANGILASH (Update Cache Immediately on Save)
                 AsyncStorage.setItem(getFormationCacheKey(targetId), JSON.stringify({
                     players: playersOnPitch,
                     availablePlayers,
@@ -379,14 +372,13 @@ export default function FormationBoard({ route, navigation }: any) {
                     });
                 }
 
-                // 4. Muvaffaqiyatli saqlanganda Alert chiqarmasdan Haptic berish va orqaga qaytish
                 try {
                     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 } catch (e) {}
 
                 navigation.goBack();
             } else {
-                Alert.alert(t('common.error', 'Xato'), response.error || 'Sostavni saqlashda xatolik yuz berdi.');
+                Alert.alert(t('common.error', 'Xato'), response.error || 'Tarkibni saqlashda xatolik yuz berdi.');
             }
         } catch (error) {
             console.error('Error saving formation:', error);
@@ -429,7 +421,7 @@ export default function FormationBoard({ route, navigation }: any) {
         const isOnPitch = playersOnPitch.some(p => p.id === bId);
         if (isOnPitch) return;
 
-        const ovr = calculateFifaAttributes(benchPlayer).ovr || 60;
+        const rating = getPlayerRatingScore(benchPlayer);
         const cat = getPositionCategory(benchPlayer.position);
         const name = (benchPlayer.firstName || benchPlayer.name || 'O\'yinchi').trim();
         const photo = benchPlayer.photo || benchPlayer.photo_url || benchPlayer.avatar || null;
@@ -449,7 +441,7 @@ export default function FormationBoard({ route, navigation }: any) {
                         photo,
                         position: benchPlayer.position,
                         role: p.role || cat,
-                        ovr,
+                        rating,
                     };
                 }
                 return p;
@@ -465,7 +457,6 @@ export default function FormationBoard({ route, navigation }: any) {
                 return;
             }
 
-            // Find an open slot coordinate from preset
             const nextSlotIndex = playersOnPitch.length;
             const slot = activePreset.slots[nextSlotIndex] || { role: cat, x: 50, y: 50 };
 
@@ -478,7 +469,7 @@ export default function FormationBoard({ route, navigation }: any) {
                 photo,
                 position: benchPlayer.position,
                 role: slot.role,
-                ovr,
+                rating,
                 x: slot.x,
                 y: slot.y,
             };
@@ -498,7 +489,7 @@ export default function FormationBoard({ route, navigation }: any) {
     if (loading) {
         return (
             <View style={[styles.loadingContainer, { backgroundColor: homeColors.background }]}>
-                <ActivityIndicator size="large" color={homeColors.accent} />
+                <ActivityIndicator size="large" color={homeColors.textPrimary} />
             </View>
         );
     }
@@ -525,12 +516,14 @@ export default function FormationBoard({ route, navigation }: any) {
                         <TouchableOpacity
                             onPress={handleSave}
                             disabled={saving}
-                            style={[styles.saveBtn, { backgroundColor: homeColors.accent }]}
+                            style={[styles.saveBtn, { backgroundColor: homeColors.textPrimary }]}
                         >
                             {saving ? (
-                                <ActivityIndicator size="small" color="#000000" />
+                                <ActivityIndicator size="small" color={isDark ? '#000000' : '#FFFFFF'} />
                             ) : (
-                                <Text style={styles.saveBtnText}>{t('common.save', 'Saqlash')}</Text>
+                                <Text style={[styles.saveBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                                    {t('common.save', 'Saqlash')}
+                                </Text>
                             )}
                         </TouchableOpacity>
                     ) : (
@@ -539,10 +532,9 @@ export default function FormationBoard({ route, navigation }: any) {
                 </View>
 
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    {/* FORMAT & AUTO-PICK CONTROLS BAR */}
+                    {/* FORMAT CONTROLS BAR (AVTO-TARKIB BUTTON REMOVED) */}
                     {!isReadOnly && (
                         <View style={styles.controlBarContainer}>
-                            {/* MATCH FORMAT PICKER PILLS */}
                             <ScrollView
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
@@ -555,30 +547,21 @@ export default function FormationBoard({ route, navigation }: any) {
                                             key={fmt}
                                             style={[
                                                 styles.formatPill,
-                                                { borderColor: isSelected ? homeColors.accent : homeColors.border },
-                                                isSelected && { backgroundColor: isDark ? 'rgba(0, 223, 130, 0.15)' : 'rgba(0, 223, 130, 0.2)' }
+                                                cardSurface,
+                                                isSelected && {
+                                                    borderColor: homeColors.textPrimary,
+                                                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'
+                                                }
                                             ]}
                                             onPress={() => handleSelectFormat(fmt)}
                                         >
-                                            <Text style={[styles.formatPillText, { color: isSelected ? homeColors.accent : homeColors.textSecondary }]}>
+                                            <Text style={[styles.formatPillText, { color: isSelected ? homeColors.textPrimary : homeColors.textSecondary }]}>
                                                 {fmt}
                                             </Text>
                                         </TouchableOpacity>
                                     );
                                 })}
                             </ScrollView>
-
-                            {/* AUTO LINEUP (AVTO-SOSTAV) BUTTON */}
-                            <TouchableOpacity
-                                style={[styles.autoPickBtn, { backgroundColor: isDark ? '#1C2520' : '#E8F8F0', borderColor: homeColors.accent }]}
-                                onPress={handleAutoPick}
-                                activeOpacity={0.8}
-                            >
-                                <Ionicons name="flash" size={15} color={homeColors.accent} style={{ marginRight: 6 }} />
-                                <Text style={[styles.autoPickBtnText, { color: homeColors.accent }]}>
-                                    {t('teams.auto_formation', 'AVTO-SOSTAV').toUpperCase()}
-                                </Text>
-                            </TouchableOpacity>
                         </View>
                     )}
 
@@ -599,8 +582,8 @@ export default function FormationBoard({ route, navigation }: any) {
                                                 styles.presetChip,
                                                 cardSurface,
                                                 isSelected && {
-                                                    borderColor: homeColors.accent,
-                                                    backgroundColor: isDark ? 'rgba(0, 223, 130, 0.12)' : 'rgba(0, 223, 130, 0.15)',
+                                                    borderColor: homeColors.textPrimary,
+                                                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
                                                 }
                                             ]}
                                             onPress={() => handleSelectPreset(preset)}
@@ -609,10 +592,10 @@ export default function FormationBoard({ route, navigation }: any) {
                                             <MaterialCommunityIcons
                                                 name="soccer-field"
                                                 size={16}
-                                                color={isSelected ? homeColors.accent : homeColors.textSecondary}
+                                                color={isSelected ? homeColors.textPrimary : homeColors.textSecondary}
                                                 style={{ marginRight: 5 }}
                                             />
-                                            <Text style={[styles.presetChipText, { color: isSelected ? homeColors.accent : homeColors.textPrimary }]}>
+                                            <Text style={[styles.presetChipText, { color: isSelected ? homeColors.textPrimary : homeColors.textSecondary }]}>
                                                 {preset.name}
                                             </Text>
                                         </TouchableOpacity>
@@ -622,9 +605,9 @@ export default function FormationBoard({ route, navigation }: any) {
                         </View>
                     )}
 
-                    {/* PES 2013 TACTICAL PITCH */}
+                    {/* TACTICAL PITCH */}
                     <View style={styles.fieldWrapper}>
-                        <View style={[styles.field, { backgroundColor: isDark ? '#0F1A15' : '#E6F4EA', borderColor: lineColor }]}>
+                        <View style={[styles.field, { backgroundColor: isDark ? '#0D151E' : '#E8EEF5', borderColor: lineColor }]}>
                             {/* GRASS STRIPES */}
                             {[0, 1, 2, 3, 4, 5].map((i) => (
                                 <View
@@ -656,12 +639,13 @@ export default function FormationBoard({ route, navigation }: any) {
                                     onRemove={() => removePlayerFromPitch(player.id)}
                                     isReadOnly={isReadOnly}
                                     homeColors={homeColors}
+                                    t={t}
                                 />
                             ))}
                         </View>
                     </View>
 
-                    {/* SQUAD INFO & SWAP HINT BAR */}
+                    {/* SQUAD INFO BAR */}
                     <View style={[styles.squadStatusBar, cardSurface]}>
                         <View style={styles.statusItem}>
                             <Text style={[styles.statusLabel, { color: homeColors.textSecondary }]}>O'YINCHILAR</Text>
@@ -673,10 +657,10 @@ export default function FormationBoard({ route, navigation }: any) {
                         <View style={[styles.statusDivider, { backgroundColor: homeColors.border }]} />
 
                         <View style={styles.statusItem}>
-                            <Text style={[styles.statusLabel, { color: homeColors.textSecondary }]}>O'RTACHA REYTING</Text>
+                            <Text style={[styles.statusLabel, { color: homeColors.textSecondary }]}>O'RTACHA BALL</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <Ionicons name="star" size={13} color="#F59E0B" />
-                                <Text style={[styles.statusValue, { color: homeColors.accent }]}>{averagePitchOvr}</Text>
+                                <Text style={[styles.statusValue, { color: '#F59E0B' }]}>{averagePitchRating}</Text>
                             </View>
                         </View>
 
@@ -689,22 +673,22 @@ export default function FormationBoard({ route, navigation }: any) {
                     </View>
 
                     {selectedPlayerId && (
-                        <View style={[styles.swapHintBanner, { backgroundColor: isDark ? 'rgba(0, 223, 130, 0.12)' : 'rgba(0, 223, 130, 0.18)', borderColor: homeColors.accent }]}>
-                            <Ionicons name="swap-horizontal" size={16} color={homeColors.accent} />
+                        <View style={[styles.swapHintBanner, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)', borderColor: homeColors.border }]}>
+                            <Ionicons name="swap-horizontal" size={16} color={homeColors.textPrimary} />
                             <Text style={[styles.swapHintText, { color: homeColors.textPrimary }]}>
                                 {t('teams.swap_hint', "Almashtirish uchun pastdan zaxira o'yinchisini bosing")}
                             </Text>
                         </View>
                     )}
 
-                    {/* BENCH / SUBSTITUTES SECTION (PES 2013 STYLE) */}
+                    {/* BENCH / SUBSTITUTES SECTION */}
                     <View style={styles.subsSection}>
                         <View style={styles.subsHeader}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Ionicons name="people-outline" size={18} color={homeColors.textSecondary} />
                                 <Text style={[styles.subsTitle, { color: homeColors.textPrimary }]}>{t('teams.substitutes')}</Text>
                             </View>
-                            <Text style={[styles.subsCountBadge, { backgroundColor: homeColors.surface, color: homeColors.accent }]}>
+                            <Text style={[styles.subsCountBadge, { backgroundColor: homeColors.surface, color: homeColors.textPrimary }]}>
                                 {availablePlayers.filter(p => {
                                     const id = String(p._id || p.id);
                                     return !playersOnPitch.some(pitchP => pitchP.id === id);
@@ -720,7 +704,7 @@ export default function FormationBoard({ route, navigation }: any) {
                                 const lastName = player.lastName || player.last_name || '';
                                 const number = player.number || player.player_number || player.shirt_number || '-';
                                 const photo = player.photo_url || player.photo || player.photoUrl || player.avatar;
-                                const ovr = calculateFifaAttributes(player).ovr || 60;
+                                const ratingScore = getPlayerRatingScore(player);
                                 const cat = getPositionCategory(player.position);
                                 const posStyle = PES_POSITION_THEMES[cat];
 
@@ -730,8 +714,8 @@ export default function FormationBoard({ route, navigation }: any) {
                                         style={[
                                             styles.subRowCard,
                                             cardSurface,
-                                            isOnPitch && { opacity: 0.55 },
-                                            selectedPlayerId && !isOnPitch && { borderColor: homeColors.accent, borderWidth: 1.5 }
+                                            isOnPitch && { opacity: 0.5 },
+                                            selectedPlayerId && !isOnPitch && { borderColor: homeColors.textPrimary, borderWidth: 1.5 }
                                         ]}
                                         onPress={() => handleBenchPlayerPress(player)}
                                         disabled={isReadOnly || isOnPitch}
@@ -751,40 +735,40 @@ export default function FormationBoard({ route, navigation }: any) {
                                             </View>
                                         </View>
 
-                                        {/* NAME & LOCALIZED POSITION */}
+                                        {/* NAME & POSITION TAG (COLORED BY POSITION) */}
                                         <View style={styles.subRowInfo}>
                                             <Text style={[styles.subRowFirstName, { color: homeColors.textPrimary }]} numberOfLines={1}>
                                                 {firstName} {lastName}
                                             </Text>
-                                            <Text style={[styles.subRowPosText, { color: homeColors.textSecondary }]}>
-                                                {getLocalizedPosition(player.position, t)}
-                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+                                                <View style={[styles.positionBadgeTag, { backgroundColor: posStyle.bg }]}>
+                                                    <Text style={[styles.positionBadgeTagText, { color: posStyle.text }]}>
+                                                        {getLocalizedPosition(player.position, t).toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            </View>
                                         </View>
 
-                                        {/* PES POSITION CATEGORY BADGE */}
-                                        <View style={[styles.pesCategoryPill, { backgroundColor: posStyle.bg }]}>
-                                            <Text style={[styles.pesCategoryPillText, { color: posStyle.text }]}>{posStyle.label}</Text>
-                                        </View>
-
-                                        {/* OVR RATING BADGE */}
-                                        <View style={[styles.ovrBadgeCircle, { borderColor: homeColors.border, backgroundColor: homeColors.surface }]}>
-                                            <Text style={[styles.ovrBadgeText, { color: homeColors.accent }]}>{ovr}</Text>
+                                        {/* REAL DECIMAL RATING (e.g. 7.5, 8.5) */}
+                                        <View style={[styles.ratingBadgePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                                            <Ionicons name="star" size={12} color="#F59E0B" style={{ marginRight: 3 }} />
+                                            <Text style={[styles.ratingBadgePillText, { color: homeColors.textPrimary }]}>{ratingScore}</Text>
                                         </View>
 
                                         {/* ACTION STATUS BUTTON */}
                                         <View style={{ marginLeft: 8 }}>
                                             {isOnPitch ? (
                                                 <View style={styles.badgeMainPill}>
-                                                    <Text style={styles.badgeMainPillText}>ASOSIY</Text>
+                                                    <Text style={styles.badgeMainPillText}>MAYDONDA</Text>
                                                 </View>
                                             ) : selectedPlayerId ? (
-                                                <View style={[styles.badgeSwapPill, { backgroundColor: homeColors.accent }]}>
-                                                    <Ionicons name="swap-horizontal" size={13} color="#000000" />
-                                                    <Text style={styles.badgeSwapPillText}>ALMASH</Text>
+                                                <View style={[styles.badgeSwapPill, { backgroundColor: homeColors.textPrimary }]}>
+                                                    <Ionicons name="swap-horizontal" size={13} color={isDark ? '#000000' : '#FFFFFF'} />
+                                                    <Text style={[styles.badgeSwapPillText, { color: isDark ? '#000000' : '#FFFFFF' }]}>ALMASH</Text>
                                                 </View>
                                             ) : (
-                                                <View style={[styles.badgeAddPill, { borderColor: homeColors.accent }]}>
-                                                    <Ionicons name="add" size={14} color={homeColors.accent} />
+                                                <View style={[styles.badgeAddPill, { borderColor: homeColors.border }]}>
+                                                    <Ionicons name="add" size={14} color={homeColors.textPrimary} />
                                                 </View>
                                             )}
                                         </View>
@@ -799,7 +783,7 @@ export default function FormationBoard({ route, navigation }: any) {
     );
 }
 
-// 🎮 PES 2013 TACTICAL DRAGGABLE PLAYER MARKER
+// 🎮 TACTICAL DRAGGABLE PLAYER MARKER WITH REAL RATING & POSITION-COLORED TAG
 const PesDraggablePlayer = ({
     player,
     isSelected,
@@ -807,10 +791,12 @@ const PesDraggablePlayer = ({
     onPress,
     onRemove,
     isReadOnly,
-    homeColors
+    homeColors,
+    t
 }: any) => {
     const cat = getPositionCategory(player.position || player.role);
     const posStyle = PES_POSITION_THEMES[cat];
+    const ratingVal = player.rating || getPlayerRatingScore(player);
 
     const translateX = useSharedValue((player.x / 100) * FIELD_WIDTH);
     const translateY = useSharedValue((player.y / 100) * FIELD_HEIGHT);
@@ -840,8 +826,8 @@ const PesDraggablePlayer = ({
     const animatedStyle = useAnimatedStyle(() => {
         return {
             transform: [
-                { translateX: translateX.value - 28 },
-                { translateY: translateY.value - 32 },
+                { translateX: translateX.value - 32 },
+                { translateY: translateY.value - 34 },
             ],
         };
     });
@@ -856,12 +842,12 @@ const PesDraggablePlayer = ({
                     disabled={isReadOnly}
                     style={styles.playerTouchable}
                 >
-                    {/* AVATAR WRAPPER WITH PES BORDER */}
+                    {/* AVATAR BOX WITH POSITION COLORED BORDER */}
                     <View
                         style={[
                             styles.pesAvatarBox,
                             { borderColor: posStyle.bg, backgroundColor: homeColors.surface },
-                            isSelected && { borderColor: homeColors.accent, borderWidth: 2.5, transform: [{ scale: 1.1 }] }
+                            isSelected && { borderColor: '#FFFFFF', borderWidth: 2.5, transform: [{ scale: 1.1 }] }
                         ]}
                     >
                         <SmartImage
@@ -872,17 +858,11 @@ const PesDraggablePlayer = ({
                             fallbackIconSize={20}
                         />
 
-                        {/* POSITION ROLE BADGE (TOP LEFT) */}
-                        <View style={[styles.pesRoleBadge, { backgroundColor: posStyle.bg }]}>
-                            <Text style={[styles.pesRoleBadgeText, { color: posStyle.text }]}>
-                                {player.role || posStyle.label}
-                            </Text>
-                        </View>
-
-                        {/* OVR RATING BADGE (TOP RIGHT) */}
-                        {!!player.ovr && (
-                            <View style={[styles.pesOvrBadge, { backgroundColor: '#111827', borderColor: posStyle.bg }]}>
-                                <Text style={styles.pesOvrBadgeText}>{player.ovr}</Text>
+                        {/* REAL RATING PILL ONLY (NO DEF/ATT/GK/CM PREFIX) */}
+                        {!!ratingVal && (
+                            <View style={[styles.pesRatingPill, { backgroundColor: '#111827', borderColor: posStyle.bg }]}>
+                                <Ionicons name="star" size={9} color="#F59E0B" style={{ marginRight: 1.5 }} />
+                                <Text style={styles.pesRatingPillText}>{ratingVal}</Text>
                             </View>
                         )}
 
@@ -894,11 +874,16 @@ const PesDraggablePlayer = ({
                         )}
                     </View>
 
-                    {/* NAME TAG BADGE */}
+                    {/* NAME & POSITION TAG (COLORED BY POSITION CATEGORY) */}
                     <View style={[styles.pesNameTag, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
                         <Text style={[styles.pesNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
                             {(player.firstName || player.name || '').toUpperCase()}
                         </Text>
+                        <View style={[styles.pesPositionBadge, { backgroundColor: posStyle.bg }]}>
+                            <Text style={[styles.pesPositionBadgeText, { color: posStyle.text }]} numberOfLines={1}>
+                                {getLocalizedPosition(player.position, t).toUpperCase()}
+                            </Text>
+                        </View>
                     </View>
                 </TouchableOpacity>
             </Animated.View>
@@ -947,7 +932,6 @@ const styles = StyleSheet.create({
         borderRadius: 10,
     },
     saveBtnText: {
-        color: '#000000',
         fontWeight: '900',
         fontSize: 12,
         letterSpacing: 0.3,
@@ -958,37 +942,22 @@ const styles = StyleSheet.create({
     controlBarContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         paddingHorizontal: 16,
         marginBottom: 8,
-        gap: 10,
     },
     formatScroll: {
         flexDirection: 'row',
         gap: 6,
     },
     formatPill: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 8,
-        borderWidth: 1,
-    },
-    formatPillText: {
-        fontSize: 11,
-        fontWeight: '800',
-    },
-    autoPickBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 10,
+        paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: 8,
         borderWidth: 1,
     },
-    autoPickBtnText: {
-        fontSize: 11,
-        fontWeight: '900',
-        letterSpacing: 0.3,
+    formatPillText: {
+        fontSize: 12,
+        fontWeight: '800',
     },
     presetsTrayContainer: {
         marginBottom: 10,
@@ -1001,17 +970,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingVertical: 7,
         borderRadius: 10,
     },
     presetChipText: {
         fontSize: 12,
         fontWeight: '800',
-        letterSpacing: 0.2,
     },
     fieldWrapper: {
         paddingHorizontal: 16,
-        marginBottom: 12,
+        alignItems: 'center',
     },
     field: {
         width: FIELD_WIDTH,
@@ -1085,49 +1053,129 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderBottomWidth: 0,
     },
+    pesPlayerMarker: {
+        position: 'absolute',
+        width: 64,
+        alignItems: 'center',
+    },
+    playerTouchable: {
+        alignItems: 'center',
+    },
+    pesAvatarBox: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        borderWidth: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
+    pesAvatar: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+    },
+    pesRatingPill: {
+        position: 'absolute',
+        top: -6,
+        right: -8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 6,
+        borderWidth: 1,
+    },
+    pesRatingPillText: {
+        color: '#FFFFFF',
+        fontSize: 9,
+        fontWeight: '900',
+    },
+    pesNumberBadge: {
+        position: 'absolute',
+        bottom: -4,
+        right: -6,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 6,
+        borderWidth: 1,
+    },
+    pesNumberBadgeText: {
+        fontSize: 8,
+        fontWeight: '900',
+    },
+    pesNameTag: {
+        marginTop: 3,
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        alignItems: 'center',
+        maxWidth: 64,
+    },
+    pesNameText: {
+        fontSize: 8,
+        fontWeight: '900',
+        letterSpacing: 0.2,
+    },
+    pesPositionBadge: {
+        marginTop: 1.5,
+        paddingHorizontal: 3,
+        paddingVertical: 1,
+        borderRadius: 3,
+        maxWidth: 58,
+    },
+    pesPositionBadgeText: {
+        fontSize: 6.5,
+        fontWeight: '900',
+        textAlign: 'center',
+    },
     squadStatusBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-around',
+        justifyContent: 'space-between',
         marginHorizontal: 16,
+        marginTop: 12,
+        paddingHorizontal: 16,
         paddingVertical: 10,
-        borderRadius: 12,
-        marginBottom: 10,
+        borderRadius: 14,
     },
     statusItem: {
         alignItems: 'center',
+        flex: 1,
     },
     statusLabel: {
         fontSize: 9,
         fontWeight: '800',
         letterSpacing: 0.4,
+        marginBottom: 2,
     },
     statusValue: {
         fontSize: 13,
         fontWeight: '900',
-        marginTop: 2,
     },
     statusDivider: {
         width: 1,
-        height: 22,
+        height: 24,
     },
     swapHintBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
         marginHorizontal: 16,
-        marginBottom: 12,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        marginTop: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
         borderRadius: 10,
         borderWidth: 1,
+        gap: 8,
     },
     swapHintText: {
-        fontSize: 11.5,
+        fontSize: 11,
         fontWeight: '700',
+        flex: 1,
     },
     subsSection: {
+        marginTop: 16,
         paddingHorizontal: 16,
     },
     subsHeader: {
@@ -1142,11 +1190,11 @@ const styles = StyleSheet.create({
         letterSpacing: 0.4,
     },
     subsCountBadge: {
-        fontSize: 11,
-        fontWeight: '800',
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 6,
+        borderRadius: 8,
+        fontSize: 11,
+        fontWeight: '800',
     },
     subsListVertical: {
         gap: 8,
@@ -1154,30 +1202,29 @@ const styles = StyleSheet.create({
     subRowCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 10,
-        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 12,
     },
     subRowPhotoContainer: {
         position: 'relative',
         marginRight: 10,
     },
     subRowPhoto: {
-        width: 42,
-        height: 42,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
     },
     subNumberBadge: {
         position: 'absolute',
         bottom: -2,
         right: -2,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 3,
+        borderRadius: 4,
         borderWidth: 1,
     },
     subNumberText: {
-        fontSize: 8.5,
+        fontSize: 8,
         fontWeight: '900',
     },
     subRowInfo: {
@@ -1187,145 +1234,57 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '800',
     },
-    subRowPosText: {
-        fontSize: 11,
-        fontWeight: '600',
-        marginTop: 1,
-    },
-    pesCategoryPill: {
+    positionBadgeTag: {
         paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 6,
-        marginRight: 8,
+        paddingVertical: 1.5,
+        borderRadius: 4,
     },
-    pesCategoryPillText: {
-        fontSize: 9.5,
+    positionBadgeTagText: {
+        fontSize: 9,
         fontWeight: '900',
+        letterSpacing: 0.3,
     },
-    ovrBadgeCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 1.5,
+    ratingBadgePill: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginRight: 4,
     },
-    ovrBadgeText: {
+    ratingBadgePillText: {
         fontSize: 12,
         fontWeight: '900',
     },
     badgeMainPill: {
+        backgroundColor: 'rgba(255,255,255,0.06)',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 6,
-        backgroundColor: 'rgba(255,255,255,0.08)',
     },
     badgeMainPillText: {
-        fontSize: 9.5,
+        color: '#94A3B8',
+        fontSize: 9,
         fontWeight: '800',
-        color: '#888888',
     },
     badgeSwapPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 3,
         paddingHorizontal: 8,
-        paddingVertical: 5,
-        borderRadius: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        gap: 3,
     },
     badgeSwapPillText: {
         fontSize: 10,
         fontWeight: '900',
-        color: '#000000',
     },
     badgeAddPill: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-
-    // PES PLAYER MARKER STYLES
-    pesPlayerMarker: {
-        position: 'absolute',
-        width: 56,
-        alignItems: 'center',
-        zIndex: 10,
-    },
-    playerTouchable: {
-        alignItems: 'center',
-        width: '100%',
-    },
-    pesAvatarBox: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        borderWidth: 2,
-        position: 'relative',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    pesAvatar: {
-        width: 40,
-        height: 40,
-    },
-    pesRoleBadge: {
-        position: 'absolute',
-        top: -6,
-        left: -6,
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 4,
-        zIndex: 12,
-    },
-    pesRoleBadgeText: {
-        fontSize: 7.5,
-        fontWeight: '900',
-    },
-    pesOvrBadge: {
-        position: 'absolute',
-        top: -6,
-        right: -6,
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 4,
-        borderWidth: 1,
-        zIndex: 12,
-    },
-    pesOvrBadgeText: {
-        color: '#FFFFFF',
-        fontSize: 7.5,
-        fontWeight: '900',
-    },
-    pesNumberBadge: {
-        position: 'absolute',
-        bottom: -3,
-        right: -3,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 12,
-    },
-    pesNumberBadgeText: {
-        fontSize: 8,
-        fontWeight: '900',
-    },
-    pesNameTag: {
-        marginTop: 3,
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 4,
-        borderWidth: 0.5,
-        maxWidth: 62,
-    },
-    pesNameText: {
-        fontSize: 8.5,
-        fontWeight: '800',
-        textAlign: 'center',
     },
 });
