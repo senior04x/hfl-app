@@ -47,7 +47,8 @@
     "error": "Ошибка",
     "details": "Подробнее",
     "clear": "Очистить",
-    "copy": "Копировать"
+    "copy": "Копировать",
+    "version": "ВЕРСИЯ"
   },
   "nav": {
     "home": "Главная",
@@ -78,7 +79,7 @@
     "resend_timer": "Отправить повторно через: {{seconds}}с",
     "resend_code": "Отправить код повторно",
     "logout_confirm": "Вы уверены, что хотите выйти из аккаунта?",
-    "logout_confirm_title": "Выйти из системы?",
+    "logout_confirm_title": "Вы хотите выйти из аккаунта?",
     "logout_confirm_sub": "Для повторного входа потребуется код подтверждения по номеру телефона.",
     "logout_guest": "Выйти из гостевого режима",
     "logout_current": "Выйти из текущего аккаунта",
@@ -293,6 +294,16 @@
   },
   "settings": {
     "title": "Настройки",
+    "system_settings": "Системные настройки",
+    "appearance": "Тема и оформление",
+    "theme": "Тема",
+    "dark_mode": "Темный режим",
+    "light_mode": "Светлый режим",
+    "system_mode": "Системная тема (Авто)",
+    "system_mode_sub": "Адаптируется под тему вашего устройства",
+    "system_auto": "Авто",
+    "dark": "Темный",
+    "light": "Светлый",
     "language": "Язык приложения",
     "select_language": "Выберите язык приложения",
     "system_lang": "Язык системы",
@@ -301,6 +312,7 @@
     "english": "English",
     "notifications": "Уведомления",
     "security_title": "БЕЗОПАСНОСТЬ И ДОКУМЕНТЫ",
+    "security_sub": "Политика конфиденциальности, условия и управление аккаунтом",
     "change_pin": "Изменить PIN-код",
     "legal_docs": "ДОКУМЕНТЫ И ИНФОРМАЦИЯ",
     "privacy_policy": "Политика конфиденциальности",
@@ -554,12 +566,24 @@
     "main_referee": "ГЛАВНЫЙ СУДЬЯ",
     "linesman_1": "БОКОВОЙ СУДЬЯ 1",
     "linesman_2": "БОКОВОЙ СУДЬЯ 2",
+    "referee_not_appointed": "Судья не назначен",
+    "commissioner_not_appointed": "Комиссар не назначен",
     "managers_captains": "МЕНЕДЖЕРЫ И КАПИТАНЫ КОМАНД",
+    "team_manager": "МЕНЕДЖЕР {{team}}",
     "team_captain": "КАПИТАН {{team}}",
+    "not_appointed": "Не назначен",
+    "not_specified": "Не указан",
     "pitch_inspector": "ИНСПЕКТОР МАТЧА",
     "league_commissioner": "КОМИССАР HFL",
     "no_events": "ВО ВРЕМЯ МАТЧА СОБЫТИЙ НЕ ЗАФИКСИРОВАНО",
     "goals_count": "⚽ {{count}} голов",
     "assists_count": "🎯 {{count}} пасов"
+  },
+  "calendar": {
+    "title": "КАЛЕНДАРЬ",
+    "all_matches": "Все матчи",
+    "my_calendar": "Мой календарь",
+    "select_date": "Выберите дату",
+    "matches_in_range": "Матчи за выбранный период"
   }
 }

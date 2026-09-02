@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Appearance } from 'react-native';
 
-export type ThemeMode = 'dark' | 'light';
+export type ThemeMode = 'system' | 'dark' | 'light';
 
 export interface ThemeColors {
     background: string;
@@ -65,14 +66,22 @@ interface ThemeState {
 
 const THEME_STORAGE_KEY = '@amatora_app_theme_mode';
 
+const resolveIsDark = (mode: ThemeMode): boolean => {
+    if (mode === 'dark') return true;
+    if (mode === 'light') return false;
+    const systemScheme = Appearance.getColorScheme();
+    return systemScheme !== 'light';
+};
+
 export const useThemeStore = create<ThemeState>((set, get) => ({
     theme: 'dark',
     colors: darkThemeColors,
     isDark: true,
 
     setTheme: async (newTheme: ThemeMode) => {
-        const colors = newTheme === 'light' ? lightThemeColors : darkThemeColors;
-        set({ theme: newTheme, colors, isDark: newTheme === 'dark' });
+        const isDark = resolveIsDark(newTheme);
+        const colors = isDark ? darkThemeColors : lightThemeColors;
+        set({ theme: newTheme, colors, isDark });
         try {
             await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
         } catch (e) {
@@ -82,19 +91,34 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
     toggleTheme: async () => {
         const currentTheme = get().theme;
-        const newTheme: ThemeMode = currentTheme === 'dark' ? 'light' : 'dark';
-        await get().setTheme(newTheme);
+        let nextTheme: ThemeMode;
+        if (currentTheme === 'dark') nextTheme = 'light';
+        else if (currentTheme === 'light') nextTheme = 'system';
+        else nextTheme = 'dark';
+        await get().setTheme(nextTheme);
     },
 
     loadTheme: async () => {
         try {
-            const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
-            if (savedTheme === 'light' || savedTheme === 'dark') {
-                const colors = savedTheme === 'light' ? lightThemeColors : darkThemeColors;
-                set({ theme: savedTheme, colors, isDark: savedTheme === 'dark' });
-            }
+            const savedTheme = (await AsyncStorage.getItem(THEME_STORAGE_KEY)) as ThemeMode | null;
+            const activeTheme: ThemeMode = savedTheme || 'dark';
+            const isDark = resolveIsDark(activeTheme);
+            const colors = isDark ? darkThemeColors : lightThemeColors;
+            set({ theme: activeTheme, colors, isDark });
         } catch (e) {
             console.error('Error loading theme from AsyncStorage:', e);
         }
-    }
+    },
 }));
+
+// Listen to system appearance changes if theme is 'system'
+Appearance.addChangeListener(({ colorScheme }) => {
+    const { theme } = useThemeStore.getState();
+    if (theme === 'system') {
+        const isDark = colorScheme !== 'light';
+        useThemeStore.setState({
+            isDark,
+            colors: isDark ? darkThemeColors : lightThemeColors,
+        });
+    }
+});

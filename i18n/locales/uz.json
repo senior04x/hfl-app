@@ -47,7 +47,8 @@
     "error": "Xatolik",
     "details": "Batafsil",
     "clear": "Tozalash",
-    "copy": "Nusxalash"
+    "copy": "Nusxalash",
+    "version": "VERSIYA"
   },
   "nav": {
     "home": "Asosiy",
@@ -78,7 +79,7 @@
     "resend_timer": "Qayta kod yuborish: {{seconds}}s",
     "resend_code": "Kodni qayta yuborish",
     "logout_confirm": "Haqiqatan ham hisobingizdan chiqmoqchimisiz?",
-    "logout_confirm_title": "Tizimdan chiqmoqchimisiz?",
+    "logout_confirm_title": "Akkauntingizdan chiqmoqchimisiz?",
     "logout_confirm_sub": "Qayta kirish uchun telefon raqamingiz orqali tasdiqlash kodi talab qilinadi.",
     "logout_guest": "Mehmon rejimidan chiqish",
     "logout_current": "Joriy akkauntdan chiqish",
@@ -294,6 +295,16 @@
   },
   "settings": {
     "title": "Sozlamalar",
+    "system_settings": "Tizim sozlamalari",
+    "appearance": "Mavzu va ko'rinish",
+    "theme": "Mavzu",
+    "dark_mode": "Qorong'u rejim",
+    "light_mode": "Yorug' rejim",
+    "system_mode": "Qurilma mavzusi (Avtomatik)",
+    "system_mode_sub": "Qurilma tizim sozlamalariga qarab moslashadi",
+    "system_auto": "Avtomatik",
+    "dark": "Qorong'u",
+    "light": "Yorug'",
     "language": "Ilova tili",
     "select_language": "Ilova tilini tanlang",
     "system_lang": "Tizim tili",
@@ -302,6 +313,7 @@
     "english": "English",
     "notifications": "Bildirishnomalar",
     "security_title": "XAVFSIZLIK VA HUJJATLAR",
+    "security_sub": "Maxfiylik siyosati, foydalanish shartlari va hisob sozlamalari",
     "change_pin": "PIN-kodni o'zgartirish",
     "legal_docs": "HUJJATLAR VA MA'LUMOTLAR",
     "privacy_policy": "Maxfiylik siyosati",
@@ -555,12 +567,24 @@
     "main_referee": "BOSH HAKAM",
     "linesman_1": "QANOT HAKAMI 1",
     "linesman_2": "QANOT HAKAMI 2",
+    "referee_not_appointed": "Hakam tayinlanmagan",
+    "commissioner_not_appointed": "Komissar tayinlanmagan",
     "managers_captains": "JAMOA MENEJERLARI VA SARDORLARI",
+    "team_manager": "{{team}} MENEJERI",
     "team_captain": "{{team}} SARDORI",
+    "not_appointed": "Tayinlanmagan",
+    "not_specified": "Ko'rsatilmagan",
     "pitch_inspector": "MAYDON INSPEKTORI",
     "league_commissioner": "HFL KOMISSARI",
     "no_events": "O'YIN DAVOMIDA VOQEALAR RO'YXATGA OLINMAGAN",
     "goals_count": "⚽ {{count}} ta gol",
     "assists_count": "🎯 {{count}} ta assist"
+  },
+  "calendar": {
+    "title": "TAQVIM",
+    "all_matches": "Barcha o'yinlar",
+    "my_calendar": "Mening taqvimim",
+    "select_date": "Sanani tanlang",
+    "matches_in_range": "Tanlangan sanadagi o'yinlar"
   }
 }

@@ -15,7 +15,7 @@ import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@r
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from './store/useAuthStore';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from '@react-navigation/stack';
 import AppNavigator from './navigation/AppNavigator';
 import AuthNavigator from './navigation/AuthNavigator';
 import WelcomeScreen from './screens/WelcomeScreen';
@@ -36,6 +36,7 @@ import TeamProfileScreen from './screens/TeamProfileScreen';
 import MyTeamScreen from './screens/MyTeamScreen';
 import ApplicationsScreen from './screens/ApplicationsScreen';
 import SecuritySettingsScreen from './screens/SecuritySettingsScreen';
+import SystemSettingsScreen from './screens/SystemSettingsScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
 import { notificationService } from './services/notificationService';
@@ -184,7 +185,10 @@ function App() {
                                 <Stack.Navigator 
                                     screenOptions={{ 
                                         headerShown: false,
-                                        cardStyle: { backgroundColor: 'transparent' }
+                                        cardStyle: { backgroundColor: 'transparent' },
+                                        cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                        gestureEnabled: true,
+                                        gestureDirection: 'horizontal',
                                     }}
                                 >
                                     <Stack.Screen name="MainTabs" component={AppNavigator} />
@@ -196,17 +200,118 @@ function App() {
                                     <Stack.Screen name="FormationBoard" component={FormationBoard} />
                                     <Stack.Screen name="TeamChat" component={TeamChatScreen} />
                                     <Stack.Screen name="Standings" component={StandingsScreen} />
-                                    <Stack.Screen name="TournamentDetail" component={TournamentDetailScreen} />
-                                    <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
-                                    <Stack.Screen name="MatchDetail" component={MatchDetailScreen} />
-                                    <Stack.Screen name="CalendarMatches" component={CalendarMatchesScreen} />
+                                    <Stack.Screen 
+                                        name="TournamentDetail" 
+                                        component={TournamentDetailScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="NewsDetail" 
+                                        component={NewsDetailScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="MatchDetail" 
+                                        component={MatchDetailScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="CalendarMatches" 
+                                        component={CalendarMatchesScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
                                     <Stack.Screen name="Teams" component={TeamsScreen} />
-                                    <Stack.Screen name="TeamProfile" component={TeamProfileScreen} />
-                                    <Stack.Screen name="MyTeam" component={MyTeamScreen} />
+                                    <Stack.Screen 
+                                        name="TeamProfile" 
+                                        component={TeamProfileScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="MyTeam" 
+                                        component={MyTeamScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
                                     <Stack.Screen name="Players" component={PlayersScreen} />
-                                    <Stack.Screen name="PlayerStats" component={PlayerStatsScreen} />
-                                    <Stack.Screen name="Notifications" component={NotificationsScreen} />
-                                    <Stack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
+                                    <Stack.Screen 
+                                        name="PlayerStats" 
+                                        component={PlayerStatsScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="Notifications" 
+                                        component={NotificationsScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="SecuritySettings" 
+                                        component={SecuritySettingsScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
+                                    <Stack.Screen 
+                                        name="SystemSettings" 
+                                        component={SystemSettingsScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
                                 </Stack.Navigator>
                             ) : (
                                 <AuthNavigator />

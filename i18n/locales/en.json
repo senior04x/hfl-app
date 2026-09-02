@@ -47,7 +47,8 @@
     "error": "Error",
     "details": "Details",
     "clear": "Clear",
-    "copy": "Copy"
+    "copy": "Copy",
+    "version": "VERSION"
   },
   "nav": {
     "home": "Home",
@@ -78,7 +79,7 @@
     "resend_timer": "Resend code in: {{seconds}}s",
     "resend_code": "Resend verification code",
     "logout_confirm": "Are you sure you want to log out?",
-    "logout_confirm_title": "Log out of system?",
+    "logout_confirm_title": "Do you want to log out of your account?",
     "logout_confirm_sub": "You will need a phone verification code to log in again.",
     "logout_guest": "Exit guest mode",
     "logout_current": "Log out of current account",
@@ -294,6 +295,16 @@
   },
   "settings": {
     "title": "Settings",
+    "system_settings": "System Settings",
+    "appearance": "Theme & Appearance",
+    "theme": "Theme",
+    "dark_mode": "Dark Mode",
+    "light_mode": "Light Mode",
+    "system_mode": "Device Theme (Auto)",
+    "system_mode_sub": "Matches your device system theme",
+    "system_auto": "Auto",
+    "dark": "Dark",
+    "light": "Light",
     "language": "App Language",
     "select_language": "Select App Language",
     "system_lang": "System Language",
@@ -302,6 +313,7 @@
     "english": "English",
     "notifications": "Notifications",
     "security_title": "SECURITY & DOCUMENTS",
+    "security_sub": "Privacy policy, terms of use and account settings",
     "change_pin": "Change PIN code",
     "legal_docs": "DOCUMENTS & INFORMATION",
     "privacy_policy": "Privacy Policy",
@@ -555,12 +567,24 @@
     "main_referee": "HEAD REFEREE",
     "linesman_1": "ASSISTANT REFEREE 1",
     "linesman_2": "ASSISTANT REFEREE 2",
+    "referee_not_appointed": "Referee not appointed",
+    "commissioner_not_appointed": "Commissioner not appointed",
     "managers_captains": "TEAM MANAGERS AND CAPTAINS",
+    "team_manager": "{{team}} MANAGER",
     "team_captain": "{{team}} CAPTAIN",
+    "not_appointed": "Not appointed",
+    "not_specified": "Not specified",
     "pitch_inspector": "PITCH INSPECTOR",
     "league_commissioner": "HFL COMMISSIONER",
     "no_events": "NO EVENTS RECORDED DURING THE MATCH",
     "goals_count": "⚽ {{count}} goals",
     "assists_count": "🎯 {{count}} assists"
+  },
+  "calendar": {
+    "title": "CALENDAR",
+    "all_matches": "All matches",
+    "my_calendar": "My calendar",
+    "select_date": "Select date",
+    "matches_in_range": "Matches in selected range"
   }
 }
