@@ -783,7 +783,7 @@ export default function FormationBoard({ route, navigation }: any) {
     );
 }
 
-// 🎮 TACTICAL DRAGGABLE PLAYER MARKER WITH REAL RATING & POSITION-COLORED TAG
+// 🎮 CLEAN RECTANGULAR PLAYER MARKER ON THE BOARD
 const PesDraggablePlayer = ({
     player,
     isSelected,
@@ -792,12 +792,7 @@ const PesDraggablePlayer = ({
     onRemove,
     isReadOnly,
     homeColors,
-    t
 }: any) => {
-    const cat = getPositionCategory(player.position || player.role);
-    const posStyle = PES_POSITION_THEMES[cat];
-    const ratingVal = player.rating || getPlayerRatingScore(player);
-
     const translateX = useSharedValue((player.x / 100) * FIELD_WIDTH);
     const translateY = useSharedValue((player.y / 100) * FIELD_HEIGHT);
     const context = useSharedValue({ x: 0, y: 0 });
@@ -826,8 +821,8 @@ const PesDraggablePlayer = ({
     const animatedStyle = useAnimatedStyle(() => {
         return {
             transform: [
-                { translateX: translateX.value - 32 },
-                { translateY: translateY.value - 34 },
+                { translateX: translateX.value - 26 },
+                { translateY: translateY.value - 30 },
             ],
         };
     });
@@ -842,48 +837,35 @@ const PesDraggablePlayer = ({
                     disabled={isReadOnly}
                     style={styles.playerTouchable}
                 >
-                    {/* AVATAR BOX WITH POSITION COLORED BORDER */}
+                    {/* RECTANGULAR PHOTO BOX (TO'RTBURCHAK) */}
                     <View
                         style={[
-                            styles.pesAvatarBox,
-                            { borderColor: posStyle.bg, backgroundColor: homeColors.surface },
-                            isSelected && { borderColor: '#FFFFFF', borderWidth: 2.5, transform: [{ scale: 1.1 }] }
+                            styles.rectPhotoBox,
+                            { borderColor: isSelected ? homeColors.textPrimary : homeColors.border, backgroundColor: homeColors.surface },
+                            isSelected && { borderWidth: 2, transform: [{ scale: 1.08 }] }
                         ]}
                     >
                         <SmartImage
                             uri={player.photo}
-                            style={styles.pesAvatar}
-                            borderRadius={22}
+                            style={styles.rectPhoto}
+                            borderRadius={6}
                             fallbackIcon="person"
-                            fallbackIconSize={20}
+                            fallbackIconSize={22}
                         />
-
-                        {/* REAL RATING PILL ONLY (NO DEF/ATT/GK/CM PREFIX) */}
-                        {!!ratingVal && (
-                            <View style={[styles.pesRatingPill, { backgroundColor: '#111827', borderColor: posStyle.bg }]}>
-                                <Ionicons name="star" size={9} color="#F59E0B" style={{ marginRight: 1.5 }} />
-                                <Text style={styles.pesRatingPillText}>{ratingVal}</Text>
-                            </View>
-                        )}
 
                         {/* NUMBER BADGE (BOTTOM RIGHT) */}
                         {!!player.number && (
-                            <View style={[styles.pesNumberBadge, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
-                                <Text style={[styles.pesNumberBadgeText, { color: homeColors.textPrimary }]}>{player.number}</Text>
+                            <View style={[styles.rectNumberBadge, { backgroundColor: 'rgba(0,0,0,0.8)' }]}>
+                                <Text style={styles.rectNumberBadgeText}>{player.number}</Text>
                             </View>
                         )}
                     </View>
 
-                    {/* NAME & POSITION TAG (COLORED BY POSITION CATEGORY) */}
-                    <View style={[styles.pesNameTag, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
-                        <Text style={[styles.pesNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                    {/* PLAYER NAME TAG (NO EXTRA POSITION OR CLUTTER) */}
+                    <View style={[styles.rectNameTag, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                        <Text style={[styles.rectNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
                             {(player.firstName || player.name || '').toUpperCase()}
                         </Text>
-                        <View style={[styles.pesPositionBadge, { backgroundColor: posStyle.bg }]}>
-                            <Text style={[styles.pesPositionBadgeText, { color: posStyle.text }]} numberOfLines={1}>
-                                {getLocalizedPosition(player.position, t).toUpperCase()}
-                            </Text>
-                        </View>
                     </View>
                 </TouchableOpacity>
             </Animated.View>
@@ -1055,80 +1037,53 @@ const styles = StyleSheet.create({
     },
     pesPlayerMarker: {
         position: 'absolute',
-        width: 64,
+        width: 54,
         alignItems: 'center',
     },
     playerTouchable: {
         alignItems: 'center',
     },
-    pesAvatarBox: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
-        borderWidth: 2,
+    rectPhotoBox: {
+        width: 44,
+        height: 48,
+        borderRadius: 8,
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
+        overflow: 'hidden',
     },
-    pesAvatar: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-    },
-    pesRatingPill: {
-        position: 'absolute',
-        top: -6,
-        right: -8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 4,
-        paddingVertical: 1,
+    rectPhoto: {
+        width: 40,
+        height: 44,
         borderRadius: 6,
-        borderWidth: 1,
     },
-    pesRatingPillText: {
+    rectNumberBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        paddingHorizontal: 3.5,
+        paddingVertical: 1,
+        borderTopLeftRadius: 4,
+    },
+    rectNumberBadgeText: {
         color: '#FFFFFF',
-        fontSize: 9,
+        fontSize: 8.5,
         fontWeight: '900',
     },
-    pesNumberBadge: {
-        position: 'absolute',
-        bottom: -4,
-        right: -6,
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 6,
-        borderWidth: 1,
-    },
-    pesNumberBadgeText: {
-        fontSize: 8,
-        fontWeight: '900',
-    },
-    pesNameTag: {
+    rectNameTag: {
         marginTop: 3,
         paddingHorizontal: 4,
-        paddingVertical: 2,
-        borderRadius: 6,
+        paddingVertical: 1.5,
+        borderRadius: 4,
         borderWidth: 1,
         alignItems: 'center',
-        maxWidth: 64,
+        maxWidth: 54,
     },
-    pesNameText: {
+    rectNameText: {
         fontSize: 8,
         fontWeight: '900',
-        letterSpacing: 0.2,
-    },
-    pesPositionBadge: {
-        marginTop: 1.5,
-        paddingHorizontal: 3,
-        paddingVertical: 1,
-        borderRadius: 3,
-        maxWidth: 58,
-    },
-    pesPositionBadgeText: {
-        fontSize: 6.5,
-        fontWeight: '900',
-        textAlign: 'center',
+        letterSpacing: 0.1,
     },
     squadStatusBar: {
         flexDirection: 'row',
