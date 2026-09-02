@@ -15,6 +15,7 @@ import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@r
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from './store/useAuthStore';
+import { useThemeStore } from './store/useThemeStore';
 import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from '@react-navigation/stack';
 import AppNavigator from './navigation/AppNavigator';
 import AuthNavigator from './navigation/AuthNavigator';
@@ -63,6 +64,7 @@ function App() {
 
     React.useEffect(() => {
         initI18n().catch((e) => console.warn('i18n init error:', e));
+        useThemeStore.getState().loadTheme().catch((e) => console.warn('theme init error:', e));
     }, []);
 
     React.useEffect(() => {

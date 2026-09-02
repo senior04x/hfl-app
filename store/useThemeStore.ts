@@ -73,10 +73,12 @@ const resolveIsDark = (mode: ThemeMode): boolean => {
     return systemScheme !== 'light';
 };
 
+const initialIsDark = resolveIsDark('system');
+
 export const useThemeStore = create<ThemeState>((set, get) => ({
-    theme: 'dark',
-    colors: darkThemeColors,
-    isDark: true,
+    theme: 'system',
+    colors: initialIsDark ? darkThemeColors : lightThemeColors,
+    isDark: initialIsDark,
 
     setTheme: async (newTheme: ThemeMode) => {
         const isDark = resolveIsDark(newTheme);
@@ -101,7 +103,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     loadTheme: async () => {
         try {
             const savedTheme = (await AsyncStorage.getItem(THEME_STORAGE_KEY)) as ThemeMode | null;
-            const activeTheme: ThemeMode = savedTheme || 'dark';
+            const activeTheme: ThemeMode = (savedTheme === 'dark' || savedTheme === 'light' || savedTheme === 'system') ? savedTheme : 'system';
             const isDark = resolveIsDark(activeTheme);
             const colors = isDark ? darkThemeColors : lightThemeColors;
             set({ theme: activeTheme, colors, isDark });
@@ -110,6 +112,9 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
         }
     },
 }));
+
+// Immediately auto-load persisted theme on store initialization
+useThemeStore.getState().loadTheme().catch(() => {});
 
 // Listen to system appearance changes if theme is 'system'
 Appearance.addChangeListener(({ colorScheme }) => {
