@@ -53,14 +53,14 @@ export default function MyTeamScreen({ route, navigation }: any) {
         borderColor: homeColors.border,
     };
 
-    const initialTeamId = route?.params?.teamId || route?.params?.id;
+    const { teamId, team: initialTeam } = route?.params || {};
     const userTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
-    const activeTeamId = initialTeamId || userTeamId;
+    const activeTeamId = teamId || route?.params?.id || route?.params?.teamId || initialTeam?.id || initialTeam?._id || userTeamId;
 
-    const [team, setTeam] = useState<any | null>(route?.params?.team || null);
+    const [team, setTeam] = useState<any | null>(initialTeam || route?.params?.team || null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(!route?.params?.team);
+    const [isLoading, setIsLoading] = useState(!initialTeam && !route?.params?.team);
     const [isPlayersLoading, setIsPlayersLoading] = useState(true);
     const [isMatchesLoading, setIsMatchesLoading] = useState(true);
 
@@ -167,7 +167,8 @@ export default function MyTeamScreen({ route, navigation }: any) {
     });
 
     const fetchData = async () => {
-        if (!activeTeamId) {
+        const currentId = activeTeamId;
+        if (!currentId) {
             setIsLoading(false);
             setIsPlayersLoading(false);
             setIsMatchesLoading(false);
@@ -176,11 +177,11 @@ export default function MyTeamScreen({ route, navigation }: any) {
 
         // 1. HERO QISMI: Jamoa ma'lumotlarini birinchi tezkor yuklash
         if (!team) setIsLoading(true);
-        apiService.getTeamById(activeTeamId)
+        apiService.getTeamById(currentId)
             .then((teamData) => {
                 if (teamData) setTeam(teamData);
             })
-            .catch((err) => console.log('Team fetch error:', err))
+            .catch((err) => console.log('MyTeamScreen team fetch error:', err))
             .finally(() => {
                 setIsLoading(false);
             });
@@ -189,16 +190,21 @@ export default function MyTeamScreen({ route, navigation }: any) {
         setIsPlayersLoading(true);
         setIsMatchesLoading(true);
 
-        apiService.getPlayersByTeam(activeTeamId)
+        apiService.getPlayersByTeam(currentId)
             .then((playersData) => {
-                setPlayers(playersData || []);
+                const activeTeamPlayers = (playersData || []).filter((p: any) => {
+                    const st = String(p.status || '').toLowerCase().trim();
+                    const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
+                    return !isArchived && st === 'approved';
+                });
+                setPlayers(activeTeamPlayers);
             })
             .catch(() => {})
             .finally(() => {
                 setIsPlayersLoading(false);
             });
 
-        apiService.getMatches({ teamId: activeTeamId })
+        apiService.getMatches({ teamId: currentId })
             .then((matchesData) => {
                 setMatches(matchesData?.slice(0, 8) || []);
             })
