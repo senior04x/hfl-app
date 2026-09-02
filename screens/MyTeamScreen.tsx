@@ -167,6 +167,8 @@ export default function MyTeamScreen({ route, navigation }: any) {
         extrapolate: 'clamp',
     });
 
+    const getTeamCacheKey = (tId: string) => `@amatora_team_cache_${tId}`;
+
     const fetchData = async () => {
         const currentId = activeTeamId;
         if (!currentId) {
@@ -176,18 +178,48 @@ export default function MyTeamScreen({ route, navigation }: any) {
             return;
         }
 
-        // 1. HERO QISMI: Jamoa ma'lumotlarini birinchi tezkor yuklash
+        // 0. INSTANT CACHE LOAD: Keshdan jamoa ma'lumotlarini darhol o'qish (0ms)
+        try {
+            const cachedStr = await AsyncStorage.getItem(getTeamCacheKey(currentId));
+            if (cachedStr) {
+                const cached = JSON.parse(cachedStr);
+                if (cached.team) {
+                    setTeam(cached.team);
+                    setIsLoading(false);
+                }
+                if (cached.players && Array.isArray(cached.players) && cached.players.length > 0) {
+                    setPlayers(cached.players);
+                    setIsPlayersLoading(false);
+                }
+                if (cached.matches && Array.isArray(cached.matches)) {
+                    setMatches(cached.matches);
+                    setIsMatchesLoading(false);
+                }
+            }
+        } catch (e) {
+            console.log('Team cache read error:', e);
+        }
+
+        // 1-BOSQICH (HERO QISMI): Jamoa ma'lumotlarini birinchi tezkor yuklash
         if (!team) setIsLoading(true);
         apiService.getTeamById(currentId)
             .then((teamData) => {
-                if (teamData) setTeam(teamData);
+                if (teamData) {
+                    setTeam(teamData);
+                    setIsLoading(false);
+                    // Keshga saqlash
+                    AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
+                        const existing = cStr ? JSON.parse(cStr) : {};
+                        AsyncStorage.setItem(getTeamCacheKey(currentId), JSON.stringify({ ...existing, team: teamData })).catch(() => {});
+                    }).catch(() => {});
+                }
             })
-            .catch((err) => console.log('MyTeamScreen team fetch error:', err))
-            .finally(() => {
+            .catch((err) => {
+                console.log('MyTeamScreen team fetch error:', err);
                 setIsLoading(false);
             });
 
-        // 2. TABLAR: Tarkib va o'yinlar ma'lumotlarini fonda parallel yuklash
+        // 2-BOSQICH (TABLAR): Tarkib va o'yinlar ma'lumotlarini fonda parallel yuklash
         setIsPlayersLoading(true);
         setIsMatchesLoading(true);
 
@@ -199,6 +231,11 @@ export default function MyTeamScreen({ route, navigation }: any) {
                     return !isArchived && st === 'approved';
                 });
                 setPlayers(activeTeamPlayers);
+                // Keshga saqlash
+                AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
+                    const existing = cStr ? JSON.parse(cStr) : {};
+                    AsyncStorage.setItem(getTeamCacheKey(currentId), JSON.stringify({ ...existing, players: activeTeamPlayers })).catch(() => {});
+                }).catch(() => {});
             })
             .catch(() => {})
             .finally(() => {
@@ -207,7 +244,13 @@ export default function MyTeamScreen({ route, navigation }: any) {
 
         apiService.getMatches({ teamId: currentId })
             .then((matchesData) => {
-                setMatches(matchesData?.slice(0, 8) || []);
+                const sliced = matchesData?.slice(0, 8) || [];
+                setMatches(sliced);
+                // Keshga saqlash
+                AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
+                    const existing = cStr ? JSON.parse(cStr) : {};
+                    AsyncStorage.setItem(getTeamCacheKey(currentId), JSON.stringify({ ...existing, matches: sliced })).catch(() => {});
+                }).catch(() => {});
             })
             .catch(() => {})
             .finally(() => {
@@ -230,9 +273,6 @@ export default function MyTeamScreen({ route, navigation }: any) {
         }
     }, [activeTeamId, socket]);
 
-    // Match Detail sahifasidagi haqiqiy pager mexanizmi bilan bir xil:
-    // tab bosilganda animatsiyasiz (instant) scrollTo, aslida silliq slide esa
-    // faqat qo'l bilan swipe/momentum orqali (native ScrollView gesture).
     const handleTabPress = async (index: number) => {
         if (index === currentTabIndexRef.current) return;
         try {
@@ -275,11 +315,8 @@ export default function MyTeamScreen({ route, navigation }: any) {
                 <View style={styles.emptyContent}>
                     <Ionicons name="shield-outline" size={64} color={homeColors.textSecondary} />
                     <Text style={[styles.emptyTitle, { color: homeColors.textPrimary }]}>{t('teams.team_not_found')}</Text>
-                    <Text style={[styles.emptySub, { color: homeColors.textSecondary }]}>
-                        {t('teams.no_teams')}
-                    </Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Teams')} style={[styles.loginBtn, { backgroundColor: homeColors.accent }]}>
-                        <Text style={styles.loginBtnText}>{t('teams.view_teams')}</Text>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.loginBtn, { backgroundColor: homeColors.accent }]}>
+                        <Text style={styles.loginBtnText}>{t('common.back', 'Orqaga')}</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
@@ -480,8 +517,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                 </View>
             </View>
 
-            {/* HORIZONTAL PAGER WITH INDEPENDENT SCROLLVIEWS */}
-            <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+            {/* PAGER WITH 3 ATTACHED PANELS */}
             <Animated.ScrollView
                 ref={pagerScrollRef}
                 horizontal
@@ -853,329 +889,320 @@ export default function MyTeamScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    // MUHIM: gorizontal padding endi shu yerda emas — tabsContainer va pager
-    // (Animated.ScrollView) haqiqiy pager sifatida ekranning to'liq kengligini
-    // egallashi SHART (Match Detail'dagidek). Aks holda pagingEnabled'ning
-    // ichki hisob-kitobi (ScrollView'ning haqiqiy eni) bilan bizning width*index
-    // scrollTo/panel kengligimiz mos kelmay, swipe yarim yo'lda "qotib qoladi"
-    // va indikator chiziqcha ham tugma markazidan siljib qoladi.
-    // Shuning uchun gorizontal padding faqat heroSection va har bir pager
-    // panelining ICHIDA qo'llanadi (pastga qarang).
-    scrollContent: { paddingBottom: 60 },
     headerStickySection: {
         paddingHorizontal: 16,
         paddingTop: 8,
         paddingBottom: 0,
         borderBottomWidth: 1,
-        zIndex: 100,
     },
-    topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 8 },
-    identityRowSticky: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 12 },
-    statsSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
-    iconBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-    unreadBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: Colors.danger, minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-    unreadBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
-    logoBox: { width: 96, height: 96, borderRadius: 20, padding: 4, overflow: 'hidden' },
-    storyBadge: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        justifyContent: 'center',
+    topRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 2,
+        justifyContent: 'space-between',
+        marginBottom: 8,
     },
-    teamName: { fontWeight: '900', fontSize: 20, letterSpacing: 0.3, textAlign: 'center' },
-    teamLeague: { fontSize: 12, fontWeight: '600', marginTop: 3 },
-    logoBoxSm: { width: 56, height: 56, borderRadius: 16, padding: 4, overflow: 'hidden' },
-    storyBadgeSm: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        justifyContent: 'center',
+    iconBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
         alignItems: 'center',
-        borderWidth: 2,
+        justifyContent: 'center',
     },
-    teamNameSm: { fontWeight: '900', fontSize: 16, letterSpacing: 0.2 },
-    leadershipRowSm: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    leadershipNameSm: { flex: 1, fontSize: 11, fontWeight: '600' },
-    infoCard: { borderRadius: 18, padding: 14, marginTop: 4 },
-    infoTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
-    infoStat: { alignItems: 'center', gap: 2, flexDirection: 'row' },
-    infoStatText: { fontSize: 13, fontWeight: '800' },
-    infoStatValue: { fontSize: 15, fontWeight: '900' },
-    infoStatLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
-    infoDivider: { width: 1, height: 22 },
-    leadershipBlock: { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 10 },
-    leadershipRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    leadershipLabel: { fontSize: 11, fontWeight: '600', width: 62 },
-    leadershipName: { flex: 1, fontSize: 12, fontWeight: '700' },
-    // Tab qatori — Match Detail sahifasidagi tabsContainer/tabActiveLine bilan bir xil
+    unreadBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#FF3B30',
+        borderRadius: 9,
+        minWidth: 18,
+        height: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    unreadBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    identityRowSticky: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 12,
+    },
+    logoBoxSm: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 4,
+    },
+    teamNameSm: {
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
+    teamLeague: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginTop: 1,
+    },
+    leadershipRowSm: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    leadershipNameSm: {
+        fontSize: 11,
+        fontWeight: '600',
+        flex: 1,
+    },
+    infoCard: {
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+    },
+    infoTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+    },
+    infoStat: {
+        alignItems: 'center',
+    },
+    infoStatValue: {
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    infoStatText: {
+        fontSize: 13,
+        fontWeight: '800',
+        marginTop: 2,
+    },
+    infoStatLabel: {
+        fontSize: 9,
+        fontWeight: '700',
+        letterSpacing: 0.4,
+        marginTop: 1,
+    },
+    infoDivider: {
+        width: 1,
+        height: 20,
+    },
     tabsContainer: {
-        height: 44,
-        marginTop: 0,
-        marginBottom: 0,
-        overflow: 'hidden',
         position: 'relative',
-        justifyContent: 'center',
+        marginTop: 4,
     },
-    tabsRowContainer: { flexDirection: 'row', width: '100%', height: '100%', alignItems: 'center' },
-    tabEqual: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center' },
+    tabsRowContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: 40,
+    },
+    tabEqual: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 40,
+    },
+    tabText: {
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
     tabActiveLine: {
         position: 'absolute',
         bottom: 0,
-        left: 0,
-        height: 3,
-        borderRadius: 1.5,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 6,
-        elevation: 4,
-        zIndex: 5,
+        height: 2.5,
+        borderRadius: 2,
     },
-    tabText: { fontSize: 12, fontWeight: '800' },
-    mainContent: { minHeight: 350 },
-    squadGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    playerCard: { width: (width - 44) / 2, borderRadius: 16, padding: 10 },
-    // aspectRatio: 1 — rasm konteyneri qurilma eni qanday bo'lishidan qat'iy nazar
-    // doim 1:1 (kvadrat) bo'lib qoladi, fixed height'dan farqli o'laroq
-    playerPhotoContainer: { width: '100%', aspectRatio: 1, borderRadius: 12, overflow: 'hidden', position: 'relative' },
-    playerPhoto: { width: '100%', height: '100%' },
-    playerNumberBadge: { position: 'absolute', bottom: 6, right: 6, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-    playerNumberText: { color: '#FFFFFF', fontWeight: '900', fontSize: 10 },
-    playerInfo: { marginTop: 8 },
-    playerCardName: { fontWeight: '900', fontSize: 12 },
-    playerCardLastName: { fontWeight: '900', fontSize: 12 },
-    playerCardPosition: { fontWeight: '700', fontSize: 9, marginTop: 2, letterSpacing: 0.3 },
-    matchCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16 },
-    matchTeamCol: { flex: 1, alignItems: 'center', gap: 6 },
-    matchTeamLogo: { width: 28, height: 28 },
-    matchTeamName: { fontSize: 10, fontWeight: '700', textAlign: 'center' },
-    hMatchCard: {
+    squadGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        paddingTop: 4,
+    },
+    playerCard: {
+        width: (width - 44) / 2,
+        borderRadius: 16,
+        padding: 10,
+    },
+    playerPhotoContainer: {
         width: '100%',
-        borderRadius: 20,
+        aspectRatio: 1,
+        borderRadius: 12,
         overflow: 'hidden',
+        position: 'relative',
     },
-    matchScoreCol: { alignItems: 'center', paddingHorizontal: 10 },
-    matchScoreText: { fontSize: 16, fontWeight: '900' },
-    matchDateText: { fontSize: 9, fontWeight: '600', marginTop: 2 },
-    emptyState: { padding: 24, alignItems: 'center', borderRadius: 16, gap: 8 },
-    emptyStateText: { fontSize: 12, fontWeight: '700' },
-    emptyStateBtn: { marginTop: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
-    emptyStateBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
-    emptyContainer: { flex: 1 },
-    emptyContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 },
-    emptyTitle: { fontSize: 18, fontWeight: '900', marginTop: 16, letterSpacing: 0.5 },
-    emptySub: { fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 18 },
-    loginBtn: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14 },
-    loginBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12 },
+    playerPhoto: {
+        width: '100%',
+        height: '100%',
+    },
+    playerNumberBadge: {
+        position: 'absolute',
+        top: 6,
+        left: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    playerNumberText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    playerInfo: {
+        marginTop: 8,
+    },
+    playerCardName: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        letterSpacing: 0.2,
+    },
+    playerCardLastName: {
+        fontSize: 11,
+        fontWeight: '700',
+        opacity: 0.8,
+    },
+    playerCardPosition: {
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 2,
+    },
     phoneBadgeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         borderRadius: 8,
-        width: '100%',
+        borderWidth: 1,
     },
     phoneBadgeText: {
-        fontWeight: '800',
-        fontSize: 10,
-        letterSpacing: 0.3
+        fontSize: 10.5,
+        fontWeight: '600',
     },
     addPhoneBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 3,
-        alignSelf: 'flex-start'
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 223, 130, 0.3)',
     },
     addPhoneBtnText: {
-        fontWeight: '900',
-        fontSize: 9,
-        letterSpacing: 0.3
+        fontSize: 9.5,
+        fontWeight: '800',
     },
-    replayModalOverlay: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        padding: 20,
-        paddingBottom: 40,
-        backgroundColor: 'rgba(0,0,0,0.5)'
-    },
-    replaySheet: {
-        width: '100%',
-        borderRadius: 20,
-        paddingVertical: 8,
-        paddingHorizontal: 14
-    },
-    replayRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        gap: 10,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    replayRowIcon: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    replayRowMinute: {
-        fontSize: 13,
-        fontWeight: '700'
-    },
-    replayPlayerOverlay: {
-        flex: 1,
-        backgroundColor: '#000000',
-        justifyContent: 'center',
-        alignItems: 'stretch',
-        paddingHorizontal: 16
-    },
-    replayPlayerVideoBox: {
-        width: '100%',
-        height: 260,
-        borderRadius: 14,
-        overflow: 'hidden',
-        backgroundColor: '#0A0A0A',
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    replayPlayerVideo: {
-        width: '100%',
-        height: '100%'
-    },
-    replayInfoCard: {
-        marginTop: 18,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        padding: 16
-    },
-    replayInfoTeamsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-    },
-    replayInfoTeamCol: {
-        flex: 1,
-        alignItems: 'center',
-        gap: 6
-    },
-    replayInfoTeamLogo: {
-        width: 40,
-        height: 40
-    },
-    replayInfoTeamName: {
-        color: '#E2E8F0',
-        fontSize: 12,
-        fontWeight: '700',
-        textAlign: 'center'
-    },
-    replayInfoScore: {
-        color: '#FFFFFF',
-        fontSize: 20,
-        fontWeight: '900',
-        marginHorizontal: 14
-    },
-    replayInfoMetaRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        gap: 16,
-        marginTop: 16,
-        paddingTop: 14,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: 'rgba(255,255,255,0.1)'
-    },
-    replayInfoMetaItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5
-    },
-    replayInfoMetaText: {
-        color: '#E2E8F0',
-        fontSize: 12,
-        fontWeight: '600'
-    },
-    replayPlayerClose: {
-        position: 'absolute',
-        top: 56,
-        right: 20,
-        zIndex: 5,
-        width: 36,
-        height: 36,
+    emptyState: {
         borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.15)',
+        padding: 32,
+        alignItems: 'center',
         justifyContent: 'center',
-        alignItems: 'center'
+        gap: 8,
+    },
+    emptyStateText: {
+        fontSize: 13,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    emptyStateBtn: {
+        marginTop: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 10,
+    },
+    emptyStateBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    hMatchCard: {
+        borderRadius: 16,
+        overflow: 'hidden',
     },
     phoneModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20
+        padding: 24,
     },
     phoneModalCard: {
         width: '100%',
         maxWidth: 320,
         borderRadius: 20,
         padding: 20,
-        alignItems: 'center'
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     phoneModalTitle: {
         fontSize: 14,
         fontWeight: '900',
-        letterSpacing: 0.5
+        letterSpacing: 0.3,
     },
     phoneModalSub: {
         fontSize: 12,
-        textAlign: 'center',
-        marginTop: 4,
-        marginBottom: 14
+        marginBottom: 14,
     },
     phoneInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
         borderRadius: 12,
         borderWidth: 1,
-        height: 46,
-        paddingHorizontal: 14,
-        width: '100%'
+        paddingHorizontal: 12,
+        height: 44,
     },
     phonePrefixText: {
-        fontSize: 15,
-        fontWeight: '900',
-        marginRight: 8
+        fontSize: 14,
+        fontWeight: '800',
+        marginRight: 6,
     },
     phoneInput: {
         flex: 1,
-        fontSize: 16,
-        fontWeight: '800'
+        fontSize: 14,
+        fontWeight: '700',
     },
     cancelPhoneBtn: {
         width: 44,
         height: 44,
         borderRadius: 12,
         backgroundColor: 'rgba(255, 59, 48, 0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 59, 48, 0.3)',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
     },
     savePhoneBtn: {
         flex: 1,
         height: 44,
         borderRadius: 12,
         alignItems: 'center',
-        justifyContent: 'center'
-    }
+        justifyContent: 'center',
+    },
+    emptyContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    emptyContent: {
+        alignItems: 'center',
+        gap: 12,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    loginBtn: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 12,
+        marginTop: 8,
+    },
+    loginBtnText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '800',
+    },
 });
