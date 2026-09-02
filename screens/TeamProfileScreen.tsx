@@ -14,7 +14,8 @@ import {
     Alert,
     Platform,
     Modal,
-    TextInput
+    TextInput,
+    PanResponder
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -173,15 +174,6 @@ export default function TeamProfileScreen({ route, navigation }: any) {
         });
     };
 
-    const isExitingRef = useRef(false);
-    const handlePagerScroll = (e: any) => {
-        const offsetX = e.nativeEvent?.contentOffset?.x;
-        if (currentTabIndexRef.current === 0 && typeof offsetX === 'number' && offsetX < -25 && !isExitingRef.current) {
-            isExitingRef.current = true;
-            navigation.goBack();
-        }
-    };
-
     const handlePagerMomentumScrollEnd = (e: any) => {
         const offsetX = e.nativeEvent.contentOffset.x;
         const newIdx = Math.max(0, Math.min(tabs.length - 1, Math.round(offsetX / width)));
@@ -190,15 +182,6 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             setCurrentTabIndex(newIdx);
         }
         isPagerScrolling.current = false;
-    };
-
-    // Tarkib — birinchi tab. Shu yerda o'ngga (orqaga) swipe qilinsa, sahifadan chiqiladi.
-    const handlePagerScrollEndDrag = (e: any) => {
-        const offsetX = e.nativeEvent?.contentOffset?.x;
-        if (currentTabIndexRef.current === 0 && typeof offsetX === 'number' && offsetX < -20 && !isExitingRef.current) {
-            isExitingRef.current = true;
-            navigation.goBack();
-        }
     };
 
     if (isLoading && !team) {
@@ -233,11 +216,90 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
     const hasStats = team?.stats && team.stats.played > 0;
 
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+
+    // 1-tabda (tarkib) turib o'ngga surilganda real-vaqtda interaktiv orqaga qaytish:
+    const swipeBackPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                if (currentTabIndexRef.current !== 0) return false;
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: width,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            },
+            onPanResponderTerminationRequest: () => true,
+        })
+    ).current;
+
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, width * 0.8, width],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
+
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
             <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-            {/* STICKY HEADER: TOP ACTIONS + LOGO + LEADERSHIP + STATS + TABS */}
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
+            />
+
+            <Animated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
+            >
+                <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                    {/* STICKY HEADER: TOP ACTIONS + LOGO + LEADERSHIP + STATS + TABS */}
             <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
                 {/* TOP ROW: BACK BUTTON & ACTIONS */}
                 <View style={styles.topRow}>
@@ -394,24 +456,20 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             </View>
 
             {/* HORIZONTAL PAGER WITH INDEPENDENT SCROLLVIEWS */}
+            <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
             <Animated.ScrollView
                 ref={pagerScrollRef}
                 horizontal
                 pagingEnabled
-                nestedScrollEnabled
-                directionalLockEnabled
                 showsHorizontalScrollIndicator={false}
-                bounces={true}
-                alwaysBounceHorizontal={true}
-                overScrollMode="always"
+                bounces={false}
                 scrollEventThrottle={16}
                 decelerationRate="fast"
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
-                    { useNativeDriver: false, listener: handlePagerScroll }
+                    { useNativeDriver: false }
                 )}
                 onMomentumScrollEnd={handlePagerMomentumScrollEnd}
-                onScrollEndDrag={handlePagerScrollEndDrag}
                 style={{ flex: 1 }}
                 contentContainerStyle={{ width: width * tabs.length }}
             >
@@ -656,6 +714,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                     </ScrollView>
                 </View>
             </Animated.ScrollView>
+            </View>
 
             {/* ADD PHONE MODAL */}
             <Modal
@@ -668,55 +727,34 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                     <View style={[styles.phoneModalCard, { backgroundColor: homeColors.background }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                             <Ionicons name="call" size={20} color={homeColors.accent} style={{ marginRight: 8 }} />
-                            <Text style={[styles.phoneModalTitle, { color: homeColors.textPrimary }]}>{t('teams.add_phone_title')}</Text>
+                            <Text style={[styles.phoneModalTitle, { color: homeColors.textPrimary }]}>{t('teams.add_phone')}</Text>
                         </View>
-
                         <Text style={[styles.phoneModalSub, { color: homeColors.textSecondary }]}>
-                            {t('teams.add_phone_sub', { name: selectedPlayerForPhone?.firstName || selectedPlayerForPhone?.first_name || selectedPlayerForPhone?.name || t('teams.player_fallback') })}
+                            {selectedPlayerForPhone ? `${selectedPlayerForPhone.firstName || selectedPlayerForPhone.first_name || ''} ${selectedPlayerForPhone.lastName || selectedPlayerForPhone.last_name || ''}`.trim() : ''}
                         </Text>
 
-                        <View style={[styles.phoneInputRow, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
-                            <Text style={[styles.phonePrefixText, { color: homeColors.accent }]}>+998</Text>
+                        <View style={[styles.phoneInputBox, { borderColor: homeColors.border, backgroundColor: homeColors.surface }]}>
+                            <Text style={[styles.phonePrefix, { color: homeColors.textSecondary }]}>+998</Text>
                             <TextInput
                                 style={[styles.phoneInput, { color: homeColors.textPrimary }]}
-                                value={phoneInputText}
-                                onChangeText={setPhoneInputText}
-                                keyboardType="phone-pad"
-                                maxLength={9}
                                 placeholder="901234567"
                                 placeholderTextColor={homeColors.textSecondary}
+                                keyboardType="number-pad"
+                                maxLength={9}
+                                value={phoneInputText}
+                                onChangeText={setPhoneInputText}
                                 autoFocus
                             />
-                        </View>
-
-                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 18, width: '100%' }}>
                             <TouchableOpacity
-                                style={styles.cancelPhoneBtn}
-                                onPress={() => setSelectedPlayerForPhone(null)}
-                            >
-                                <Ionicons name="close" size={18} color="#FF3B30" />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.savePhoneBtn, { backgroundColor: homeColors.accent }]}
-                                disabled={savingPhone}
+                                style={[styles.phoneSaveBtn, { backgroundColor: homeColors.accent }]}
+                                disabled={savingPhone || phoneInputText.length < 9}
                                 onPress={async () => {
-                                    if (!canEdit) {
-                                        Alert.alert('Ruxsat berilmadi', "Faqat o'z jamoangiz menejeri o'yinchilar telefon raqamini tahrirlay oladi!");
-                                        setSelectedPlayerForPhone(null);
-                                        return;
-                                    }
-                                    if (phoneInputText.length < 9) {
-                                        Alert.alert(t('common.error'), t('teams.phone_length_error'));
-                                        return;
-                                    }
+                                    if (phoneInputText.length < 9) return;
+                                    setSavingPhone(true);
                                     try {
-                                        setSavingPhone(true);
-                                        const fullPhone = `+998${phoneInputText.replace(/\D/g, '')}`;
-                                        const pId = selectedPlayerForPhone.id || selectedPlayerForPhone._id;
-                                        const res = await apiService.updatePlayerPhone(pId, fullPhone);
-                                        if (res.success) {
-                                            setPlayers((prev: any[]) => prev.map((p: any) => (p.id === pId || p._id === pId) ? { ...p, phone: fullPhone } : p));
+                                        const res = await apiService.updatePlayerPhone(selectedPlayerForPhone._id || selectedPlayerForPhone.id, `+998${phoneInputText}`);
+                                        if (res && res.success) {
+                                            setPlayers(prev => prev.map(p => (p._id === selectedPlayerForPhone._id || p.id === selectedPlayerForPhone.id) ? { ...p, phone: `+998${phoneInputText}` } : p));
                                             setSelectedPlayerForPhone(null);
                                             setPhoneInputText('');
                                             Alert.alert(t('common.success'), t('teams.phone_saved_success'));
@@ -742,6 +780,8 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             </Modal>
 
         </SafeAreaView>
+    </Animated.View>
+</View>
     );
 }
 

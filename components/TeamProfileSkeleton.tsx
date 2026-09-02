@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, Dimensions, Platform, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Skeleton from './Skeleton';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
@@ -28,7 +29,8 @@ const TeamProfileSkeleton = () => {
     const skeletonColor = { backgroundColor: homeColors.surface };
 
     return (
-        <View style={[styles.container, { backgroundColor: homeColors.background }]}>
+        <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: homeColors.background }]}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
             {/* FIXED HEADER SKELETON */}
             <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
                 {/* TOP ROW: orqaga va harakatlar */}
@@ -84,7 +86,7 @@ const TeamProfileSkeleton = () => {
                     ))}
                 </View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 };
 

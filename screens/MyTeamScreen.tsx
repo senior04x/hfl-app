@@ -15,7 +15,8 @@ import {
     Alert,
     Platform,
     Modal,
-    TextInput
+    TextInput,
+    PanResponder
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -58,8 +59,9 @@ export default function MyTeamScreen({ route, navigation }: any) {
     const [team, setTeam] = useState<any | null>(route?.params?.team || null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(!route?.params?.team);
     const [isPlayersLoading, setIsPlayersLoading] = useState(true);
+    const [isMatchesLoading, setIsMatchesLoading] = useState(true);
 
     const [selectedPlayerForPhone, setSelectedPlayerForPhone] = useState<any | null>(null);
     const [phoneInputText, setPhoneInputText] = useState('');
@@ -105,33 +107,100 @@ export default function MyTeamScreen({ route, navigation }: any) {
         extrapolate: 'clamp',
     });
 
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+
+    // 1-tabda (tarkib) turib o'ngga surilganda real-vaqtda interaktiv orqaga qaytish:
+    const swipeBackPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                if (currentTabIndexRef.current !== 0) return false;
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: width,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            },
+            onPanResponderTerminationRequest: () => true,
+        })
+    ).current;
+
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, width * 0.8, width],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
+
     const fetchData = async () => {
-        try {
-            if (!team) setIsLoading(true);
-            setIsPlayersLoading(true);
-            if (!activeTeamId) {
-                setIsLoading(false);
-                setIsPlayersLoading(false);
-                return;
-            }
-
-            const teamData = await apiService.getTeamById(activeTeamId).catch(() => null);
-            if (teamData) setTeam(teamData);
-            setIsLoading(false);
-
-            const [playersData, matchesData] = await Promise.all([
-                apiService.getPlayersByTeam(activeTeamId).catch(() => []),
-                apiService.getMatches({ teamId: activeTeamId }).catch(() => null)
-            ]);
-
-            setPlayers(playersData || []);
-            setMatches(matchesData?.slice(0, 8) || []);
-        } catch (error) {
-            console.error('MyTeamScreen fetch error:', error);
-        } finally {
+        if (!activeTeamId) {
             setIsLoading(false);
             setIsPlayersLoading(false);
+            setIsMatchesLoading(false);
+            return;
         }
+
+        // 1. HERO QISMI: Jamoa ma'lumotlarini birinchi tezkor yuklash
+        if (!team) setIsLoading(true);
+        apiService.getTeamById(activeTeamId)
+            .then((teamData) => {
+                if (teamData) setTeam(teamData);
+            })
+            .catch((err) => console.log('Team fetch error:', err))
+            .finally(() => {
+                setIsLoading(false);
+            });
+
+        // 2. TABLAR: Tarkib va o'yinlar ma'lumotlarini fonda parallel yuklash
+        setIsPlayersLoading(true);
+        setIsMatchesLoading(true);
+
+        apiService.getPlayersByTeam(activeTeamId)
+            .then((playersData) => {
+                setPlayers(playersData || []);
+            })
+            .catch(() => {})
+            .finally(() => {
+                setIsPlayersLoading(false);
+            });
+
+        apiService.getMatches({ teamId: activeTeamId })
+            .then((matchesData) => {
+                setMatches(matchesData?.slice(0, 8) || []);
+            })
+            .catch(() => {})
+            .finally(() => {
+                setIsMatchesLoading(false);
+            });
     };
 
     useEffect(() => {
@@ -169,15 +238,6 @@ export default function MyTeamScreen({ route, navigation }: any) {
         });
     };
 
-    const isExitingRef = useRef(false);
-    const handlePagerScroll = (e: any) => {
-        const offsetX = e.nativeEvent?.contentOffset?.x;
-        if (currentTabIndexRef.current === 0 && typeof offsetX === 'number' && offsetX < -25 && !isExitingRef.current) {
-            isExitingRef.current = true;
-            navigation.goBack();
-        }
-    };
-
     const handlePagerMomentumScrollEnd = (e: any) => {
         const offsetX = e.nativeEvent.contentOffset.x;
         const newIdx = Math.max(0, Math.min(tabs.length - 1, Math.round(offsetX / width)));
@@ -186,15 +246,6 @@ export default function MyTeamScreen({ route, navigation }: any) {
             setCurrentTabIndex(newIdx);
         }
         isPagerScrolling.current = false;
-    };
-
-    // Tarkib — birinchi tab. Shu yerda o'ngga (orqaga) swipe qilinsa, sahifadan chiqiladi.
-    const handlePagerScrollEndDrag = (e: any) => {
-        const offsetX = e.nativeEvent?.contentOffset?.x;
-        if (currentTabIndexRef.current === 0 && typeof offsetX === 'number' && offsetX < -20 && !isExitingRef.current) {
-            isExitingRef.current = true;
-            navigation.goBack();
-        }
     };
 
     if (isLoading) {
@@ -233,10 +284,35 @@ export default function MyTeamScreen({ route, navigation }: any) {
     const hasStats = team?.stats && team.stats.played > 0;
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
             <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-            {/* STICKY HEADER: TOP ACTIONS + LOGO + LEADERSHIP + STATS + TABS */}
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
+            />
+
+            <Animated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
+            >
+                <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                    {/* STICKY HEADER: TOP ACTIONS + LOGO + LEADERSHIP + STATS + TABS */}
             <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
                 {/* TOP ROW: BACK BUTTON & ACTIONS */}
                 <View style={styles.topRow}>
@@ -393,24 +469,20 @@ export default function MyTeamScreen({ route, navigation }: any) {
             </View>
 
             {/* HORIZONTAL PAGER WITH INDEPENDENT SCROLLVIEWS */}
+            <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
             <Animated.ScrollView
                 ref={pagerScrollRef}
                 horizontal
                 pagingEnabled
-                nestedScrollEnabled
-                directionalLockEnabled
                 showsHorizontalScrollIndicator={false}
-                bounces={true}
-                alwaysBounceHorizontal={true}
-                overScrollMode="always"
+                bounces={false}
                 scrollEventThrottle={16}
                 decelerationRate="fast"
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
-                    { useNativeDriver: false, listener: handlePagerScroll }
+                    { useNativeDriver: false }
                 )}
                 onMomentumScrollEnd={handlePagerMomentumScrollEnd}
-                onScrollEndDrag={handlePagerScrollEndDrag}
                 style={{ flex: 1 }}
                 contentContainerStyle={{ width: width * tabs.length }}
             >
@@ -537,7 +609,28 @@ export default function MyTeamScreen({ route, navigation }: any) {
                 {/* TAB 2: O'YINLAR */}
                 <View style={{ width, flex: 1 }}>
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}>
-                        {matches.length > 0 ? (
+                        {isMatchesLoading ? (
+                            [1, 2, 3].map((key) => (
+                                <View
+                                    key={key}
+                                    style={[
+                                        styles.hMatchCard,
+                                        {
+                                            backgroundColor: homeColors.background,
+                                            borderWidth: 1,
+                                            borderColor: homeColors.border,
+                                            opacity: 0.5,
+                                        },
+                                    ]}
+                                >
+                                    <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <View style={{ width: '35%', height: 14, backgroundColor: homeColors.surface, borderRadius: 4 }} />
+                                        <View style={{ width: 40, height: 16, backgroundColor: homeColors.surface, borderRadius: 6 }} />
+                                        <View style={{ width: '35%', height: 14, backgroundColor: homeColors.surface, borderRadius: 4 }} />
+                                    </View>
+                                </View>
+                            ))
+                        ) : matches.length > 0 ? (
                             matches.map((match: any) => {
                                 const st = String(match.status || '').toLowerCase().trim();
                                 const matchIsLive = ['live', 'first_half', 'second_half', 'half_time', 'halftime', 'ongoing', 'in_progress', '1st_half', '2nd_half', '1-taym', '2-taym', 'tanaffus'].includes(st);
@@ -655,6 +748,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                     </ScrollView>
                 </View>
             </Animated.ScrollView>
+            </View>
 
             {/* ADD PHONE MODAL */}
             <Modal
@@ -740,7 +834,9 @@ export default function MyTeamScreen({ route, navigation }: any) {
                 </View>
             </Modal>
 
-        </SafeAreaView>
+                </SafeAreaView>
+            </Animated.View>
+        </View>
     );
 }
 
