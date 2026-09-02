@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -10,19 +10,21 @@ import {
     Alert,
     Dimensions,
     StatusBar,
-    Linking
+    PanResponder,
+    Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { apiService, clearApiCache } from '../services/apiService';
-import VideoBackground from '../components/VideoBackground';
-import { useTranslation } from 'react-i18next';
 import { getLocalizedErrorMessage } from '../utils/errorParser';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
+import AppNavbar from '../components/AppNavbar';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface SettingRowProps {
     icon: any;
@@ -31,6 +33,8 @@ interface SettingRowProps {
     onPress: () => void;
     destructive?: boolean;
     isLast?: boolean;
+    isDark: boolean;
+    homeColors: any;
 }
 
 const SettingRow: React.FC<SettingRowProps> = ({
@@ -39,59 +43,136 @@ const SettingRow: React.FC<SettingRowProps> = ({
     subtitle,
     onPress,
     destructive = false,
-    isLast = false
+    isLast = false,
+    isDark,
+    homeColors,
 }) => (
     <TouchableOpacity
-        style={[styles.settingRow, isLast && styles.settingRowLast]}
+        style={[
+            styles.settingRow,
+            !isLast && {
+                borderBottomWidth: 1,
+                borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+            }
+        ]}
         onPress={onPress}
         activeOpacity={0.7}
     >
-        <View style={[styles.iconBox, destructive && styles.iconBoxDestructive]}>
+        <View
+            style={[
+                styles.iconCircle,
+                {
+                    backgroundColor: destructive
+                        ? (isDark ? 'rgba(255, 59, 48, 0.12)' : 'rgba(255, 59, 48, 0.08)')
+                        : (isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)'),
+                }
+            ]}
+        >
             <Ionicons
                 name={icon}
-                size={20}
-                color={destructive ? Colors.danger : Colors.primary}
+                size={18}
+                color={destructive ? Colors.danger : homeColors.accent}
             />
         </View>
+
         <View style={styles.settingContent}>
-            <Text style={[styles.settingTitle, destructive && styles.settingTitleDestructive]}>
+            <Text
+                style={[
+                    styles.settingTitle,
+                    { color: destructive ? Colors.danger : homeColors.textPrimary }
+                ]}
+            >
                 {title}
             </Text>
-            {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+            {subtitle && (
+                <Text
+                    style={[
+                        styles.settingSubtitle,
+                        { color: destructive ? 'rgba(255, 59, 48, 0.7)' : homeColors.textSecondary }
+                    ]}
+                >
+                    {subtitle}
+                </Text>
+            )}
         </View>
+
         <Ionicons
             name="chevron-forward"
-            size={18}
-            color={destructive ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.3)'}
+            size={16}
+            color={destructive ? Colors.danger : homeColors.textSecondary}
+            style={{ opacity: 0.5 }}
         />
     </TouchableOpacity>
 );
 
 export default function SecuritySettingsScreen({ navigation }: any) {
     const { t } = useTranslation();
-    const insets = useSafeAreaInsets();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
     const { user, isGuest, logout } = useAuthStore();
 
     const [showPrivacyModal, setShowPrivacyModal] = useState(false);
     const [showTermsModal, setShowTermsModal] = useState(false);
-    const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleConfirmLogout = async () => {
-        try {
-            setShowLogoutModal(false);
-            clearApiCache();
-            await logout();
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Welcome' }],
-            });
-        } catch (error) {
-            console.error('Logout error:', error);
-            logout();
-        }
-    };
+    // 1:1 Real-time interactive swipe-to-back animation
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+
+    const swipeBackPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                return (
+                    gestureState.dx > 15 &&
+                    Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.4
+                );
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit =
+                    gestureState.dx > SCREEN_WIDTH * 0.35 ||
+                    (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: SCREEN_WIDTH,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            },
+            onPanResponderTerminationRequest: () => true,
+        })
+    ).current;
+
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, SCREEN_WIDTH * 0.8, SCREEN_WIDTH],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
 
     const handleConfirmDelete = async () => {
         try {
@@ -105,11 +186,11 @@ export default function SecuritySettingsScreen({ navigation }: any) {
 
             if (res && res.success) {
                 Alert.alert(
-                    t('settings.account_deleted'),
-                    t('settings.account_deleted_sub'),
+                    t('settings.account_deleted', 'Hisob o\'chirildi'),
+                    t('settings.account_deleted_sub', 'Sizning hisobingiz va barcha shaxsiy ma\'lumotlaringiz muvaffaqiyatli o\'chirildi.'),
                     [
                         {
-                            text: "OK",
+                            text: 'OK',
                             onPress: async () => {
                                 clearApiCache();
                                 await logout();
@@ -122,131 +203,130 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                     ]
                 );
             } else {
-                Alert.alert(t('common.error'), getLocalizedErrorMessage(res?.error));
+                Alert.alert(t('common.error', 'Xato'), getLocalizedErrorMessage(res?.error));
             }
         } catch (error: any) {
             setIsDeleting(false);
             setShowDeleteModal(false);
-            Alert.alert(t('common.error'), getLocalizedErrorMessage(error));
+            Alert.alert(t('common.error', 'Xato'), getLocalizedErrorMessage(error));
         }
     };
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.85}
-                style={StyleSheet.absoluteFill}
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
             />
 
-            {/* Header */}
-            <View style={[styles.header, { paddingTop: Math.max(insets.top + 10, 20) }]}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="arrow-back" size={24} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('settings.security_title')}</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
-            <ScrollView
-                style={styles.scrollContent}
-                contentContainerStyle={{ paddingBottom: 60 }}
-                showsVerticalScrollIndicator={false}
+            <Animated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
             >
-                {/* SECTION 1: Legal & Information */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>{t('settings.legal_docs')}</Text>
-                    <View style={styles.cardContainer}>
-                        <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                        <SettingRow
-                            icon="shield-checkmark-outline"
-                            title={t('settings.privacy_policy')}
-                            subtitle={t('settings.privacy_policy_sub')}
-                            onPress={() => setShowPrivacyModal(true)}
-                        />
-                        <SettingRow
-                            icon="document-text-outline"
-                            title={t('settings.terms_of_use')}
-                            subtitle={t('settings.terms_of_use_sub')}
-                            onPress={() => setShowTermsModal(true)}
-                            isLast={true}
-                        />
-                    </View>
-                </View>
+                <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+                    {/* App Navbar */}
+                    <AppNavbar
+                        title={t('settings.security_title', 'XAVFSIZLIK VA HUJJATLAR')}
+                        subtitle="AMATORA"
+                        onBackPress={() => navigation.goBack()}
+                    />
 
-                {/* SECTION 2: Account Actions */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>{t('settings.account_management')}</Text>
-                    <View style={styles.cardContainer}>
-                        <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                        <SettingRow
-                            icon="log-out-outline"
-                            title={t('auth.logout')}
-                            subtitle={isGuest ? t('auth.logout_guest') : t('auth.logout_current')}
-                            onPress={() => setShowLogoutModal(true)}
-                            isLast={isGuest}
-                        />
-                        {!isGuest && (
-                            <SettingRow
-                                icon="trash-outline"
-                                title={t('settings.delete_account')}
-                                subtitle={t('settings.delete_account_sub')}
-                                onPress={() => setShowDeleteModal(true)}
-                                destructive={true}
-                                isLast={true}
-                            />
-                        )}
-                    </View>
-                </View>
+                    <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                        <ScrollView
+                            style={styles.container}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 60, paddingTop: 10 }}
+                        >
+                            {/* SECTION 1: Legal & Information */}
+                            <Text style={[styles.sectionHeading, { color: homeColors.textSecondary }]}>
+                                {t('settings.legal_docs', 'HUJJATLAR VA MA\'LUMOTLAR').toUpperCase()}
+                            </Text>
 
-                {/* Certified Badge */}
-                <View style={styles.badgeContainer}>
-                    <View style={styles.badgeRow}>
-                        <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
-                        <Text style={styles.badgeText}>AMATORA PRODUCTION SECURITY CERTIFIED</Text>
-                    </View>
-                    <Text style={styles.versionText}>Versiya 2.1.1 (Build Release Candidate)</Text>
-                </View>
-            </ScrollView>
-
-            {/* Logout Confirmation Modal */}
-            <Modal
-                visible={showLogoutModal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowLogoutModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalCard}>
-                        <View style={styles.modalIconBox}>
-                            <Ionicons name="log-out-outline" size={32} color={Colors.primary} />
-                        </View>
-                        <Text style={styles.modalTitle}>{t('auth.logout_confirm_title')}</Text>
-                        <Text style={styles.modalSubtitle}>
-                            {t('auth.logout_confirm_sub')}
-                        </Text>
-                        <View style={styles.modalActions}>
-                            <TouchableOpacity
-                                style={styles.modalCancelBtn}
-                                onPress={() => setShowLogoutModal(false)}
+                            <View
+                                style={[
+                                    styles.groupedCard,
+                                    {
+                                        backgroundColor: isDark ? homeColors.background : '#FFFFFF',
+                                        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : homeColors.border,
+                                    }
+                                ]}
                             >
-                                <Text style={styles.modalCancelText}>{t('common.cancel').toUpperCase()}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.modalPrimaryBtn}
-                                onPress={handleConfirmLogout}
-                            >
-                                <Text style={styles.modalPrimaryText}>{t('auth.logout').toUpperCase()}</Text>
-                            </TouchableOpacity>
-                        </View>
+                                <SettingRow
+                                    icon="shield-checkmark-outline"
+                                    title={t('settings.privacy_policy', 'Maxfiylik siyosati')}
+                                    subtitle={t('settings.privacy_policy_sub', 'Shaxsiy ma\'lumotlarni saqlash va himoya qilish')}
+                                    onPress={() => setShowPrivacyModal(true)}
+                                    isDark={isDark}
+                                    homeColors={homeColors}
+                                />
+                                <SettingRow
+                                    icon="document-text-outline"
+                                    title={t('settings.terms_of_use', 'Foydalanish shartlari')}
+                                    subtitle={t('settings.terms_of_use_sub', 'Liga reglamenti, qoidalar va Fair Play')}
+                                    onPress={() => setShowTermsModal(true)}
+                                    isLast={true}
+                                    isDark={isDark}
+                                    homeColors={homeColors}
+                                />
+                            </View>
+
+                            {/* SECTION 2: Account Management (Delete Account) */}
+                            {!isGuest && (
+                                <>
+                                    <Text style={[styles.sectionHeading, { color: homeColors.textSecondary, marginTop: 24 }]}>
+                                        {t('settings.account_management', 'HISOB VA BOSHQARUV').toUpperCase()}
+                                    </Text>
+
+                                    <View
+                                        style={[
+                                            styles.groupedCard,
+                                            {
+                                                backgroundColor: isDark ? homeColors.background : '#FFFFFF',
+                                                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : homeColors.border,
+                                            }
+                                        ]}
+                                    >
+                                        <SettingRow
+                                            icon="trash-outline"
+                                            title={t('settings.delete_account', 'Hisobni o\'chirish')}
+                                            subtitle={t('settings.delete_account_sub', 'Barcha shaxsiy ma\'lumotlarni butunlay o\'chirish')}
+                                            onPress={() => setShowDeleteModal(true)}
+                                            destructive={true}
+                                            isLast={true}
+                                            isDark={isDark}
+                                            homeColors={homeColors}
+                                        />
+                                    </View>
+                                </>
+                            )}
+
+                            {/* Version Tag */}
+                            <View style={styles.versionContainer}>
+                                <Text style={[styles.versionText, { color: homeColors.textSecondary }]}>
+                                    {`AMATORA • ${t('common.version', 'VERSIYA').toUpperCase()} 2.1.1`}
+                                </Text>
+                            </View>
+                        </ScrollView>
                     </View>
-                </View>
-            </Modal>
+                </SafeAreaView>
+            </Animated.View>
 
             {/* Delete Account 2-Step Confirmation Modal */}
             <Modal
@@ -255,39 +335,65 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                 animationType="fade"
                 onRequestClose={() => !isDeleting && setShowDeleteModal(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalCard, { borderColor: 'rgba(239, 68, 68, 0.4)' }]}>
-                        <View style={[styles.modalIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-                            <Ionicons name="trash-outline" size={32} color={Colors.danger} />
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => !isDeleting && setShowDeleteModal(false)}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={(e) => e.stopPropagation()}
+                        style={[
+                            styles.modalCard,
+                            {
+                                backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                                borderColor: isDark ? 'rgba(255, 59, 48, 0.25)' : 'rgba(255, 59, 48, 0.2)',
+                            }
+                        ]}
+                    >
+                        <View style={[styles.modalIconBox, { backgroundColor: isDark ? 'rgba(255, 59, 48, 0.12)' : 'rgba(255, 59, 48, 0.08)' }]}>
+                            <Ionicons name="trash-outline" size={28} color={Colors.danger} />
                         </View>
-                        <Text style={[styles.modalTitle, { color: Colors.danger }]}>{t('settings.delete_account').toUpperCase()}</Text>
-                        <Text style={styles.modalSubtitle}>
-                            {t('settings.delete_account_modal_warning')}
+
+                        <Text style={[styles.modalTitle, { color: Colors.danger }]}>
+                            {t('settings.delete_account', 'Hisobni o\'chirish').toUpperCase()}
+                        </Text>
+                        <Text style={[styles.modalSubtitle, { color: homeColors.textSecondary }]}>
+                            {t('settings.delete_account_modal_warning', 'Ushbu amalni ortga qaytarib bo\'lmaydi! Profilingiz, o\'yinchi statistikangiz, arizalaringiz va barcha shaxsiy ma\'lumotlaringiz butunlay o\'chiriladi.')}
                         </Text>
 
                         {isDeleting ? (
                             <View style={{ paddingVertical: 20, alignItems: 'center' }}>
                                 <ActivityIndicator size="large" color={Colors.danger} />
-                                <Text style={[styles.modalSubtitle, { marginTop: 10 }]}>{t('settings.deleting_data')}</Text>
+                                <Text style={[styles.modalSubtitle, { marginTop: 10, color: homeColors.textSecondary }]}>
+                                    {t('settings.deleting_data', 'Ma\'lumotlar o\'chirilmoqda...')}
+                                </Text>
                             </View>
                         ) : (
                             <View style={styles.modalActions}>
                                 <TouchableOpacity
-                                    style={styles.modalCancelBtn}
-                                    onPress={() => setShowDeleteModal(false)}
-                                >
-                                    <Text style={styles.modalCancelText}>{t('common.cancel').toUpperCase()}</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
                                     style={[styles.modalPrimaryBtn, { backgroundColor: Colors.danger }]}
                                     onPress={handleConfirmDelete}
+                                    activeOpacity={0.8}
                                 >
-                                    <Text style={[styles.modalPrimaryText, { color: '#FFF' }]}>{t('common.delete').toUpperCase()}</Text>
+                                    <Text style={styles.modalPrimaryText}>
+                                        {t('common.delete', 'O\'chirish').toUpperCase()}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.modalCancelBtn}
+                                    onPress={() => setShowDeleteModal(false)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={[styles.modalCancelText, { color: homeColors.textSecondary }]}>
+                                        {t('common.cancel', 'Bekor qilish')}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         )}
-                    </View>
-                </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
             </Modal>
 
             {/* Privacy Policy Modal */}
@@ -298,39 +404,68 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                 onRequestClose={() => setShowPrivacyModal(false)}
             >
                 <View style={styles.docModalOverlay}>
-                    <View style={styles.docModalContainer}>
-                        <View style={styles.docModalHeader}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                <Ionicons name="shield-checkmark" size={22} color={Colors.primary} />
-                                <Text style={styles.docModalTitle}>{t('settings.privacy_policy')}</Text>
+                    <View
+                        style={[
+                            styles.docModalContainer,
+                            {
+                                backgroundColor: isDark ? '#121212' : '#FFFFFF',
+                                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : homeColors.border,
+                            }
+                        ]}
+                    >
+                        <View
+                            style={[
+                                styles.docModalHeader,
+                                {
+                                    borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : homeColors.border,
+                                }
+                            ]}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <Ionicons name="shield-checkmark" size={20} color={homeColors.accent} />
+                                <Text style={[styles.docModalTitle, { color: homeColors.textPrimary }]}>
+                                    {t('settings.privacy_policy', 'Maxfiylik siyosati')}
+                                </Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setShowPrivacyModal(false)}
-                                style={styles.docCloseBtn}
+                                style={[
+                                    styles.docCloseBtn,
+                                    { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F0F0F2' }
+                                ]}
+                                activeOpacity={0.7}
                             >
-                                <Ionicons name="close" size={22} color="#FFF" />
+                                <Ionicons name="close" size={18} color={homeColors.textPrimary} />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView style={styles.docModalBody} showsVerticalScrollIndicator={false}>
-                            <Text style={styles.docSectionTitle}>{t('settings.privacy_sec1_title')}</Text>
-                            <Text style={styles.docText}>
-                                {t('settings.privacy_sec1_text')}
+                            <Text style={[styles.docSectionTitle, { color: homeColors.textPrimary }]}>
+                                {t('settings.privacy_sec1_title', '1. To\'planadigan Ma\'lumotlar')}
+                            </Text>
+                            <Text style={[styles.docText, { color: homeColors.textSecondary }]}>
+                                {t('settings.privacy_sec1_text', 'AMATORA ilovasi foydalanuvchilarning telefon raqami, ism-familiyasi, o\'yinchi fotosurati, amplua va jamoa tarkibi ma\'lumotlarini to\'playdi.')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>{t('settings.privacy_sec2_title')}</Text>
-                            <Text style={styles.docText}>
-                                {t('settings.privacy_sec2_text')}
+                            <Text style={[styles.docSectionTitle, { color: homeColors.textPrimary }]}>
+                                {t('settings.privacy_sec2_title', '2. Ma\'lumotlardan Foydalanish')}
+                            </Text>
+                            <Text style={[styles.docText, { color: homeColors.textSecondary }]}>
+                                {t('settings.privacy_sec2_text', 'Ma\'lumotlar faqat futbol ligasi va turnirlarini tashkil etish, taqvim va jadvallarni yuritish, o\'yinchi profillarini shakllantirish hamda hisoblar bo\'yicha bildirishnomalar yuborish uchun ishlatiladi.')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>{t('settings.privacy_sec3_title')}</Text>
-                            <Text style={styles.docText}>
-                                {t('settings.privacy_sec3_text')}
+                            <Text style={[styles.docSectionTitle, { color: homeColors.textPrimary }]}>
+                                {t('settings.privacy_sec3_title', '3. Uchinchi Shaxslar')}
+                            </Text>
+                            <Text style={[styles.docText, { color: homeColors.textSecondary }]}>
+                                {t('settings.privacy_sec3_text', 'Shaxsiy ma\'lumotlar hech qanday uchinchi shaxslarga tijoriy yoki reklama maqsadlarida sotilmaydi va tarqatilmaydi.')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>{t('settings.privacy_sec4_title')}</Text>
-                            <Text style={styles.docText}>
-                                {t('settings.privacy_sec4_text')}
+                            <Text style={[styles.docSectionTitle, { color: homeColors.textPrimary }]}>
+                                {t('settings.privacy_sec4_title', '4. Hisobni O\'chirish Huquqi')}
+                            </Text>
+                            <Text style={[styles.docText, { color: homeColors.textSecondary }]}>
+                                {t('settings.privacy_sec4_text', 'Foydalanuvchi istalgan vaqtda o\'z hisobini va unga tegishli barcha ma\'lumotlarni sozlamalar bo\'limidagi \'Hisobni o\'chirish\' tugmasi orqali to\'liq o\'chirib tashlashi mumkin.')}
                             </Text>
 
                             <View style={{ height: 40 }} />
@@ -347,34 +482,61 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                 onRequestClose={() => setShowTermsModal(false)}
             >
                 <View style={styles.docModalOverlay}>
-                    <View style={styles.docModalContainer}>
-                        <View style={styles.docModalHeader}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                <Ionicons name="document-text" size={22} color={Colors.primary} />
-                                <Text style={styles.docModalTitle}>{t('settings.terms_of_use')}</Text>
+                    <View
+                        style={[
+                            styles.docModalContainer,
+                            {
+                                backgroundColor: isDark ? '#121212' : '#FFFFFF',
+                                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : homeColors.border,
+                            }
+                        ]}
+                    >
+                        <View
+                            style={[
+                                styles.docModalHeader,
+                                {
+                                    borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : homeColors.border,
+                                }
+                            ]}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                <Ionicons name="document-text" size={20} color={homeColors.accent} />
+                                <Text style={[styles.docModalTitle, { color: homeColors.textPrimary }]}>
+                                    {t('settings.terms_of_use', 'Foydalanish shartlari')}
+                                </Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setShowTermsModal(false)}
-                                style={styles.docCloseBtn}
+                                style={[
+                                    styles.docCloseBtn,
+                                    { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F0F0F2' }
+                                ]}
+                                activeOpacity={0.7}
                             >
-                                <Ionicons name="close" size={22} color="#FFF" />
+                                <Ionicons name="close" size={18} color={homeColors.textPrimary} />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView style={styles.docModalBody} showsVerticalScrollIndicator={false}>
-                            <Text style={styles.docSectionTitle}>{t('settings.terms_sec1_title')}</Text>
-                            <Text style={styles.docText}>
-                                {t('settings.terms_sec1_text')}
+                            <Text style={[styles.docSectionTitle, { color: homeColors.textPrimary }]}>
+                                {t('settings.terms_sec1_title', '1. Ro\'yxatdan O\'tish va Arizalar')}
+                            </Text>
+                            <Text style={[styles.docText, { color: homeColors.textSecondary }]}>
+                                {t('settings.terms_sec1_text', 'Foydalanuvchi ariza topshirishda haqiqiy va to\'g\'ri shaxsiy ma\'lumotlarni kiritish majburiyatini oladi. Bitta o\'yinchi bir vaqtning o\'zida liga qoidalariga zid ravishda bir nechta jamoada o\'ynay olmaydi.')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>{t('settings.terms_sec2_title')}</Text>
-                            <Text style={styles.docText}>
-                                {t('settings.terms_sec2_text')}
+                            <Text style={[styles.docSectionTitle, { color: homeColors.textPrimary }]}>
+                                {t('settings.terms_sec2_title', '2. Fair Play va Sport Odob-axloqi')}
+                            </Text>
+                            <Text style={[styles.docText, { color: homeColors.textSecondary }]}>
+                                {t('settings.terms_sec2_text', 'Barcha futbolchilar, murabbiylar va jamoa a\'zolari hakamlar, raqiblar va tashkilotchilarga hurmat bilan munosabatda bo\'lishlari shart. Intizomsizlik diskvalifikatsiyaga sabab bo\'lishi mumkin.')}
                             </Text>
 
-                            <Text style={styles.docSectionTitle}>{t('settings.terms_sec3_title')}</Text>
-                            <Text style={styles.docText}>
-                                {t('settings.terms_sec3_text')}
+                            <Text style={[styles.docSectionTitle, { color: homeColors.textPrimary }]}>
+                                {t('settings.terms_sec3_title', '3. Mas\'uliyat Cheklovi')}
+                            </Text>
+                            <Text style={[styles.docText, { color: homeColors.textSecondary }]}>
+                                {t('settings.terms_sec3_text', 'AMATORA platformasi o\'yinlar davomida yuz berishi mumkin bo\'lgan jismoniy jarohatlar yoki noqulayliklar uchun mas\'uliyatni o\'z zimmasiga olmaydi.')}
                             </Text>
 
                             <View style={{ height: 40 }} />
@@ -389,239 +551,165 @@ export default function SecuritySettingsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#050811',
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    scrollContent: {
-        paddingHorizontal: 16,
-        paddingTop: 20,
-    },
-    section: {
-        marginBottom: 26,
-    },
-    sectionHeader: {
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontSize: 12,
+    sectionHeading: {
+        fontSize: 11,
         fontWeight: '800',
-        letterSpacing: 1,
-        marginBottom: 10,
+        letterSpacing: 0.6,
+        marginBottom: 8,
         marginLeft: 4,
     },
-    cardContainer: {
+    groupedCard: {
         borderRadius: 18,
-        overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        overflow: 'hidden',
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 1,
     },
     settingRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 15,
         paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+        paddingVertical: 14,
     },
-    settingRowLast: {
-        borderBottomWidth: 0,
-    },
-    iconBox: {
-        width: 38,
-        height: 38,
+    iconCircle: {
+        width: 36,
+        height: 36,
         borderRadius: 12,
-        backgroundColor: 'rgba(0, 255, 135, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 14,
     },
-    iconBoxDestructive: {
-        backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    },
     settingContent: {
         flex: 1,
+        marginRight: 8,
     },
     settingTitle: {
-        color: '#FFFFFF',
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '700',
-    },
-    settingTitleDestructive: {
-        color: Colors.danger,
+        letterSpacing: 0.1,
     },
     settingSubtitle: {
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontSize: 12,
+        fontSize: 11.5,
+        fontWeight: '500',
         marginTop: 2,
     },
-    badgeContainer: {
+    versionContainer: {
         alignItems: 'center',
-        marginTop: 10,
-        paddingVertical: 14,
-    },
-    badgeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(0, 255, 135, 0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 135, 0.25)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-    },
-    badgeText: {
-        color: Colors.primary,
-        fontSize: 11,
-        fontWeight: '800',
-        letterSpacing: 0.5,
+        paddingVertical: 24,
     },
     versionText: {
-        color: 'rgba(255, 255, 255, 0.35)',
-        fontSize: 12,
-        fontWeight: '500',
-        marginTop: 10,
+        fontSize: 10.5,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: 'rgba(0,0,0,0.7)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        padding: 24,
     },
     modalCard: {
         width: '100%',
         maxWidth: 340,
-        backgroundColor: '#111726',
         borderRadius: 24,
-        padding: 24,
+        padding: 22,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
         alignItems: 'center',
     },
     modalIconBox: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        width: 54,
+        height: 54,
+        borderRadius: 27,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     modalTitle: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '800',
-        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.3,
         marginBottom: 8,
+        textAlign: 'center',
     },
     modalSubtitle: {
-        color: 'rgba(255, 255, 255, 0.65)',
         fontSize: 13,
-        textAlign: 'center',
         lineHeight: 18,
+        textAlign: 'center',
         marginBottom: 20,
     },
     modalActions: {
-        flexDirection: 'row',
-        gap: 12,
         width: '100%',
-    },
-    modalCancelBtn: {
-        flex: 1,
-        paddingVertical: 13,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    modalCancelText: {
-        color: '#FFFFFF',
-        fontSize: 13,
-        fontWeight: '700',
+        gap: 10,
     },
     modalPrimaryBtn: {
-        flex: 1,
+        width: '100%',
         paddingVertical: 13,
         borderRadius: 14,
-        backgroundColor: Colors.primary,
         alignItems: 'center',
-        justifyContent: 'center',
     },
     modalPrimaryText: {
-        color: '#000000',
+        color: '#FFFFFF',
+        fontSize: 13.5,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    modalCancelBtn: {
+        width: '100%',
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    modalCancelText: {
         fontSize: 13,
-        fontWeight: '900',
+        fontWeight: '600',
     },
     docModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: 'rgba(0,0,0,0.65)',
         justifyContent: 'flex-end',
     },
     docModalContainer: {
-        backgroundColor: '#111726',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        height: '80%',
-        padding: 24,
-        borderTopWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        borderWidth: 1,
+        maxHeight: '85%',
+        paddingTop: 16,
+        paddingHorizontal: 20,
     },
     docModalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingBottom: 16,
+        paddingBottom: 14,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     },
     docModalTitle: {
-        color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '800',
     },
     docCloseBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
     docModalBody: {
-        marginTop: 16,
+        paddingTop: 16,
     },
     docSectionTitle: {
-        color: Colors.primary,
-        fontSize: 15,
+        fontSize: 13.5,
         fontWeight: '800',
-        marginTop: 14,
+        marginTop: 12,
         marginBottom: 6,
     },
     docText: {
-        color: 'rgba(255, 255, 255, 0.75)',
-        fontSize: 13,
-        lineHeight: 20,
+        fontSize: 12.5,
+        lineHeight: 18,
+        marginBottom: 10,
     },
 });
