@@ -46,17 +46,71 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const FIELD_WIDTH = SCREEN_WIDTH - 32;
 const FIELD_HEIGHT = FIELD_WIDTH * 1.34;
 
-export const getPlayerRatingScore = (player: any): string => {
-    const raw = player?.rating ?? player?.stats?.rating ?? player?.avg_rating ?? player?.stats?.avg_rating ?? player?.match_rating ?? player?.score;
-    if (raw !== undefined && raw !== null && raw !== '') {
-        const num = Number(raw);
-        if (!isNaN(num) && num > 0) {
-            if (num <= 10) return num.toFixed(1);
-            return (num / 10).toFixed(1);
-        }
+export const computePlayerStatsAndRating = (player: any, allEvents: any[] = [], teamMatchesCount: number = 0) => {
+    if (!player) return { goals: 0, assists: 0, yellowCards: 0, redCards: 0, rating: '7.0' };
+
+    const pId = String(player.id || player._id);
+    const pEvents = allEvents.filter((e: any) => String(e.player_id) === pId);
+
+    const goals = pEvents.filter((e: any) => String(e.event_type || '').toLowerCase() === 'goal').length;
+    const assists = pEvents.filter((e: any) => String(e.event_type || '').toLowerCase() === 'assist').length;
+    const yellowCards = pEvents.filter((e: any) => {
+        const t = String(e.event_type || '').toLowerCase();
+        return t === 'yellow_card' || t === 'yellowcard' || t === 'yellow';
+    }).length;
+    const redCards = pEvents.filter((e: any) => {
+        const t = String(e.event_type || '').toLowerCase();
+        return t === 'red_card' || t === 'redcard' || t === 'red';
+    }).length;
+
+    // Direct database rating check (from PlayerStatsScreen logic)
+    if (player.rating !== undefined && player.rating !== null && Number(player.rating) > 0) {
+        const n = Number(player.rating);
+        return {
+            goals,
+            assists,
+            yellowCards,
+            redCards,
+            rating: (n <= 10 ? n : n / 10).toFixed(1)
+        };
     }
+
+    // Match events score calculation (from apiService.getPlayerStats / PlayerStatsScreen)
+    let calculatedRating = 0;
+    if (teamMatchesCount > 0) {
+        const rawScore = (goals * 0.5) + (assists * 0.3) - (yellowCards * 0.2) - (redCards * 0.5);
+        if (teamMatchesCount >= 3) {
+            calculatedRating = 5.0 + (rawScore / teamMatchesCount) * 3;
+        } else {
+            calculatedRating = 5.0 + rawScore;
+        }
+        calculatedRating = Math.min(10.0, Math.max(1.0, calculatedRating));
+        calculatedRating = Math.round(calculatedRating * 10) / 10;
+    }
+
+    if (calculatedRating > 0) {
+        return {
+            goals,
+            assists,
+            yellowCards,
+            redCards,
+            rating: calculatedRating.toFixed(1)
+        };
+    }
+
+    // Fallback: FIFA OVR scaled to 10
     const ovr = calculateFifaAttributes(player).ovr || 72;
-    return (ovr / 10).toFixed(1);
+    return {
+        goals,
+        assists,
+        yellowCards,
+        redCards,
+        rating: (ovr / 10).toFixed(1)
+    };
+};
+
+export const getPlayerRatingScore = (player: any): string => {
+    return computePlayerStatsAndRating(player).rating;
 };
 
 export interface PitchPlayer {
@@ -210,20 +264,41 @@ export default function FormationBoard({ route, navigation }: any) {
 
             let teamPlayers: any[] = [];
             let team: any = null;
+            let allMatchEvents: any[] = [];
+            let teamMatchesCount = 0;
 
             if (targetTeamId) {
-                const [tRes, pRes] = await Promise.all([
+                const [tRes, pRes, homeRes, awayRes] = await Promise.all([
                     apiService.getTeamById(targetTeamId),
-                    apiService.getPlayersByTeam(targetTeamId)
+                    apiService.getPlayersByTeam(targetTeamId),
+                    supabase.from('matches').select('id', { count: 'exact', head: true }).eq('home_team_id', targetTeamId),
+                    supabase.from('matches').select('id', { count: 'exact', head: true }).eq('away_team_id', targetTeamId)
                 ]);
                 team = tRes;
                 teamPlayers = pRes || [];
+                teamMatchesCount = (homeRes.count || 0) + (awayRes.count || 0);
+
+                const playerIds = (teamPlayers || []).map((p: any) => p.id || p._id);
+                if (playerIds.length > 0) {
+                    const { data: eventsData } = await supabase
+                        .from('match_events')
+                        .select('*')
+                        .in('player_id', playerIds);
+                    allMatchEvents = eventsData || [];
+                }
             }
 
             const activeTeamPlayers = (teamPlayers || []).filter((p: any) => {
                 const st = String(p.status || '').toLowerCase().trim();
                 const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
                 return !isArchived && st === 'approved';
+            }).map((p: any) => {
+                const statsObj = computePlayerStatsAndRating(p, allMatchEvents, teamMatchesCount);
+                return {
+                    ...p,
+                    stats: statsObj,
+                    rating: statsObj.rating,
+                };
             });
 
             setAvailablePlayers(activeTeamPlayers);
@@ -257,7 +332,7 @@ export default function FormationBoard({ route, navigation }: any) {
             if (team?.formation?.players && Array.isArray(team.formation.players) && team.formation.players.length > 0) {
                 finalEnrichedFormation = team.formation.players.map((fp: any) => {
                     const matchedRoster = activeTeamPlayers.find((p: any) => String(p.id || p._id) === String(fp.id));
-                    const ratingScore = matchedRoster ? getPlayerRatingScore(matchedRoster) : (fp.rating || '7.5');
+                    const ratingScore = matchedRoster?.rating || fp.rating || computePlayerStatsAndRating(matchedRoster || fp, allMatchEvents, teamMatchesCount).rating;
                     return {
                         ...fp,
                         photo: matchedRoster?.photo || matchedRoster?.photo_url || matchedRoster?.avatar || fp.photo || null,
@@ -269,7 +344,6 @@ export default function FormationBoard({ route, navigation }: any) {
                 });
                 setPlayersOnPitch(finalEnrichedFormation);
             }
-
             // 2. KESHNI YANGILASH (Save fetched data to cache)
             if (targetTeamId) {
                 AsyncStorage.setItem(getFormationCacheKey(targetTeamId), JSON.stringify({
