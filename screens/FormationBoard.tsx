@@ -832,8 +832,8 @@ export default function FormationBoard({ route, navigation }: any) {
                                         {/* ACTION STATUS BUTTON */}
                                         <View style={{ marginLeft: 8 }}>
                                             {isOnPitch ? (
-                                                <View style={styles.badgeMainPill}>
-                                                    <Text style={styles.badgeMainPillText}>MAYDONDA</Text>
+                                                <View style={[styles.badgeCheckedCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }]}>
+                                                    <Ionicons name="checkmark" size={14} color={homeColors.textPrimary} />
                                                 </View>
                                             ) : selectedPlayerId ? (
                                                 <View style={[styles.badgeSwapPill, { backgroundColor: homeColors.textPrimary }]}>
@@ -1284,6 +1284,13 @@ const styles = StyleSheet.create({
     ratingBadgePillText: {
         fontSize: 12,
         fontWeight: '900',
+    },
+    badgeCheckedCircle: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     badgeMainPill: {
         backgroundColor: 'rgba(255,255,255,0.06)',
