@@ -832,7 +832,7 @@ export default function FormationBoard({ route, navigation }: any) {
                                         {/* ACTION STATUS BUTTON */}
                                         <View style={{ marginLeft: 8 }}>
                                             {isOnPitch ? (
-                                                <View style={[styles.badgeCheckedCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }]}>
+                                                <View style={[styles.badgeActionCircle, { borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                                                     <Ionicons name="checkmark" size={14} color={homeColors.textPrimary} />
                                                 </View>
                                             ) : selectedPlayerId ? (
@@ -841,7 +841,7 @@ export default function FormationBoard({ route, navigation }: any) {
                                                     <Text style={[styles.badgeSwapPillText, { color: isDark ? '#000000' : '#FFFFFF' }]}>ALMASH</Text>
                                                 </View>
                                             ) : (
-                                                <View style={[styles.badgeAddPill, { borderColor: homeColors.border }]}>
+                                                <View style={[styles.badgeActionCircle, { borderColor: homeColors.border }]}>
                                                     <Ionicons name="add" size={14} color={homeColors.textPrimary} />
                                                 </View>
                                             )}
@@ -1285,23 +1285,13 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '900',
     },
-    badgeCheckedCircle: {
+    badgeActionCircle: {
         width: 26,
         height: 26,
         borderRadius: 13,
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    badgeMainPill: {
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-    },
-    badgeMainPillText: {
-        color: '#94A3B8',
-        fontSize: 9,
-        fontWeight: '800',
     },
     badgeSwapPill: {
         flexDirection: 'row',
@@ -1314,13 +1304,5 @@ const styles = StyleSheet.create({
     badgeSwapPillText: {
         fontSize: 10,
         fontWeight: '900',
-    },
-    badgeAddPill: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
 });
