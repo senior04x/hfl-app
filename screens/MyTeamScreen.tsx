@@ -759,7 +759,6 @@ export default function MyTeamScreen({ route, navigation }: any) {
                     </ScrollView>
                 </View>
             </Animated.ScrollView>
-            </View>
 
             {/* ADD PHONE MODAL */}
             <Modal
