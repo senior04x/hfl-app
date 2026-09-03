@@ -66,10 +66,10 @@ function computeCardLayout(cardW: number, showAttrs: boolean) {
 
     const ovrFont = Math.round(32 * sf);
     const ovrLineH = Math.round(34 * sf);
-    const posFont = Math.round(8.5 * sf);
-    const posLineH = Math.round(11 * sf);
-    const posBorder = Math.max(1, Math.round(1 * sf));
-    const posPadV = Math.max(1, Math.round(2 * sf));
+    const posFont = Math.max(6, Math.round(6.8 * sf));
+    const posLineH = Math.max(8, Math.round(9 * sf));
+    const posBorder = Math.max(1, Math.round(0.8 * sf));
+    const posPadV = Math.max(1, Math.round(1.5 * sf));
     const dividerH = Math.max(1, Math.round(1.5 * sf));
     const clubBadgeD = Math.round(38 * sf);
 
@@ -801,16 +801,16 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     posBadge: {
-        borderRadius: 6,
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 5,
+        backgroundColor: 'rgba(0,0,0,0.35)',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '100%',
-        paddingHorizontal: 4,
+        width: '92%',
+        paddingHorizontal: 3,
     },
     posText: {
-        fontWeight: '900',
-        letterSpacing: 0.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
         textAlign: 'center',
         includeFontPadding: false,
     },
