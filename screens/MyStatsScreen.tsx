@@ -16,6 +16,8 @@ import {
     Alert,
     Platform,
     PanResponder,
+    KeyboardAvoidingView,
+    Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -301,6 +303,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
     const [exportState, setExportState] = useState<'idle' | 'loading' | 'complete'>('idle');
     const [exportProgress, setExportProgress] = useState(0);
     const posterShotRef = useRef<any>(null);
+    const passportNumberRef = useRef<TextInput>(null);
 
     // Profile update form state
     const [updateForm, setUpdateForm] = useState({
@@ -1382,214 +1385,323 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 onRequestClose={() => setShowProfileUpdateModal(false)}
             >
                 <View style={[styles.editModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
-                    <View style={[styles.editModalCard, cardSurface, { maxHeight: '90%' }]}>
-                        <View style={styles.editModalHeader}>
-                            <Text style={[styles.editModalTitle, { color: homeColors.textPrimary }]}>{t('profile.edit_profile', 'PROFILNI TAHRIRLASH')}</Text>
-                            <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                <Ionicons name="close" size={22} color={homeColors.textPrimary} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView style={{ maxHeight: 440 }} showsVerticalScrollIndicator={false}>
-                            {/* Photo upload row */}
-                            <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                                <TouchableOpacity onPress={handlePickImage} style={styles.editAvatarWrapper} activeOpacity={0.8}>
-                                    <SmartImage uri={updateForm.photoUrl || player.photo || player.avatar} style={{ width: 88, height: 88, borderRadius: 22 }} contentFit="cover" fallbackIcon="person" />
-                                    <View style={[styles.cameraIconBadge, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}>
-                                        <Ionicons name="camera" size={14} color={isDark ? '#000000' : '#FFFFFF'} />
-                                    </View>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 30 : 0}
+                    >
+                        <View style={[styles.editModalCard, cardSurface, { maxHeight: '92%' }]}>
+                            <View style={styles.editModalHeader}>
+                                <Text style={[styles.editModalTitle, { color: homeColors.textPrimary }]}>{t('profile.edit_profile', 'PROFILNI TAHRIRLASH')}</Text>
+                                <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <Ionicons name="close" size={22} color={homeColors.textPrimary} />
                                 </TouchableOpacity>
-                                <Text style={{ color: homeColors.textSecondary, fontSize: 11.5, marginTop: 6, fontWeight: '600' }}>
-                                    {pickerLoading ? 'Rasm yuklanmoqda...' : 'Rasmni o\'zgartirish'}
-                                </Text>
                             </View>
 
-                            <View style={styles.formRow}>
-                                <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Ism *</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.firstName}
-                                        placeholder="Ismingiz"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, firstName: v }))}
-                                    />
-                                </View>
-                                <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Familiya *</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.lastName}
-                                        placeholder="Familiyangiz"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, lastName: v }))}
-                                    />
-                                </View>
-                            </View>
-
-                            <View style={styles.formRow}>
-                                <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Otasining ismi</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.fatherName}
-                                        placeholder="Sharifingiz"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, fatherName: v }))}
-                                    />
-                                </View>
-                                <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Telefon raqam</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.phone}
-                                        keyboardType="phone-pad"
-                                        placeholder="+998901234567"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, phone: v }))}
-                                    />
-                                </View>
-                            </View>
-
-                            <View style={styles.formRow}>
-                                <View style={[styles.formGroup, { flex: 1.2 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pozitsiya</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.position}
-                                        placeholder="Masalan: Hujumchi"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, position: v }))}
-                                    />
-                                </View>
-                                <View style={[styles.formGroup, { flex: 0.8 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Forma (#)</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.playerNumber}
-                                        keyboardType="numeric"
-                                        placeholder="10"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, playerNumber: v }))}
-                                    />
-                                </View>
-                            </View>
-
-                            {/* Tug'ilgan sana (JoinApplication date picker modal) */}
-                            <View style={styles.formGroup}>
-                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug'ilgan sana</Text>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => setIsDatePickerVisible(true)}
-                                    style={[
-                                        styles.modalInput,
-                                        {
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            borderColor: homeColors.border,
-                                            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                                            paddingVertical: 12,
-                                        }
-                                    ]}
-                                >
-                                    <Text style={{ color: updateForm.birthDate ? homeColors.textPrimary : homeColors.textSecondary, fontSize: 14, fontWeight: '600' }}>
-                                        {updateForm.birthDate || "Sanani tanlang"}
+                            <ScrollView
+                                style={{ maxHeight: 480 }}
+                                contentContainerStyle={{ paddingBottom: 24 }}
+                                showsVerticalScrollIndicator={false}
+                                keyboardShouldPersistTaps="handled"
+                            >
+                                {/* Photo upload row */}
+                                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                                    <TouchableOpacity onPress={handlePickImage} style={styles.editAvatarWrapper} activeOpacity={0.8}>
+                                        <SmartImage uri={updateForm.photoUrl || player.photo || player.avatar} style={{ width: 88, height: 88, borderRadius: 22 }} contentFit="cover" fallbackIcon="person" />
+                                        <View style={[styles.cameraIconBadge, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}>
+                                            <Ionicons name="camera" size={14} color={isDark ? '#000000' : '#FFFFFF'} />
+                                        </View>
+                                    </TouchableOpacity>
+                                    <Text style={{ color: homeColors.textSecondary, fontSize: 11.5, marginTop: 6, fontWeight: '600' }}>
+                                        {pickerLoading ? 'Rasm yuklanmoqda...' : 'Rasmni o\'zgartirish'}
                                     </Text>
-                                    <Ionicons name="calendar-outline" size={18} color={homeColors.textPrimary} />
-                                </TouchableOpacity>
-                            </View>
+                                </View>
 
-                            <View style={styles.formRow}>
-                                <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Bo\'yi (sm)</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.height}
-                                        keyboardType="numeric"
-                                        placeholder="180"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, height: v }))}
-                                    />
+                                <View style={styles.formRow}>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Ism *</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                            value={updateForm.firstName}
+                                            placeholder="Ismingiz"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => setUpdateForm(p => ({ ...p, firstName: v }))}
+                                        />
+                                    </View>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Familiya *</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                            value={updateForm.lastName}
+                                            placeholder="Familiyangiz"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => setUpdateForm(p => ({ ...p, lastName: v }))}
+                                        />
+                                    </View>
                                 </View>
-                                <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Vazni (kg)</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.weight}
-                                        keyboardType="numeric"
-                                        placeholder="75"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, weight: v }))}
-                                    />
-                                </View>
-                            </View>
 
-                            <View style={styles.formRow}>
-                                <View style={[styles.formGroup, { flex: 0.8 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pasport Seriya</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.passportSeries}
-                                        autoCapitalize="characters"
-                                        maxLength={2}
-                                        placeholder="AA"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, passportSeries: v }))}
-                                    />
+                                <View style={styles.formRow}>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Otasining ismi</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                            value={updateForm.fatherName}
+                                            placeholder="Sharifingiz"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => setUpdateForm(p => ({ ...p, fatherName: v }))}
+                                        />
+                                    </View>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Telefon raqam *</Text>
+                                        <View style={[
+                                            styles.modalInput,
+                                            {
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                paddingHorizontal: 0,
+                                                paddingVertical: 0,
+                                                borderColor: homeColors.border,
+                                                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                                overflow: 'hidden'
+                                            }
+                                        ]}>
+                                            <View style={{
+                                                paddingHorizontal: 10,
+                                                paddingVertical: 10,
+                                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                                borderRightWidth: 1,
+                                                borderRightColor: homeColors.border,
+                                                justifyContent: 'center',
+                                                alignItems: 'center'
+                                            }}>
+                                                <Text style={{ color: homeColors.textPrimary, fontWeight: '700', fontSize: 13.5 }}>+998</Text>
+                                            </View>
+                                            <TextInput
+                                                style={{
+                                                    flex: 1,
+                                                    color: homeColors.textPrimary,
+                                                    paddingHorizontal: 10,
+                                                    paddingVertical: 8,
+                                                    fontSize: 14,
+                                                    fontWeight: '600'
+                                                }}
+                                                value={(updateForm.phone || '').replace(/^\+998/, '').replace(/^998/, '')}
+                                                keyboardType="number-pad"
+                                                maxLength={9}
+                                                placeholder="901234567"
+                                                placeholderTextColor={homeColors.textSecondary}
+                                                onChangeText={(v) => {
+                                                    const clean = v.replace(/\D/g, '').slice(0, 9);
+                                                    setUpdateForm(p => ({ ...p, phone: `+998${clean}` }));
+                                                }}
+                                            />
+                                        </View>
+                                    </View>
                                 </View>
-                                <View style={[styles.formGroup, { flex: 1.2 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pasport Raqam</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.passportNumber}
-                                        keyboardType="numeric"
-                                        maxLength={7}
-                                        placeholder="1234567"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, passportNumber: v }))}
-                                    />
-                                </View>
-                            </View>
 
-                            <View style={styles.formRow}>
-                                <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Millati / Fuqaroligi</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.citizenship}
-                                        placeholder="O'zbekiston"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, citizenship: v }))}
-                                    />
+                                {/* 4 Positions Select Pills */}
+                                <View style={styles.formGroup}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pozitsiya (Amplua)</Text>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                                        {['Darvozabon', 'Himoyachi', 'Yarim himoyachi', 'Hujumchi'].map((pos) => {
+                                            const isSel = updateForm.position === pos;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={pos}
+                                                    activeOpacity={0.7}
+                                                    onPress={() => {
+                                                        try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                                        setUpdateForm(p => ({ ...p, position: pos }));
+                                                    }}
+                                                    style={[
+                                                        {
+                                                            flex: 1,
+                                                            minWidth: '45%',
+                                                            paddingVertical: 9,
+                                                            paddingHorizontal: 8,
+                                                            borderRadius: 10,
+                                                            borderWidth: 1,
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            borderColor: isSel ? (isDark ? '#FFFFFF' : '#000000') : homeColors.border,
+                                                            backgroundColor: isSel
+                                                                ? (isDark ? '#FFFFFF' : '#000000')
+                                                                : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
+                                                        }
+                                                    ]}
+                                                >
+                                                    <Text style={[
+                                                        {
+                                                            fontSize: 12.5,
+                                                            fontWeight: isSel ? '800' : '600',
+                                                            color: isSel ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textPrimary
+                                                        }
+                                                    ]}>
+                                                        {pos}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
                                 </View>
-                                <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Instagram Username</Text>
-                                    <TextInput
-                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.instagramUsername}
-                                        placeholder="username"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        autoCapitalize="none"
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, instagramUsername: v }))}
-                                    />
-                                </View>
-                            </View>
-                        </ScrollView>
 
-                        {/* Interactive Slide To Send Button */}
-                        <View style={{ marginTop: 14, alignItems: 'center', width: '100%' }}>
-                            <SlideButton
-                                title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
-                                loadingTitle={t('common.loading', 'Yuborilmoqda...')}
-                                successTitle={t('common.success', 'Muvaffaqiyatli!')}
-                                onSwipeSuccess={handleSubmitProfileUpdate}
-                                loading={submittingUpdate}
-                                status={updateSubmitStatus}
-                                disabled={submittingUpdate}
-                            />
+                                <View style={styles.formRow}>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Forma (#)</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                            value={updateForm.playerNumber}
+                                            keyboardType="numeric"
+                                            placeholder="10"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => setUpdateForm(p => ({ ...p, playerNumber: v }))}
+                                        />
+                                    </View>
+                                    <View style={[styles.formGroup, { flex: 1.2 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug\'ilgan sana</Text>
+                                        <TouchableOpacity
+                                            activeOpacity={0.7}
+                                            onPress={() => setIsDatePickerVisible(true)}
+                                            style={[
+                                                styles.modalInput,
+                                                {
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    borderColor: homeColors.border,
+                                                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                                    paddingVertical: 12,
+                                                }
+                                            ]}
+                                        >
+                                            <Text style={{ color: updateForm.birthDate ? homeColors.textPrimary : homeColors.textSecondary, fontSize: 13.5, fontWeight: '600' }}>
+                                                {updateForm.birthDate || "Sanani tanlang"}
+                                            </Text>
+                                            <Ionicons name="calendar-outline" size={17} color={homeColors.textPrimary} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <View style={styles.formRow}>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Bo\'yi (sm)</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                            value={updateForm.height}
+                                            keyboardType="numeric"
+                                            placeholder="180"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => setUpdateForm(p => ({ ...p, height: v }))}
+                                        />
+                                    </View>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Vazni (kg)</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                            value={updateForm.weight}
+                                            keyboardType="numeric"
+                                            placeholder="75"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => setUpdateForm(p => ({ ...p, weight: v }))}
+                                        />
+                                    </View>
+                                </View>
+
+                                {/* Passport Series & Number (Close together + Auto-focus) */}
+                                <View style={styles.formGroup}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pasport seriya va raqami</Text>
+                                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                                        <TextInput
+                                            style={[
+                                                styles.modalInput,
+                                                {
+                                                    width: 72,
+                                                    textAlign: 'center',
+                                                    color: homeColors.textPrimary,
+                                                    borderColor: homeColors.border,
+                                                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                                    fontWeight: '700',
+                                                    fontSize: 14
+                                                }
+                                            ]}
+                                            value={updateForm.passportSeries}
+                                            autoCapitalize="characters"
+                                            maxLength={2}
+                                            placeholder="AA"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => {
+                                                const clean = v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2);
+                                                setUpdateForm(p => ({ ...p, passportSeries: clean }));
+                                                if (clean.length === 2) {
+                                                    passportNumberRef.current?.focus();
+                                                }
+                                            }}
+                                        />
+                                        <TextInput
+                                            ref={passportNumberRef}
+                                            style={[
+                                                styles.modalInput,
+                                                {
+                                                    flex: 1,
+                                                    color: homeColors.textPrimary,
+                                                    borderColor: homeColors.border,
+                                                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                                    fontWeight: '600',
+                                                    fontSize: 14
+                                                }
+                                            ]}
+                                            value={updateForm.passportNumber}
+                                            keyboardType="number-pad"
+                                            maxLength={7}
+                                            placeholder="1234567"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => {
+                                                const clean = v.replace(/\D/g, '').slice(0, 7);
+                                                setUpdateForm(p => ({ ...p, passportNumber: clean }));
+                                            }}
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.formRow}>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Millati / Fuqaroligi</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                            value={updateForm.citizenship}
+                                            placeholder="O'zbekiston"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            onChangeText={(v) => setUpdateForm(p => ({ ...p, citizenship: v }))}
+                                        />
+                                    </View>
+                                    <View style={[styles.formGroup, { flex: 1 }]}>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Instagram Username</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                            value={updateForm.instagramUsername}
+                                            placeholder="username"
+                                            placeholderTextColor={homeColors.textSecondary}
+                                            autoCapitalize="none"
+                                            onChangeText={(v) => setUpdateForm(p => ({ ...p, instagramUsername: v }))}
+                                        />
+                                    </View>
+                                </View>
+
+                                {/* Interactive Slide To Send Button inside ScrollView */}
+                                <View style={{ marginTop: 20, marginBottom: 10, alignItems: 'center', width: '100%' }}>
+                                    <SlideButton
+                                        title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
+                                        loadingTitle={t('common.loading', 'Yuborilmoqda...')}
+                                        successTitle={t('common.success', 'Muvaffaqiyatli!')}
+                                        onSwipeSuccess={handleSubmitProfileUpdate}
+                                        loading={submittingUpdate}
+                                        status={updateSubmitStatus}
+                                        disabled={submittingUpdate}
+                                    />
+                                </View>
+                            </ScrollView>
                         </View>
-                    </View>
+                    </KeyboardAvoidingView>
 
                     {/* INLINE DATE PICKER OVERLAY */}
                     <CustomDatePickerModal
