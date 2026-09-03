@@ -171,6 +171,40 @@ export function getCardRarity(player: any): CardRarity {
 }
 
 /**
+ * Numeric tier level (0-6) for progressive visual richness and luxury styling.
+ */
+export function getRarityTierLevel(rarity: CardRarity): number {
+    switch (rarity) {
+        case 'icon': return 6;
+        case 'holographic': return 5;
+        case 'amatora_elite': return 4;
+        case 'gold': return 3;
+        case 'silver': return 2;
+        case 'bronze': return 1;
+        case 'unrated':
+        default: return 0;
+    }
+}
+
+/**
+ * Returns localized label for card rarity tier badge.
+ */
+export function getLocalizedRarityLabel(rarity: CardRarity, lang: string = 'uz'): string {
+    const isUz = lang === 'uz';
+    const isRu = lang === 'ru';
+    switch (rarity) {
+        case 'icon': return isUz ? 'TOTY AFSONA' : isRu ? 'TOTY ИКОНА' : 'TOTY ICON';
+        case 'holographic': return isUz ? 'TOTS GOLOGRAMMA' : isRu ? 'TOTS ГОЛОГРАММА' : 'TOTS HOLO';
+        case 'amatora_elite': return isUz ? 'AMATORA ELITA' : isRu ? 'AMATORA ЭЛИТА' : 'AMATORA ELITE';
+        case 'gold': return isUz ? 'OLTIN' : isRu ? 'ЗОЛОТО' : 'GOLD RARE';
+        case 'silver': return isUz ? 'KUMUSH' : isRu ? 'СЕРЕБРО' : 'SILVER RARE';
+        case 'bronze': return isUz ? 'BRONZA' : isRu ? 'БРОНЗА' : 'BRONZE';
+        case 'unrated':
+        default: return isUz ? 'AMATORA' : isRu ? 'AMATORA' : 'AMATORA';
+    }
+}
+
+/**
  * Returns EA FC PlayStyles for the player based on position, stats and current language.
  */
 export function getPlayStyles(player: any, lang: string = 'uz'): PlayStyle[] {
