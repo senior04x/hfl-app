@@ -89,10 +89,10 @@ function computeCardLayout(cardW: number, showAttrs: boolean) {
     const gapStatNumToLabel = Math.max(1, Math.round(2 * sf));
     const statColItemH = statNumLineH + gapStatNumToLabel + statLabelLineH;
 
-    const gapStatsToFooter = Math.round(6 * sf);
-    const footerH = Math.round(14 * sf);
-    const footerLogo = Math.round(11 * sf);
-    const footerFont = Math.round(8.5 * sf);
+    const gapStatsToFooter = Math.round(3 * sf);
+    const footerH = Math.round(10 * sf);
+    const footerLogo = Math.max(6, Math.round(7.5 * sf));
+    const footerFont = Math.max(5.5, Math.round(6 * sf));
 
     return {
         sf,
@@ -679,11 +679,11 @@ export default function FifaPlayerCard({
                                         </View>
                                     </View>
 
-                                    {/* Subtle Amatora Footer Seal */}
+                                    {/* Subtle Micro Amatora Footer Seal */}
                                     <View style={[styles.cardFooterBrand, { marginTop: L.gapStatsToFooter, height: L.footerH }]}>
                                         <Image
                                             source={require('../assets/logo.png')}
-                                            style={{ width: L.footerLogo, height: L.footerLogo, opacity: 0.5, marginRight: 4 * scaleFactor }}
+                                            style={{ width: L.footerLogo, height: L.footerLogo, opacity: 0.4, marginRight: 3 * scaleFactor }}
                                             resizeMode="contain"
                                         />
                                         <Text style={[styles.footerBrandText, { fontSize: L.footerFont, lineHeight: L.footerH, color: theme.textGold }]}>
@@ -869,7 +869,8 @@ const styles = StyleSheet.create({
     },
     footerBrandText: {
         fontWeight: '900',
-        letterSpacing: 1.5,
+        letterSpacing: 1.2,
         includeFontPadding: false,
+        opacity: 0.55,
     },
 });
