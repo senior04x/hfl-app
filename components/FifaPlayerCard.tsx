@@ -626,35 +626,39 @@ export default function FifaPlayerCard({
                                     end={{ x: 1, y: 0 }}
                                     style={[styles.namePlateGradient, { paddingVertical: L.namePadV }]}
                                 >
+                                    {/* First Name: Sleeker, Lighter & Airy */}
                                     <Text
                                         numberOfLines={1}
                                         adjustsFontSizeToFit={true}
                                         minimumFontScale={0.55}
                                         style={[
-                                            styles.playerNameText,
+                                            styles.playerFirstNameText,
                                             {
-                                                fontSize: firstNameFont,
-                                                lineHeight: firstNameLineH,
-                                                color: theme.textPrimary,
+                                                fontSize: Math.round(firstNameFont * 0.9),
+                                                lineHeight: Math.round(firstNameLineH * 0.95),
+                                                color: theme.textGold || '#FDE047',
+                                                opacity: 0.82,
                                                 width: '100%',
                                             },
                                         ]}
                                     >
                                         {firstName}
                                     </Text>
+
+                                    {/* Last Name: Ultra-bold, Sporty, Solid Bright Headline */}
                                     {!!lastName && (
                                         <Text
                                             numberOfLines={1}
                                             adjustsFontSizeToFit={true}
                                             minimumFontScale={0.55}
                                             style={[
-                                                styles.playerNameText,
+                                                styles.playerLastNameText,
                                                 {
-                                                    fontSize: lastNameFont,
-                                                    lineHeight: lastNameLineH,
-                                                    color: theme.textPrimary,
+                                                    fontSize: Math.round(lastNameFont * 1.05),
+                                                    lineHeight: Math.round(lastNameLineH * 1.08),
+                                                    color: theme.textPrimary || '#FFFFFF',
                                                     width: '100%',
-                                                    marginTop: 2,
+                                                    marginTop: 1,
                                                 },
                                             ]}
                                         >
@@ -878,11 +882,20 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         paddingHorizontal: 4,
     },
-    playerNameText: {
-        fontWeight: '900',
-        letterSpacing: 0.4,
+    playerFirstNameText: {
+        fontWeight: '600',
+        letterSpacing: 2.2,
         textAlign: 'center',
         includeFontPadding: false,
+    },
+    playerLastNameText: {
+        fontWeight: '900',
+        letterSpacing: 0.8,
+        textAlign: 'center',
+        includeFontPadding: false,
+        textShadowColor: 'rgba(0, 0, 0, 0.85)',
+        textShadowOffset: { width: 0, height: 1.5 },
+        textShadowRadius: 3,
     },
     separatorContainer: {
         flexDirection: 'row',
