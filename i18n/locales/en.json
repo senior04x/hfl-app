@@ -516,11 +516,26 @@
     "to_team": "New Team"
   },
   "transfers": {
-    "title": "Transfer Request",
-    "current_team": "Current team:",
-    "reason_placeholder": "Transfer reason...",
+    "title": "TRANSFER REQUEST",
+    "current_team": "Current Team",
+    "reason_placeholder": "Describe why you wish to transfer to another team...",
     "send_request": "Send Request",
-    "select_team": "Select team"
+    "select_team": "Select New Team",
+    "new_team": "New Team",
+    "select_league": "Select League",
+    "reason_label": "Transfer Reason (optional)",
+    "step_league": "STEP 1: SELECT LEAGUE",
+    "step_team": "STEP 2: SELECT NEW TEAM",
+    "step_reason": "STEP 3: TRANSFER REASON",
+    "window_open_desc": "Select a league and your target new team to submit a transfer request for admin review.",
+    "window_closed_desc": "Transfer window is currently closed. Transfer requests are paused.",
+    "search_team": "Search team...",
+    "no_teams_found": "No teams found",
+    "choose_league_first": "Please select a league first",
+    "success_title": "REQUEST SUBMITTED",
+    "success_desc": "Your transfer request has been submitted successfully. Administrators will review it shortly.",
+    "select_team_error": "Please select a target team",
+    "window_closed_error": "Transfer window is closed"
   },
   "match_detail": {
     "about_match": "ABOUT MATCH",

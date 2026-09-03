@@ -12,88 +12,144 @@ import {
     Platform,
     Modal,
     FlatList,
-    Pressable,
     Animated,
-    Easing
+    Dimensions,
+    PanResponder,
+    StatusBar
 } from 'react-native';
-import { Image } from 'expo-image';
-import { apiService, supabase } from '../services/apiService';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../store/useAuthStore';
-import VideoBackground from '../components/VideoBackground';
+import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
-import { getLocalizedErrorMessage } from '../utils/errorParser';
-import Colors from '../constants/Colors';
-import SlideButton, { SlideButtonStatus } from '../components/SlideButton';
+import { useAuthStore } from '../store/useAuthStore';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
+import { apiService } from '../services/apiService';
+import SmartImage from '../components/SmartImage';
+import SlideButton from '../components/SlideButton';
 
-const TransferRequestScreen = ({ route, navigation }: any) => {
+const { width } = Dimensions.get('window');
+const BRAND_ORANGE = '#FF6B00';
+
+const DEFAULT_LEAGUES = [
+    { id: 'super', name: 'Super liga' },
+    { id: 'pro', name: 'Pro liga' },
+    { id: '3liga', name: '3-liga' },
+    { id: '7x7', name: '7x7 liga' }
+];
+
+export default function TransferRequestScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { user } = useAuthStore();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
     const { playerId } = route.params || {};
-
-    const LEAGUES = [
-        { id: 'super', name: 'Super liga' },
-        { id: 'pro', name: 'Pro liga' },
-        { id: '3liga', name: '3-liga' },
-        { id: '7x7', name: '7x7 liga' }
-    ];
 
     const [selectedLeague, setSelectedLeague] = useState('');
     const [leagueModalVisible, setLeagueModalVisible] = useState(false);
+    const [leaguesList, setLeaguesList] = useState<any[]>(DEFAULT_LEAGUES);
+
     const [teams, setTeams] = useState<any[]>([]);
     const [selectedTeam, setSelectedTeam] = useState('');
     const [loadingTeams, setLoadingTeams] = useState(false);
+    const [teamModalVisible, setTeamModalVisible] = useState(false);
+    const [teamSearchQuery, setTeamSearchQuery] = useState('');
+
     const [reason, setReason] = useState('');
-    const [loadingSubmit, setLoadingSubmit] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-    const [modalVisible, setModalVisible] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
     const [isTransferWindowOpen, setIsTransferWindowOpen] = useState<boolean>(true);
-
-    // Player & current team info loading state
     const [infoLoading, setInfoLoading] = useState(true);
     const [playerInfo, setPlayerInfo] = useState<any>(null);
     const [currentTeam, setCurrentTeam] = useState<any>(null);
 
-    // Skeleton Shimmer Animation
-    const shimmerAnim = useRef(new Animated.Value(0.3)).current;
+    // Interactive Swipe to Back Animation
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+    const swipeBackPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: width,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            }
+        })
+    ).current;
+
+    const cardSurface = {
+        backgroundColor: homeColors.background,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                borderColor: homeColors.border,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 1,
+                borderColor: homeColors.border,
+                elevation: 2,
+                shadowColor: isDark ? '#FFFFFF' : '#000000',
+            },
+        }),
+    };
 
     useEffect(() => {
-        const pulse = Animated.loop(
-            Animated.sequence([
-                Animated.timing(shimmerAnim, {
-                    toValue: 0.8,
-                    duration: 800,
-                    easing: Easing.linear,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(shimmerAnim, {
-                    toValue: 0.3,
-                    duration: 800,
-                    easing: Easing.linear,
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-        pulse.start();
-        return () => pulse.stop();
-    }, [shimmerAnim]);
-
-    useEffect(() => {
-        const checkWindow = async () => {
-            const isOpen = await apiService.getTransferWindowStatus();
-            setIsTransferWindowOpen(isOpen);
+        const initData = async () => {
+            try {
+                const [isOpen, leagues] = await Promise.all([
+                    apiService.getTransferWindowStatus().catch(() => true),
+                    apiService.getLeagues().catch(() => null)
+                ]);
+                setIsTransferWindowOpen(isOpen);
+                if (leagues && Array.isArray(leagues) && leagues.length > 0) {
+                    setLeaguesList(leagues);
+                }
+            } catch (e) {
+                console.warn('Error fetching transfer config:', e);
+            }
         };
-        checkWindow();
+
+        initData();
         fetchPlayerInfo();
     }, [playerId]);
 
     const fetchPlayerInfo = async () => {
         try {
             setInfoLoading(true);
-            const targetPlayerId = playerId || user?.id || user?._id;
+            const targetPlayerId = playerId || user?.id || user?._id || user?.playerId;
             if (targetPlayerId) {
                 const player = await apiService.getPlayerById(targetPlayerId);
                 if (player) {
@@ -131,9 +187,9 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
     };
 
     const getFilteredTeams = () => {
-        if (!searchQuery) return teams;
+        if (!teamSearchQuery) return teams;
         return teams.filter((t: any) =>
-            (t.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+            (t.name || '').toLowerCase().includes(teamSearchQuery.toLowerCase())
         );
     };
 
@@ -143,15 +199,21 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
 
     const handleSubmit = async () => {
         if (!selectedTeam) {
-            Alert.alert('Xatolik', 'Iltimos, yangi jamoani tanlang');
+            Alert.alert(t('common.notice', 'Eslatma'), t('transfers.select_team_error', 'Iltimos, yangi jamoani tanlang'));
+            setSubmitStatus('idle');
+            return;
+        }
+
+        if (!isTransferWindowOpen) {
+            Alert.alert(t('common.notice', 'Eslatma'), t('transfers.window_closed_error', 'Transfer oynasi yopilgan'));
             setSubmitStatus('idle');
             return;
         }
 
         try {
-            setLoadingSubmit(true);
+            setSubmitting(true);
             setSubmitStatus('loading');
-            const targetPlayerId = playerId || user?.id || user?._id;
+            const targetPlayerId = playerId || user?.id || user?._id || user?.playerId;
             const transferData = {
                 playerId: targetPlayerId,
                 currentTeamId: currentTeam?.id || currentTeam?._id || user?.teamId || user?.team_id || 'unknown_old_team',
@@ -162,184 +224,427 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
             const response: any = await apiService.createTransferRequest(transferData);
             if (response && response.success) {
                 setSubmitStatus('success');
+                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); } catch (e) {}
                 setShowSuccessModal(true);
             } else {
                 setSubmitStatus('error');
-                Alert.alert('Xatolik', response?.error || "So'rov yuborib bo'lmadi");
+                Alert.alert(t('common.notice', 'Xatolik'), response?.error || "So'rov yuborib bo'lmadi");
             }
         } catch (error) {
             console.error('Error submitting transfer request:', error);
             setSubmitStatus('error');
-            Alert.alert('Xatolik', "Server bilan bog'lanishda xatolik yuz berdi");
+            Alert.alert(t('common.notice', 'Xatolik'), "Server bilan bog'lanishda xatolik yuz berdi");
         } finally {
-            setLoadingSubmit(false);
+            setSubmitting(false);
         }
     };
 
     const selectedTeamObj = getSelectedTeamObj();
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <VideoBackground 
-                source={require('../assets/images/welcomeScreenVideo1.mp4')} 
-                overlayOpacity={0.78}
-                style={StyleSheet.absoluteFill}
-            />
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
+        <Animated.View
+            style={[
+                styles.rootContainer,
+                {
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }]
+                }
+            ]}
+            {...swipeBackPanResponder.panHandlers}
+        >
+            <SafeAreaView style={{ flex: 1, backgroundColor: homeColors.background }}>
+                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+                {/* Top Header */}
+                <View style={[styles.topHeader, { borderBottomColor: homeColors.border }]}>
+                    <TouchableOpacity
+                        style={[styles.backBtnAction, cardSurface]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
+                            navigation.goBack();
+                        }}
+                    >
+                        <Ionicons name="arrow-back" size={20} color={homeColors.textPrimary} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{t('transfers.title')}</Text>
-                    <View style={{ width: 40 }} />
+
+                    <View style={styles.headerTitleGroup}>
+                        <Ionicons name="swap-horizontal" size={18} color={BRAND_ORANGE} style={{ marginRight: 6 }} />
+                        <Text style={[styles.headerTitleText, { color: homeColors.textPrimary }]}>
+                            {t('transfers.title', "TRANSFER SO'ROVI")}
+                        </Text>
+                    </View>
+
+                    <View style={{ width: 38 }} />
                 </View>
 
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                    {/* Transfer Visual Card with Skeleton */}
-                    {infoLoading ? (
-                        <View style={styles.transferVisualCardSkeleton}>
-                            <View style={styles.teamVisual}>
-                                <Animated.View style={[styles.skeletonCircle, { opacity: shimmerAnim }]} />
-                                <Animated.View style={[styles.skeletonText, { width: 70, opacity: shimmerAnim }]} />
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* Visual Team Swap Card */}
+                    <View style={[styles.transferVisualCard, cardSurface]}>
+                        {/* Current Team Box */}
+                        <View style={styles.teamVisualBox}>
+                            <View style={[styles.teamLogoCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }]}>
+                                {currentTeam?.logo_url || currentTeam?.logo ? (
+                                    <SmartImage
+                                        uri={currentTeam.logo_url || currentTeam.logo}
+                                        style={styles.teamLogo}
+                                        contentFit="contain"
+                                        fallbackIcon="shield-outline"
+                                    />
+                                ) : (
+                                    <Ionicons name="shield-outline" size={26} color={BRAND_ORANGE} />
+                                )}
                             </View>
-                            <View style={styles.arrowContainer}>
-                                <Ionicons name="swap-horizontal" size={28} color="rgba(0, 255, 102, 0.4)" />
-                            </View>
-                            <View style={styles.teamVisual}>
-                                <Animated.View style={[styles.skeletonCircle, { opacity: shimmerAnim }]} />
-                                <Animated.View style={[styles.skeletonText, { width: 70, opacity: shimmerAnim }]} />
-                            </View>
+                            <Text style={[styles.teamVisualName, { color: homeColors.textPrimary }]} numberOfLines={2}>
+                                {currentTeam?.name || t('transfers.current_team', 'Hozirgi Jamoa')}
+                            </Text>
                         </View>
-                    ) : (
-                        <View style={styles.transferVisualCard}>
-                            {/* Current Team */}
-                            <View style={styles.teamVisual}>
-                                <View style={styles.teamLogoCircle}>
-                                    {currentTeam?.logo_url || currentTeam?.logo ? (
-                                        <Image
-                                            source={{ uri: currentTeam.logo_url || currentTeam.logo }}
-                                            style={styles.teamLogo}
-                                            contentFit="contain"
-                                        />
-                                    ) : (
-                                        <Ionicons name="shield-outline" size={28} color="#00FF66" />
-                                    )}
-                                </View>
-                                <Text style={styles.teamVisualName} numberOfLines={2}>
-                                    {currentTeam?.name || 'Hozirgi Jamoa'}
-                                </Text>
-                            </View>
 
-                            {/* Swap Icon */}
-                            <View style={styles.arrowContainer}>
-                                <Ionicons name="swap-horizontal" size={28} color="#00FF66" />
-                            </View>
-
-                            {/* New Team */}
-                            <View style={styles.teamVisual}>
-                                <View style={[styles.teamLogoCircle, selectedTeamObj && styles.teamLogoCircleActive]}>
-                                    {selectedTeamObj?.logo_url || selectedTeamObj?.logo ? (
-                                        <Image
-                                            source={{ uri: selectedTeamObj.logo_url || selectedTeamObj.logo }}
-                                            style={styles.teamLogo}
-                                            contentFit="contain"
-                                        />
-                                    ) : (
-                                        <Ionicons name="add-circle-outline" size={32} color="rgba(255,255,255,0.4)" />
-                                    )}
-                                </View>
-                                <Text style={[styles.teamVisualName, selectedTeamObj && { color: '#00FF66' }]} numberOfLines={2}>
-                                    {selectedTeamObj?.name || 'Yangi Jamoa'}
-                                </Text>
-                            </View>
+                        {/* Middle Brand Orange Arrow */}
+                        <View style={[styles.swapArrowCircle, { backgroundColor: isDark ? 'rgba(255, 107, 0, 0.15)' : 'rgba(255, 107, 0, 0.1)', borderColor: 'rgba(255, 107, 0, 0.3)' }]}>
+                            <Ionicons name="arrow-forward" size={20} color={BRAND_ORANGE} />
                         </View>
-                    )}
 
-                    <View style={[styles.infoBox, !isTransferWindowOpen && { borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-                        <Ionicons name={!isTransferWindowOpen ? "warning" : "information-circle"} size={22} color={!isTransferWindowOpen ? "#EF4444" : "#00FF66"} />
-                        <Text style={[styles.infoText, !isTransferWindowOpen && { color: '#EF4444', fontWeight: '700' }]}>
-                            {!isTransferWindowOpen
-                                ? "Tashkilotingizda transfer oynasi hozirda yopilgan. Ariza va o'tishlar vaqtincha to'xtatilgan."
-                                : "Boshqa jamoaga o'tish uchun liga va yangi jamoani tanlab so'rov yuboring. So'rov adminlar tomonidan ko'rib chiqiladi."}
+                        {/* Target New Team Box */}
+                        <View style={styles.teamVisualBox}>
+                            <View
+                                style={[
+                                    styles.teamLogoCircle,
+                                    {
+                                        backgroundColor: selectedTeamObj
+                                            ? (isDark ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 107, 0, 0.08)')
+                                            : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+                                        borderColor: selectedTeamObj ? BRAND_ORANGE : homeColors.border
+                                    }
+                                ]}
+                            >
+                                {selectedTeamObj?.logo_url || selectedTeamObj?.logo ? (
+                                    <SmartImage
+                                        uri={selectedTeamObj.logo_url || selectedTeamObj.logo}
+                                        style={styles.teamLogo}
+                                        contentFit="contain"
+                                        fallbackIcon="shield-outline"
+                                    />
+                                ) : (
+                                    <Ionicons name="add" size={28} color={BRAND_ORANGE} />
+                                )}
+                            </View>
+                            <Text
+                                style={[
+                                    styles.teamVisualName,
+                                    { color: selectedTeamObj ? BRAND_ORANGE : homeColors.textSecondary }
+                                ]}
+                                numberOfLines={2}
+                            >
+                                {selectedTeamObj?.name || t('transfers.new_team', 'Yangi Jamoa')}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Window Status Banner */}
+                    <View
+                        style={[
+                            styles.infoBanner,
+                            {
+                                backgroundColor: isTransferWindowOpen
+                                    ? (isDark ? 'rgba(255, 107, 0, 0.08)' : 'rgba(255, 107, 0, 0.05)')
+                                    : (isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)'),
+                                borderColor: isTransferWindowOpen
+                                    ? (isDark ? 'rgba(255, 107, 0, 0.25)' : 'rgba(255, 107, 0, 0.18)')
+                                    : (isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)'),
+                            }
+                        ]}
+                    >
+                        <Ionicons
+                            name={isTransferWindowOpen ? "information-circle-outline" : "alert-circle-outline"}
+                            size={20}
+                            color={isTransferWindowOpen ? BRAND_ORANGE : '#EF4444'}
+                            style={{ marginRight: 10, marginTop: 1 }}
+                        />
+                        <Text
+                            style={[
+                                styles.infoBannerText,
+                                {
+                                    color: isTransferWindowOpen ? homeColors.textPrimary : '#EF4444',
+                                    fontWeight: isTransferWindowOpen ? '500' : '700'
+                                }
+                            ]}
+                        >
+                            {isTransferWindowOpen
+                                ? t('transfers.window_open_desc', "Boshqa jamoaga o'tish uchun liga va yangi jamoani tanlab so'rov yuboring. So'rov adminlar tomonidan ko'rib chiqiladi.")
+                                : t('transfers.window_closed_desc', "Tashkilotingizda transfer oynasi hozirda yopilgan. Ariza va o'tishlar vaqtincha to'xtatilgan.")}
                         </Text>
                     </View>
 
                     {/* Step 1: Select League */}
-                    <Text style={styles.label}>{t('transfers.step_league')}</Text>
-                    <TouchableOpacity
-                        style={[styles.selectButton, !isTransferWindowOpen && styles.disabledButton]}
-                        onPress={() => {
-                            if (!isTransferWindowOpen) {
-                                Alert.alert(t('common.error'), t('errors.TRANSFER_NOT_ALLOWED'));
-                                return;
-                            }
-                            setLeagueModalVisible(true);
-                        }}
-                        disabled={!isTransferWindowOpen}
-                    >
-                        <Text style={[styles.selectButtonText, !selectedLeague && styles.placeholderText]}>
-                            {selectedLeague || t('auth.select_league_sub')}
+                    <View style={styles.formSection}>
+                        <Text style={[styles.sectionLabel, { color: homeColors.textSecondary }]}>
+                            {t('transfers.step_league', '1-QADAM: LIGANI TANLANG')}
                         </Text>
-                        <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
-                    </TouchableOpacity>
-
-                    {/* Step 2: Select Team */}
-                    {selectedLeague ? (
-                        loadingTeams ? (
-                            <View style={styles.loadingTeamsContainer}>
-                                <ActivityIndicator size="small" color="#00FF66" />
-                                <Text style={styles.loadingTeamsText}>
-                                    {t('common.loading')}
+                        <TouchableOpacity
+                            style={[
+                                styles.selectButton,
+                                cardSurface,
+                                !isTransferWindowOpen && { opacity: 0.5 }
+                            ]}
+                            activeOpacity={0.75}
+                            disabled={!isTransferWindowOpen}
+                            onPress={() => {
+                                try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                setLeagueModalVisible(true);
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <Ionicons name="trophy-outline" size={18} color={BRAND_ORANGE} style={{ marginRight: 10 }} />
+                                <Text
+                                    style={[
+                                        styles.selectButtonText,
+                                        { color: selectedLeague ? homeColors.textPrimary : homeColors.textSecondary }
+                                    ]}
+                                >
+                                    {selectedLeague || t('transfers.select_league', 'Ligani tanlang')}
                                 </Text>
                             </View>
-                        ) : (
-                            <>
-                                <Text style={styles.label}>{t('transfers.step_team')}</Text>
-                                <TouchableOpacity
-                                    style={[styles.selectButton, !isTransferWindowOpen && styles.disabledButton]}
-                                    onPress={() => {
-                                        if (!isTransferWindowOpen) {
-                                            Alert.alert(t('common.error'), t('errors.TRANSFER_NOT_ALLOWED'));
-                                            return;
-                                        }
-                                        setSearchQuery('');
-                                        setModalVisible(true);
-                                    }}
-                                    disabled={!isTransferWindowOpen}
+                            <Ionicons name="chevron-forward" size={18} color={homeColors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Step 2: Select Team */}
+                    <View style={styles.formSection}>
+                        <Text style={[styles.sectionLabel, { color: homeColors.textSecondary }]}>
+                            {t('transfers.step_team', '2-QADAM: YANGI JAMOANI TANLANG')}
+                        </Text>
+                        <TouchableOpacity
+                            style={[
+                                styles.selectButton,
+                                cardSurface,
+                                (!selectedLeague || !isTransferWindowOpen) && { opacity: 0.5 }
+                            ]}
+                            activeOpacity={0.75}
+                            disabled={!selectedLeague || !isTransferWindowOpen}
+                            onPress={() => {
+                                if (!selectedLeague) {
+                                    Alert.alert(t('common.notice', 'Eslatma'), t('transfers.choose_league_first', 'Avval ligani tanlang'));
+                                    return;
+                                }
+                                try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                setTeamModalVisible(true);
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <Ionicons name="shield-outline" size={18} color={BRAND_ORANGE} style={{ marginRight: 10 }} />
+                                <Text
+                                    style={[
+                                        styles.selectButtonText,
+                                        { color: selectedTeamObj ? homeColors.textPrimary : homeColors.textSecondary }
+                                    ]}
                                 >
-                                    <Text style={[styles.selectButtonText, !selectedTeam && styles.placeholderText]}>
-                                        {selectedTeamObj?.name || t('teams.title')}
-                                    </Text>
-                                    <Ionicons name="chevron-down" size={20} color={!isTransferWindowOpen ? "rgba(255,255,255,0.3)" : "#00FF66"} />
-                                </TouchableOpacity>
-                            </>
-                        )
-                    ) : null}
+                                    {selectedTeamObj?.name || t('transfers.select_team', 'Yangi jamoani tanlang')}
+                                </Text>
+                            </View>
+                            {loadingTeams ? (
+                                <ActivityIndicator size="small" color={BRAND_ORANGE} />
+                            ) : (
+                                <Ionicons name="chevron-forward" size={18} color={homeColors.textSecondary} />
+                            )}
+                        </TouchableOpacity>
+                    </View>
 
-                    {/* Step 3: Reason */}
-                    <Text style={styles.label}>{t('transfers.step_reason')}</Text>
-                    <TextInput
-                        style={[styles.textArea, !isTransferWindowOpen && { opacity: 0.5 }]}
-                        placeholder={t('transfers.reason_placeholder')}
-                        placeholderTextColor="rgba(255,255,255,0.4)"
-                        multiline
-                        numberOfLines={5}
-                        value={reason}
-                        onChangeText={setReason}
-                        editable={isTransferWindowOpen}
-                    />
+                    {/* Step 3: Transfer Reason */}
+                    <View style={styles.formSection}>
+                        <Text style={[styles.sectionLabel, { color: homeColors.textSecondary }]}>
+                            {t('transfers.step_reason', "3-QADAM: O'TISH SABABI")}
+                        </Text>
+                        <TextInput
+                            style={[
+                                styles.reasonInput,
+                                cardSurface,
+                                {
+                                    color: homeColors.textPrimary,
+                                    borderColor: homeColors.border,
+                                    backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'
+                                }
+                            ]}
+                            placeholder={t('transfers.reason_placeholder', "Boshqa jamoaga o'tish sababingizni yozing...")}
+                            placeholderTextColor={homeColors.textSecondary}
+                            multiline
+                            numberOfLines={4}
+                            textAlignVertical="top"
+                            value={reason}
+                            onChangeText={setReason}
+                            maxLength={300}
+                        />
+                        <Text style={[styles.charCountText, { color: homeColors.textSecondary }]}>
+                            {reason.length}/300
+                        </Text>
+                    </View>
 
-                    {/* Slide to Confirm Submit Button */}
-                    <SlideButton
-                        disabled={!isTransferWindowOpen || !selectedLeague || !selectedTeam}
-                        loading={loadingSubmit}
-                        status={submitStatus}
-                        onSwipeSuccess={handleSubmit}
-                        onReset={() => setSubmitStatus('idle')}
-                    />
+                    {/* Slide To Send Action Button */}
+                    <View style={{ marginTop: 12, marginBottom: 24, alignItems: 'center', width: '100%' }}>
+                        <SlideButton
+                            title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
+                            loadingTitle={t('common.loading', 'Yuborilmoqda...')}
+                            successTitle={t('common.success', 'Muvaffaqiyatli!')}
+                            onSwipeSuccess={handleSubmit}
+                            loading={submitting}
+                            status={submitStatus}
+                            disabled={submitting || !selectedTeam || !isTransferWindowOpen}
+                            compact={false}
+                            showHelperText={false}
+                        />
+                    </View>
                 </ScrollView>
 
-                {/* App Style Success Modal */}
+                {/* LEAGUE SELECTOR MODAL */}
+                <Modal
+                    visible={leagueModalVisible}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setLeagueModalVisible(false)}
+                >
+                    <TouchableOpacity
+                        style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.8)' }]}
+                        activeOpacity={1}
+                        onPress={() => setLeagueModalVisible(false)}
+                    >
+                        <TouchableOpacity
+                            activeOpacity={1}
+                            style={[styles.pickerModalCard, cardSurface, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}
+                        >
+                            <View style={[styles.pickerModalHeader, { borderBottomColor: homeColors.border }]}>
+                                <Text style={[styles.pickerModalTitle, { color: homeColors.textPrimary }]}>
+                                    {t('transfers.select_league', 'Ligani tanlang')}
+                                </Text>
+                                <TouchableOpacity onPress={() => setLeagueModalVisible(false)} style={styles.modalCloseBtn}>
+                                    <Ionicons name="close" size={20} color={homeColors.textPrimary} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                                {leaguesList.map((item: any) => {
+                                    const lName = item.name || item.title || item.id;
+                                    const isSel = selectedLeague === lName;
+                                    return (
+                                        <TouchableOpacity
+                                            key={item.id || lName}
+                                            style={[
+                                                styles.pickerItemRow,
+                                                { borderBottomColor: homeColors.border },
+                                                isSel && { backgroundColor: isDark ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 107, 0, 0.08)' }
+                                            ]}
+                                            onPress={() => {
+                                                try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                                setSelectedLeague(lName);
+                                                setSelectedTeam('');
+                                                fetchTeams(lName);
+                                                setLeagueModalVisible(false);
+                                            }}
+                                        >
+                                            <Ionicons name="trophy-outline" size={18} color={isSel ? BRAND_ORANGE : homeColors.textSecondary} style={{ marginRight: 12 }} />
+                                            <Text style={[styles.pickerItemText, { color: isSel ? BRAND_ORANGE : homeColors.textPrimary, fontWeight: isSel ? '800' : '600' }]}>
+                                                {lName}
+                                            </Text>
+                                            {isSel && <Ionicons name="checkmark-circle" size={18} color={BRAND_ORANGE} />}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </Modal>
+
+                {/* TEAM SELECTOR MODAL WITH SEARCH */}
+                <Modal
+                    visible={teamModalVisible}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setTeamModalVisible(false)}
+                >
+                    <TouchableOpacity
+                        style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.8)' }]}
+                        activeOpacity={1}
+                        onPress={() => setTeamModalVisible(false)}
+                    >
+                        <TouchableOpacity
+                            activeOpacity={1}
+                            style={[styles.pickerModalCard, cardSurface, { backgroundColor: homeColors.background, borderColor: homeColors.border, maxHeight: 520 }]}
+                        >
+                            <View style={[styles.pickerModalHeader, { borderBottomColor: homeColors.border }]}>
+                                <Text style={[styles.pickerModalTitle, { color: homeColors.textPrimary }]}>
+                                    {t('transfers.select_team', 'Yangi jamoani tanlang')}
+                                </Text>
+                                <TouchableOpacity onPress={() => setTeamModalVisible(false)} style={styles.modalCloseBtn}>
+                                    <Ionicons name="close" size={20} color={homeColors.textPrimary} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Search Input */}
+                            <View style={[styles.searchInputWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }]}>
+                                <Ionicons name="search" size={16} color={BRAND_ORANGE} style={{ marginRight: 8 }} />
+                                <TextInput
+                                    style={[styles.searchInputText, { color: homeColors.textPrimary }]}
+                                    placeholder={t('transfers.search_team', 'Jamoani qidirish...')}
+                                    placeholderTextColor={homeColors.textSecondary}
+                                    value={teamSearchQuery}
+                                    onChangeText={setTeamSearchQuery}
+                                />
+                                {teamSearchQuery ? (
+                                    <TouchableOpacity onPress={() => setTeamSearchQuery('')}>
+                                        <Ionicons name="close-circle" size={16} color={homeColors.textSecondary} />
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+
+                            <FlatList
+                                data={getFilteredTeams()}
+                                keyExtractor={(item: any) => String(item._id || item.id)}
+                                showsVerticalScrollIndicator={false}
+                                ListEmptyComponent={
+                                    <View style={{ padding: 24, alignItems: 'center' }}>
+                                        <Text style={{ color: homeColors.textSecondary, fontSize: 13 }}>
+                                            {t('transfers.no_teams_found', 'Jamoalar topilmadi')}
+                                        </Text>
+                                    </View>
+                                }
+                                renderItem={({ item }) => {
+                                    const isSel = selectedTeam === (item._id || item.id);
+                                    return (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.pickerItemRow,
+                                                { borderBottomColor: homeColors.border },
+                                                isSel && { backgroundColor: isDark ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 107, 0, 0.08)' }
+                                            ]}
+                                            onPress={() => {
+                                                try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                                setSelectedTeam(item._id || item.id);
+                                                setTeamModalVisible(false);
+                                            }}
+                                        >
+                                            <View style={[styles.teamMiniLogo, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                                                {item.logo_url || item.logo ? (
+                                                    <SmartImage uri={item.logo_url || item.logo} style={{ width: 24, height: 24 }} contentFit="contain" fallbackIcon="shield-outline" />
+                                                ) : (
+                                                    <Ionicons name="shield-outline" size={16} color={BRAND_ORANGE} />
+                                                )}
+                                            </View>
+                                            <Text style={[styles.pickerItemText, { color: isSel ? BRAND_ORANGE : homeColors.textPrimary, fontWeight: isSel ? '800' : '600' }]} numberOfLines={1}>
+                                                {item.name}
+                                            </Text>
+                                            {isSel && <Ionicons name="checkmark-circle" size={18} color={BRAND_ORANGE} />}
+                                        </TouchableOpacity>
+                                    );
+                                }}
+                            />
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </Modal>
+
+                {/* SUCCESS MODAL */}
                 <Modal
                     visible={showSuccessModal}
                     transparent={true}
@@ -349,541 +654,249 @@ const TransferRequestScreen = ({ route, navigation }: any) => {
                         navigation.goBack();
                     }}
                 >
-                    <View style={styles.successModalOverlay}>
-                        <View style={styles.successModalCard}>
-                            <View style={styles.successIconBadge}>
-                                <Ionicons name="paper-plane-outline" size={38} color="#00FF66" />
+                    <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.82)' }]}>
+                        <View style={[styles.pickerModalCard, cardSurface, { backgroundColor: homeColors.background, borderColor: homeColors.border, alignItems: 'center', padding: 24 }]}>
+                            <View style={[styles.successIconCircle, { backgroundColor: isDark ? 'rgba(255, 107, 0, 0.15)' : 'rgba(255, 107, 0, 0.1)' }]}>
+                                <Ionicons name="checkmark-done" size={38} color={BRAND_ORANGE} />
                             </View>
-
-                            <View style={styles.successTitleRow}>
-                                <Text style={styles.successModalTitle}>Yuborildi</Text>
-                                <Ionicons name="checkmark-circle" size={22} color="#00FF66" style={{ marginLeft: 6 }} />
-                            </View>
-
-                            <Text style={styles.successModalSub}>
-                                Organizatorlar tomonidan ko'rib chiqilmaguncha qayta yubora olmaysiz
+                            <Text style={[styles.successTitle, { color: homeColors.textPrimary }]}>
+                                {t('transfers.success_title', 'SO\'ROV YUBORILDI')}
                             </Text>
-
+                            <Text style={[styles.successDesc, { color: homeColors.textSecondary }]}>
+                                {t('transfers.success_desc', 'Transfer so\'rovingiz muvaffaqiyatli qabul qilindi. Tashkilotchi adminlar ko\'rib chiqqach arizangiz tasdiqlanadi.')}
+                            </Text>
                             <TouchableOpacity
-                                style={styles.successModalBtn}
+                                style={[styles.successBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
+                                activeOpacity={0.8}
                                 onPress={() => {
                                     setShowSuccessModal(false);
                                     navigation.goBack();
                                 }}
                             >
-                                <Text style={styles.successModalBtnText}>RAHMAT</Text>
+                                <Text style={[styles.successBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                                    {t('common.done', 'Tayyor')}
+                                </Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
-                </Modal>
-
-                {/* Team Selection Modal */}
-                <Modal
-                    visible={modalVisible}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => setModalVisible(false)}
-                >
-                    <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)} />
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Jamoani Tanlang</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Ionicons name="close-circle" size={26} color="rgba(255,255,255,0.6)" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.searchContainer}>
-                            <Ionicons name="search" size={20} color="rgba(255,255,255,0.5)" />
-                            <TextInput
-                                style={styles.searchInput}
-                                placeholder="Jamoa nomini qidiring..."
-                                placeholderTextColor="rgba(255,255,255,0.4)"
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                            />
-                            {searchQuery !== '' && (
-                                <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                    <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.5)" />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        <FlatList
-                            data={getFilteredTeams()}
-                            keyExtractor={(item) => item._id || item.id}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={[styles.modalItem, (item._id || item.id) === selectedTeam && styles.modalItemActive]}
-                                    onPress={() => {
-                                        setSelectedTeam(item._id || item.id);
-                                        setModalVisible(false);
-                                    }}
-                                >
-                                    <View style={styles.modalItemRow}>
-                                        <View style={styles.modalTeamLogo}>
-                                            {item.logo_url || item.logo ? (
-                                                <Image
-                                                    source={{ uri: item.logo_url || item.logo }}
-                                                    style={{ width: 34, height: 34 }}
-                                                    contentFit="contain"
-                                                />
-                                            ) : (
-                                                <Ionicons name="shield-outline" size={22} color="#00FF66" />
-                                            )}
-                                        </View>
-                                        <View style={{ flex: 1, marginLeft: 12 }}>
-                                            <Text style={styles.modalItemText}>{item.name}</Text>
-                                            {item.league && (
-                                                <Text style={styles.modalItemSub}>{item.league}</Text>
-                                            )}
-                                        </View>
-                                    </View>
-                                    {(item._id || item.id) === selectedTeam && (
-                                        <Ionicons name="checkmark-circle" size={22} color="#00FF66" />
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                            ItemSeparatorComponent={() => <View style={styles.separator} />}
-                            ListEmptyComponent={<Text style={styles.emptyText}>Hech qanday jamoa topilmadi</Text>}
-                            showsVerticalScrollIndicator={false}
-                        />
-                    </View>
-                </Modal>
-
-                {/* League Selection Modal */}
-                <Modal
-                    visible={leagueModalVisible}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => setLeagueModalVisible(false)}
-                >
-                    <Pressable style={styles.modalOverlay} onPress={() => setLeagueModalVisible(false)} />
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Ligani Tanlang</Text>
-                            <TouchableOpacity onPress={() => setLeagueModalVisible(false)}>
-                                <Ionicons name="close-circle" size={26} color="rgba(255,255,255,0.6)" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <FlatList
-                            data={LEAGUES}
-                            keyExtractor={(item) => item.id}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={[styles.modalItem, item.name === selectedLeague && styles.modalItemActive]}
-                                    onPress={() => {
-                                        setSelectedLeague(item.name);
-                                        setSelectedTeam('');
-                                        fetchTeams(item.name);
-                                        setLeagueModalVisible(false);
-                                    }}
-                                >
-                                    <View style={styles.modalItemRow}>
-                                        <Ionicons name="trophy-outline" size={22} color="#00FF66" />
-                                        <Text style={[styles.modalItemText, { marginLeft: 14 }]}>{item.name}</Text>
-                                    </View>
-                                    {item.name === selectedLeague && (
-                                        <Ionicons name="checkmark-circle" size={22} color="#00FF66" />
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                            ItemSeparatorComponent={() => <View style={styles.separator} />}
-                            showsVerticalScrollIndicator={false}
-                        />
                     </View>
                 </Modal>
             </SafeAreaView>
-        </View>
+        </Animated.View>
     );
-};
+}
 
 const styles = StyleSheet.create({
-    container: {
+    rootContainer: {
         flex: 1,
-        backgroundColor: 'transparent',
     },
-    header: {
+    topHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-        backgroundColor: 'rgba(18, 23, 34, 0.65)',
     },
-    backBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.25)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-    },
-    backIconCenter: {
-        width: '100%',
-        height: '100%',
+    backBtnAction: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    headerTitle: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '800',
-        letterSpacing: 0.5,
+    headerTitleGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerTitleText: {
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.8,
     },
     scrollContent: {
-        padding: 20,
+        padding: 16,
+        gap: 16,
     },
-
-    /* Transfer Visual Card */
     transferVisualCard: {
+        borderRadius: 20,
+        padding: 18,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(18, 23, 34, 0.75)',
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.25)',
-        boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
     },
-    transferVisualCardSkeleton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: 'rgba(18, 23, 34, 0.65)',
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    teamVisual: {
-        alignItems: 'center',
+    teamVisualBox: {
         flex: 1,
+        alignItems: 'center',
     },
     teamLogoCircle: {
         width: 64,
         height: 64,
-        borderRadius: 32,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderRadius: 20,
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        overflow: 'hidden',
-    },
-    teamLogoCircleActive: {
-        borderColor: '#00FF66',
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        marginBottom: 8,
     },
     teamLogo: {
         width: 44,
         height: 44,
     },
     teamVisualName: {
-        color: '#FFFFFF',
         fontSize: 13,
-        fontWeight: '700',
+        fontWeight: '800',
         textAlign: 'center',
-        marginTop: 8,
-        maxWidth: 100,
+        lineHeight: 17,
     },
-    arrowContainer: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(0, 255, 102, 0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-
-    /* Skeleton Loading Elements */
-    skeletonCircle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    },
-    skeletonText: {
-        height: 14,
-        borderRadius: 7,
-        backgroundColor: 'rgba(255, 255, 255, 0.12)',
-        marginTop: 10,
-    },
-
-    /* Info Box */
-    infoBox: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(0, 255, 102, 0.08)',
-        padding: 14,
-        borderRadius: 14,
-        marginBottom: 24,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.2)',
-        alignItems: 'center',
-    },
-    infoText: {
-        color: '#D0DFD5',
-        fontSize: 13,
-        marginLeft: 10,
-        flex: 1,
-        lineHeight: 18,
-    },
-
-    /* Form Elements */
-    label: {
-        color: '#8A9BB4',
-        fontSize: 12,
-        fontWeight: '800',
-        letterSpacing: 1,
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    selectButton: {
-        backgroundColor: 'rgba(18, 23, 34, 0.75)',
-        borderRadius: 14,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        height: 54,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-    },
-    selectButtonText: {
-        color: '#FFFFFF',
-        fontSize: 15,
-        fontWeight: '600',
-        flex: 1,
-    },
-    placeholderText: {
-        color: 'rgba(255, 255, 255, 0.4)',
-    },
-    disabledButton: {
-        opacity: 0.5,
-    },
-    textArea: {
-        backgroundColor: 'rgba(18, 23, 34, 0.75)',
-        borderRadius: 14,
-        color: '#FFFFFF',
-        padding: 16,
-        height: 120,
-        textAlignVertical: 'top',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        marginBottom: 28,
-        fontSize: 15,
-        lineHeight: 22,
-    },
-
-    /* Submit Button */
-    submitButton: {
-        backgroundColor: '#00FF66',
-        borderRadius: 14,
-        height: 54,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 4px 15px rgba(0, 255, 102, 0.3)',
-    },
-    submitButtonText: {
-        color: '#0B0E17',
-        fontSize: 16,
-        fontWeight: '800',
-    },
-
-    /* Modal Styles */
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    },
-    modalContent: {
-        backgroundColor: '#121722',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.25)',
-        padding: 20,
-        maxHeight: '75%',
-        marginTop: 'auto',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    modalTitle: {
-        color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '800',
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        height: 48,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    searchInput: {
-        flex: 1,
-        color: '#FFFFFF',
-        fontSize: 15,
-        marginLeft: 10,
-    },
-    modalItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 14,
-        paddingHorizontal: 12,
-        borderRadius: 12,
-    },
-    modalItemActive: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-    },
-    modalItemRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    modalTeamLogo: {
+    swapArrowCircle: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        overflow: 'hidden',
+        marginHorizontal: 8,
     },
-    modalItemText: {
-        color: '#FFFFFF',
-        fontSize: 15,
-        fontWeight: '700',
+    infoBanner: {
+        flexDirection: 'row',
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        alignItems: 'flex-start',
     },
-    modalItemSub: {
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontSize: 12,
-        marginTop: 2,
-    },
-    separator: {
-        height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    },
-    emptyText: {
-        color: 'rgba(255, 255, 255, 0.5)',
-        textAlign: 'center',
-        marginTop: 30,
-        marginBottom: 30,
-        fontSize: 14,
-    },
-    successModalOverlay: {
+    infoBannerText: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
+        fontSize: 12.5,
+        lineHeight: 18,
     },
-    successModalCard: {
-        width: '100%',
-        maxWidth: 340,
-        backgroundColor: '#0d1117',
-        borderRadius: 24,
-        padding: 28,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
-        shadowColor: '#00FF66',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
-        elevation: 12,
+    formSection: {
+        gap: 8,
     },
-    successIconBadge: {
-        width: 76,
-        height: 76,
-        borderRadius: 38,
-        backgroundColor: 'rgba(0, 255, 102, 0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
+    sectionLabel: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        letterSpacing: 0.6,
+        marginLeft: 2,
     },
-    successTitleRow: {
+    selectButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 10,
-    },
-    successModalTitle: {
-        color: '#FFFFFF',
-        fontSize: 22,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    successModalSub: {
-        color: 'rgba(255, 255, 255, 0.65)',
-        fontSize: 14,
-        textAlign: 'center',
-        lineHeight: 21,
-        marginBottom: 24,
-    },
-    successModalBtn: {
-        width: '100%',
-        height: 48,
+        justifyContent: 'space-between',
+        paddingHorizontal: 14,
+        paddingVertical: 14,
         borderRadius: 14,
-        backgroundColor: '#00FF66',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#00FF66',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 4,
     },
-    successModalBtnText: {
-        color: '#0b0e17',
+    selectButtonText: {
+        fontSize: 13.5,
+        fontWeight: '600',
+    },
+    reasonInput: {
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 14,
+        fontSize: 13.5,
+        minHeight: 90,
+    },
+    charCountText: {
+        fontSize: 11,
+        textAlign: 'right',
+        marginTop: 2,
+        marginRight: 4,
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    pickerModalCard: {
+        width: '100%',
+        maxWidth: 380,
+        borderRadius: 24,
+        padding: 18,
+        borderWidth: 1,
+    },
+    pickerModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        marginBottom: 8,
+    },
+    pickerModalTitle: {
         fontSize: 15,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
-    loadingTeamsContainer: {
+    modalCloseBtn: {
+        padding: 4,
+    },
+    pickerItemRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        backgroundColor: 'rgba(0, 255, 102, 0.06)',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.25)',
-        borderRadius: 14,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        marginBottom: 16,
+        paddingVertical: 13,
+        paddingHorizontal: 8,
+        borderBottomWidth: 1,
+        borderRadius: 10,
     },
-    loadingTeamsText: {
-        color: '#00FF66',
+    pickerItemText: {
+        flex: 1,
+        fontSize: 14,
+    },
+    searchInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: 10,
+        marginTop: 4,
+    },
+    searchInputText: {
+        flex: 1,
         fontSize: 13.5,
-        fontWeight: '700',
+        paddingVertical: 2,
+    },
+    teamMiniLogo: {
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    successIconCircle: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+    },
+    successTitle: {
+        fontSize: 17,
+        fontWeight: '900',
+        letterSpacing: 0.6,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    successDesc: {
+        fontSize: 13,
+        lineHeight: 19,
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    successBtn: {
+        width: '100%',
+        paddingVertical: 13,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    successBtnText: {
+        fontSize: 14.5,
+        fontWeight: '800',
+        letterSpacing: 0.4,
     },
 });
-
-export default TransferRequestScreen;

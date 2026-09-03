@@ -516,11 +516,26 @@
     "to_team": "Yangi jamoa"
   },
   "transfers": {
-    "title": "Transfer So'rovi",
-    "current_team": "Hozirgi jamoa:",
-    "reason_placeholder": "O'tish sababi...",
+    "title": "TRANSFER SO'ROVI",
+    "current_team": "Hozirgi jamoa",
+    "reason_placeholder": "Boshqa jamoaga o'tish sababingizni yozing...",
     "send_request": "So'rov Yuborish",
-    "select_team": "Jamoani tanlang"
+    "select_team": "Yangi jamoani tanlang",
+    "new_team": "Yangi jamoa",
+    "select_league": "Ligani tanlang",
+    "reason_label": "O'tish sababi (ixtiyoriy)",
+    "step_league": "1-QADAM: LIGANI TANLANG",
+    "step_team": "2-QADAM: YANGI JAMOANI TANLANG",
+    "step_reason": "3-QADAM: O'TISH SABABI",
+    "window_open_desc": "Boshqa jamoaga o'tish uchun liga va yangi jamoani tanlab so'rov yuboring. So'rov adminlar tomonidan ko'rib chiqiladi.",
+    "window_closed_desc": "Tashkilotingizda transfer oynasi hozirda yopilgan. Ariza va o'tishlar vaqtincha to'xtatilgan.",
+    "search_team": "Jamoani qidirish...",
+    "no_teams_found": "Jamoalar topilmadi",
+    "choose_league_first": "Avval ligani tanlang",
+    "success_title": "SO'ROV YUBORILDI",
+    "success_desc": "Transfer so'rovingiz muvaffaqiyatli qabul qilindi. Tashkilotchi adminlar ko'rib chiqqach arizangiz tasdiqlanadi.",
+    "select_team_error": "Iltimos, yangi jamoani tanlang",
+    "window_closed_error": "Transfer oynasi yopilgan"
   },
   "match_detail": {
     "about_match": "O'YIN HAQIDA",
