@@ -35,8 +35,8 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 import SmartImage from '../components/SmartImage';
 import ChatSkeleton from '../components/ChatSkeleton';
-import AnimatedBackground from '../components/AnimatedBackground';
-import backgroundImage from '../assets/images/backroud-image.png';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 const CHAT_CACHE_PREFIX = '@team_chat_messages_v2_';
 const TEAM_INFO_CACHE_PREFIX = '@team_info_v2_';
@@ -46,6 +46,8 @@ function TeamChatScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { teamId, userId, userName } = route.params || {};
     const { user } = useAuthStore();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
     const insets = useSafeAreaInsets();
     
     const [messages, setMessages] = useState<any[]>([]);
@@ -198,20 +200,18 @@ function TeamChatScreen({ route, navigation }: any) {
 
     if (!hasPermission) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#000' }}>
-                <AnimatedBackground />
+            <View style={{ flex: 1, backgroundColor: homeColors.background }}>
                 <SafeAreaView style={styles.container} edges={['top']}>
-                    <View style={styles.header}>
-                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={[styles.header, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <Ionicons name="chevron-back" size={28} color={Colors.primary} />
+                            <Ionicons name="arrow-back" size={24} color={homeColors.textPrimary} />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>{t('chat.access_denied')}</Text>
+                        <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]}>{t('chat.access_denied')}</Text>
                         <View style={{ width: 40 }} />
                     </View>
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                        <Ionicons name="lock-closed-outline" size={80} color={Colors.danger} />
-                        <Text style={styles.errorText}>{t('chat.not_member')}</Text>
+                        <Ionicons name="lock-closed-outline" size={72} color={homeColors.textSecondary} />
+                        <Text style={[styles.errorText, { color: homeColors.textSecondary }]}>{t('chat.not_member')}</Text>
                     </View>
                 </SafeAreaView>
             </View>
@@ -1130,30 +1130,35 @@ function TeamChatScreen({ route, navigation }: any) {
                     )}
                     
                     <View style={[styles.messageWrapper, isMe ? styles.myMessageWrapper : styles.otherMessageWrapper]}>
-                        {!isMe && <Text style={styles.senderName}>{senderDisplayName.toUpperCase()}</Text>}
-                        <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}>
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <Text style={[styles.messageText, isMe ? styles.myText : styles.otherText]}>{item.text}</Text>
+                        {!isMe && <Text style={[styles.senderName, { color: homeColors.textSecondary }]}>{senderDisplayName.toUpperCase()}</Text>}
+                        <View style={[
+                            styles.messageBubble,
+                            isMe 
+                                ? [styles.myBubble, { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }] 
+                                : [styles.otherBubble, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }],
+                            { shadowColor: isDark ? '#FFFFFF' : '#000000' }
+                        ]}>
+                            <Text style={[styles.messageText, { color: isMe ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textPrimary }]}>{item.text}</Text>
                             <View style={styles.messageFooter}>
                                 {isItemEdited && (
-                                    <Text style={[styles.editedLabel, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
+                                    <Text style={[styles.editedLabel, { color: isMe ? (isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)') : homeColors.textSecondary }]}>
                                         {t('chat.edited')}
                                     </Text>
                                 )}
-                                <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
+                                <Text style={[styles.timestamp, { color: isMe ? (isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)') : homeColors.textSecondary }]}>
                                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </Text>
                             </View>
                             {item.isError && (
                                 <TouchableOpacity onPress={() => retryMessage(item)} style={{ marginTop: 4, alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center' }}>
-                                    <Text style={{ color: Colors.danger, fontSize: 10, fontWeight: 'bold', marginRight: 4 }}>
+                                    <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: 'bold', marginRight: 4 }}>
                                         {t('chat.send_failed_retry')}
                                     </Text>
-                                    <Ionicons name="refresh-circle" size={14} color={Colors.danger} />
+                                    <Ionicons name="refresh-circle" size={14} color="#EF4444" />
                                 </TouchableOpacity>
                             )}
                         </View>
-                        </View>
+                    </View>
                     </View>
                 </TouchableOpacity>
             </Animated.View>
@@ -1202,22 +1207,21 @@ function TeamChatScreen({ route, navigation }: any) {
     }, [user, teamInfo, teamPlayers, t]);
 
     return (
-        <AnimatedBackground overlayOpacity={0.8} backgroundImage={backgroundImage}>
+        <View style={{ flex: 1, backgroundColor: homeColors.background }}>
             <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
-                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={[styles.header, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
+                        <Ionicons name="arrow-back" size={24} color={homeColors.textPrimary} />
                     </TouchableOpacity>
                     
                     <TouchableOpacity 
                         style={styles.headerInfo} 
                         onPress={openMembersModal}
                     >
-                        <Text style={styles.headerTitle} numberOfLines={1}>{(teamInfo?.name || 'JAMOA CHATI').toUpperCase()}</Text>
+                        <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>{(teamInfo?.name || 'JAMOA CHATI').toUpperCase()}</Text>
                         <View style={styles.statusBadge}>
-                            <View style={[styles.statusDot, { backgroundColor: Colors.primary }]} />
-                            <Text style={[styles.headerStatus, { color: Colors.primary }]}>
+                            <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
+                            <Text style={[styles.headerStatus, { color: homeColors.textSecondary }]}>
                                 {teamPlayers.length > 0 ? t('chat.members_count', { count: teamPlayers.length }) : t('chat.online').toUpperCase()}
                             </Text>
                         </View>
@@ -1233,12 +1237,12 @@ function TeamChatScreen({ route, navigation }: any) {
                         <Ionicons 
                             name={isChatMuted ? "notifications-off" : "notifications"} 
                             size={22} 
-                            color={isChatMuted ? "rgba(255,255,255,0.4)" : Colors.primary} 
+                            color={isChatMuted ? homeColors.textSecondary : homeColors.textPrimary} 
                         />
                     </TouchableOpacity>
 
                     <TouchableOpacity 
-                        style={styles.headerLogoContainer}
+                        style={[styles.headerLogoContainer, { borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
                         onPress={openMembersModal}
                     >
                         {teamInfo?.logo && (
@@ -1299,13 +1303,17 @@ function TeamChatScreen({ route, navigation }: any) {
                                                         />
                                                     </View>
                                                     <View style={styles.otherMessageWrapper}>
-                                                        <Text style={styles.senderName}>{displayName}</Text>
-                                                        <View style={[styles.messageBubble, styles.otherBubble, styles.typingBubble]}>
-                                                            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                                                        <Text style={[styles.senderName, { color: homeColors.textSecondary }]}>{displayName}</Text>
+                                                        <View style={[
+                                                            styles.messageBubble,
+                                                            styles.otherBubble,
+                                                            styles.typingBubble,
+                                                            { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }
+                                                        ]}>
                                                             <View style={styles.typingDotsContainer}>
-                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot1Y }], opacity: typingDot1Opacity }]} />
-                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot2Y }], opacity: typingDot2Opacity }]} />
-                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot3Y }], opacity: typingDot3Opacity }]} />
+                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot1Y }], opacity: typingDot1Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
+                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot2Y }], opacity: typingDot2Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
+                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot3Y }], opacity: typingDot3Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
                                                             </View>
                                                         </View>
                                                     </View>
@@ -1317,7 +1325,7 @@ function TeamChatScreen({ route, navigation }: any) {
                             }
                             ListFooterComponent={isFetchingMore ? (
                                 <View style={{ paddingVertical: 20 }}>
-                                    <ActivityIndicator size="small" color={Colors.primary} />
+                                    <ActivityIndicator size="small" color={isDark ? '#FFFFFF' : '#000000'} />
                                 </View>
                             ) : null}
                             keyboardShouldPersistTaps="handled"
@@ -1333,7 +1341,14 @@ function TeamChatScreen({ route, navigation }: any) {
                     {unreadNewCount > 0 && (
                         <View style={styles.newMessagesPillContainer}>
                             <TouchableOpacity
-                                style={styles.newMessagesPill}
+                                style={[
+                                    styles.newMessagesPill,
+                                    {
+                                        backgroundColor: homeColors.card,
+                                        borderColor: homeColors.border,
+                                        shadowColor: isDark ? '#FFFFFF' : '#000000'
+                                    }
+                                ]}
                                 activeOpacity={0.85}
                                 onPress={() => {
                                     setUnreadNewCount(0);
@@ -1341,40 +1356,47 @@ function TeamChatScreen({ route, navigation }: any) {
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 }}
                             >
-                                <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
-                                <View style={styles.pillDot} />
-                                <Text style={styles.pillText}>
+                                <View style={[styles.pillDot, { backgroundColor: '#10B981' }]} />
+                                <Text style={[styles.pillText, { color: homeColors.textPrimary }]}>
                                     {unreadNewCount === 1 
                                         ? (t('chat.one_new_message') || '1 ta yangi xabar') 
                                         : (t('chat.new_messages_count', { count: unreadNewCount }) || `${unreadNewCount} ta yangi xabar`)}
                                 </Text>
-                                <Ionicons name="arrow-down" size={13} color={Colors.primary} style={{ marginLeft: 4 }} />
+                                <Ionicons name="arrow-down" size={13} color={homeColors.textPrimary} style={{ marginLeft: 4 }} />
                             </TouchableOpacity>
                         </View>
                     )}
 
                     {isEditing && (
-                        <View style={styles.editingBanner}>
-                            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={[styles.editingBanner, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderTopColor: homeColors.border }]}>
                             <View style={styles.editingInfo}>
-                                <Ionicons name="create" size={16} color={Colors.primary} />
-                                <Text style={styles.editingText} numberOfLines={1}>{t('chat.editing_title')}: {inputText}</Text>
+                                <Ionicons name="create" size={16} color={homeColors.textPrimary} />
+                                <Text style={[styles.editingText, { color: homeColors.textPrimary }]} numberOfLines={1}>{t('chat.editing_title')}: {inputText}</Text>
                             </View>
                             <TouchableOpacity onPress={() => { setIsEditing(false); setInputText(''); }}>
-                                <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.5)" />
+                                <Ionicons name="close-circle" size={20} color={homeColors.textSecondary} />
                             </TouchableOpacity>
                         </View>
                     )}
 
                     <View style={[
                         styles.inputContainer,
-                        { paddingBottom: Platform.OS === 'ios' ? 12 : Math.max(insets.bottom ? 6 : 8, 8) }
+                        {
+                            backgroundColor: homeColors.background,
+                            borderTopColor: homeColors.border,
+                            paddingBottom: Platform.OS === 'ios' ? 12 : Math.max(insets.bottom ? 6 : 8, 8)
+                        }
                     ]}>
-                        <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
-                        
                         <View style={styles.inputWrapper}>
                             <TextInput
-                                style={styles.input}
+                                style={[
+                                    styles.input,
+                                    {
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                        borderColor: homeColors.border,
+                                        color: homeColors.textPrimary,
+                                    }
+                                ]}
                                 value={inputText}
                                 onChangeText={(text) => {
                                     setInputText(text);
@@ -1391,22 +1413,26 @@ function TeamChatScreen({ route, navigation }: any) {
                                 ]} 
                                 pointerEvents="none"
                             >
-                                <Text style={styles.placeholderText}>{t('chat.type_message')}</Text>
+                                <Text style={[styles.placeholderText, { color: homeColors.textSecondary }]}>{t('chat.type_message')}</Text>
                                 <View style={styles.dotsRow}>
-                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot1Y }] }]}>.</Animated.Text>
-                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot2Y }] }]}>.</Animated.Text>
-                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot3Y }] }]}>.</Animated.Text>
+                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot1Y }], color: homeColors.textSecondary }]}>.</Animated.Text>
+                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot2Y }], color: homeColors.textSecondary }]}>.</Animated.Text>
+                                    <Animated.Text style={[styles.dotText, { transform: [{ translateY: dot3Y }], color: homeColors.textSecondary }]}>.</Animated.Text>
                                 </View>
                             </View>
                         </View>
 
                         <Animated.View style={{ transform: [{ scale: sendButtonScale }] }}>
                             <TouchableOpacity 
-                                style={[styles.sendButton, { backgroundColor: Colors.primary }, (!inputText.trim() || isRateLimited) && { opacity: 0.5 }]} 
+                                style={[
+                                    styles.sendButton,
+                                    { backgroundColor: isDark ? '#FFFFFF' : '#000000' },
+                                    (!inputText.trim() || isRateLimited) && { opacity: 0.35 }
+                                ]} 
                                 onPress={sendMessage}
                                 disabled={!inputText.trim() || isRateLimited}
                             >
-                                <Ionicons name="paper-plane" size={20} color="#000" />
+                                <Ionicons name="paper-plane" size={18} color={isDark ? '#000000' : '#FFFFFF'} />
                             </TouchableOpacity>
                         </Animated.View>
                     </View>
@@ -1421,9 +1447,6 @@ function TeamChatScreen({ route, navigation }: any) {
                 onRequestClose={closeMenu}
             >
                 <View style={styles.menuOverlay}>
-                    {/* Deep Blur Backdrop */}
-                    <BlurView intensity={95} tint="dark" style={StyleSheet.absoluteFill} />
-
                     <TouchableOpacity 
                         style={StyleSheet.absoluteFill} 
                         activeOpacity={1} 
@@ -1448,20 +1471,28 @@ function TeamChatScreen({ route, navigation }: any) {
                                 {/* Scaled Message Bubble Preview with Larger Font */}
                                 <View style={[
                                     styles.messageBubblePreview,
-                                    isMe ? styles.myBubble : styles.otherBubble,
+                                    isMe 
+                                        ? [styles.myBubble, { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }] 
+                                        : [styles.otherBubble, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }],
+                                    { shadowColor: isDark ? '#FFFFFF' : '#000000' }
                                 ]}>
-                                    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
                                     <Text style={[
                                         styles.messageTextPreview,
-                                        isMe ? styles.myText : styles.otherText
+                                        { color: isMe ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textPrimary }
                                     ]}>
                                         {selectedMessage.text}
                                     </Text>
                                 </View>
 
-                                {/* Glassmorphic Action Menu Card */}
-                                <View style={styles.actionMenuGlassCard}>
-                                    <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
+                                {/* Action Menu Card */}
+                                <View style={[
+                                    styles.actionMenuGlassCard,
+                                    {
+                                        backgroundColor: homeColors.card,
+                                        borderColor: homeColors.border,
+                                        shadowColor: isDark ? '#FFFFFF' : '#000000',
+                                    }
+                                ]}>
                                     <View style={{ paddingVertical: 4 }}>
                                         {/* Copy Action */}
                                         <TouchableOpacity
@@ -1469,21 +1500,21 @@ function TeamChatScreen({ route, navigation }: any) {
                                             onPress={() => copyToClipboard(selectedMessage.text)}
                                             activeOpacity={0.75}
                                         >
-                                            <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
-                                            <Text style={styles.menuActionText}>{t('chat.copy')}</Text>
+                                            <Ionicons name="copy-outline" size={16} color={homeColors.textPrimary} />
+                                            <Text style={[styles.menuActionText, { color: homeColors.textPrimary }]}>{t('chat.copy')}</Text>
                                         </TouchableOpacity>
 
                                         {/* Edit Action (Only for User's own messages) */}
                                         {isMe && (
                                             <>
-                                                <View style={styles.menuDivider} />
+                                                <View style={[styles.menuDivider, { backgroundColor: homeColors.border }]} />
                                                 <TouchableOpacity
                                                     style={styles.menuActionItem}
                                                     onPress={() => handleEdit(selectedMessage)}
                                                     activeOpacity={0.75}
                                                 >
-                                                    <Ionicons name="create-outline" size={16} color="#00FF87" />
-                                                    <Text style={[styles.menuActionText, { color: '#00FF87' }]}>{t('common.edit')}</Text>
+                                                    <Ionicons name="create-outline" size={16} color={isDark ? '#FFFFFF' : '#000000'} />
+                                                    <Text style={[styles.menuActionText, { color: isDark ? '#FFFFFF' : '#000000', fontWeight: '700' }]}>{t('common.edit')}</Text>
                                                 </TouchableOpacity>
                                             </>
                                         )}
@@ -1491,14 +1522,14 @@ function TeamChatScreen({ route, navigation }: any) {
                                         {/* Delete Action (Only for User's own messages or Manager/Admin) */}
                                         {(isMe || user?.role === 'manager' || user?.role === 'admin') && (
                                             <>
-                                                <View style={styles.menuDivider} />
+                                                <View style={[styles.menuDivider, { backgroundColor: homeColors.border }]} />
                                                 <TouchableOpacity
                                                     style={styles.menuActionItem}
                                                     onPress={() => handleDelete(selectedMessage._id || selectedMessage.id)}
                                                     activeOpacity={0.75}
                                                 >
-                                                    <Ionicons name="trash-outline" size={16} color="#FF3B30" />
-                                                    <Text style={[styles.menuActionText, { color: '#FF3B30' }]}>{t('chat.delete')}</Text>
+                                                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                                                    <Text style={[styles.menuActionText, { color: '#EF4444', fontWeight: '700' }]}>{t('chat.delete')}</Text>
                                                 </TouchableOpacity>
                                             </>
                                         )}
@@ -1519,131 +1550,162 @@ function TeamChatScreen({ route, navigation }: any) {
                 statusBarTranslucent={true}
                 onRequestClose={() => setShowMembers(false)}
             >
-                <AnimatedBackground overlayOpacity={0.92}>
-                    <View style={{ flex: 1, paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 28)) }}>
-                        {/* Top Header Section */}
-                        <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', alignItems: 'center', position: 'relative' }}>
-                            <TouchableOpacity 
-                                style={{ position: 'absolute', top: 10, right: 20, zIndex: 100, backgroundColor: 'rgba(255,255,255,0.1)', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }} 
-                                onPress={() => setShowMembers(false)}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons name="close" size={24} color="#FFF" />
-                            </TouchableOpacity>
+                <View style={{ flex: 1, backgroundColor: homeColors.background, paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 28)) }}>
+                    {/* Top Header Section */}
+                    <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: homeColors.border, alignItems: 'center', position: 'relative' }}>
+                        <TouchableOpacity 
+                            style={{ position: 'absolute', top: 10, right: 20, zIndex: 100, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }} 
+                            onPress={() => setShowMembers(false)}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="close" size={22} color={homeColors.textPrimary} />
+                        </TouchableOpacity>
 
-                            <SmartImage uri={teamInfo?.logo} style={{ width: 60, height: 60, marginBottom: 8 }} contentFit="contain" />
-                            <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '900', textAlign: 'center', letterSpacing: 1 }}>{teamInfo?.name?.toUpperCase()}</Text>
-                            <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: '900', marginTop: 4, letterSpacing: 0.5 }}>
-                                {t('chat.all_team_members', { count: teamPlayers.length })}
-                            </Text>
-                        </View>
-
-                        {/* Full Height Members List */}
-                        <FlatList
-                            data={teamPlayers}
-                            keyExtractor={(item, index) => item._id || item.id || String(index)}
-                            style={{ flex: 1 }}
-                            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-                            showsVerticalScrollIndicator={false}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity 
-                                    style={styles.memberItem}
-                                    activeOpacity={0.8}
-                                    onPress={() => {
-                                        setShowMembers(false);
-                                        navigation.navigate('PlayerStats', { playerId: item._id || item.id, player: item });
-                                    }}
-                                >
-                                    <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
-                                    <SmartImage 
-                                        uri={item.photo || item.photo_url || item.avatar} 
-                                        style={{ width: 48, height: 48, borderRadius: 12 }} 
-                                        fallbackIcon="person"
-                                    />
-                                    <View style={styles.memberInfo}>
-                                        <Text style={styles.memberName}>{(item.firstName || item.name || item.first_name || t('teams.player_fallback'))} {item.lastName || item.last_name || ''}</Text>
-                                        <Text style={styles.memberPosition}>
-                                            {(item.role === 'manager' || item.role === 'trainer' || item.role === 'coach' ? t('roles.trainer') : getLocalizedPosition(item.position, t)).toUpperCase()}
-                                        </Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
-                                </TouchableOpacity>
-                            )}
-                        />
+                        <SmartImage uri={teamInfo?.logo} style={{ width: 60, height: 60, marginBottom: 8 }} contentFit="contain" />
+                        <Text style={{ color: homeColors.textPrimary, fontSize: 18, fontWeight: '900', textAlign: 'center', letterSpacing: 0.5 }}>{teamInfo?.name?.toUpperCase()}</Text>
+                        <Text style={{ color: homeColors.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 4, letterSpacing: 0.3 }}>
+                            {t('chat.all_team_members', { count: teamPlayers.length })}
+                        </Text>
                     </View>
-                </AnimatedBackground>
+
+                    {/* Full Height Members List */}
+                    <FlatList
+                        data={teamPlayers}
+                        keyExtractor={(item, index) => item._id || item.id || String(index)}
+                        style={{ flex: 1 }}
+                        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+                        showsVerticalScrollIndicator={false}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity 
+                                style={[
+                                    styles.memberItem,
+                                    {
+                                        backgroundColor: homeColors.card,
+                                        borderColor: homeColors.border,
+                                        shadowColor: isDark ? '#FFFFFF' : '#000000',
+                                    }
+                                ]}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                    setShowMembers(false);
+                                    navigation.navigate('PlayerStats', { playerId: item._id || item.id, player: item });
+                                }}
+                            >
+                                <SmartImage 
+                                    uri={item.photo || item.photo_url || item.avatar} 
+                                    style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }} 
+                                    fallbackIcon="person"
+                                />
+                                <View style={styles.memberInfo}>
+                                    <Text style={[styles.memberName, { color: homeColors.textPrimary }]}>{(item.firstName || item.name || item.first_name || t('teams.player_fallback'))} {item.lastName || item.last_name || ''}</Text>
+                                    <Text style={[styles.memberPosition, { color: homeColors.textSecondary }]}>
+                                        {(item.role === 'manager' || item.role === 'trainer' || item.role === 'coach' ? t('roles.trainer') : getLocalizedPosition(item.position, t)).toUpperCase()}
+                                    </Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={18} color={homeColors.textSecondary} />
+                            </TouchableOpacity>
+                        )}
+                    />
+                </View>
             </Modal>
-        </AnimatedBackground>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent' },
-    header: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, overflow: 'hidden', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-    backButton: { padding: 5 },
-    headerInfo: { flex: 1, alignItems: 'center', marginLeft: 15 },
-    muteButton: { padding: 8, marginRight: 5 },
-    headerTitle: { color: '#FFF', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+    container: { flex: 1 },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    backButton: { padding: 6 },
+    headerInfo: { flex: 1, alignItems: 'center', marginHorizontal: 8 },
+    muteButton: { padding: 6 },
+    headerTitle: { fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
     statusBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-    statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-    headerStatus: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-    messageList: { padding: 15, paddingBottom: 20 },
-    messageRow: { flexDirection: 'row', marginBottom: 15, alignItems: 'flex-end' },
+    statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
+    headerStatus: { fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
+    headerLogoContainer: { width: 36, height: 36, borderRadius: 10, overflow: 'hidden', borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+    headerLogo: { width: '100%', height: '100%' },
+
+    messageList: { padding: 14, paddingBottom: 20 },
+    messageRow: { flexDirection: 'row', marginBottom: 12, alignItems: 'flex-end' },
     myMessageRow: { justifyContent: 'flex-end' },
     otherMessageRow: { justifyContent: 'flex-start' },
-    avatarContainer: { marginRight: 10, marginBottom: 2 },
-    avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.1)' },
-    messageWrapper: { maxWidth: '80%' },
+    avatarContainer: { marginRight: 8, marginBottom: 2 },
+    avatar: { width: 32, height: 32, borderRadius: 16 },
+    messageWrapper: { maxWidth: '78%' },
     myMessageWrapper: { alignItems: 'flex-end' },
     otherMessageWrapper: { alignItems: 'flex-start' },
-    senderName: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', marginBottom: 4, marginLeft: 4, letterSpacing: 0.5 },
-    messageBubble: { paddingVertical: 11, paddingHorizontal: 16, borderRadius: 18, overflow: 'hidden', borderWidth: 0 },
-    myBubble: { backgroundColor: 'rgba(0, 223, 130, 0.28)', borderBottomRightRadius: 4 },
-    otherBubble: { backgroundColor: 'rgba(255,255,255,0.15)', borderBottomLeftRadius: 10 },
-    messageText: { fontSize: 18, lineHeight: 24, fontWeight: '500' },
-    myText: { color: '#FFF' },
-    otherText: { color: '#FFF' },
+    senderName: { fontSize: 10.5, fontWeight: '700', marginBottom: 4, marginLeft: 4, letterSpacing: 0.3 },
+    messageBubble: {
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 18,
+        overflow: 'hidden',
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 2,
+            },
+        }),
+    },
+    myBubble: { borderBottomRightRadius: 4 },
+    otherBubble: { borderBottomLeftRadius: 4 },
+    messageText: { fontSize: 15, lineHeight: 21, fontWeight: '500' },
+    myText: {},
+    otherText: {},
     messageFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 4 },
-    editedLabel: { fontSize: 10, marginRight: 4, fontStyle: 'italic', opacity: 0.7 },
-    timestamp: { fontSize: 10, marginTop: 0, fontWeight: '600' },
-    myTimestamp: { color: 'rgba(255,255,255,0.5)', textAlign: 'right' },
-    otherTimestamp: { color: 'rgba(255,255,255,0.3)', textAlign: 'left' },
+    editedLabel: { fontSize: 9.5, marginRight: 4, fontStyle: 'italic', opacity: 0.7 },
+    timestamp: { fontSize: 9.5, fontWeight: '600' },
+    myTimestamp: { textAlign: 'right' },
+    otherTimestamp: { textAlign: 'left' },
+
     inputContainer: { 
         flexDirection: 'row', 
-        paddingHorizontal: 14, 
-        paddingTop: 10,
+        paddingHorizontal: 12, 
+        paddingTop: 8,
         alignItems: 'center', 
-        borderTopWidth: 1, 
-        borderTopColor: 'rgba(255,255,255,0.08)', 
-        overflow: 'hidden' 
+        borderTopWidth: StyleSheet.hairlineWidth,
     },
     inputWrapper: {
         flex: 1,
-        marginRight: 10,
+        marginRight: 8,
         position: 'relative',
         justifyContent: 'center',
     },
     input: { 
-        minHeight: 44, 
-        maxHeight: 120, 
-        backgroundColor: 'rgba(255,255,255,0.06)', 
-        borderRadius: 22, 
-        paddingHorizontal: 18, 
-        paddingVertical: 10, 
-        color: '#FFF', 
-        fontSize: 16, 
-        borderWidth: 1, 
-        borderColor: 'rgba(255,255,255,0.12)' 
+        minHeight: 42, 
+        maxHeight: 110, 
+        borderRadius: 21, 
+        paddingHorizontal: 16, 
+        paddingVertical: 9, 
+        fontSize: 15, 
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 1,
+            },
+        }),
     },
     animatedPlaceholderContainer: {
         position: 'absolute',
-        left: 18,
+        left: 16,
         flexDirection: 'row',
         alignItems: 'center',
     },
     placeholderText: {
-        color: 'rgba(255, 255, 255, 0.35)',
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '500',
     },
     dotsRow: {
@@ -1652,28 +1714,37 @@ const styles = StyleSheet.create({
         marginLeft: 2,
     },
     dotText: {
-        color: 'rgba(255, 255, 255, 0.55)',
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '900',
         marginLeft: 1.5,
     },
-    sendButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-    errorText: { color: 'rgba(255,255,255,0.6)', marginTop: 20, fontSize: 16, textAlign: 'center' },
-    headerLogoContainer: { width: 34, height: 34, borderRadius: 10, overflow: 'hidden', marginLeft: 10, justifyContent: 'center', alignItems: 'center' },
-    headerLogo: { width: '100%', height: '100%' },
-    modalOverlay: { flex: 1, backgroundColor: '#000' },
-    modalHeader: { paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-    modalTeamLogo: { width: 70, height: 70, marginBottom: 8 },
-    modalTeamName: { color: '#FFF', fontSize: 20, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
-    memberItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, marginBottom: 10, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    memberInfo: { flex: 1, marginLeft: 15 },
-    memberName: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-    memberPosition: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '900', marginTop: 4, letterSpacing: 1 },
-    closeButton: { position: 'absolute', top: 10, right: 15, zIndex: 100, backgroundColor: 'rgba(255,255,255,0.1)', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-    dragHandleContainer: { width: '100%', height: 40, alignItems: 'center', justifyContent: 'center' },
-    dragHandle: { width: 40, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.2)' },
+    sendButton: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
+    errorText: { marginTop: 16, fontSize: 15, textAlign: 'center', fontWeight: '600' },
+
+    memberItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 16,
+        marginBottom: 10,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 2,
+            },
+        }),
+    },
+    memberInfo: { flex: 1, marginLeft: 12 },
+    memberName: { fontSize: 15, fontWeight: '700' },
+    memberPosition: { fontSize: 11, fontWeight: '700', marginTop: 2, letterSpacing: 0.3 },
+
     menuOverlay: { 
         flex: 1, 
+        backgroundColor: 'rgba(0, 0, 0, 0.72)',
         justifyContent: 'center', 
         paddingHorizontal: 22,
     },
@@ -1682,32 +1753,41 @@ const styles = StyleSheet.create({
         maxWidth: 290,
     },
     messageBubblePreview: {
-        paddingVertical: 14,
-        paddingHorizontal: 18,
-        borderRadius: 20,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 18,
         maxWidth: '100%',
-        marginBottom: 14,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        overflow: 'hidden',
+        marginBottom: 12,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 3,
+            },
+        }),
     },
     messageTextPreview: {
-        fontSize: 20,
-        lineHeight: 28,
+        fontSize: 16,
+        lineHeight: 23,
         fontWeight: '600',
     },
     actionMenuGlassCard: {
-        width: 165,
-        borderRadius: 16,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.16)',
-        backgroundColor: 'rgba(20, 24, 36, 0.65)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 16,
-        elevation: 8,
+        width: 175,
+        borderRadius: 18,
+        paddingVertical: 4,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 8,
+            },
+        }),
     },
     menuActionItem: {
         flexDirection: 'row',
@@ -1719,30 +1799,35 @@ const styles = StyleSheet.create({
     menuActionText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
     },
     menuDivider: {
-        height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        height: StyleSheet.hairlineWidth,
         width: '100%',
     },
-    editingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 15, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
+    editingBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
     editingInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-    editingText: { color: '#FFF', fontSize: 12, marginLeft: 8, opacity: 0.8 },
+    editingText: { fontSize: 12, marginLeft: 8, fontWeight: '600' },
     typingMessagesContainer: {
-        marginBottom: 8,
+        marginBottom: 6,
         marginTop: 2,
     },
     typingMessageRow: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     typingBubble: {
-        paddingVertical: 14,
-        paddingHorizontal: 18,
-        minWidth: 70,
-        minHeight: 44,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        minWidth: 64,
+        minHeight: 38,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1750,19 +1835,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        height: 16,
+        height: 14,
     },
     typingBlinkDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
-        backgroundColor: '#00FF87',
-        marginHorizontal: 3.5,
-        shadowColor: '#00FF87',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 4,
-        elevation: 3,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        marginHorizontal: 3,
     },
     newMessagesPillContainer: {
         position: 'absolute',
@@ -1777,27 +1856,27 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 20,
-        backgroundColor: 'rgba(15, 23, 42, 0.88)',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 135, 0.45)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        overflow: 'hidden',
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 6,
+            },
+        }),
     },
     pillDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
-        backgroundColor: '#00FF87',
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         marginRight: 8,
     },
     pillText: {
-        color: '#FFFFFF',
-        fontSize: 13,
+        fontSize: 12.5,
         fontWeight: '700',
-        letterSpacing: 0.3,
+        letterSpacing: 0.2,
     },
 });
 
