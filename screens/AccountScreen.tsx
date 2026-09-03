@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import SmartImage from '../components/SmartImage';
-import { apiService } from '../services/apiService';
+import { apiService, supabase } from '../services/apiService';
 import { useTranslation } from 'react-i18next';
 import LanguageSelectModal from '../components/LanguageSelectModal';
 import { SUPPORTED_LANGUAGES } from '../store/useLanguageStore';
@@ -291,12 +291,28 @@ export default function AccountScreen({ navigation }: any) {
 
     const handleAddPlayerPress = async () => {
         try {
-            const orgId = user?.organization_id || user?.organizationId || selectedOrganizationId || 1;
-            const { data: orgData } = await apiService.supabase
-                .from('organizations')
-                .select('id, name, contact_phone, is_registration_open')
-                .eq('id', orgId)
-                .single();
+            let orgId = user?.organization_id || user?.organizationId || selectedOrganizationId || detailedData?.organization_id || detailedData?.organizationId;
+
+            // If orgId not found yet but currentTeamId exists, fetch team's organization_id
+            if (!orgId && currentTeamId) {
+                const { data: teamData } = await supabase
+                    .from('teams')
+                    .select('organization_id')
+                    .eq('id', currentTeamId)
+                    .maybeSingle();
+                if (teamData?.organization_id) {
+                    orgId = teamData.organization_id;
+                }
+            }
+
+            let query = supabase.from('organizations').select('id, name, contact_phone, is_registration_open');
+            if (orgId) {
+                query = query.eq('id', orgId);
+            } else {
+                query = query.limit(1);
+            }
+
+            const { data: orgData } = await query.maybeSingle();
 
             if (orgData && orgData.is_registration_open === false) {
                 setClosedOrgInfo({
