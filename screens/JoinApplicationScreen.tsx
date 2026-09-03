@@ -32,6 +32,7 @@ import SmartImage from '../components/SmartImage';
 import Skeleton from '../components/Skeleton';
 import { SlideButton } from '../components/SlideButton';
 import { useTranslation } from 'react-i18next';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
 
@@ -81,6 +82,25 @@ const cleanPhone9Digits = (raw: string) => {
         clean = clean.slice(3);
     }
     return clean.slice(0, 9);
+};
+
+const formatDateToString = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${d}.${m}.${y}`;
+};
+
+const parseStringToDate = (str?: string) => {
+    if (!str) return new Date(2000, 0, 1);
+    if (str.includes('.')) {
+        const [d, m, y] = str.split('.');
+        if (d && m && y) return new Date(Number(y), Number(m) - 1, Number(d));
+    } else if (str.includes('-')) {
+        const [y, m, d] = str.split('-');
+        if (d && m && y) return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+    return new Date(2000, 0, 1);
 };
 
 export default function JoinApplicationScreen({ route, navigation }: any) {
@@ -182,6 +202,46 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
     // Position Dropdown State
     const [isPositionDropdownOpen, setIsPositionDropdownOpen] = useState(false);
+
+    // DatePicker State
+    const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+    const [datePickerTarget, setDatePickerTarget] = useState<'main' | 'modal'>('main');
+    const [tempSelectedDate, setTempSelectedDate] = useState<Date>(new Date(2000, 0, 1));
+
+    const openDatePicker = (target: 'main' | 'modal') => {
+        setDatePickerTarget(target);
+        const currentDateStr = target === 'main' ? formData.birthDate : modalPlayerData.birthDate;
+        setTempSelectedDate(parseStringToDate(currentDateStr));
+        setIsDatePickerVisible(true);
+    };
+
+    const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setIsDatePickerVisible(false);
+            if (event.type === 'set' && date) {
+                const dateStr = formatDateToString(date);
+                if (datePickerTarget === 'main') {
+                    setFormData(prev => ({ ...prev, birthDate: dateStr }));
+                } else {
+                    setModalPlayerData(prev => ({ ...prev, birthDate: dateStr }));
+                }
+            }
+        } else {
+            if (date) {
+                setTempSelectedDate(date);
+            }
+        }
+    };
+
+    const confirmIosDate = () => {
+        const dateStr = formatDateToString(tempSelectedDate);
+        if (datePickerTarget === 'main') {
+            setFormData(prev => ({ ...prev, birthDate: dateStr }));
+        } else {
+            setModalPlayerData(prev => ({ ...prev, birthDate: dateStr }));
+        }
+        setIsDatePickerVisible(false);
+    };
 
     const handleNumberChange = (num: string) => {
         const cleanNum = num.replace(/\D/g, '').slice(0, 3);
@@ -1516,21 +1576,25 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                             )}
                                                         </View>
 
-                                                        {/* 3. Tug'ilgan sana */}
+                                                        {/* 3. Tug'ilgan sana (Device DatePicker) */}
                                                         <View style={styles.inputGroupCompact}>
                                                             <Text style={[styles.inputLabelCompact, { color: homeColors.textSecondary }]}>Tug'ilgan sana</Text>
-                                                            <TextInput
+                                                            <TouchableOpacity
                                                                 style={[
-                                                                    styles.inputFieldCompact,
-                                                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }
+                                                                    styles.selectTriggerCompact,
+                                                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border }
                                                                 ]}
-                                                                value={formData.birthDate}
-                                                                onChangeText={(t) => setFormData(prev => ({ ...prev, birthDate: t }))}
-                                                                placeholder="01.04.1990"
-                                                                keyboardType="numbers-and-punctuation"
-                                                                maxLength={10}
-                                                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
-                                                            />
+                                                                onPress={() => openDatePicker('main')}
+                                                                activeOpacity={0.8}
+                                                            >
+                                                                <Text style={[
+                                                                    styles.selectTriggerText,
+                                                                    { color: formData.birthDate ? homeColors.textPrimary : (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') }
+                                                                ]}>
+                                                                    {formData.birthDate || "Sanani tanlang"}
+                                                                </Text>
+                                                                <Ionicons name="calendar-outline" size={16} color={homeColors.textSecondary} />
+                                                            </TouchableOpacity>
                                                         </View>
                                                     </View>
                                                 </View>
@@ -1868,13 +1932,22 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                                     <View style={styles.inputGroup}>
                                         <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug'ilgan sana</Text>
-                                        <TextInput
-                                            style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
-                                            value={modalPlayerData.birthDate}
-                                            onChangeText={(t) => setModalPlayerData({ ...modalPlayerData, birthDate: t })}
-                                            placeholder="01.04.1990"
-                                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
-                                        />
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.selectTriggerCompact,
+                                                { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, height: 46 }
+                                            ]}
+                                            onPress={() => openDatePicker('modal')}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={[
+                                                styles.selectTriggerText,
+                                                { color: modalPlayerData.birthDate ? homeColors.textPrimary : (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') }
+                                            ]}>
+                                                {modalPlayerData.birthDate || "Sanani tanlang"}
+                                            </Text>
+                                            <Ionicons name="calendar-outline" size={18} color={homeColors.textSecondary} />
+                                        </TouchableOpacity>
                                     </View>
 
                                     <Text style={[styles.subTitle, { color: homeColors.textSecondary }]}>Amplua</Text>
@@ -2015,6 +2088,52 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     </View>
                 </View>
             </Modal>
+
+            {/* ANDROID NATIVE DATE PICKER */}
+            {isDatePickerVisible && Platform.OS === 'android' && (
+                <DateTimePicker
+                    value={tempSelectedDate}
+                    mode="date"
+                    display="default"
+                    maximumDate={new Date()}
+                    minimumDate={new Date(1950, 0, 1)}
+                    onChange={handleDateChange}
+                />
+            )}
+
+            {/* IOS DATE PICKER MODAL */}
+            {Platform.OS === 'ios' && (
+                <Modal
+                    visible={isDatePickerVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setIsDatePickerVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={[styles.iosPickerContainer, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                            <View style={[styles.iosPickerHeader, { borderBottomColor: homeColors.border }]}>
+                                <TouchableOpacity onPress={() => setIsDatePickerVisible(false)}>
+                                    <Text style={[styles.iosPickerBtnCancel, { color: homeColors.textSecondary }]}>Bekor qilish</Text>
+                                </TouchableOpacity>
+                                <Text style={[styles.iosPickerTitle, { color: homeColors.textPrimary }]}>Tug'ilgan sana</Text>
+                                <TouchableOpacity onPress={confirmIosDate}>
+                                    <Text style={[styles.iosPickerBtnDone, { color: isDark ? '#FFFFFF' : '#000000' }]}>Tayyor</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <DateTimePicker
+                                value={tempSelectedDate}
+                                mode="date"
+                                display="spinner"
+                                maximumDate={new Date()}
+                                minimumDate={new Date(1950, 0, 1)}
+                                onChange={handleDateChange}
+                                textColor={homeColors.textPrimary}
+                                themeVariant={isDark ? 'dark' : 'light'}
+                            />
+                        </View>
+                    </View>
+                </Modal>
+            )}
             </Animated.View>
         </View>
     );
@@ -2518,5 +2637,34 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+
+    // iOS DatePicker Styles
+    iosPickerContainer: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderWidth: 1,
+        borderBottomWidth: 0,
+        paddingBottom: 30,
+    },
+    iosPickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    iosPickerTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    iosPickerBtnCancel: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    iosPickerBtnDone: {
+        fontSize: 14,
+        fontWeight: '800',
     },
 });
