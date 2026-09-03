@@ -153,8 +153,33 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
     const [accountOptions, setAccountOptions] = useState<any[]>([]);
     const [loadingAccounts, setLoadingAccounts] = useState(false);
 
-    // Modal Y displacement for swipe down gesture
+    // Modal Sheet Animations (Orqa fon birdaniga qorayadi, faqat pastki karta slide bo'ladi)
     const modalY = useRef(new Animated.Value(0)).current;
+    const sheetSlideAnim = useRef(new Animated.Value(350)).current;
+
+    const closeSwitcherModal = () => {
+        Animated.timing(sheetSlideAnim, {
+            toValue: 380,
+            duration: 180,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+        }).start(() => {
+            setShowSwitcherModal(false);
+            modalY.setValue(0);
+        });
+    };
+
+    const openSwitcherModal = () => {
+        sheetSlideAnim.setValue(350);
+        modalY.setValue(0);
+        setShowSwitcherModal(true);
+        Animated.spring(sheetSlideAnim, {
+            toValue: 0,
+            tension: 75,
+            friction: 11,
+            useNativeDriver: true,
+        }).start();
+    };
 
     const modalPanResponder = useRef(
         PanResponder.create({
@@ -323,7 +348,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
             organization_id: Number(orgId),
         }, finalAccounts);
         
-        setShowSwitcherModal(false);
+        closeSwitcherModal();
     };
 
     return (
@@ -432,20 +457,20 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
             <Modal
                 visible={showSwitcherModal}
                 transparent
-                animationType="slide"
-                onRequestClose={() => setShowSwitcherModal(false)}
+                animationType="none"
+                onRequestClose={closeSwitcherModal}
             >
-                <View style={styles.modalOverlay} {...modalPanResponder.panHandlers}>
+                <View style={styles.modalOverlay}>
                     <TouchableOpacity
-                        style={{ flex: 1, width: '100%' }}
+                        style={StyleSheet.absoluteFillObject}
                         activeOpacity={1}
-                        onPress={() => setShowSwitcherModal(false)}
+                        onPress={closeSwitcherModal}
                     />
                     <Animated.View
                         style={[
                             styles.switcherModalCard,
                             { backgroundColor: colors.surface, borderColor: colors.border },
-                            { transform: [{ translateY: modalY }] }
+                            { transform: [{ translateY: Animated.add(sheetSlideAnim, modalY) }] }
                         ]}
                         {...modalPanResponder.panHandlers}
                     >
