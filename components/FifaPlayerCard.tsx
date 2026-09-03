@@ -655,8 +655,8 @@ export default function FifaPlayerCard({
                                         <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow, height: Math.max(1, scaleFactor) }]} />
                                     </View>
 
-                                    <View style={[styles.statsRowThree, { paddingHorizontal: L.bodyPadH }]}>
-                                        {/* GOL (Left) */}
+                                    <View style={[styles.statsRowThree, { paddingHorizontal: 16 }]}>
+                                        {/* GOL (Left Column) */}
                                         <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {goalsCount}
@@ -667,9 +667,9 @@ export default function FifaPlayerCard({
                                         </View>
 
                                         {/* Divider Left */}
-                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
+                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH }]} />
 
-                                        {/* ASIST (Dead Center) */}
+                                        {/* ASIST (100% Dead Center Column) */}
                                         <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {assistsCount}
@@ -680,9 +680,9 @@ export default function FifaPlayerCard({
                                         </View>
 
                                         {/* Divider Right */}
-                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
+                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH }]} />
 
-                                        {/* O'YIN (Right) */}
+                                        {/* O'YIN (Right Column) */}
                                         <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {matchesCount}
@@ -702,8 +702,10 @@ export default function FifaPlayerCard({
                                     {
                                         marginTop: 20,
                                         height: L.footerH,
+                                        flexDirection: 'row',
                                         justifyContent: 'center',
                                         alignItems: 'center',
+                                        gap: 3,
                                     }
                                 ]}
                             >
@@ -713,7 +715,6 @@ export default function FifaPlayerCard({
                                         width: L.footerLogo,
                                         height: L.footerLogo,
                                         opacity: 0.45,
-                                        marginRight: 2.5 * scaleFactor
                                     }}
                                     resizeMode="contain"
                                 />
@@ -873,7 +874,7 @@ const styles = StyleSheet.create({
         width: '100%',
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-around',
+        justifyContent: 'center',
         zIndex: 10,
     },
     bottomInfoSection: {
@@ -892,7 +893,8 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     statsVerticalDivider: {
-        marginHorizontal: 2,
+        width: 1,
+        backgroundColor: 'rgba(255,255,255,0.2)',
     },
     statLabelSmall: {
         fontWeight: '800',
