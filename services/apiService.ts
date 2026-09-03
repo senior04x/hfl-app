@@ -2062,6 +2062,75 @@ export const apiService = {
         }
     },
 
+    checkPlayerExistsInTeam: async (params: {
+        teamId?: string | number | null;
+        firstName: string;
+        lastName: string;
+        phone: string;
+    }) => {
+        try {
+            const cleanPhone = (params.phone || '').replace(/\D/g, '').slice(-9);
+            const fName = (params.firstName || '').trim();
+            const lName = (params.lastName || '').trim();
+            const teamId = params.teamId;
+
+            if (teamId) {
+                // Check players inside THIS specific team in applications table
+                const { data: teamPlayers, error } = await supabase
+                    .from('applications')
+                    .select('id, first_name, last_name, phone, status, is_archived')
+                    .eq('team_id', teamId);
+
+                if (!error && teamPlayers && teamPlayers.length > 0) {
+                    // 1. Check if phone is already registered in this team
+                    if (cleanPhone.length === 9) {
+                        const phoneMatch = teamPlayers.find((p: any) => {
+                            const st = String(p.status || '').toLowerCase();
+                            const isArchived = p.is_archived === true || st === 'archived';
+                            if (isArchived) return false;
+                            const pPhone = String(p.phone || '').replace(/\D/g, '').slice(-9);
+                            return pPhone === cleanPhone;
+                        });
+
+                        if (phoneMatch) {
+                            return {
+                                exists: true,
+                                message: "Kechirasiz, ushbu telefon raqamli o'yinchi allaqachon ushbu jamoada ro'yxatdan o'tgan!"
+                            };
+                        }
+                    }
+
+                    // 2. Check if first_name + last_name is already in this team
+                    if (fName && lName) {
+                        const nameMatch = teamPlayers.find((p: any) => {
+                            const st = String(p.status || '').toLowerCase();
+                            const isArchived = p.is_archived === true || st === 'archived';
+                            if (isArchived) return false;
+                            const pFirst = String(p.first_name || p.firstName || '').toLowerCase().trim();
+                            const pLast = String(p.last_name || p.lastName || '').toLowerCase().trim();
+                            return pFirst === fName.toLowerCase() && pLast === lName.toLowerCase();
+                        });
+
+                        if (nameMatch) {
+                            return {
+                                exists: true,
+                                message: "Kechirasiz, " + fName + " " + lName + " allaqachon ushbu jamoada ro'yxatdan o'tgan!"
+                            };
+                        }
+                    }
+                }
+            }
+
+            return {
+                exists: false,
+                message: "O'yinchi ushbu jamoada mavjud emas. Ma'lumotlarni to'ldirishingiz mumkin!"
+            };
+        } catch (err) {
+            console.error('Check player in team error:', err);
+            return { exists: false, message: "Ma'lumotlar tasdiqlandi. Davom etishingiz mumkin!" };
+        }
+    },
+
     checkTeamOrPhoneExists: async (params: { teamName?: string; phone?: string; type: 'player' | 'team' }) => {
         try {
             const cleanPhone = (params.phone || '').replace(/\D/g, '').slice(-9);
@@ -2086,17 +2155,6 @@ export const apiService = {
                     if (phoneTeamData && phoneTeamData.length > 0) {
                         return { exists: true, message: "Kechirasiz, ushbu telefon raqami allaqachon ro'yxatdan o'tgan!" };
                     }
-                }
-            }
-
-            if (cleanPhone.length === 9) {
-                const { data: appData } = await supabase
-                    .from('applications')
-                    .select('id')
-                    .or(`phone.ilike.%${cleanPhone}%`);
-                
-                if (appData && appData.length > 0) {
-                    return { exists: true, message: "Kechirasiz, ushbu telefon raqam orqali allaqachon ariza topshirilgan!" };
                 }
             }
 

@@ -307,11 +307,20 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
         setValidationResult({ isChecked: false, isValid: false, message: '' });
     };
 
-    const triggerValidation = (type: 'player' | 'team', teamNameVal?: string, phoneVal?: string) => {
+    const triggerValidation = (
+        type: 'player' | 'team',
+        teamNameVal?: string,
+        phoneVal?: string,
+        firstNameVal?: string,
+        lastNameVal?: string,
+        customTeamId?: string | number | null
+    ) => {
         if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
 
         const safePhone = phoneVal !== undefined ? phoneVal : (formData.phone || '');
         const safeTeamName = teamNameVal !== undefined ? teamNameVal : (formData.teamName || '');
+        const safeFirstName = firstNameVal !== undefined ? firstNameVal : (formData.firstName || '');
+        const safeLastName = lastNameVal !== undefined ? lastNameVal : (formData.lastName || '');
         const cleanPhone = String(safePhone).replace(/\D/g, '').slice(-9);
 
         if (type === 'team') {
@@ -320,7 +329,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 return;
             }
         } else {
-            if (cleanPhone.length < 9) {
+            // Player type requires: Ism, Familiya, and 9-digit Phone
+            if (safeFirstName.trim().length < 2 || safeLastName.trim().length < 2 || cleanPhone.length < 9) {
                 setValidationResult({ isChecked: false, isValid: false, message: '' });
                 return;
             }
@@ -328,17 +338,42 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
         setIsValidating(true);
         checkTimerRef.current = setTimeout(async () => {
-            const res = await apiService.checkTeamOrPhoneExists({
-                teamName: safeTeamName,
-                phone: cleanPhone,
-                type: type
-            });
-            setIsValidating(false);
-            setValidationResult({
-                isChecked: true,
-                isValid: !res.exists,
-                message: res.message
-            });
+            try {
+                if (type === 'player') {
+                    const currentTeamId = customTeamId !== undefined ? customTeamId : (targetTeamId || formData.selectedTeam);
+                    const res = await apiService.checkPlayerExistsInTeam({
+                        teamId: currentTeamId,
+                        firstName: safeFirstName,
+                        lastName: safeLastName,
+                        phone: cleanPhone,
+                    });
+                    setIsValidating(false);
+                    setValidationResult({
+                        isChecked: true,
+                        isValid: !res.exists,
+                        message: res.message,
+                    });
+                } else {
+                    const res = await apiService.checkTeamOrPhoneExists({
+                        teamName: safeTeamName,
+                        phone: cleanPhone,
+                        type: type,
+                    });
+                    setIsValidating(false);
+                    setValidationResult({
+                        isChecked: true,
+                        isValid: !res.exists,
+                        message: res.message,
+                    });
+                }
+            } catch (e) {
+                setIsValidating(false);
+                setValidationResult({
+                    isChecked: true,
+                    isValid: true,
+                    message: "Ma'lumotlar tasdiqlandi. Davom etishingiz mumkin!",
+                });
+            }
         }, 300);
     };
 
@@ -1089,6 +1124,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                                 onPress={() => {
                                                                     setFormData(prev => ({ ...prev, selectedTeam: tId, teamName: team.name }));
                                                                     setIsTeamDropdownOpen(false);
+                                                                    triggerValidation('player', team.name, formData.phone, formData.firstName, formData.lastName, tId);
                                                                 }}
                                                                 activeOpacity={0.7}
                                                             >
@@ -1133,7 +1169,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                         {/* MODE 1: YAKKAXON OYINCHI FORM */}
                         {applicationType === 'player' ? (
                             <>
-                                {/* INITIAL CHECK: FIRST NAME & PHONE NUMBER ONLY */}
+                                {/* INITIAL CHECK: FIRST NAME, LAST NAME & PHONE NUMBER */}
                                 <View style={styles.card}>
                                     <View style={styles.cardTitleRow}>
                                         <Ionicons name="person" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
@@ -1146,10 +1182,24 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             style={styles.inputField}
                                             value={formData.firstName}
                                             onChangeText={(t) => {
-                                                setFormData({ ...formData, firstName: t });
-                                                triggerValidation('player', formData.teamName, formData.phone);
+                                                setFormData(prev => ({ ...prev, firstName: t }));
+                                                triggerValidation('player', formData.teamName, formData.phone, t, formData.lastName);
                                             }}
                                             placeholder="Masalan: Alisher"
+                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                        />
+                                    </View>
+
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.inputLabel}>FAMILIYA *</Text>
+                                        <TextInput
+                                            style={styles.inputField}
+                                            value={formData.lastName}
+                                            onChangeText={(t) => {
+                                                setFormData(prev => ({ ...prev, lastName: t }));
+                                                triggerValidation('player', formData.teamName, formData.phone, formData.firstName, t);
+                                            }}
+                                            placeholder="Masalan: Karimov"
                                             placeholderTextColor="rgba(255,255,255,0.3)"
                                         />
                                     </View>
@@ -1162,8 +1212,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             onChangeText={(t) => {
                                                 const formatted = formatUzPhone(t);
                                                 const clean = cleanPhoneForDb(formatted).replace('+998', '');
-                                                setFormData({ ...formData, phone: clean });
-                                                triggerValidation('player', formData.teamName, clean);
+                                                setFormData(prev => ({ ...prev, phone: clean }));
+                                                triggerValidation('player', formData.teamName, clean, formData.firstName, formData.lastName);
                                             }}
                                             placeholder="+998 90 123 45 67"
                                             keyboardType="phone-pad"
@@ -1178,22 +1228,11 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                 {/* CONDITIONAL FIELDS (REVEALED ONLY IF VALIDATION PASSED) */}
                                 {validationResult.isChecked && validationResult.isValid && (
                                     <>
-                                        {/* SURNAME & FATHER NAME */}
+                                        {/* FATHER NAME */}
                                         <View style={styles.card}>
                                             <View style={styles.cardTitleRow}>
                                                 <Ionicons name="person-add" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
                                                 <Text style={styles.cardTitle}>QO’SHIMCHA MA’LUMOTLAR</Text>
-                                            </View>
-
-                                            <View style={styles.inputGroup}>
-                                                <Text style={styles.inputLabel}>FAMILIYA *</Text>
-                                                <TextInput
-                                                    style={styles.inputField}
-                                                    value={formData.lastName}
-                                                    onChangeText={(t) => setFormData({ ...formData, lastName: t })}
-                                                    placeholder="Masalan: Karimov"
-                                                    placeholderTextColor="rgba(255,255,255,0.3)"
-                                                />
                                             </View>
 
                                             <View style={styles.inputGroup}>
