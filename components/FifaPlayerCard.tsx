@@ -61,7 +61,7 @@ export default function FifaPlayerCard({
 
     // Optimized Card Aspect Ratio
     const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
-    const cardHeight = showAttributes ? cardWidth * 1.20 : cardWidth * 1.02;
+    const cardHeight = showAttributes ? cardWidth * 1.15 : cardWidth * 0.98;
     const scaleFactor = cardWidth / 260;
 
     // 3D Parallax & Tilt animations
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
         borderBottomRightRadius: 25,
         overflow: 'hidden',
         position: 'relative',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
     },
     geometricPattern: {
