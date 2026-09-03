@@ -24,6 +24,7 @@ import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 import { formatUzPhone, cleanPhoneForDb } from '../utils/stringUtils';
+import Skeleton from './Skeleton';
 import Colors from '../constants/Colors';
 
 const { width, height } = Dimensions.get('window');
@@ -445,9 +446,10 @@ export default function EditTeamModal({
                     </View>
 
                     {loading ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color={homeColors.accent} />
-                        </View>
+                        <EditTeamModalSkeleton
+                            activeTab={activeTab}
+                            cardSurface={cardSurface}
+                        />
                     ) : (
                         <ScrollView
                             showsVerticalScrollIndicator={false}
@@ -662,6 +664,96 @@ export default function EditTeamModal({
                 </View>
             </KeyboardAvoidingView>
         </Modal>
+    );
+}
+
+function EditTeamModalSkeleton({
+    activeTab,
+    cardSurface,
+}: {
+    activeTab: 'team' | 'players';
+    cardSurface: any;
+}) {
+    if (activeTab === 'team') {
+        return (
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollBody}
+            >
+                <View style={{ gap: 16 }}>
+                    {/* Logo Card Skeleton */}
+                    <View style={[styles.sectionCard, cardSurface, { gap: 12 }]}>
+                        <Skeleton width={120} height={14} borderRadius={4} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                            <Skeleton width={64} height={64} borderRadius={16} />
+                            <View style={{ gap: 8, flex: 1 }}>
+                                <Skeleton width={150} height={34} borderRadius={10} />
+                                <Skeleton width={130} height={12} borderRadius={4} />
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Team Name Skeleton */}
+                    <View style={[styles.sectionCard, cardSurface, { gap: 10 }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Skeleton width={100} height={14} borderRadius={4} />
+                            <Skeleton width={80} height={12} borderRadius={4} />
+                        </View>
+                        <Skeleton width="100%" height={42} borderRadius={10} />
+                    </View>
+
+                    {/* Leadership Card Skeleton */}
+                    <View style={[styles.sectionCard, cardSurface, { gap: 14 }]}>
+                        <Skeleton width={150} height={14} borderRadius={4} />
+                        {[1, 2, 3].map((i) => (
+                            <View key={i} style={{ gap: 6, marginTop: i > 1 ? 8 : 0 }}>
+                                <Skeleton width={70} height={12} borderRadius={4} />
+                                <Skeleton width="100%" height={40} borderRadius={10} />
+                                <Skeleton width="100%" height={40} borderRadius={10} />
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* Save Button Skeleton */}
+                    <Skeleton width="100%" height={48} borderRadius={14} />
+                </View>
+            </ScrollView>
+        );
+    }
+
+    return (
+        <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollBody}
+        >
+            <View style={{ gap: 12 }}>
+                {/* Search Box Skeleton */}
+                <Skeleton width="100%" height={42} borderRadius={12} />
+
+                {/* Players Skeletons */}
+                {[1, 2, 3, 4, 5].map((i) => (
+                    <View
+                        key={i}
+                        style={[
+                            styles.playerCard,
+                            cardSurface,
+                            { flexDirection: 'row', alignItems: 'center', padding: 12 }
+                        ]}
+                    >
+                        <Skeleton width={44} height={44} borderRadius={12} />
+                        <View style={{ flex: 1, marginLeft: 12, gap: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Skeleton width={120} height={14} borderRadius={4} />
+                                <Skeleton width={32} height={14} borderRadius={4} />
+                            </View>
+                            <Skeleton width={80} height={11} borderRadius={4} />
+                            <Skeleton width={110} height={11} borderRadius={4} />
+                        </View>
+                        <Skeleton width={32} height={32} borderRadius={16} />
+                    </View>
+                ))}
+            </View>
+        </ScrollView>
     );
 }
 
