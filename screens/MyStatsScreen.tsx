@@ -32,7 +32,6 @@ import { useAuthStore } from '../store/useAuthStore';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
 import FifaPlayerCard from '../components/FifaPlayerCard';
-import PlayerCardZoomModal from '../components/PlayerCardZoomModal';
 import PlayerComparisonModal from '../components/PlayerComparisonModal';
 import { aiScoutService, PlayerAiStats } from '../services/aiScoutService';
 import { useTranslation } from 'react-i18next';
@@ -166,8 +165,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
-    const [showCardZoomModal, setShowCardZoomModal] = useState(false);
-    const [showComparisonModal, setShowComparisonModal] = useState(false);
+        const [showComparisonModal, setShowComparisonModal] = useState(false);
     const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
 
     // Export State & ViewShot Ref
@@ -788,49 +786,19 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 )}
             </View>
 
-            {/* 3D FIFA / EA FC PLAYER CARD */}
+            {/* FIFA / EA FC PLAYER CARD (STATIC) */}
             <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14, alignItems: 'center', paddingVertical: 18 }]}>
                 <View style={[styles.sectionCardHeader, { width: '100%', borderBottomColor: homeColors.border, marginBottom: 14 }]}>
-                    <Ionicons name="sparkles-outline" size={17} color={homeColors.textPrimary} />
+                    <Ionicons name="shield-checkmark-outline" size={17} color={homeColors.textPrimary} />
                     <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.player_card_title', 'O\'YINCHI KARTASI')}</Text>
                 </View>
 
                 <FifaPlayerCard
                     player={player}
                     size="lg"
-                    interactive3D={true}
-                    showPlayStyles={true}
-                    onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setShowCardZoomModal(true);
-                    }}
-                />
-
-                <Text style={{ color: homeColors.textSecondary, fontSize: 11, fontWeight: '600', marginTop: 12, textAlign: 'center' }}>
-                    {t('stats.card_tap_hint', 'Kattalashtirish va 3D ko\'rish uchun kartaga bosing')}
-                </Text>
-
-                {aiStats?.aiScoutSummary ? (
-                    <View style={[styles.aiScoutPill, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)', borderColor: homeColors.border }]}>
-                        <Ionicons name="sparkles" size={15} color={homeColors.textPrimary} />
-                        <Text style={[styles.aiScoutText, { color: homeColors.textPrimary }]}>
-                            {aiStats.aiScoutSummary}
-                        </Text>
-                    </View>
-                ) : null}
-            </View>
-
-            {/* 3D SPIDER / RADAR POLYGON CHART */}
-            <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14, alignItems: 'center', paddingVertical: 18 }]}>
-                <View style={[styles.sectionCardHeader, { width: '100%', borderBottomColor: homeColors.border, marginBottom: 12 }]}>
-                    <Ionicons name="pie-chart-outline" size={17} color={homeColors.textPrimary} />
-                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>3D ATRIBUTLAR RADARI</Text>
-                </View>
-
-                <PlayerRadarChart
-                    player1={player}
-                    player1Name={playerNameFull}
-                    size={Math.min(width - 64, 310)}
+                    interactive3D={false}
+                    showPlayStyles={false}
+                    showAttributes={false}
                 />
 
                 <TouchableOpacity
@@ -1055,7 +1023,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                 >
                                     <Ionicons name="create-outline" size={18} color={homeColors.textPrimary} />
                                 </TouchableOpacity>
-
                                 <TouchableOpacity
                                     style={[styles.iconBtn, cardSurface]}
                                     onPress={() => {
@@ -1064,16 +1031,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                     }}
                                 >
                                     <Ionicons name="git-compare-outline" size={18} color={homeColors.textPrimary} />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.iconBtn, cardSurface]}
-                                    onPress={() => {
-                                        Haptics.selectionAsync().catch(() => {});
-                                        setShowCardZoomModal(true);
-                                    }}
-                                >
-                                    <Ionicons name="sparkles-outline" size={18} color={homeColors.textPrimary} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -1353,12 +1310,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
             />
 
             {/* ZOOM MODAL */}
-            <PlayerCardZoomModal
-                visible={showCardZoomModal}
-                onClose={() => setShowCardZoomModal(false)}
-                player={player}
-            />
-
             {/* POSTER VIEWSHOT MODAL */}
             <Modal visible={showExportModal} transparent animationType="fade" onRequestClose={() => setShowExportModal(false)}>
                 <View style={[styles.exportModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
