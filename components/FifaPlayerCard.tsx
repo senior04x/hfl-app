@@ -395,19 +395,26 @@ export default function FifaPlayerCard({
         outputRange: ['-30deg', '30deg'],
     });
 
-    const playerName = player?.name || player?.full_name || (player?.first_name ? `${player.first_name} ${player.last_name || ''}` : 'AMATORA');
-    const cleanName = playerName.trim().toUpperCase();
-    const isVeryLong = cleanName.length > 20;
-    const isLong = cleanName.length > 14;
+    let firstName = (player?.firstName || player?.first_name || '').trim().toUpperCase();
+    let lastName = (player?.lastName || player?.last_name || '').trim().toUpperCase();
+    if (!firstName && !lastName) {
+        const raw = (player?.name || player?.full_name || 'AMATORA').trim().toUpperCase();
+        const parts = raw.split(/\s+/);
+        firstName = parts[0] || 'AMATORA';
+        lastName = parts.slice(1).join(' ') || '';
+    }
+    const maxLen = Math.max(firstName.length, lastName.length);
+    const isVeryLong = maxLen > 13;
+    const isLong = maxLen > 9;
     const dynamicNameFont = isVeryLong
-        ? L.nameFont * 0.72
+        ? L.nameFont * 0.78
         : isLong
-        ? L.nameFont * 0.84
+        ? L.nameFont * 0.88
         : L.nameFont;
     const dynamicNameLineH = isVeryLong
-        ? L.nameLineH * 0.82
+        ? L.nameLineH * 0.85
         : isLong
-        ? L.nameLineH * 0.9
+        ? L.nameLineH * 0.92
         : L.nameLineH;
 
     const avatarUri = player?.avatar || player?.photo || player?.photo_url || player?.image_url;
@@ -608,7 +615,7 @@ export default function FifaPlayerCard({
                             </View>
                         </View>
 
-                        {/* Middle: Player Name Plaque */}
+                        {/* Middle: Player Name Plaque (2 Lines: First Name & Last Name) */}
                         <View style={[styles.bottomInfoSection, { marginTop: L.gapHeroToName }]}>
                             <View style={styles.namePlateWrapper}>
                                 <LinearGradient
@@ -618,9 +625,9 @@ export default function FifaPlayerCard({
                                     style={[styles.namePlateGradient, { paddingVertical: L.namePadV }]}
                                 >
                                     <Text
-                                        numberOfLines={2}
+                                        numberOfLines={1}
                                         adjustsFontSizeToFit={true}
-                                        minimumFontScale={0.65}
+                                        minimumFontScale={0.7}
                                         style={[
                                             styles.playerNameText,
                                             {
@@ -631,8 +638,27 @@ export default function FifaPlayerCard({
                                             },
                                         ]}
                                     >
-                                        {cleanName}
+                                        {firstName}
                                     </Text>
+                                    {!!lastName && (
+                                        <Text
+                                            numberOfLines={1}
+                                            adjustsFontSizeToFit={true}
+                                            minimumFontScale={0.7}
+                                            style={[
+                                                styles.playerNameText,
+                                                {
+                                                    fontSize: dynamicNameFont,
+                                                    lineHeight: dynamicNameLineH,
+                                                    color: theme.textPrimary,
+                                                    width: '100%',
+                                                    marginTop: 1,
+                                                },
+                                            ]}
+                                        >
+                                            {lastName}
+                                        </Text>
+                                    )}
                                 </LinearGradient>
                             </View>
                         </View>
