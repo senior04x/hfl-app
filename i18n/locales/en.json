@@ -425,7 +425,22 @@
     "goals": "Goals",
     "assists": "Assists",
     "matches_played": "Matches",
-    "rating": "Rating"
+    "rating": "Rating",
+    "cards": "Cards",
+    "free_agent": "Free Agent",
+    "compare_vs": "Compare with another (VS)",
+    "share_fifa_card": "Share FIFA Card",
+    "share_fifa_card_title": "Share FIFA Card",
+    "share_card_btn": "Share / Save",
+    "preparing_card": "Preparing card...",
+    "card_ready": "Card is ready!",
+    "no_matches": "No match history available",
+    "player_not_found": "Player not found",
+    "amatora_league": "Amatora League",
+    "gold_stat": "Goal",
+    "assist_stat": "Ast",
+    "matches_stat": "Apps",
+    "cards_stat": "Cards"
   },
   "applications": {
     "title": "MY APPLICATIONS",

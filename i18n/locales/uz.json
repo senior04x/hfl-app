@@ -425,7 +425,22 @@
     "goals": "Gollar",
     "assists": "Assistlar",
     "matches_played": "O'yinlar",
-    "rating": "Reyting"
+    "rating": "Reyting",
+    "cards": "Karta",
+    "free_agent": "Erkin agent",
+    "compare_vs": "Boshqasi bilan taqqoslash (VS)",
+    "share_fifa_card": "FIFA kartasini ulashish",
+    "share_fifa_card_title": "FIFA kartasini ulashish",
+    "share_card_btn": "Ulashish / Saqlash",
+    "preparing_card": "Karta tayyorlanmoqda...",
+    "card_ready": "Karta tayyor!",
+    "no_matches": "O'yinlar tarixi mavjud emas",
+    "player_not_found": "O'yinchi topilmadi",
+    "amatora_league": "Amatora liga",
+    "gold_stat": "Gol",
+    "assist_stat": "Asist",
+    "matches_stat": "O'yin",
+    "cards_stat": "Karta"
   },
   "applications": {
     "title": "MENING ARIZALARIM",

@@ -635,7 +635,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 >
                     <Ionicons name="git-compare-outline" size={16} color={isDark ? '#000000' : '#FFFFFF'} />
                     <Text style={[styles.compareBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
-                        BOSHQASI BILAN TAQQOSLASH (VS)
+                        {t('stats.compare_vs', 'BOSHQASI BILAN TAQQOSLASH (VS)').toUpperCase()}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -691,7 +691,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     <View style={{ flex: 1, marginLeft: 12 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <Text style={[styles.careerTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                {(currentTeamName || 'ERKIN AGENT').toUpperCase()}
+                                {(currentTeamName || t('stats.free_agent', 'ERKIN AGENT')).toUpperCase()}
                             </Text>
                             <View style={[styles.currentTeamBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
                                 <View style={[styles.pulsingDot, { backgroundColor: '#10B981' }]} />
@@ -796,7 +796,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 ) : (
                     <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
                         <Ionicons name="football-outline" size={32} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
-                        <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 8, fontWeight: '600' }}>O'yinlar tarixi mavjud emas</Text>
+                        <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 8, fontWeight: '600' }}>{t('stats.no_matches', "O'yinlar tarixi mavjud emas")}</Text>
                     </View>
                 )}
             </View>
@@ -882,7 +882,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                                         <SmartImage uri={currentTeamLogo} style={{ width: 14, height: 14 }} contentFit="contain" fallbackIcon="shield-outline" />
                                     ) : null}
                                     <Text style={[styles.playerTeamName, { color: homeColors.textSecondary }]} numberOfLines={1}>
-                                        {(currentTeamName || 'ERKIN AGENT').toUpperCase()}
+                                        {(currentTeamName || t('stats.free_agent', 'ERKIN AGENT')).toUpperCase()}
                                     </Text>
                                 </View>
 

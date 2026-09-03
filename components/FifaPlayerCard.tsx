@@ -22,6 +22,7 @@ import {
     getCardRarity,
     getLocalizedStatLabel,
     getCardPosition,
+    getLocalizedFootballStatLabel,
     getRarityTierLevel,
     CARD_THEMES,
     CardRarity,
@@ -465,6 +466,9 @@ export default function FifaPlayerCard({
     const theme = CARD_THEMES[rarity] || CARD_THEMES.gold;
     const attrs: FifaAttributes = calculateFifaAttributes(player);
     const cardPosition = getCardPosition(player?.position || player?.positionUz, currentLang);
+    const labelGoals = getLocalizedFootballStatLabel('goals', currentLang);
+    const labelAssists = getLocalizedFootballStatLabel('assists', currentLang);
+    const labelMatches = getLocalizedFootballStatLabel('matches', currentLang);
 
     // Reyting balandligiga qarab "qimmatbaho" darajasi (0 = past, 6 = eng yuqori)
     const tierLevel = getRarityTierLevel(rarity);

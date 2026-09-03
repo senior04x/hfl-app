@@ -288,6 +288,21 @@ export function getLocalizedStatLabel(key: 'pac' | 'sho' | 'pas' | 'dri' | 'def'
 /**
  * Returns localized full position for Player Card (DARVOZABON / НАПАДАЮЩИЙ / GOALKEEPER etc.).
  */
+
+/**
+ * Returns localized football metric labels (GOL, ASIST, O'YIN) for 3 languages (UZ, RU, EN).
+ */
+export function getLocalizedFootballStatLabel(key: 'goals' | 'assists' | 'matches', lang: string = 'uz'): string {
+    const isUz = lang === 'uz';
+    const isRu = lang === 'ru';
+    switch (key) {
+        case 'goals': return isUz ? 'GOL' : isRu ? 'ГОЛ' : 'GOAL';
+        case 'assists': return isUz ? 'ASIST' : isRu ? 'ПАС' : 'AST';
+        case 'matches': return isUz ? "O'YIN" : isRu ? 'ИГРЫ' : 'APPS';
+        default: return (key as string).toUpperCase();
+    }
+}
+
 export function getCardPosition(rawPos: string | undefined | null, lang: string = 'uz'): string {
     const key = normalizePosition(rawPos);
     const isUz = lang === 'uz';

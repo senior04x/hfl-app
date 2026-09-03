@@ -425,7 +425,22 @@
     "goals": "Голы",
     "assists": "Ассисты",
     "matches_played": "Матчи",
-    "rating": "Рейтинг"
+    "rating": "Рейтинг",
+    "cards": "Карточки",
+    "free_agent": "Свободный агент",
+    "compare_vs": "Сравнить с другим (VS)",
+    "share_fifa_card": "Поделиться FIFA картой",
+    "share_fifa_card_title": "Поделиться FIFA картой",
+    "share_card_btn": "Поделиться / Сохранить",
+    "preparing_card": "Карта готовится...",
+    "card_ready": "Карта готова!",
+    "no_matches": "История матчей отсутствует",
+    "player_not_found": "Игрок не найден",
+    "amatora_league": "Лига Amatora",
+    "gold_stat": "Гол",
+    "assist_stat": "Пас",
+    "matches_stat": "Игры",
+    "cards_stat": "Карты"
   },
   "applications": {
     "title": "МОИ ЗАЯВКИ",
