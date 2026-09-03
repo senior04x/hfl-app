@@ -1164,25 +1164,8 @@ export default function StoryViewerModal({
                     </Text>
                   </View>
 
-                  {/* Action Buttons (Right side: [+ agar o'zining jamoasi bo'lsa], Share & Like) */}
+                  {/* Action Buttons (Right side: Share & Like) */}
                   <View style={styles.socialActionsGroup}>
-                    {/* "+" Story qo'shish (faqat o'zining jamoasi story'sini ko'rayotganda) */}
-                    {currentGroup.isOwn && (
-                      <TouchableOpacity
-                        style={styles.socialAddBtn}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                          setIsPaused(true);
-                          setPickerVisible(true);
-                          if (onAddStoryPress) onAddStoryPress();
-                        }}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                      >
-                        <Ionicons name="add-circle-outline" size={24} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    )}
-
                     {/* Share Button */}
                     <TouchableOpacity
                       style={styles.socialIconBtn}
@@ -1229,27 +1212,6 @@ export default function StoryViewerModal({
             )}
           </Animated.View>
         </Animated.View>
-
-        {/* INLINE REPLAY PICKER SHEET (Directly inside StoryViewerModal so story never closes!) */}
-        {pickerVisible && (
-          <TeamStoryReplayPickerModal
-            visible={pickerVisible}
-            useNativeModal={false}
-            teamId={currentGroup.teamId || (user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null))}
-            teamName={currentGroup.title}
-            selectedByPhone={user?.phone || user?.phoneNumber || user?.phone_number || user?.tel}
-            activeReplayEventIds={(currentGroup.items || []).map((i) => i.eventId).filter(Boolean) as any[]}
-            onClose={() => {
-              setPickerVisible(false);
-              setIsPaused(false);
-            }}
-            onAdded={() => {
-              setPickerVisible(false);
-              setIsPaused(false);
-              if (onStoryAdded) onStoryAdded();
-            }}
-          />
-        )}
       </View>
     </Modal>
   );

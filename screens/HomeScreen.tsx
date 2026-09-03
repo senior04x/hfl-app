@@ -301,14 +301,7 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     const handleSelectStoryGroup = async (group: StoryGroup, index: number) => {
-        // O'zining jamoasi halqasi, lekin hali birorta story qo'yilmagan bo'lsa
-        // ("+" holati) — viewer o'rniga to'g'ridan-to'g'ri replay-tanlash
-        // modal'ini ochamiz.
-        if (group.isOwn && (!group.items || group.items.length === 0)) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-            setStoryPickerVisible(true);
-            return;
-        }
+        if (!group.items || group.items.length === 0) return;
         setSelectedStoryIndex(index);
         setStoryModalVisible(true);
         await handleStoryGroupViewed(group.id);
@@ -1147,16 +1140,7 @@ export default function HomeScreen({ navigation }: any) {
                     onStoryAdded={handleStoryAdded}
                 />
 
-                {/* Story qo'shish/tanlash — Home ekrandagi bo'sh "+" halqasi bosilganda ochiladi */}
-                <TeamStoryReplayPickerModal
-                    visible={storyPickerVisible}
-                    teamId={ownTeamId}
-                    teamName={storyGroups.find(g => g.isOwn)?.title || userProfile?.name || userProfile?.team_name}
-                    selectedByPhone={user?.phone || user?.phoneNumber || user?.phone_number || user?.tel}
-                    activeReplayEventIds={(storyGroups.find(g => g.isOwn)?.items || []).map(i => i.eventId).filter(Boolean) as any[]}
-                    onClose={() => setStoryPickerVisible(false)}
-                    onAdded={handleStoryAdded}
-                />
+
             </SafeAreaView>
         </View>
     );

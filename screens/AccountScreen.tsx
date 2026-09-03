@@ -512,12 +512,6 @@ export default function AccountScreen({ navigation }: any) {
                                                     title={t('profile.edit_team_info', 'Jamoa ma\'lumotlarini tahrirlash')}
                                                     onPress={() => navigation.navigate('MyTeam', { teamId: currentTeamId, autoOpenEdit: true })}
                                                 />
-                                                <SettingRow
-                                                    icon="film-outline"
-                                                    title={t('stories.add_story', 'Story qo\'shish')}
-                                                    value={ownActiveReplayIds.length > 0 ? `${ownActiveReplayIds.length} ${t('tournaments.active', 'faol')}` : ''}
-                                                    onPress={() => setStoryPickerVisible(true)}
-                                                />
                                             </>
                                         )}
                                         <SettingRow
@@ -633,18 +627,7 @@ export default function AccountScreen({ navigation }: any) {
                     onSelect={handleSelectOrganizationForApply}
                 />
 
-                {/* Story Picker Modal */}
-                {currentTeamId && (
-                    <TeamStoryReplayPickerModal
-                        visible={storyPickerVisible}
-                        teamId={currentTeamId}
-                        teamName={detailedData?.name || detailedData?.team_name || user?.teamName || user?.name}
-                        selectedByPhone={user?.phone || user?.phoneNumber || user?.phone_number || user?.tel}
-                        activeReplayEventIds={ownActiveReplayIds}
-                        onClose={() => setStoryPickerVisible(false)}
-                        onAdded={handleStoryPickerAdded}
-                    />
-                )}
+
 
                 {/* Logout Confirmation Modal */}
                 <Modal

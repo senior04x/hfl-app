@@ -490,18 +490,23 @@ export const storyService = {
 
     const groups: StoryGroup[] = [];
 
-    // O'z jamoasi HAR DOIM birinchi — story bor-yo'qligidan qat'iy nazar
-    // (story yo'q bo'lsa "+" halqasi sifatida, bor bo'lsa oddiy halqa sifatida).
-    if (ownIdStr) {
+    // Faqat haqiqiy faol story'lari (items > 0) bor jamoalarni ko'rsatamiz (bo'sh "+" halqasi chiqarilmaydi)
+    if (ownIdStr && byTeam.has(ownIdStr)) {
       const ownTeam = teamsById.get(ownIdStr);
-      if (ownTeam) groups.push(buildGroupForTeam(ownTeam));
+      if (ownTeam) {
+        const ownGrp = buildGroupForTeam(ownTeam);
+        if (ownGrp.items && ownGrp.items.length > 0) groups.push(ownGrp);
+      }
     }
 
     const orderedOtherTeams = (teamsWithPoints || [])
       .filter((t: any) => String(t.id ?? t._id) !== ownIdStr && byTeam.has(String(t.id ?? t._id)))
       .sort((a: any, b: any) => (b.points || 0) - (a.points || 0));
 
-    orderedOtherTeams.forEach((t: any) => groups.push(buildGroupForTeam(t)));
+    orderedOtherTeams.forEach((t: any) => {
+      const otherGrp = buildGroupForTeam(t);
+      if (otherGrp.items && otherGrp.items.length > 0) groups.push(otherGrp);
+    });
 
     return groups;
   },

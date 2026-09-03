@@ -74,7 +74,8 @@ export default function MatchStoriesTray({
   const { isDark } = useThemeStore();
   const homeColors = getHomeScreenColors(isDark);
 
-  if (!stories || stories.length === 0) return null;
+  const visibleStories = (stories || []).filter(g => g && g.items && g.items.length > 0);
+  if (visibleStories.length === 0) return null;
 
   const handlePress = (group: StoryGroup, index: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -88,7 +89,7 @@ export default function MatchStoriesTray({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {stories.map((group, index) => {
+        {visibleStories.map((group, index) => {
           const isLive = group.isLive;
           const isViewed = group.isViewed;
           const isOwnEmpty = !!group.isOwn && (!group.items || group.items.length === 0);
