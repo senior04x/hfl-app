@@ -673,7 +673,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 .insert([{
                     organization_id: targetOrgId,
                     team_id: null,
-                    type: 'player',
                     first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
                     last_name: updateForm.lastName || player?.last_name || '',
                     father_name: updateForm.fatherName || player?.father_name || '',
@@ -694,7 +693,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     .insert([{
                         organization_id: targetOrgId,
                         team_id: null,
-                        type: 'player',
                         first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
                         last_name: updateForm.lastName || player?.last_name || '',
                         father_name: updateForm.fatherName || player?.father_name || '',
