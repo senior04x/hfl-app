@@ -363,7 +363,8 @@
     "pending_application_msg": "Sizda ko'rib chiqilayotgan faol ariza mavjud. Administrator tasdiqlashini kuting.",
     "cooldown_title": "Ariza topshirish cheklovi",
     "cooldown_badge": "3 HAFTALIK CHEKLOV",
-    "cooldown_msg": "Siz yaqinda ma'lumotlarni o'zgartirish uchun ariza topshirgansiz. Qayta ariza topshirish uchun {{time}} dan so'ng urinib ko'ring."
+    "cooldown_msg": "Siz yaqinda ma'lumotlarni o'zgartirish uchun ariza topshirgansiz. Qayta ariza topshirish uchun {{time}} dan so'ng urinib ko'ring.",
+    "submit_cooldown_notice": "Eslatma: Ariza yuborilgandan so'ng qayta o'zgartirish 3 haftadan keyin mumkin bo'ladi."
   },
   "settings": {
     "title": "Sozlamalar",

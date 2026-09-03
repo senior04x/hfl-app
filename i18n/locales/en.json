@@ -363,7 +363,8 @@
     "pending_application_msg": "You have an active pending application under review. Please wait for administrator approval.",
     "cooldown_title": "Application Cooldown",
     "cooldown_badge": "3-WEEK COOLDOWN",
-    "cooldown_msg": "You recently submitted a profile update request. You can apply again in {{time}}."
+    "cooldown_msg": "You recently submitted a profile update request. You can apply again in {{time}}.",
+    "submit_cooldown_notice": "Note: After submitting, profile changes can only be requested again after 3 weeks."
   },
   "settings": {
     "title": "Settings",

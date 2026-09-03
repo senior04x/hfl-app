@@ -1970,8 +1970,39 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                     </View>
                                 </View>
 
+                                {/* 3-Week Cooldown Notice Banner */}
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 7,
+                                        marginTop: 14,
+                                        marginBottom: 2,
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 8,
+                                        borderRadius: 12,
+                                        backgroundColor: isDark ? 'rgba(234, 179, 8, 0.08)' : 'rgba(234, 179, 8, 0.06)',
+                                        borderWidth: 1,
+                                        borderColor: isDark ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 179, 8, 0.15)',
+                                        width: '100%',
+                                    }}
+                                >
+                                    <Ionicons name="information-circle-outline" size={16} color="#EAB308" />
+                                    <Text
+                                        style={{
+                                            flex: 1,
+                                            fontSize: 11.5,
+                                            lineHeight: 16,
+                                            fontWeight: '600',
+                                            color: isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.65)',
+                                        }}
+                                    >
+                                        {t('profile.submit_cooldown_notice', "Eslatma: Ariza yuborilgandan so'ng qayta o'zgartirish 3 haftadan keyin mumkin bo'ladi.")}
+                                    </Text>
+                                </View>
+
                                 {/* Slide To Send Button inside Scrollable Form */}
-                                <View style={{ marginTop: 16, marginBottom: 4, alignItems: 'center', width: '100%' }}>
+                                <View style={{ marginTop: 12, marginBottom: 4, alignItems: 'center', width: '100%' }}>
                                     <SlideButton
                                         title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
                                         loadingTitle={t('common.loading', 'Yuborilmoqda...')}
