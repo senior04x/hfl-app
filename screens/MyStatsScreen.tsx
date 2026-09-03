@@ -304,6 +304,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
     const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [openingInstagram, setOpeningInstagram] = useState(false);
 
     // Profile Update & Modals

@@ -15,6 +15,7 @@ import {
     Alert,
     Modal,
     PanResponder,
+    RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -50,9 +51,23 @@ const extractPlayerData = (data: any) => {
         if (metaMatch?.[1]) {
             try {
                 const obj = JSON.parse(metaMatch[1]);
-                if (obj.citizenship && !citizenship) citizenship = obj.citizenship;
-                if (obj.height && !height) height = obj.height;
-                if (obj.weight && !weight) weight = obj.weight;
+                if (obj.citizenship) citizenship = obj.citizenship;
+                if (obj.height) height = String(obj.height);
+                if (obj.weight) weight = String(obj.weight);
+            } catch (e) {}
+        }
+
+        if (data.comment.includes('[PROFILE_UPDATE]')) {
+            try {
+                const parts = data.comment.split('[PROFILE_UPDATE]');
+                let jsonStr = parts[1] || '';
+                const tagIdx = jsonStr.indexOf(' [');
+                if (tagIdx !== -1) jsonStr = jsonStr.substring(0, tagIdx);
+                const pObj = JSON.parse(jsonStr.trim());
+                const target = pObj.newData || pObj;
+                if (target.citizenship && !citizenship) citizenship = target.citizenship;
+                if (target.height && !height) height = String(target.height);
+                if (target.weight && !weight) weight = String(target.weight);
             } catch (e) {}
         }
 
@@ -66,7 +81,7 @@ const extractPlayerData = (data: any) => {
 
     return {
         ...data,
-        citizenship,
+        citizenship: citizenship || "O'zbekiston",
         height,
         weight,
         fatherName: data.fatherName || data.father_name || '',
@@ -278,6 +293,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [openingInstagram, setOpeningInstagram] = useState(false);
     const [showComparisonModal, setShowComparisonModal] = useState(false);
         const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
@@ -494,6 +510,20 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         }
     };
 
+    const onRefresh = async () => {
+        setRefreshing(true);
+        try {
+            await Promise.all([
+                fetchPlayer(),
+                fetchPlayerMatches(),
+            ]);
+        } catch (error) {
+            console.error('Error refreshing player stats:', error);
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
     const fetchPlayerMatches = async () => {
         try {
             setMatchesLoading(true);
@@ -509,8 +539,10 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     useEffect(() => {
         if (playerId) {
             fetchPlayer();
+            fetchPlayerMatches();
         } else {
             setLoading(false);
+            setMatchesLoading(false);
         }
     }, [playerId]);
 
@@ -841,44 +873,148 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     );
 
     const renderMatches = () => (
-        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-            <View style={[styles.infoSectionCard, cardSurface]}>
-                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
-                    <Ionicons name="football-outline" size={17} color={homeColors.textPrimary} />
-                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.past_matches', 'O\'YINLAR TARIXI').toUpperCase()}</Text>
-                </View>
-
-                {matchesLoading ? (
-                    <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 24 }} />
-                ) : matches.length > 0 ? (
-                    matches.map((match: any, idx: number) => (
-                        <View key={match.id || match._id || idx} style={[styles.matchRowItem, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: homeColors.border }]}>
-                            <View style={styles.matchRowTop}>
-                                <Text style={[styles.matchRowLeague, { color: homeColors.textSecondary }]}>{match.leagueName || 'AMATORA LIGA'}</Text>
-                                <Text style={[styles.matchRowDate, { color: homeColors.textSecondary }]}>{new Date(match.date || match.match_date || Date.now()).toLocaleDateString('uz-UZ')}</Text>
-                            </View>
-                            <View style={styles.matchTeamsRow}>
-                                <View style={styles.teamCol}>
-                                    <SmartImage uri={match.homeTeam?.logo || match.homeTeamLogo} style={styles.teamMiniLogo} contentFit="contain" fallbackIcon="shield-outline" />
-                                    <Text style={[styles.teamNameMatch, { color: homeColors.textPrimary }]} numberOfLines={1}>{match.homeTeam?.name || match.homeTeamName || 'Jamoa A'}</Text>
-                                </View>
-                                <View style={[styles.scoreBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
-                                    <Text style={[styles.scoreText, { color: homeColors.textPrimary }]}>{match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}</Text>
-                                </View>
-                                <View style={styles.teamCol}>
-                                    <SmartImage uri={match.awayTeam?.logo || match.awayTeamLogo} style={styles.teamMiniLogo} contentFit="contain" fallbackIcon="shield-outline" />
-                                    <Text style={[styles.teamNameMatch, { color: homeColors.textPrimary }]} numberOfLines={1}>{match.awayTeam?.name || match.awayTeamName || 'Jamoa B'}</Text>
-                                </View>
-                            </View>
+        <ScrollView
+            style={styles.tabContent}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={homeColors.textPrimary}
+                    colors={[homeColors.accent || '#F59E0B']}
+                />
+            }
+        >
+            {matchesLoading ? (
+                [1, 2, 3, 4].map((key) => (
+                    <View
+                        key={key}
+                        style={[
+                            styles.hMatchCard,
+                            cardSurface,
+                            { opacity: 0.5 }
+                        ]}
+                    >
+                        <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ width: '35%', height: 14, backgroundColor: homeColors.surface, borderRadius: 4 }} />
+                            <View style={{ width: 40, height: 16, backgroundColor: homeColors.surface, borderRadius: 6 }} />
+                            <View style={{ width: '35%', height: 14, backgroundColor: homeColors.surface, borderRadius: 4 }} />
                         </View>
-                    ))
-                ) : (
-                    <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="football-outline" size={32} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
-                        <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 8, fontWeight: '600' }}>{t('stats.no_matches', "O'yinlar tarixi mavjud emas")}</Text>
                     </View>
-                )}
-            </View>
+                ))
+            ) : matches.length > 0 ? (
+                matches.map((match: any) => {
+                    const st = String(match.status || '').toLowerCase().trim();
+                    const matchIsLive = ['live', 'first_half', 'second_half', 'half_time', 'halftime', 'ongoing', 'in_progress', '1st_half', '2nd_half', '1-taym', '2-taym', 'tanaffus'].includes(st);
+                    const matchIsFinished = ['finished', 'completed', 'ended', 'tugadi'].includes(st);
+                    const rawDate = match.date || match.match_date;
+                    const matchDate = new Date(rawDate);
+                    const isValidDate = !isNaN(matchDate.getTime());
+                    const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
+                    const day = isValidDate ? matchDate.getDate() : '';
+                    const month = isValidDate ? months[matchDate.getMonth()] : '';
+                    let formattedTime = String(match.match_time || match.time || '').trim();
+                    if (formattedTime.includes(':')) {
+                        const timeParts = formattedTime.split(':');
+                        formattedTime = `${timeParts[0].padStart(2, '0')}:${(timeParts[1] || '00').padStart(2, '0')}`;
+                    }
+                    if (!formattedTime && isValidDate) {
+                        const hrs = String(matchDate.getHours()).padStart(2, '0');
+                        const mins = String(matchDate.getMinutes()).padStart(2, '0');
+                        if (hrs !== '00' || mins !== '00') formattedTime = `${hrs}:${mins}`;
+                    }
+                    if (!formattedTime) formattedTime = '18:00';
+
+                    return (
+                        <TouchableOpacity
+                            key={match.id || match._id}
+                            style={[
+                                styles.hMatchCard,
+                                cardSurface,
+                                matchIsLive && { borderColor: homeColors.accent }
+                            ]}
+                            onPress={() => navigation.navigate('MatchDetail', { matchId: match.id || match._id })}
+                            activeOpacity={0.85}
+                        >
+                            <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    {/* CHAP: Uy jamoasi */}
+                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, paddingRight: 8 }}>
+                                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
+                                            {match.homeTeamName || match.homeTeam?.name || match.home_team?.name || t('matches.home_short', 'UY')}
+                                        </Text>
+                                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                                            <SmartImage
+                                                uri={match.homeTeamLogo || match.homeTeam?.logo || match.home_team?.logo_url}
+                                                style={{ width: 20, height: 20 }}
+                                                contentFit="contain"
+                                                fallbackIcon="shield-outline"
+                                            />
+                                        </View>
+                                    </View>
+
+                                    {/* O'RTA: Hisob yoki vaqt */}
+                                    <View style={{ width: 72, alignItems: 'center' }}>
+                                        {(matchIsLive || matchIsFinished) ? (
+                                            <View style={{ alignItems: 'center' }}>
+                                                <Text style={{ fontSize: 20, fontWeight: '900', color: homeColors.textPrimary, letterSpacing: -0.5 }}>
+                                                    {match.score?.home ?? match.home_score ?? 0} - {match.score?.away ?? match.away_score ?? 0}
+                                                </Text>
+                                                {matchIsLive && (
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                                                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: homeColors.accent }} />
+                                                        <Text style={{ fontSize: 8, fontWeight: '700', color: homeColors.accent, letterSpacing: 0.3 }}>LIVE</Text>
+                                                    </View>
+                                                )}
+                                                {!!(match.round || match.tour) && (
+                                                    <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 2 }}>
+                                                        {match.round || match.tour}-{t('teams.tour_short', 'tur')}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        ) : (
+                                            <View style={{ alignItems: 'center' }}>
+                                                <Text style={{ fontSize: 15, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
+                                                    {formattedTime}
+                                                </Text>
+                                                <Text style={{ fontSize: 8.5, color: homeColors.textSecondary, marginTop: 1 }}>
+                                                    {day} {month}
+                                                </Text>
+                                                {!!(match.round || match.tour) && (
+                                                    <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 1 }}>
+                                                        {match.round || match.tour}-{t('teams.tour_short', 'tur')}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    {/* O'NG: Mehmon jamoa */}
+                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 6, paddingLeft: 8 }}>
+                                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                                            <SmartImage
+                                                uri={match.awayTeamLogo || match.awayTeam?.logo || match.away_team?.logo_url}
+                                                style={{ width: 20, height: 20 }}
+                                                contentFit="contain"
+                                                fallbackIcon="shield-outline"
+                                            />
+                                        </View>
+                                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
+                                            {match.awayTeamName || match.awayTeam?.name || match.away_team?.name || t('matches.away_short', 'MEH')}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })
+            ) : (
+                <View style={[styles.emptyState, cardSurface]}>
+                    <Ionicons name="football-outline" size={24} color={homeColors.textSecondary} />
+                    <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>{t('teams.no_matches', "O'yinlar tarixi mavjud emas")}</Text>
+                </View>
+            )}
         </ScrollView>
     );
 
@@ -1423,6 +1559,22 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
 
+    hMatchCard: {
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    emptyState: {
+        padding: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    emptyStateText: {
+        fontSize: 13,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
     matchRowItem: {
         paddingVertical: 12,
     },
