@@ -133,6 +133,9 @@ export interface PitchPlayer {
     y: number; // 0 to 100 percentage
 }
 
+// Global in-memory cache to guarantee 0ms instant render without skeleton flash
+const globalFormationMemoryCache: Record<string, any> = {};
+
 export default function FormationBoard({ route, navigation }: any) {
     const { t } = useTranslation();
     const { teamId, isReadOnly: initialReadOnly = false } = route.params || {};
@@ -154,16 +157,19 @@ export default function FormationBoard({ route, navigation }: any) {
             shadowRadius: 6,
         };
 
-    const [loading, setLoading] = useState(true);
-    const [playersOnPitch, setPlayersOnPitch] = useState<PitchPlayer[]>([]);
-    const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
+    const targetTeamId = teamId || user?.team_id || user?.teamId;
+    const initialMem = targetTeamId ? globalFormationMemoryCache[targetTeamId] : null;
+
+    const [loading, setLoading] = useState(!initialMem?.players?.length);
+    const [playersOnPitch, setPlayersOnPitch] = useState<PitchPlayer[]>(initialMem?.players || []);
+    const [availablePlayers, setAvailablePlayers] = useState<any[]>(initialMem?.availablePlayers || []);
     const [saving, setSaving] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
     // Format & Preset State
-    const [selectedFormat, setSelectedFormat] = useState<MatchFormat>('8v8');
-    const [selectedPresetId, setSelectedPresetId] = useState<string>('8v8_2-3-2');
+    const [selectedFormat, setSelectedFormat] = useState<MatchFormat>(initialMem?.format || '8v8');
+    const [selectedPresetId, setSelectedPresetId] = useState<string>(initialMem?.presetId || '8v8_2-3-2');
     const { socket } = useSocket();
 
     // Real-time Interactive Swipe-to-Back (Right Swipe)
@@ -340,8 +346,13 @@ export default function FormationBoard({ route, navigation }: any) {
                 const cachedStr = await AsyncStorage.getItem(getFormationCacheKey(targetTeamId));
                 if (cachedStr) {
                     const cached = JSON.parse(cachedStr);
-                    if (cached.players && Array.isArray(cached.players)) {
+                    globalFormationMemoryCache[targetTeamId] = {
+                        ...globalFormationMemoryCache[targetTeamId],
+                        ...cached,
+                    };
+                    if (cached.players && Array.isArray(cached.players) && cached.players.length > 0) {
                         setPlayersOnPitch(cached.players);
+                        setLoading(false);
                     }
                     if (cached.availablePlayers && Array.isArray(cached.availablePlayers)) {
                         setAvailablePlayers(cached.availablePlayers);
@@ -360,7 +371,7 @@ export default function FormationBoard({ route, navigation }: any) {
         }
 
         try {
-            if (!playersOnPitch || playersOnPitch.length === 0) {
+            if ((!playersOnPitch || playersOnPitch.length === 0) && !globalFormationMemoryCache[targetTeamId]?.players?.length) {
                 setLoading(true);
             }
 
@@ -448,6 +459,12 @@ export default function FormationBoard({ route, navigation }: any) {
             }
             // 2. KESHNI YANGILASH (Save fetched data to cache)
             if (targetTeamId) {
+                globalFormationMemoryCache[targetTeamId] = {
+                    players: finalEnrichedFormation.length > 0 ? finalEnrichedFormation : playersOnPitch,
+                    availablePlayers: activeTeamPlayers,
+                    format: detectedFormat,
+                    presetId: detectedPresetId,
+                };
                 AsyncStorage.setItem(getFormationCacheKey(targetTeamId), JSON.stringify({
                     players: finalEnrichedFormation.length > 0 ? finalEnrichedFormation : playersOnPitch,
                     availablePlayers: activeTeamPlayers,
@@ -546,6 +563,13 @@ export default function FormationBoard({ route, navigation }: any) {
                     })).catch(() => {});
                 }).catch(() => {});
 
+                globalFormationMemoryCache[targetId] = {
+                    players: playersOnPitch,
+                    availablePlayers,
+                    format: selectedFormat,
+                    presetId: selectedPresetId,
+                    preset: activePreset.name,
+                };
                 AsyncStorage.setItem(getFormationCacheKey(targetId), JSON.stringify({
                     players: playersOnPitch,
                     availablePlayers,

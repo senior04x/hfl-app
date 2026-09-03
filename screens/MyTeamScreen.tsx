@@ -42,6 +42,9 @@ import { getLocalizedPosition } from '../utils/localizationUtils';
 
 const { width } = Dimensions.get('window');
 
+// Global in-memory cache to guarantee 0ms instant render without skeleton flash
+const globalTeamMemoryCache: Record<string, any> = {};
+
 export default function MyTeamScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { user, unreadCount, isChatMuted } = useAuthStore();
@@ -196,6 +199,10 @@ export default function MyTeamScreen({ route, navigation }: any) {
             const cachedStr = await AsyncStorage.getItem(getTeamCacheKey(currentId));
             if (cachedStr) {
                 const cached = JSON.parse(cachedStr);
+                globalTeamMemoryCache[currentId] = {
+                    ...globalTeamMemoryCache[currentId],
+                    ...cached,
+                };
                 if (cached.team) {
                     setTeam(cached.team);
                     setIsLoading(false);
@@ -220,6 +227,10 @@ export default function MyTeamScreen({ route, navigation }: any) {
                 if (teamData) {
                     setTeam(teamData);
                     setIsLoading(false);
+                    globalTeamMemoryCache[currentId] = {
+                        ...globalTeamMemoryCache[currentId],
+                        team: teamData,
+                    };
                     // Keshga saqlash
                     AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
                         const existing = cStr ? JSON.parse(cStr) : {};
@@ -244,6 +255,10 @@ export default function MyTeamScreen({ route, navigation }: any) {
                     return !isArchived && st === 'approved';
                 });
                 setPlayers(activeTeamPlayers);
+                globalTeamMemoryCache[currentId] = {
+                    ...globalTeamMemoryCache[currentId],
+                    players: activeTeamPlayers,
+                };
                 // Keshga saqlash
                 AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
                     const existing = cStr ? JSON.parse(cStr) : {};
@@ -259,6 +274,10 @@ export default function MyTeamScreen({ route, navigation }: any) {
             .then((matchesData) => {
                 const sliced = matchesData?.slice(0, 8) || [];
                 setMatches(sliced);
+                globalTeamMemoryCache[currentId] = {
+                    ...globalTeamMemoryCache[currentId],
+                    matches: sliced,
+                };
                 // Keshga saqlash
                 AsyncStorage.getItem(getTeamCacheKey(currentId)).then((cStr) => {
                     const existing = cStr ? JSON.parse(cStr) : {};
