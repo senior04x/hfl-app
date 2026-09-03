@@ -695,12 +695,12 @@ export default function FifaPlayerCard({
                                 </View>
                             )}
 
-                            {/* Micro Amatora Seal Glued exactly 10px below stats row at the absolute bottom */}
+                            {/* Micro Amatora Seal Glued exactly 20px below stats row at the absolute bottom */}
                             <View
                                 style={[
                                     styles.cardFooterBrand,
                                     {
-                                        marginTop: 10,
+                                        marginTop: 20,
                                         height: L.footerH,
                                         justifyContent: 'center',
                                         alignItems: 'center',
