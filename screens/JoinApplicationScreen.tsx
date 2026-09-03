@@ -22,10 +22,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
-import VideoBackground from '../components/VideoBackground';
-import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -296,18 +293,23 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const teamAnimVal = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        loadOrganizations();
+        loadInitialData();
     }, []);
 
-    const loadOrganizations = async () => {
+    const loadInitialData = async () => {
         try {
             const orgs = await apiService.getOrganizations();
-            const availableOrgs = orgs || [];
-            setOrganizations(availableOrgs);
-
-            if (availableOrgs.length > 0) {
-                const firstOrg = availableOrgs[0];
-                handleOrgSelect(firstOrg);
+            setOrganizations(orgs || []);
+            if (orgs && orgs.length > 0) {
+                const firstOrg = orgs[0];
+                setFormData(prev => ({
+                    ...prev,
+                    selectedOrgId: firstOrg.id,
+                    selectedOrgName: firstOrg.name,
+                    selectedOrgLogo: firstOrg.logo_url || firstOrg.logo || ''
+                }));
+                const lData = await apiService.getLeaguesByOrgId(firstOrg.id);
+                setLeagues(lData && lData.length > 0 ? lData : LEAGUE_OPTIONS);
             } else {
                 setFormData(prev => ({ ...prev, selectedOrgId: 1, selectedOrgName: 'Havas Futbol Ligasi' }));
                 const lData = await apiService.getLeaguesByOrgId(1);
@@ -552,7 +554,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
         if (Platform.OS === 'ios') {
             ActionSheetIOS.showActionSheetWithOptions(
                 {
-                    options: ['Медиатека (Galereya)', 'Сделать снимок (Kamera)', 'Bekor qilish'],
+                    options: ['Galereyadan tanlash', 'Kameradan olish', 'Bekor qilish'],
                     cancelButtonIndex: 2,
                     title: 'Rasm yuklash',
                 },
@@ -569,8 +571,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 "Rasm yuklash",
                 "Rasmni qaysi usulda yuklamoqchisiz?",
                 [
-                    { text: "🖼️ Galereya (Медиатека)", onPress: () => openGallery(onPick) },
-                    { text: "📸 Kamera (Сделать снимок)", onPress: () => openCamera(onPick) },
+                    { text: "Galereya", onPress: () => openGallery(onPick) },
+                    { text: "Kamera", onPress: () => openCamera(onPick) },
                     { text: "Bekor qilish", style: "cancel" }
                 ]
             );
@@ -646,52 +648,37 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             const uploadedSquad = await Promise.all(
                 squadPlayers.map(async (player) => {
                     let pPhoto = player.photo;
-                    if (player.photo && !player.photo.startsWith('http')) {
-                        const uRes = await apiService.uploadPhoto(player.photo);
-                        if (uRes.url) pPhoto = uRes.url;
+                    if (pPhoto && !pPhoto.startsWith('http')) {
+                        const upRes = await apiService.uploadPhoto(pPhoto);
+                        if (upRes.url) pPhoto = upRes.url;
                     }
                     return { ...player, photo: pPhoto };
                 })
             );
 
-            // Format phone number with +998
-            let formattedPhone = formData.phone.replace(/\D/g, '');
-            if (formattedPhone.length === 9) {
-                formattedPhone = `+998${formattedPhone}`;
-            } else if (!formattedPhone.startsWith('+')) {
-                formattedPhone = `+${formattedPhone}`;
-            }
+            const cleanPhone = formData.phone.replace(/\D/g, '').slice(-9);
+            const formattedPhone = `+998${cleanPhone}`;
 
             if (applicationType === 'player') {
-                const selectedTeamObj = teams.find(t => String(t.id || t._id) === String(formData.selectedTeam || targetTeamId));
-                const targetOrgId = selectedTeamObj?.organization_id || selectedTeamObj?.org_id || formData.selectedOrgId || 1;
-                const targetLeague = formData.selectedLeague || selectedTeamObj?.league || selectedTeamObj?.league_name || '';
-
-                let commentStr = formData.comment || '';
-                if (targetLeague && !commentStr.includes('[LEAGUE:')) {
-                    commentStr = `${commentStr} [LEAGUE:${targetLeague}]`.trim();
-                }
-
-                const applicationPayload: any = {
-                    organization_id: targetOrgId,
+                const appPayload = {
                     first_name: formData.firstName.trim(),
                     last_name: formData.lastName.trim(),
                     father_name: formData.fatherName ? formData.fatherName.trim() : null,
-                    passport_series: (formData.passportSeries || '').toUpperCase(),
-                    passport_number: formData.passportNumber || '',
                     phone: formattedPhone,
+                    passport_series: formData.passportSeries ? formData.passportSeries.toUpperCase().trim() : null,
+                    passport_number: formData.passportNumber ? formData.passportNumber.trim() : null,
                     photo_url: photoUrl || '',
                     birth_date: formData.birthDate || null,
-                    position: formData.position || formData.detailedPosition || null,
+                    position: formData.position || null,
                     player_number: formData.number || null,
-                    comment: commentStr || null,
-                    team_id: formData.selectedTeam || targetTeamId || null,
+                    comment: formData.detailedPosition ? `[${formData.detailedPosition}] ${formData.comment || ''}` : (formData.comment || null),
+                    organization_id: formData.selectedOrgId || 1,
+                    team_id: targetTeamId || formData.selectedTeam || null,
                     status: 'pending'
                 };
 
-                const response = await apiService.createApplication(applicationPayload);
-
-                if (response && response.success) {
+                const res = await apiService.createApplication(appPayload);
+                if (res && (res.id || res._id || res.success)) {
                     setSubmitStatus('success');
                     showNotice(
                         'success',
@@ -704,32 +691,33 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     );
                 } else {
                     setSubmitStatus('error');
-                    throw new Error('Player application failed');
+                    throw new Error('Application creation failed');
                 }
             } else {
-                const defaultTeamLogo = 'https://xzzyhfyazwohdqqbjiiy.supabase.co/storage/v1/object/public/sponsors/jd017tpq0c8.png';
-                const teamPayload: any = {
-                    organization_id: formData.selectedOrgId || 1,
+                // Team application
+                const teamPayload = {
                     name: formData.teamName.trim(),
+                    logo_url: teamLogoUrl || '',
+                    captain_name: formData.staffName.trim(),
                     captain_phone: formattedPhone,
-                    logo_url: teamLogoUrl || defaultTeamLogo,
+                    organization_id: formData.selectedOrgId || 1,
                     league: formData.selectedLeague || 'Super liga',
                     status: 'pending'
                 };
 
-                const createdTeam = await apiService.createTeam(teamPayload);
-                const newTeamId = createdTeam?.id || createdTeam?._id || createdTeam?.data?.id || createdTeam?.data?._id;
+                const res = await apiService.createTeam(teamPayload);
+                const createdTeamId = res?.id || res?._id;
 
-                if (newTeamId) {
-                    if (uploadedSquad && uploadedSquad.length > 0) {
-                        const squadApplications = uploadedSquad.map((p: any) => ({
+                if (createdTeamId) {
+                    if (uploadedSquad.length > 0) {
+                        const squadApplications = uploadedSquad.map(p => ({
+                            first_name: p.firstName.trim(),
+                            last_name: p.lastName.trim(),
+                            father_name: p.fatherName ? p.fatherName.trim() : null,
+                            team_id: createdTeamId,
                             organization_id: formData.selectedOrgId || 1,
-                            team_id: newTeamId,
-                            first_name: p.firstName?.trim() || '',
-                            last_name: p.lastName?.trim() || '',
-                            father_name: p.fatherName?.trim() || null,
-                            passport_series: (p.passportSeries || '').toUpperCase(),
-                            passport_number: p.passportNumber || '',
+                            passport_series: p.passportSeries ? p.passportSeries.toUpperCase().trim() : null,
+                            passport_number: p.passportNumber ? p.passportNumber.trim() : null,
                             phone: p.phone ? (p.phone.startsWith('+') ? p.phone : `+998${p.phone.replace(/\D/g, '')}`) : formattedPhone,
                             photo_url: p.photo || '',
                             birth_date: p.birthDate || null,
@@ -766,39 +754,52 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     };
 
     const renderHeader = () => (
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: homeColors.border }]}>
             <TouchableOpacity
-                style={styles.backButton}
+                style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: homeColors.border }]}
                 onPress={handleBack}
                 activeOpacity={0.7}
             >
-                <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+                <Ionicons name="chevron-back" size={22} color={homeColors.textPrimary} />
             </TouchableOpacity>
             <View style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={styles.headerTitle}>
-                    {targetTeamId ? t('teams.add_player', "O'YINCHI QO'SHISH") : t('applications.submit_app', 'ARIZA TOPSHIRISH')}
+                <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]}>
+                    {targetTeamId ? t('teams.add_player', "O'yinchi qo'shish") : t('applications.submit_app', 'Ariza topshirish')}
                 </Text>
-                <Text style={styles.headerSubtitle}>AMATORA LEAGUE</Text>
             </View>
             <View style={{ width: 42 }} />
         </View>
     );
 
     const renderTypeSelector = () => (
-        <View style={styles.typeSelectorWrapper}>
+        <View style={[styles.typeSelectorWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', borderColor: homeColors.border }]}>
             <TouchableOpacity
-                style={[styles.typeOption, applicationType === 'player' && styles.typeOptionActive]}
+                style={[styles.typeOption, applicationType === 'player' && { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
                 onPress={() => handleTypeChange('player')}
             >
-                <Ionicons name="person" size={18} color={applicationType === 'player' ? '#000' : Colors.textMuted} style={{ marginRight: 6 }} />
-                <Text style={[styles.typeOptionText, applicationType === 'player' && styles.typeOptionTextActive]}>{t('applications.solo_player')}</Text>
+                <Ionicons
+                    name="person"
+                    size={16}
+                    color={applicationType === 'player' ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textSecondary}
+                    style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.typeOptionText, { color: applicationType === 'player' ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textSecondary }]}>
+                    {t('applications.solo_player', "Yakkaxon o'yinchi")}
+                </Text>
             </TouchableOpacity>
             <TouchableOpacity
-                style={[styles.typeOption, applicationType === 'team' && styles.typeOptionActive]}
+                style={[styles.typeOption, applicationType === 'team' && { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
                 onPress={() => handleTypeChange('team')}
             >
-                <Ionicons name="people" size={18} color={applicationType === 'team' ? '#000' : Colors.textMuted} style={{ marginRight: 6 }} />
-                <Text style={[styles.typeOptionText, applicationType === 'team' && styles.typeOptionTextActive]}>{t('applications.team')}</Text>
+                <Ionicons
+                    name="people"
+                    size={16}
+                    color={applicationType === 'team' ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textSecondary}
+                    style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.typeOptionText, { color: applicationType === 'team' ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textSecondary }]}>
+                    {t('applications.team', 'Jamoa')}
+                </Text>
             </TouchableOpacity>
         </View>
     );
@@ -806,9 +807,9 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const renderValidationBadge = () => {
         if (isValidating) {
             return (
-                <View style={styles.validatingBox}>
-                    <ActivityIndicator size="small" color={Colors.primary} style={{ marginRight: 8 }} />
-                    <Text style={styles.validatingText}>{t('applications.checking_info')}</Text>
+                <View style={[styles.validatingBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderColor: homeColors.border }]}>
+                    <ActivityIndicator size="small" color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                    <Text style={[styles.validatingText, { color: homeColors.textSecondary }]}>{t('applications.checking_info', 'Ma\'lumotlar tekshirilmoqda...')}</Text>
                 </View>
             );
         }
@@ -817,14 +818,14 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             if (!validationResult.isValid) {
                 return (
                     <View style={styles.validationErrorBox}>
-                        <Ionicons name="alert-circle" size={20} color="#FF3B30" style={{ marginRight: 8 }} />
+                        <Ionicons name="alert-circle" size={18} color="#EF4444" style={{ marginRight: 8 }} />
                         <Text style={styles.validationErrorText}>{validationResult.message}</Text>
                     </View>
                 );
             } else {
                 return (
                     <View style={styles.validationSuccessBox}>
-                        <Ionicons name="checkmark-circle" size={20} color="#00FF66" style={{ marginRight: 8 }} />
+                        <Ionicons name="checkmark-circle" size={18} color="#10B981" style={{ marginRight: 8 }} />
                         <Text style={styles.validationSuccessText}>{validationResult.message}</Text>
                     </View>
                 );
@@ -839,71 +840,64 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             style={[
                 styles.container,
                 {
+                    backgroundColor: homeColors.background,
                     transform: [{ translateX: swipeBackAnim }],
                 }
             ]}
             {...exitPanResponder.panHandlers}
         >
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.88}
-            >
-                <SafeAreaView style={{ flex: 1 }}>
-                    {renderHeader()}
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} translucent backgroundColor="transparent" />
+            <SafeAreaView style={{ flex: 1, backgroundColor: homeColors.background }}>
+                {renderHeader()}
 
-                    <KeyboardAvoidingView
-                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                        style={{ flex: 1 }}
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={{ flex: 1 }}
+                >
+                    <ScrollView
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 }]}
                     >
-                        <ScrollView
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                            contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 }]}
-                        >
                         {!route?.params?.initialType && renderTypeSelector()}
 
-                        {/* TARGET TEAM HEADER BANNER (WHEN NAVIGATING FROM TEAM) */}
+                        {/* TARGET TEAM HEADER BANNER */}
                         {targetTeamId && (
-                            <View style={[styles.card, { backgroundColor: isDark ? 'rgba(20,20,20,0.92)' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.1)' : homeColors.border, marginBottom: 14 }]}>
+                            <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border, marginBottom: 14 }]}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                                     <SmartImage
                                         uri={targetTeamData?.logo_url || targetTeamData?.logo || formData.selectedOrgLogo}
-                                        style={{ width: 52, height: 52, borderRadius: 16 }}
+                                        style={{ width: 48, height: 48, borderRadius: 14 }}
                                         contentFit="cover"
                                         fallbackIcon="shield-outline"
                                     />
                                     <View style={{ flex: 1 }}>
-                                        <Text style={{ fontSize: 16, fontWeight: '800', color: isDark ? '#FFFFFF' : homeColors.textPrimary, letterSpacing: -0.2 }}>
+                                        <Text style={{ fontSize: 16, fontWeight: '700', color: homeColors.textPrimary }}>
                                             {targetTeamData?.name || formData.teamName || t('teams.my_team', 'Mening jamoam')}
                                         </Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
-                                            <Text style={{ fontSize: 12.5, fontWeight: '600', color: homeColors.accent }}>
-                                                {t('teams.add_player_to_squad', 'Jamoa tarkibiga yangi o\'yinchi qo\'shish')}
-                                            </Text>
-                                        </View>
+                                        <Text style={{ fontSize: 13, color: homeColors.textSecondary, marginTop: 2 }}>
+                                            {t('teams.add_player_to_squad', 'Jamoa tarkibiga yangi o\'yinchi qo\'shish')}
+                                        </Text>
                                     </View>
                                 </View>
                             </View>
                         )}
 
-                        {/* STEP 1: TASHKILOT TANLASH (EXPANDABLE SELECT WITH LOGO & NAME) */}
+                        {/* STEP 1: TASHKILOT TANLASH */}
                         {!targetTeamId && organizations.length > 0 && (
-                            <View style={styles.card}>
+                            <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                 <View style={styles.cardTitleRow}>
-                                    <Ionicons name="business" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                    <Text style={styles.cardTitle}>1. TASHKILOTNI TANLANG</Text>
+                                    <Ionicons name="business-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Tashkilotni tanlang</Text>
                                 </View>
 
                                 <TouchableOpacity
-                                    style={styles.leagueSelectTrigger}
+                                    style={[styles.leagueSelectTrigger, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border }]}
                                     onPress={() => setIsOrgDropdownOpen(prev => !prev)}
                                     activeOpacity={0.8}
                                 >
-                                    <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
                                     <View style={styles.leagueTriggerLeft}>
-                                        <View style={styles.triggerLogoWrapper}>
+                                        <View style={[styles.triggerLogoWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }]}>
                                             {formData.selectedOrgLogo ? (
                                                 <Image
                                                     source={{ uri: formData.selectedOrgLogo }}
@@ -911,31 +905,31 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                     contentFit="contain"
                                                 />
                                             ) : (
-                                                <Ionicons name="business" size={24} color={Colors.primary} />
+                                                <Ionicons name="business" size={20} color={homeColors.textPrimary} />
                                             )}
                                         </View>
                                         <View style={{ marginLeft: 12, flex: 1 }}>
-                                            <Text style={styles.triggerLeagueTitle} numberOfLines={1}>
-                                                {(formData.selectedOrgName || 'TASHKILOTNI TANLANG').toUpperCase()}
+                                            <Text style={[styles.triggerLeagueTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                {formData.selectedOrgName || 'Tashkilotni tanlang'}
                                             </Text>
-                                            <Text style={styles.triggerLeagueSubTitle} numberOfLines={1}>
+                                            <Text style={[styles.triggerLeagueSubTitle, { color: homeColors.textSecondary }]} numberOfLines={1}>
                                                 {formData.selectedOrgName ? 'Tanlangan futbol tashkiloti' : 'Iltimos, avval tashkilotni tanlang'}
                                             </Text>
                                         </View>
                                     </View>
 
-                                    <View style={styles.triggerRightBadge}>
-                                        <Ionicons
-                                            name={isOrgDropdownOpen ? "chevron-up" : "chevron-down"}
-                                            size={20}
-                                            color="#00FF66"
-                                        />
-                                    </View>
+                                    <Ionicons
+                                        name={isOrgDropdownOpen ? "chevron-up" : "chevron-down"}
+                                        size={18}
+                                        color={homeColors.textSecondary}
+                                    />
                                 </TouchableOpacity>
 
                                 <Animated.View style={[
                                     styles.leagueDropdownContainer,
                                     {
+                                        backgroundColor: homeColors.surface,
+                                        borderColor: homeColors.border,
                                         maxHeight: orgAnimVal.interpolate({
                                             inputRange: [0, 1],
                                             outputRange: [0, 360]
@@ -954,13 +948,12 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             return (
                                                 <TouchableOpacity
                                                     key={org.id}
-                                                    style={[styles.leagueOptionItem, isSelected && styles.leagueOptionItemActive]}
+                                                    style={[styles.leagueOptionItem, { borderBottomColor: homeColors.border }, isSelected && { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
                                                     onPress={() => handleOrgSelect(org)}
                                                     activeOpacity={0.7}
                                                 >
-                                                    <BlurView intensity={isSelected ? 30 : 15} tint="dark" style={StyleSheet.absoluteFill} />
                                                     <View style={styles.leagueOptionLeft}>
-                                                        <View style={styles.optionLogoWrapper}>
+                                                        <View style={[styles.optionLogoWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                                                             {org.logo_url ? (
                                                                 <Image
                                                                     source={{ uri: org.logo_url }}
@@ -968,23 +961,21 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                                     contentFit="contain"
                                                                 />
                                                             ) : (
-                                                                <Ionicons name="business" size={20} color={Colors.primary} />
+                                                                <Ionicons name="business" size={18} color={homeColors.textPrimary} />
                                                             )}
                                                         </View>
                                                         <View style={{ marginLeft: 12, flex: 1 }}>
-                                                            <Text style={[styles.optionLeagueTitle, isSelected && styles.optionLeagueTitleActive]}>
-                                                                {org.name.toUpperCase()}
+                                                            <Text style={[styles.optionLeagueTitle, { color: homeColors.textPrimary }]}>
+                                                                {org.name}
                                                             </Text>
-                                                            <Text style={styles.optionLeagueSubTitle}>
+                                                            <Text style={[styles.optionLeagueSubTitle, { color: homeColors.textSecondary }]}>
                                                                 {org.slug || 'Futbol Tashkiloti'}
                                                             </Text>
                                                         </View>
                                                     </View>
 
                                                     {isSelected && (
-                                                        <View style={styles.optionCheckBadge}>
-                                                            <Ionicons name="checkmark-circle" size={20} color="#00FF66" />
-                                                        </View>
+                                                        <Ionicons name="checkmark" size={18} color={homeColors.textPrimary} />
                                                     )}
                                                 </TouchableOpacity>
                                             );
@@ -994,268 +985,258 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                             </View>
                         )}
 
-                        {/* STEP 2: TURNIR TANLASH (EXPANDABLE SELECT) */}
+                        {/* STEP 2: TURNIR TANLASH */}
                         {!targetTeamId && (
-                            <>
-                                <View style={styles.card}>
-                                        <View style={styles.cardTitleRow}>
-                                            <Ionicons name="trophy" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                            <Text style={styles.cardTitle}>2. TURNIR (LIGA) TANLASH</Text>
-                                        </View>
-                                        
-                                        <TouchableOpacity
-                                            style={styles.leagueSelectTrigger}
-                                            onPress={() => setIsLeagueDropdownOpen(prev => !prev)}
-                                            activeOpacity={0.8}
-                                        >
-                                            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                                            <View style={styles.leagueTriggerLeft}>
-                                                <View style={styles.triggerLogoWrapper}>
-                                                    {LEAGUE_LOGOS[formData.selectedLeague] ? (
-                                                        <Image
-                                                            source={LEAGUE_LOGOS[formData.selectedLeague]}
-                                                            style={styles.triggerLeagueLogo}
-                                                            contentFit="contain"
-                                                        />
-                                                    ) : (
-                                                        <Ionicons name="trophy" size={24} color={Colors.primary} />
-                                                    )}
-                                                </View>
-                                                <View style={{ marginLeft: 12, flex: 1 }}>
-                                                    <Text style={styles.triggerLeagueTitle} numberOfLines={1}>
-                                                        {(formData.selectedLeague || 'LIGA TANLANG').toUpperCase()}
-                                                    </Text>
-                                                    <Text style={styles.triggerLeagueSubTitle} numberOfLines={1}>
-                                                        {formData.selectedLeague ? 'Tanlangan turnir ligasi' : 'Iltimos, ligani tanlang'}
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            <View style={styles.triggerRightBadge}>
-                                                <Ionicons
-                                                    name={isLeagueDropdownOpen ? "chevron-up" : "chevron-down"}
-                                                    size={20}
-                                                    color="#00FF66"
+                            <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                <View style={styles.cardTitleRow}>
+                                    <Ionicons name="trophy-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Turnir (Liga) tanlash</Text>
+                                </View>
+                                
+                                <TouchableOpacity
+                                    style={[styles.leagueSelectTrigger, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border }]}
+                                    onPress={() => setIsLeagueDropdownOpen(prev => !prev)}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={styles.leagueTriggerLeft}>
+                                        <View style={[styles.triggerLogoWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }]}>
+                                            {LEAGUE_LOGOS[formData.selectedLeague] ? (
+                                                <Image
+                                                    source={LEAGUE_LOGOS[formData.selectedLeague]}
+                                                    style={styles.triggerLeagueLogo}
+                                                    contentFit="contain"
                                                 />
-                                            </View>
-                                        </TouchableOpacity>
-
-                                        <Animated.View style={[
-                                            styles.leagueDropdownContainer,
-                                            {
-                                                maxHeight: leagueAnimVal.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: [0, 360]
-                                                }),
-                                                opacity: leagueAnimVal,
-                                                overflow: 'hidden',
-                                                marginTop: leagueAnimVal.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: [0, 8]
-                                                })
-                                            }
-                                        ]}>
-                                            <ScrollView nestedScrollEnabled style={{ maxHeight: 280 }}>
-                                                {(leagues.length > 0 ? leagues : LEAGUE_OPTIONS).map((league: any) => {
-                                                    const lName = league.name || league.id || league.label;
-                                                    const isSelected = formData.selectedLeague === lName;
-                                                    return (
-                                                        <TouchableOpacity
-                                                            key={league.id || lName}
-                                                            style={[styles.leagueOptionItem, isSelected && styles.leagueOptionItemActive]}
-                                                            onPress={() => handleLeagueSelect(lName)}
-                                                            activeOpacity={0.7}
-                                                        >
-                                                            <BlurView intensity={isSelected ? 30 : 15} tint="dark" style={StyleSheet.absoluteFill} />
-                                                            <View style={styles.leagueOptionLeft}>
-                                                                <View style={styles.optionLogoWrapper}>
-                                                                    {LEAGUE_LOGOS[lName] ? (
-                                                                        <Image
-                                                                            source={LEAGUE_LOGOS[lName]}
-                                                                            style={styles.optionLeagueLogo}
-                                                                            contentFit="contain"
-                                                                        />
-                                                                    ) : (
-                                                                        <Ionicons name="shield" size={20} color={Colors.primary} />
-                                                                    )}
-                                                                </View>
-                                                                <View style={{ marginLeft: 12, flex: 1 }}>
-                                                                    <Text style={[styles.optionLeagueTitle, isSelected && styles.optionLeagueTitleActive]}>
-                                                                        {String(lName).toUpperCase()}
-                                                                    </Text>
-                                                                    <Text style={styles.optionLeagueSubTitle}>
-                                                                        {league.subLabel || 'Rasmiy musobaqa ligasi'}
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-
-                                                            {isSelected && (
-                                                                <View style={styles.optionCheckBadge}>
-                                                                    <Ionicons name="checkmark-circle" size={20} color="#00FF66" />
-                                                                </View>
-                                                            )}
-                                                        </TouchableOpacity>
-                                                    );
-                                                })}
-                                            </ScrollView>
-                                        </Animated.View>
+                                            ) : (
+                                                <Ionicons name="trophy" size={20} color={homeColors.textPrimary} />
+                                            )}
+                                        </View>
+                                        <View style={{ marginLeft: 12, flex: 1 }}>
+                                            <Text style={[styles.triggerLeagueTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                {formData.selectedLeague || 'Liga tanlang'}
+                                            </Text>
+                                            <Text style={[styles.triggerLeagueSubTitle, { color: homeColors.textSecondary }]} numberOfLines={1}>
+                                                {formData.selectedLeague ? 'Tanlangan turnir ligasi' : 'Iltimos, ligani tanlang'}
+                                            </Text>
+                                        </View>
                                     </View>
 
-                                {/* STEP 3: JAMOA TANLASH */}
-                                {applicationType === 'player' && (
-                                    <View style={styles.card}>
-                                        <View style={styles.cardTitleRow}>
-                                            <Ionicons name="shield" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                            <Text style={styles.cardTitle}>3. JAMOA TANLASH</Text>
-                                        </View>
-                                            
-                                            <TouchableOpacity
-                                                style={styles.leagueSelectTrigger}
-                                                onPress={() => setIsTeamDropdownOpen(prev => !prev)}
-                                                activeOpacity={0.8}
-                                            >
-                                                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-                                                <View style={styles.leagueTriggerLeft}>
-                                                    <View style={styles.triggerLogoWrapper}>
-                                                        {getSelectedTeamObj()?.logo_url || getSelectedTeamObj()?.logo ? (
-                                                            <Image
-                                                                source={{ uri: getSelectedTeamObj()?.logo_url || getSelectedTeamObj()?.logo }}
-                                                                style={styles.triggerLeagueLogo}
-                                                                contentFit="contain"
-                                                            />
-                                                        ) : (
-                                                            <Ionicons name="shield-outline" size={24} color={Colors.primary} />
-                                                        )}
+                                    <Ionicons
+                                        name={isLeagueDropdownOpen ? "chevron-up" : "chevron-down"}
+                                        size={18}
+                                        color={homeColors.textSecondary}
+                                    />
+                                </TouchableOpacity>
+
+                                <Animated.View style={[
+                                    styles.leagueDropdownContainer,
+                                    {
+                                        backgroundColor: homeColors.surface,
+                                        borderColor: homeColors.border,
+                                        maxHeight: leagueAnimVal.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0, 360]
+                                        }),
+                                        opacity: leagueAnimVal,
+                                        overflow: 'hidden',
+                                        marginTop: leagueAnimVal.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0, 8]
+                                        })
+                                    }
+                                ]}>
+                                    <ScrollView nestedScrollEnabled style={{ maxHeight: 280 }}>
+                                        {(leagues.length > 0 ? leagues : LEAGUE_OPTIONS).map((league: any) => {
+                                            const lName = league.name || league.id || league.label;
+                                            const isSelected = formData.selectedLeague === lName;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={league.id || lName}
+                                                    style={[styles.leagueOptionItem, { borderBottomColor: homeColors.border }, isSelected && { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                                    onPress={() => handleLeagueSelect(lName)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <View style={styles.leagueOptionLeft}>
+                                                        <View style={[styles.optionLogoWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                                                            {LEAGUE_LOGOS[lName] ? (
+                                                                <Image
+                                                                    source={LEAGUE_LOGOS[lName]}
+                                                                    style={styles.optionLeagueLogo}
+                                                                    contentFit="contain"
+                                                                />
+                                                            ) : (
+                                                                <Ionicons name="shield" size={18} color={homeColors.textPrimary} />
+                                                            )}
+                                                        </View>
+                                                        <View style={{ marginLeft: 12, flex: 1 }}>
+                                                            <Text style={[styles.optionLeagueTitle, { color: homeColors.textPrimary }]}>
+                                                                {String(lName)}
+                                                            </Text>
+                                                            <Text style={[styles.optionLeagueSubTitle, { color: homeColors.textSecondary }]}>
+                                                                {league.subLabel || 'Rasmiy musobaqa ligasi'}
+                                                            </Text>
+                                                        </View>
                                                     </View>
-                                                    <View style={{ marginLeft: 12, flex: 1 }}>
-                                                        <Text style={styles.triggerLeagueTitle} numberOfLines={1}>
-                                                            {(getSelectedTeamObj()?.name || 'JAMOANGIZNI TANLANG').toUpperCase()}
-                                                        </Text>
-                                                        <Text style={styles.triggerLeagueSubTitle} numberOfLines={1}>
-                                                            {getSelectedTeamObj() ? `${formData.selectedLeague} jamoasi` : 'Iltimos, jamoangizni tanlang'}
-                                                        </Text>
-                                                    </View>
-                                                </View>
 
-                                                <View style={styles.triggerRightBadge}>
-                                                    <Ionicons
-                                                        name={isTeamDropdownOpen ? "chevron-up" : "chevron-down"}
-                                                        size={20}
-                                                        color="#00FF66"
-                                                    />
-                                                </View>
-                                            </TouchableOpacity>
+                                                    {isSelected && (
+                                                        <Ionicons name="checkmark" size={18} color={homeColors.textPrimary} />
+                                                    )}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                </Animated.View>
+                            </View>
+                        )}
 
-                                            <Animated.View style={[
-                                                styles.leagueDropdownContainer,
-                                                {
-                                                    maxHeight: teamAnimVal.interpolate({
-                                                        inputRange: [0, 1],
-                                                        outputRange: [0, 360]
-                                                    }),
-                                                    opacity: teamAnimVal,
-                                                    overflow: 'hidden',
-                                                    marginTop: teamAnimVal.interpolate({
-                                                        inputRange: [0, 1],
-                                                        outputRange: [0, 8]
-                                                    })
-                                                }
-                                            ]}>
-                                                <ScrollView nestedScrollEnabled style={{ maxHeight: 280 }}>
-                                                    {teams.map((team) => {
-                                                        const tId = team.id || team._id;
-                                                        const isSelected = formData.selectedTeam === tId;
-                                                        return (
-                                                            <TouchableOpacity
-                                                                key={tId}
-                                                                style={[styles.leagueOptionItem, isSelected && styles.leagueOptionItemActive]}
-                                                                onPress={() => {
-                                                                    setFormData(prev => ({ ...prev, selectedTeam: tId, teamName: team.name }));
-                                                                    setIsTeamDropdownOpen(false);
-                                                                    triggerValidation('player', team.name, formData.phone, formData.firstName, formData.lastName, tId);
-                                                                }}
-                                                                activeOpacity={0.7}
-                                                            >
-                                                                <BlurView intensity={isSelected ? 30 : 15} tint="dark" style={StyleSheet.absoluteFill} />
-                                                                <View style={styles.leagueOptionLeft}>
-                                                                    <View style={styles.optionLogoWrapper}>
-                                                                        {team.logo_url || team.logo ? (
-                                                                            <Image
-                                                                                source={{ uri: team.logo_url || team.logo }}
-                                                                                style={styles.optionLeagueLogo}
-                                                                                contentFit="contain"
-                                                                            />
-                                                                        ) : (
-                                                                            <Ionicons name="shield-outline" size={20} color={Colors.primary} />
-                                                                        )}
-                                                                    </View>
-                                                                    <View style={{ marginLeft: 12, flex: 1 }}>
-                                                                        <Text style={[styles.optionLeagueTitle, isSelected && styles.optionLeagueTitleActive]}>
-                                                                            {team.name.toUpperCase()}
-                                                                        </Text>
-                                                                        <Text style={styles.optionLeagueSubTitle}>
-                                                                            {team.league || formData.selectedLeague}
-                                                                        </Text>
-                                                                    </View>
-                                                                </View>
-
-                                                                {isSelected && (
-                                                                    <View style={styles.optionCheckBadge}>
-                                                                        <Ionicons name="checkmark-circle" size={20} color="#00FF66" />
-                                                                    </View>
-                                                                )}
-                                                            </TouchableOpacity>
-                                                        );
-                                                    })}
-                                                </ScrollView>
-                                            </Animated.View>
+                        {/* STEP 3: JAMOA TANLASH */}
+                        {!targetTeamId && applicationType === 'player' && (
+                            <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                <View style={styles.cardTitleRow}>
+                                    <Ionicons name="shield-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Jamoa tanlash</Text>
+                                </View>
+                                    
+                                <TouchableOpacity
+                                    style={[styles.leagueSelectTrigger, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border }]}
+                                    onPress={() => setIsTeamDropdownOpen(prev => !prev)}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={styles.leagueTriggerLeft}>
+                                        <View style={[styles.triggerLogoWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }]}>
+                                            {getSelectedTeamObj()?.logo_url || getSelectedTeamObj()?.logo ? (
+                                                <Image
+                                                    source={{ uri: getSelectedTeamObj()?.logo_url || getSelectedTeamObj()?.logo }}
+                                                    style={styles.triggerLeagueLogo}
+                                                    contentFit="contain"
+                                                />
+                                            ) : (
+                                                <Ionicons name="shield-outline" size={20} color={homeColors.textPrimary} />
+                                            )}
                                         </View>
-                                     )}
-                             </>
-                         )}
+                                        <View style={{ marginLeft: 12, flex: 1 }}>
+                                            <Text style={[styles.triggerLeagueTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                {getSelectedTeamObj()?.name || 'Jamoangizni tanlang'}
+                                            </Text>
+                                            <Text style={[styles.triggerLeagueSubTitle, { color: homeColors.textSecondary }]} numberOfLines={1}>
+                                                {getSelectedTeamObj() ? `${formData.selectedLeague} jamoasi` : 'Iltimos, jamoangizni tanlang'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <Ionicons
+                                        name={isTeamDropdownOpen ? "chevron-up" : "chevron-down"}
+                                        size={18}
+                                        color={homeColors.textSecondary}
+                                    />
+                                </TouchableOpacity>
+
+                                <Animated.View style={[
+                                    styles.leagueDropdownContainer,
+                                    {
+                                        backgroundColor: homeColors.surface,
+                                        borderColor: homeColors.border,
+                                        maxHeight: teamAnimVal.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0, 360]
+                                        }),
+                                        opacity: teamAnimVal,
+                                        overflow: 'hidden',
+                                        marginTop: teamAnimVal.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0, 8]
+                                        })
+                                    }
+                                ]}>
+                                    <ScrollView nestedScrollEnabled style={{ maxHeight: 280 }}>
+                                        {teams.map((team) => {
+                                            const tId = team.id || team._id;
+                                            const isSelected = formData.selectedTeam === tId;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={tId}
+                                                    style={[styles.leagueOptionItem, { borderBottomColor: homeColors.border }, isSelected && { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                                    onPress={() => {
+                                                        setFormData(prev => ({ ...prev, selectedTeam: tId, teamName: team.name }));
+                                                        setIsTeamDropdownOpen(false);
+                                                        triggerValidation('player', team.name, formData.phone, formData.firstName, formData.lastName, tId);
+                                                    }}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <View style={styles.leagueOptionLeft}>
+                                                        <View style={[styles.optionLogoWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                                                            {team.logo_url || team.logo ? (
+                                                                <Image
+                                                                    source={{ uri: team.logo_url || team.logo }}
+                                                                    style={styles.optionLeagueLogo}
+                                                                    contentFit="contain"
+                                                                />
+                                                            ) : (
+                                                                <Ionicons name="shield-outline" size={18} color={homeColors.textPrimary} />
+                                                            )}
+                                                        </View>
+                                                        <View style={{ marginLeft: 12, flex: 1 }}>
+                                                            <Text style={[styles.optionLeagueTitle, { color: homeColors.textPrimary }]}>
+                                                                {team.name}
+                                                            </Text>
+                                                            <Text style={[styles.optionLeagueSubTitle, { color: homeColors.textSecondary }]}>
+                                                                {team.league || formData.selectedLeague}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+
+                                                    {isSelected && (
+                                                        <Ionicons name="checkmark" size={18} color={homeColors.textPrimary} />
+                                                    )}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                </Animated.View>
+                            </View>
+                        )}
 
                         {/* MODE 1: YAKKAXON OYINCHI FORM */}
                         {applicationType === 'player' ? (
                             <>
-                                {/* INITIAL CHECK: FIRST NAME, LAST NAME & PHONE NUMBER */}
-                                <View style={styles.card}>
+                                {/* DASTLABKI TEKSHIRUV: ISM, FAMILIYA & TELEFON */}
+                                <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                     <View style={styles.cardTitleRow}>
-                                        <Ionicons name="person" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                        <Text style={styles.cardTitle}>DASTLABKI TEKSHIRUV</Text>
+                                        <Ionicons name="shield-checkmark-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                        <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Dastlabki tekshiruv</Text>
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>ISM *</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Ism *</Text>
                                         <TextInput
-                                            style={styles.inputField}
+                                            style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                             value={formData.firstName}
                                             onChangeText={(t) => {
                                                 setFormData(prev => ({ ...prev, firstName: t }));
                                                 triggerValidation('player', formData.teamName, formData.phone, t, formData.lastName);
                                             }}
                                             placeholder="Masalan: Alisher"
-                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                         />
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>FAMILIYA *</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Familiya *</Text>
                                         <TextInput
-                                            style={styles.inputField}
+                                            style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                             value={formData.lastName}
                                             onChangeText={(t) => {
                                                 setFormData(prev => ({ ...prev, lastName: t }));
                                                 triggerValidation('player', formData.teamName, formData.phone, formData.firstName, t);
                                             }}
                                             placeholder="Masalan: Karimov"
-                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                         />
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>TELEFON RAQAM *</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Telefon raqam *</Text>
                                         <TextInput
-                                            style={styles.inputField}
+                                            style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                             value={formatUzPhone(formData.phone)}
                                             onChangeText={(t) => {
                                                 const formatted = formatUzPhone(t);
@@ -1266,7 +1247,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             placeholder="+998 90 123 45 67"
                                             keyboardType="phone-pad"
                                             maxLength={17}
-                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                         />
                                     </View>
 
@@ -1277,73 +1258,82 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                 {validationResult.isChecked && validationResult.isValid && (
                                     <>
                                         {/* FATHER NAME */}
-                                        <View style={styles.card}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                             <View style={styles.cardTitleRow}>
-                                                <Ionicons name="person-add" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                                <Text style={styles.cardTitle}>QO’SHIMCHA MA’LUMOTLAR</Text>
+                                                <Ionicons name="person-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                                <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Qo'shimcha ma'lumotlar</Text>
                                             </View>
 
                                             <View style={styles.inputGroup}>
-                                                <Text style={styles.inputLabel}>OTASINING ISMI (IXTIYORIY)</Text>
+                                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Otasining ismi (ixtiyoriy)</Text>
                                                 <TextInput
-                                                    style={styles.inputField}
+                                                    style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                                     value={formData.fatherName}
                                                     onChangeText={(t) => setFormData({ ...formData, fatherName: t })}
                                                     placeholder="Masalan: Bahodirovich"
-                                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                                 />
                                             </View>
                                         </View>
-                                        {/* PHOTO UPLOAD */}
-                                        <View style={styles.card}>
+
+                                        {/* PHOTO UPLOAD & BIRTH DATE */}
+                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                             <View style={styles.cardTitleRow}>
-                                                <Ionicons name="camera" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                                <Text style={styles.cardTitle}>1x1 RASM YUKLASH</Text>
+                                                <Ionicons name="camera-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                                <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Rasm va tug'ilgan sana</Text>
                                             </View>
                                             <TouchableOpacity
-                                                style={styles.photoUploadBox}
+                                                style={[styles.photoUploadBox, { borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}
                                                 onPress={() => pickImage((uri) => setFormData({ ...formData, photo: uri }))}
                                             >
                                                 {formData.photo ? (
                                                     <Image source={{ uri: formData.photo }} style={styles.uploadedPhoto} />
                                                 ) : (
                                                     <View style={styles.photoPlaceholderInner}>
-                                                        <Ionicons name="camera" size={36} color={Colors.primary} />
-                                                        <Text style={styles.photoUploadText}>RASMNI TANLANG</Text>
+                                                        <Ionicons name="camera" size={32} color={homeColors.textSecondary} />
+                                                        <Text style={[styles.photoUploadText, { color: homeColors.textSecondary }]}>Rasm yuklash (1x1 format)</Text>
                                                     </View>
                                                 )}
                                             </TouchableOpacity>
 
                                             <View style={styles.inputGroup}>
-                                                <Text style={styles.inputLabel}>TUG'ILGAN SANA (IXTIYORIY)</Text>
+                                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug'ilgan sana (ixtiyoriy)</Text>
                                                 <TextInput
-                                                    style={styles.inputField}
+                                                    style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                                     value={formData.birthDate}
                                                     onChangeText={(t) => setFormData({ ...formData, birthDate: t })}
                                                     placeholder="01.04.1990"
-                                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                                 />
                                             </View>
                                         </View>
 
                                         {/* POSITION & NUMBER */}
-                                        <View style={styles.card}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                             <View style={styles.cardTitleRow}>
-                                                <Ionicons name="football" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                                <Text style={styles.cardTitle}>AMPLUA VA O'YINCHI RAQAMI</Text>
+                                                <Ionicons name="football-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                                <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Amplua va raqam</Text>
                                             </View>
 
-                                            <Text style={styles.subTitle}>AMPLUA (IXTIYORIY)</Text>
+                                            <Text style={[styles.subTitle, { color: homeColors.textSecondary }]}>Amplua (ixtiyoriy)</Text>
                                             <View style={styles.posGrid}>
                                                 {PLAYER_POSITIONS.map((pos) => {
                                                     const isSelected = formData.position === pos.id;
                                                     return (
                                                         <TouchableOpacity
                                                             key={pos.id}
-                                                            style={[styles.posBtn, isSelected && styles.posBtnActive]}
+                                                            style={[
+                                                                styles.posBtn,
+                                                                { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border },
+                                                                isSelected && { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? '#FFFFFF' : '#000000' }
+                                                            ]}
                                                             onPress={() => setFormData({ ...formData, position: pos.id })}
                                                         >
-                                                            <Text style={[styles.posBtnText, isSelected && styles.posBtnTextActive]}>
+                                                            <Text style={[
+                                                                styles.posBtnText,
+                                                                { color: homeColors.textSecondary },
+                                                                isSelected && { color: isDark ? '#000000' : '#FFFFFF', fontWeight: '800' }
+                                                            ]}>
                                                                 {pos.label}
                                                             </Text>
                                                         </TouchableOpacity>
@@ -1351,40 +1341,51 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                 })}
                                             </View>
 
-                                            <Text style={[styles.subTitle, { marginTop: 14 }]}>ANIQ POZITSIYA (IXTIYORIY)</Text>
+                                            <Text style={[styles.subTitle, { color: homeColors.textSecondary, marginTop: 14 }]}>Aniq pozitsiya (ixtiyoriy)</Text>
                                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                                                 {DETAILED_POSITIONS.map((p) => {
                                                     const isSelected = formData.detailedPosition === p;
                                                     return (
                                                         <TouchableOpacity
                                                             key={p}
-                                                            style={[styles.detailPosPill, isSelected && styles.detailPosPillActive]}
+                                                            style={[
+                                                                styles.detailPosPill,
+                                                                { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border },
+                                                                isSelected && { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? '#FFFFFF' : '#000000' }
+                                                            ]}
                                                             onPress={() => setFormData({ ...formData, detailedPosition: p })}
                                                         >
-                                                            <Text style={[styles.detailPosPillText, isSelected && styles.detailPosPillTextActive]}>{p}</Text>
+                                                            <Text style={[
+                                                                styles.detailPosPillText,
+                                                                { color: homeColors.textSecondary },
+                                                                isSelected && { color: isDark ? '#000000' : '#FFFFFF', fontWeight: '800' }
+                                                            ]}>
+                                                                {p}
+                                                            </Text>
                                                         </TouchableOpacity>
                                                     );
                                                 })}
                                             </ScrollView>
 
                                             <View style={styles.inputGroup}>
-                                                <Text style={styles.inputLabel}>O'YINCHI RAQAMI (IXTIYORIY)</Text>
+                                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>O'yinchi raqami (ixtiyoriy)</Text>
                                                 <TextInput
                                                     style={[
                                                         styles.inputField,
-                                                        numberCheckResult.isChecked && numberCheckResult.isDuplicate && { borderColor: '#FF3B30', borderWidth: 1.5 }
+                                                        { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary },
+                                                        numberCheckResult.isChecked && numberCheckResult.isDuplicate && { borderColor: '#EF4444', borderWidth: 1.5 }
                                                     ]}
                                                     value={formData.number}
                                                     onChangeText={handleNumberChange}
                                                     placeholder="Masalan: 10"
                                                     keyboardType="number-pad"
                                                     maxLength={3}
-                                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                                 />
                                                 {isCheckingNumber && (
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6 }}>
-                                                        <ActivityIndicator size="small" color={Colors.primary} />
-                                                        <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Raqam tekshirilmoqda...</Text>
+                                                        <ActivityIndicator size="small" color={homeColors.textPrimary} />
+                                                        <Text style={{ color: homeColors.textSecondary, fontSize: 12 }}>Raqam tekshirilmoqda...</Text>
                                                     </View>
                                                 )}
                                                 {!isCheckingNumber && numberCheckResult.isChecked && (
@@ -1395,12 +1396,12 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                         <Ionicons
                                                             name={numberCheckResult.isDuplicate ? "alert-circle" : "checkmark-circle"}
                                                             size={16}
-                                                            color={numberCheckResult.isDuplicate ? "#FF3B30" : "#00FF66"}
+                                                            color={numberCheckResult.isDuplicate ? "#EF4444" : "#10B981"}
                                                             style={{ marginRight: 6 }}
                                                         />
                                                         <Text style={[
                                                             styles.numberBadgeText,
-                                                            numberCheckResult.isDuplicate ? { color: '#FF6B6B' } : { color: '#00FF66' }
+                                                            numberCheckResult.isDuplicate ? { color: '#EF4444' } : { color: '#10B981' }
                                                         ]}>
                                                             {numberCheckResult.message}
                                                         </Text>
@@ -1410,31 +1411,31 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                         </View>
 
                                         {/* PASSPORT & COMMENT */}
-                                        <View style={styles.card}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                             <View style={styles.cardTitleRow}>
-                                                <Ionicons name="card" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                                <Text style={styles.cardTitle}>PASPORT VA IZOH</Text>
+                                                <Ionicons name="card-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                                <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Pasport va izoh</Text>
                                             </View>
 
                                             <View style={styles.inputGroup}>
-                                                <Text style={styles.inputLabel}>PASPORT SERIYA VA RAQAMI (IXTIYORIY)</Text>
+                                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pasport seriya va raqami (ixtiyoriy)</Text>
                                                 <View style={{ flexDirection: 'row', gap: 10 }}>
                                                     <TextInput
-                                                        style={[styles.inputField, { width: 70, textTransform: 'uppercase' }]}
+                                                        style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary, width: 70, textTransform: 'uppercase' }]}
                                                         value={formData.passportSeries}
                                                         onChangeText={(t) => setFormData({ ...formData, passportSeries: t.toUpperCase() })}
                                                         placeholder="AA"
                                                         maxLength={2}
-                                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                                        placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                                     />
                                                     <TextInput
-                                                        style={[styles.inputField, { flex: 1 }]}
+                                                        style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary, flex: 1 }]}
                                                         value={formData.passportNumber}
                                                         onChangeText={(t) => setFormData({ ...formData, passportNumber: t })}
                                                         placeholder="1234567"
                                                         keyboardType="number-pad"
                                                         maxLength={7}
-                                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                                        placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                                     />
                                                 </View>
                                             </View>
@@ -1442,17 +1443,25 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             {/* TEAM SELECT OR ENTER */}
                                             {!targetTeamId && teams.length > 0 && (
                                                 <View style={styles.inputGroup}>
-                                                    <Text style={styles.inputLabel}>JAMOA TANLASH (IXTIYORIY)</Text>
+                                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Jamoa tanlash (ixtiyoriy)</Text>
                                                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                                         {teams.map((tm) => {
                                                             const isSelected = formData.selectedTeam === tm._id || formData.selectedTeam === tm.id;
                                                             return (
                                                                 <TouchableOpacity
                                                                     key={tm._id || tm.id}
-                                                                    style={[styles.detailPosPill, isSelected && styles.detailPosPillActive]}
+                                                                    style={[
+                                                                        styles.detailPosPill,
+                                                                        { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border },
+                                                                        isSelected && { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? '#FFFFFF' : '#000000' }
+                                                                    ]}
                                                                     onPress={() => setFormData({ ...formData, selectedTeam: tm._id || tm.id })}
                                                                 >
-                                                                    <Text style={[styles.detailPosPillText, isSelected && styles.detailPosPillTextActive]}>{tm.name}</Text>
+                                                                    <Text style={[
+                                                                        styles.detailPosPillText,
+                                                                        { color: homeColors.textSecondary },
+                                                                        isSelected && { color: isDark ? '#000000' : '#FFFFFF', fontWeight: '800' }
+                                                                    ]}>{tm.name}</Text>
                                                                 </TouchableOpacity>
                                                             );
                                                         })}
@@ -1461,15 +1470,15 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             )}
 
                                             <View style={styles.inputGroup}>
-                                                <Text style={styles.inputLabel}>IZOH / TAJRIBA (IXTIYORIY)</Text>
+                                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Izoh / Tajriba (ixtiyoriy)</Text>
                                                 <TextInput
-                                                    style={[styles.inputField, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
+                                                    style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary, height: 80, textAlignVertical: 'top', paddingTop: 10 }]}
                                                     value={formData.comment}
                                                     onChangeText={(t) => setFormData({ ...formData, comment: t })}
-                                                    placeholder="Avval qaysi komandada o'ynaganingiz yoki niyatlaringiz haqida yozing..."
+                                                    placeholder="Qo'shimcha izoh yoki tajribangiz haqida yozing..."
                                                     multiline
                                                     numberOfLines={3}
-                                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                                 />
                                             </View>
                                         </View>
@@ -1490,30 +1499,30 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                             /* MODE 2: JAMOA REGISTRATION FORM */
                             <>
                                 {/* TEAM INITIAL DETAILS & CHECK */}
-                                <View style={styles.card}>
+                                <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                     <View style={styles.cardTitleRow}>
-                                        <Ionicons name="shield-checkmark" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                        <Text style={styles.cardTitle}>JAMOA TEKSHIRUVI</Text>
+                                        <Ionicons name="shield-checkmark-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                        <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Jamoa tekshiruvi</Text>
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>JAMOA NOMI *</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Jamoa nomi *</Text>
                                         <TextInput
-                                            style={styles.inputField}
+                                            style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                             value={formData.teamName}
                                             onChangeText={(t) => {
                                                 setFormData({ ...formData, teamName: t });
                                                 triggerValidation('team', t, formData.phone);
                                             }}
                                             placeholder="Masalan: Paxtakor FC"
-                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                         />
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.inputLabel}>SARDOR (KAPITAN) TELEFONI *</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Sardor telefoni *</Text>
                                         <TextInput
-                                            style={styles.inputField}
+                                            style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                             value={formatUzPhone(formData.phone)}
                                             onChangeText={(t) => {
                                                 const formatted = formatUzPhone(t);
@@ -1524,7 +1533,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             placeholder="+998 90 123 45 67"
                                             keyboardType="phone-pad"
                                             maxLength={17}
-                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                         />
                                     </View>
 
@@ -1534,49 +1543,57 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                 {/* CONDITIONAL TEAM FIELDS (REVEALED ONLY IF VALIDATION PASSED) */}
                                 {validationResult.isChecked && validationResult.isValid && (
                                     <>
-                                        <View style={styles.card}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                             <View style={styles.cardTitleRow}>
-                                                <Ionicons name="image" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                                <Text style={styles.cardTitle}>JAMOA LOGOTIPI VA MAS'UL SHAXS</Text>
+                                                <Ionicons name="image-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                                <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Jamoa logotipi va mas'ul shaxs</Text>
                                             </View>
                                             
-                                            <Text style={styles.inputLabel}>JAMOA LOGOTIPI (1x1 FORMAT)</Text>
+                                            <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Jamoa logotipi (1x1 format)</Text>
                                             <TouchableOpacity
-                                                style={styles.photoUploadBox}
+                                                style={[styles.photoUploadBox, { borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}
                                                 onPress={() => pickImage((uri) => setFormData({ ...formData, teamLogo: uri }))}
                                             >
                                                 {formData.teamLogo ? (
                                                     <Image source={{ uri: formData.teamLogo }} style={styles.uploadedPhoto} />
                                                 ) : (
                                                     <View style={styles.photoPlaceholderInner}>
-                                                        <Ionicons name="shield" size={36} color={Colors.primary} />
-                                                        <Text style={styles.photoUploadText}>LOGOTIP YUKLASH</Text>
+                                                        <Ionicons name="shield" size={32} color={homeColors.textSecondary} />
+                                                        <Text style={[styles.photoUploadText, { color: homeColors.textSecondary }]}>Logotip yuklash</Text>
                                                     </View>
                                                 )}
                                             </TouchableOpacity>
 
                                             <View style={[styles.inputGroup, { marginTop: 14 }]}>
-                                                <Text style={styles.inputLabel}>MAS'UL SHAXS (KAPITAN/MANAGER) ISMI *</Text>
+                                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Mas'ul shaxs ismi *</Text>
                                                 <TextInput
-                                                    style={styles.inputField}
+                                                    style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                                     value={formData.staffName}
                                                     onChangeText={(t) => setFormData({ ...formData, staffName: t })}
                                                     placeholder="Ism sharifingizni kiriting"
-                                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                                 />
                                             </View>
 
-                                            <Text style={styles.subTitle}>ROLINGIZ</Text>
+                                            <Text style={[styles.subTitle, { color: homeColors.textSecondary }]}>Rolingiz</Text>
                                             <View style={styles.posGrid}>
                                                 {TEAM_ROLES.map((r) => {
                                                     const isSelected = formData.staffRole === r.id;
                                                     return (
                                                         <TouchableOpacity
                                                             key={r.id}
-                                                            style={[styles.posBtn, isSelected && styles.posBtnActive]}
+                                                            style={[
+                                                                styles.posBtn,
+                                                                { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border },
+                                                                isSelected && { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? '#FFFFFF' : '#000000' }
+                                                            ]}
                                                             onPress={() => setFormData({ ...formData, staffRole: r.id })}
                                                         >
-                                                            <Text style={[styles.posBtnText, isSelected && styles.posBtnTextActive]}>
+                                                            <Text style={[
+                                                                styles.posBtnText,
+                                                                { color: homeColors.textSecondary },
+                                                                isSelected && { color: isDark ? '#000000' : '#FFFFFF', fontWeight: '800' }
+                                                            ]}>
                                                                 {r.label}
                                                             </Text>
                                                         </TouchableOpacity>
@@ -1586,32 +1603,32 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                         </View>
 
                                         {/* SQUAD PLAYERS LIST SECTION */}
-                                        <View style={styles.card}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                                 <View style={styles.cardTitleRow}>
-                                                    <Ionicons name="people" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
-                                                    <Text style={styles.cardTitle}>O'YINCHILAR RO'YXATI</Text>
+                                                    <Ionicons name="people-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                                    <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>O'yinchilar ro'yxati</Text>
                                                 </View>
-                                                <View style={styles.countBadge}>
-                                                    <Text style={styles.countBadgeText}>{squadPlayers.length} TA</Text>
+                                                <View style={[styles.countBadge, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}>
+                                                    <Text style={[styles.countBadgeText, { color: isDark ? '#000000' : '#FFFFFF' }]}>{squadPlayers.length} ta</Text>
                                                 </View>
                                             </View>
 
                                             {/* Added Squad Player Cards */}
                                             {squadPlayers.map((player) => (
-                                                <View key={player.id} style={styles.squadPlayerCard}>
-                                                    <View style={styles.squadAvatar}>
+                                                <View key={player.id} style={[styles.squadPlayerCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border }]}>
+                                                    <View style={[styles.squadAvatar, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                                                         {player.photo ? (
                                                             <Image source={{ uri: player.photo }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                                                         ) : (
-                                                            <Ionicons name="person" size={24} color={Colors.primary} />
+                                                            <Ionicons name="person" size={20} color={homeColors.textPrimary} />
                                                         )}
                                                     </View>
                                                     <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                                                        <Text style={styles.squadPlayerName} numberOfLines={1}>
+                                                        <Text style={[styles.squadPlayerName, { color: homeColors.textPrimary }]} numberOfLines={1}>
                                                             {player.firstName} {player.lastName} {player.fatherName}
                                                         </Text>
-                                                        <Text style={styles.squadPlayerMeta}>
+                                                        <Text style={[styles.squadPlayerMeta, { color: homeColors.textSecondary }]}>
                                                             {player.position} {player.number ? `• #${player.number}` : ''}
                                                         </Text>
                                                     </View>
@@ -1619,17 +1636,17 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                                         style={styles.removeSquadBtn}
                                                         onPress={() => removeSquadPlayer(player.id)}
                                                     >
-                                                        <Ionicons name="close" size={18} color="#FF3B30" />
+                                                        <Ionicons name="close" size={18} color="#EF4444" />
                                                     </TouchableOpacity>
                                                 </View>
                                             ))}
 
                                             <TouchableOpacity
-                                                style={styles.addSquadBtn}
+                                                style={[styles.addSquadBtn, { borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}
                                                 onPress={() => setIsPlayerModalOpen(true)}
                                             >
-                                                <Ionicons name="person-add" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-                                                <Text style={styles.addSquadBtnText}>YANGI O'YINCHI QO'SHISH</Text>
+                                                <Ionicons name="person-add" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
+                                                <Text style={[styles.addSquadBtnText, { color: homeColors.textPrimary }]}>Yangi o'yinchi qo'shish</Text>
                                             </TouchableOpacity>
                                         </View>
 
@@ -1651,7 +1668,6 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     </ScrollView>
                 </KeyboardAvoidingView>
             </SafeAreaView>
-            </VideoBackground>
 
             {/* ADD SQUAD PLAYER MODAL */}
             <Modal
@@ -1661,85 +1677,92 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 onRequestClose={() => setIsPlayerModalOpen(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
-                        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={[styles.modalContainer, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                         <View style={{ padding: 20 }}>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>O'YINCHI QO'SHISH</Text>
+                                <Text style={[styles.modalTitle, { color: homeColors.textPrimary }]}>O'yinchi qo'shish</Text>
                                 <TouchableOpacity onPress={() => setIsPlayerModalOpen(false)}>
-                                    <Ionicons name="close-circle" size={28} color="rgba(255,255,255,0.6)" />
+                                    <Ionicons name="close" size={24} color={homeColors.textSecondary} />
                                 </TouchableOpacity>
                             </View>
 
                             <ScrollView style={{ maxHeight: 450 }} showsVerticalScrollIndicator={false}>
                                 {/* Player Photo */}
                                 <TouchableOpacity
-                                    style={styles.photoUploadBoxSmall}
+                                    style={[styles.photoUploadBoxSmall, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', borderColor: homeColors.border }]}
                                     onPress={() => pickImage((uri) => setModalPlayerData({ ...modalPlayerData, photo: uri }))}
                                 >
                                     {modalPlayerData.photo ? (
                                         <Image source={{ uri: modalPlayerData.photo }} style={{ width: 70, height: 70, borderRadius: 35 }} />
                                     ) : (
                                         <View style={{ alignItems: 'center' }}>
-                                            <Ionicons name="camera" size={24} color={Colors.primary} />
-                                            <Text style={{ color: Colors.primary, fontSize: 10, fontWeight: '700', marginTop: 2 }}>RASM</Text>
+                                            <Ionicons name="camera" size={24} color={homeColors.textSecondary} />
+                                            <Text style={{ color: homeColors.textSecondary, fontSize: 11, fontWeight: '600', marginTop: 2 }}>Rasm</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>
 
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>ISM *</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Ism *</Text>
                                     <TextInput
-                                        style={styles.inputField}
+                                        style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                         value={modalPlayerData.firstName}
                                         onChangeText={(t) => setModalPlayerData({ ...modalPlayerData, firstName: t })}
                                         placeholder="Masalan: Alisher"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                     />
                                 </View>
 
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>FAMILIYA *</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Familiya *</Text>
                                     <TextInput
-                                        style={styles.inputField}
+                                        style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                         value={modalPlayerData.lastName}
                                         onChangeText={(t) => setModalPlayerData({ ...modalPlayerData, lastName: t })}
                                         placeholder="Masalan: Karimov"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                     />
                                 </View>
 
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>OTASINING ISMI (IXTIYORIY)</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Otasining ismi (ixtiyoriy)</Text>
                                     <TextInput
-                                        style={styles.inputField}
+                                        style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                         value={modalPlayerData.fatherName}
                                         onChangeText={(t) => setModalPlayerData({ ...modalPlayerData, fatherName: t })}
                                         placeholder="Masalan: Bahodirovich"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                     />
                                 </View>
 
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>TUG'ILGAN SANA</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug'ilgan sana</Text>
                                     <TextInput
-                                        style={styles.inputField}
+                                        style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                         value={modalPlayerData.birthDate}
                                         onChangeText={(t) => setModalPlayerData({ ...modalPlayerData, birthDate: t })}
                                         placeholder="01.04.1990"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                     />
                                 </View>
 
-                                <Text style={styles.subTitle}>AMPLUA</Text>
+                                <Text style={[styles.subTitle, { color: homeColors.textSecondary }]}>Amplua</Text>
                                 <View style={styles.posGrid}>
                                     {PLAYER_POSITIONS.map((pos) => (
                                         <TouchableOpacity
                                             key={pos.id}
-                                            style={[styles.posBtn, modalPlayerData.position === pos.id && styles.posBtnActive]}
+                                            style={[
+                                                styles.posBtn,
+                                                { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border },
+                                                modalPlayerData.position === pos.id && { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? '#FFFFFF' : '#000000' }
+                                            ]}
                                             onPress={() => setModalPlayerData({ ...modalPlayerData, position: pos.id })}
                                         >
-                                            <Text style={[styles.posBtnText, modalPlayerData.position === pos.id && styles.posBtnTextActive]}>
+                                            <Text style={[
+                                                styles.posBtnText,
+                                                { color: homeColors.textSecondary },
+                                                modalPlayerData.position === pos.id && { color: isDark ? '#000000' : '#FFFFFF', fontWeight: '800' }
+                                            ]}>
                                                 {pos.id}
                                             </Text>
                                         </TouchableOpacity>
@@ -1747,54 +1770,48 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                 </View>
 
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>O'YINCHI RAQAMI (IXTIYORIY)</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>O'yinchi raqami (ixtiyoriy)</Text>
                                     <TextInput
-                                        style={styles.inputField}
+                                        style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
                                         value={modalPlayerData.number}
                                         onChangeText={(t) => setModalPlayerData({ ...modalPlayerData, number: t })}
                                         placeholder="20"
                                         keyboardType="number-pad"
-                                        maxLength={2}
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        maxLength={3}
+                                        placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
                                     />
                                 </View>
 
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>TELEFON RAQAMI (IXTIYORIY)</Text>
-                                    <View style={styles.phoneRow}>
-                                        <View style={styles.phonePrefixBox}>
-                                            <Text style={styles.phonePrefixText}>+998</Text>
-                                        </View>
-                                        <TextInput
-                                            style={styles.phoneInputField}
-                                            value={modalPlayerData.phone}
-                                            onChangeText={(t) => {
-                                                const cleaned = t.replace(/\D/g, '');
-                                                if (cleaned.length <= 9) {
-                                                    setModalPlayerData({ ...modalPlayerData, phone: cleaned });
-                                                }
-                                            }}
-                                            placeholder="90 123 45 67"
-                                            keyboardType="phone-pad"
-                                            maxLength={9}
-                                            placeholderTextColor="rgba(255,255,255,0.3)"
-                                        />
-                                    </View>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Telefon raqami (ixtiyoriy)</Text>
+                                    <TextInput
+                                        style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
+                                        value={formatUzPhone(modalPlayerData.phone)}
+                                        onChangeText={(t) => {
+                                            const formatted = formatUzPhone(t);
+                                            const clean = cleanPhoneForDb(formatted).replace('+998', '');
+                                            setModalPlayerData({ ...modalPlayerData, phone: clean });
+                                        }}
+                                        placeholder="+998 90 123 45 67"
+                                        keyboardType="phone-pad"
+                                        maxLength={17}
+                                        placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                                    />
                                 </View>
                             </ScrollView>
 
                             <TouchableOpacity
-                                style={styles.saveModalBtn}
+                                style={[styles.saveModalBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
                                 onPress={handleAddSquadPlayer}
                             >
-                                <Text style={styles.saveModalBtnText}>QO'SHISH</Text>
+                                <Text style={[styles.saveModalBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>Qo'shish</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
 
-            {/* CUSTOM STATUS NOTICE MODAL (REPLACES DEFAULT ALERT) */}
+            {/* CUSTOM STATUS NOTICE MODAL */}
             <Modal
                 transparent
                 visible={statusModal.visible}
@@ -1805,11 +1822,11 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 }}
             >
                 <View style={styles.modalBackdrop}>
-                    <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={[
                         styles.noticeModalCard,
-                        statusModal.type === 'success' && { borderColor: 'rgba(0,255,102,0.4)' },
-                        statusModal.type === 'error' && { borderColor: 'rgba(255,59,48,0.4)' }
+                        { backgroundColor: homeColors.surface, borderColor: homeColors.border },
+                        statusModal.type === 'success' && { borderColor: 'rgba(16, 185, 129, 0.4)' },
+                        statusModal.type === 'error' && { borderColor: 'rgba(239, 68, 68, 0.4)' }
                     ]}>
                         <TouchableOpacity
                             style={styles.noticeCloseBtn}
@@ -1818,31 +1835,31 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                 if (statusModal.onClose) statusModal.onClose();
                             }}
                         >
-                            <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
+                            <Ionicons name="close" size={18} color={homeColors.textSecondary} />
                         </TouchableOpacity>
 
                         <View style={styles.noticeHeaderRow}>
                             <View style={[
                                 styles.noticeIconBox,
-                                statusModal.type === 'success' && { backgroundColor: 'rgba(0,255,102,0.15)' },
-                                statusModal.type === 'error' && { backgroundColor: 'rgba(255,59,48,0.15)' }
+                                statusModal.type === 'success' && { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
+                                statusModal.type === 'error' && { backgroundColor: 'rgba(239, 68, 68, 0.15)' }
                             ]}>
                                 <Ionicons
                                     name={statusModal.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
                                     size={24}
-                                    color={statusModal.type === 'success' ? '#00FF66' : '#FF3B30'}
+                                    color={statusModal.type === 'success' ? '#10B981' : '#EF4444'}
                                 />
                             </View>
-                            <Text style={styles.noticeTitleText}>{statusModal.title}</Text>
+                            <Text style={[styles.noticeTitleText, { color: homeColors.textPrimary }]}>{statusModal.title}</Text>
                         </View>
 
-                        <Text style={styles.noticeBodyText}>{statusModal.message}</Text>
+                        <Text style={[styles.noticeBodyText, { color: homeColors.textSecondary }]}>{statusModal.message}</Text>
 
                         <TouchableOpacity
                             style={[
                                 styles.noticeActionBtn,
                                 statusModal.type === 'success' && { backgroundColor: '#0088cc', width: '100%', borderRadius: 14, height: 46, flexDirection: 'row' },
-                                statusModal.type === 'error' && { backgroundColor: '#FF3B30' }
+                                statusModal.type === 'error' && { backgroundColor: '#EF4444' }
                             ]}
                             activeOpacity={0.8}
                             onPress={() => {
@@ -1853,7 +1870,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                             {statusModal.type === 'success' ? (
                                 <>
                                     <Ionicons name="paper-plane" size={16} color="#FFF" style={{ marginRight: 8 }} />
-                                    <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 }}>BOTGA O'TISH</Text>
+                                    <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Botga o'tish</Text>
                                 </>
                             ) : (
                                 <Ionicons name="checkmark" size={18} color="#FFF" />
@@ -1867,73 +1884,63 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#000' },
+    container: { flex: 1 },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        marginTop: Platform.OS === 'ios' ? 0 : 20,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     backButton: {
-        width: 40,
-        height: 40,
+        width: 38,
+        height: 38,
         borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.08)',
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
     },
-    headerTitle: { color: '#FFF', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
-    headerSubtitle: { color: Colors.primary, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+    headerTitle: { fontSize: 17, fontWeight: '800' },
     scrollContent: { padding: 16 },
     typeSelectorWrapper: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 16,
+        borderRadius: 14,
         padding: 4,
-        marginBottom: 16,
+        marginBottom: 14,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
     },
     typeOption: {
         flex: 1,
         flexDirection: 'row',
-        height: 44,
+        height: 40,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 12,
+        borderRadius: 10,
     },
-    typeOptionActive: { backgroundColor: Colors.primary },
-    typeOptionText: { color: Colors.textMuted, fontSize: 12, fontWeight: '900' },
-    typeOptionTextActive: { color: '#000' },
+    typeOptionText: { fontSize: 13, fontWeight: '700' },
 
     card: {
-        backgroundColor: 'rgba(20, 25, 40, 0.7)',
-        borderRadius: 20,
+        borderRadius: 16,
         padding: 16,
-        marginBottom: 16,
+        marginBottom: 14,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
     },
     cardTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 12,
     },
-    cardTitle: { color: '#FFF', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
-    subTitle: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '800', marginBottom: 8 },
+    cardTitle: { fontSize: 15, fontWeight: '700' },
+    subTitle: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
 
     leagueSelectTrigger: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
         paddingVertical: 12,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderWidth: 1.5,
-        borderColor: 'rgba(0, 255, 102, 0.35)',
-        overflow: 'hidden',
+        borderRadius: 14,
+        borderWidth: 1,
     },
     leagueTriggerLeft: {
         flexDirection: 'row',
@@ -1941,14 +1948,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     triggerLogoWrapper: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        width: 34,
+        height: 34,
+        borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         padding: 2,
     },
     triggerLeagueLogo: {
@@ -1956,46 +1961,26 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     triggerLeagueTitle: {
-        color: Colors.primary,
         fontSize: 14,
-        fontWeight: '900',
-        letterSpacing: 0.5,
+        fontWeight: '700',
     },
     triggerLeagueSubTitle: {
-        color: 'rgba(255,255,255,0.45)',
-        fontSize: 10,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '500',
         marginTop: 1,
-    },
-    triggerRightBadge: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.25)',
     },
 
     leagueDropdownContainer: {
-        borderRadius: 16,
-        backgroundColor: 'rgba(10, 15, 30, 0.95)',
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
     },
     leagueOptionItem: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
         paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
-        overflow: 'hidden',
-    },
-    leagueOptionItemActive: {
-        backgroundColor: 'rgba(0, 255, 102, 0.12)',
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     leagueOptionLeft: {
         flexDirection: 'row',
@@ -2003,10 +1988,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     optionLogoWrapper: {
-        width: 32,
-        height: 32,
+        width: 30,
+        height: 30,
         borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 2,
@@ -2016,141 +2000,100 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     optionLeagueTitle: {
-        color: 'rgba(255,255,255,0.7)',
         fontSize: 13,
-        fontWeight: '800',
-    },
-    optionLeagueTitleActive: {
-        color: Colors.primary,
+        fontWeight: '700',
     },
     optionLeagueSubTitle: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '500',
         marginTop: 1,
     },
-    optionCheckBadge: {
-        marginLeft: 8,
-    },
 
     photoUploadBox: {
-        height: 110,
-        borderRadius: 16,
+        height: 100,
+        borderRadius: 14,
         borderWidth: 1.5,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 255, 102, 0.04)',
         overflow: 'hidden',
         marginBottom: 12,
     },
-    uploadedPhoto: { width: '100%', height: '100%', borderRadius: 16 },
+    uploadedPhoto: { width: '100%', height: '100%', borderRadius: 14 },
     photoPlaceholderInner: { alignItems: 'center' },
-    photoUploadText: { color: Colors.primary, fontSize: 11, fontWeight: '900', marginTop: 4 },
+    photoUploadText: { fontSize: 12, fontWeight: '600', marginTop: 4 },
 
     inputGroup: { marginBottom: 12 },
-    inputLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '800', marginBottom: 6 },
+    inputLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
     inputField: {
-        backgroundColor: 'rgba(255,255,255,0.06)',
         borderRadius: 12,
         paddingHorizontal: 14,
         height: 46,
-        color: '#FFF',
         fontSize: 14,
         fontWeight: '600',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-
-    phoneRow: { flexDirection: 'row', gap: 8 },
-    phonePrefixBox: {
-        width: 64,
-        height: 46,
-        borderRadius: 12,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.25)',
-    },
-    phonePrefixText: { color: Colors.primary, fontWeight: '900', fontSize: 14 },
-    phoneInputField: {
-        flex: 1,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        height: 46,
-        color: '#FFF',
-        fontSize: 14,
-        fontWeight: '600',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
     },
 
     validatingBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
         padding: 12,
         borderRadius: 12,
         marginTop: 10,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     validatingText: {
-        color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 12,
         fontWeight: '600',
     },
     validationErrorBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 59, 48, 0.12)',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
         padding: 12,
         borderRadius: 12,
         marginTop: 10,
         borderWidth: 1,
-        borderColor: 'rgba(255, 59, 48, 0.3)',
+        borderColor: 'rgba(239, 68, 68, 0.3)',
     },
     validationErrorText: {
-        color: '#FF3B30',
+        color: '#EF4444',
         fontSize: 12,
-        fontWeight: '800',
+        fontWeight: '700',
         flex: 1,
     },
     validationSuccessBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 255, 102, 0.12)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
         padding: 12,
         borderRadius: 12,
         marginTop: 10,
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
+        borderColor: 'rgba(16, 185, 129, 0.3)',
     },
     validationSuccessText: {
-        color: Colors.primary,
+        color: '#10B981',
         fontSize: 12,
-        fontWeight: '800',
+        fontWeight: '700',
         flex: 1,
     },
     numberBadgeBox: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
         marginTop: 6,
         borderWidth: 1,
     },
     numberBadgeError: {
-        backgroundColor: 'rgba(255, 59, 48, 0.12)',
-        borderColor: 'rgba(255, 59, 48, 0.4)',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        borderColor: 'rgba(239, 68, 68, 0.3)',
     },
     numberBadgeSuccess: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        borderColor: 'rgba(0, 255, 102, 0.3)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderColor: 'rgba(16, 185, 129, 0.3)',
     },
     numberBadgeText: {
         fontSize: 12,
@@ -2164,216 +2107,133 @@ const styles = StyleSheet.create({
         minWidth: '45%',
         paddingVertical: 10,
         borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.05)',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
     },
-    posBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-    posBtnText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '800' },
-    posBtnTextActive: { color: '#000' },
+    posBtnText: { fontSize: 12, fontWeight: '600' },
 
     detailPosPill: {
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.06)',
         marginRight: 6,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
     },
-    detailPosPillActive: { backgroundColor: 'rgba(0, 255, 102, 0.2)', borderColor: Colors.primary },
-    detailPosPillText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '700' },
-    detailPosPillTextActive: { color: Colors.primary },
+    detailPosPillText: { fontSize: 12, fontWeight: '600' },
 
-    countBadge: { backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 2, borderRadius: 10 },
-    countBadgeText: { color: '#000', fontWeight: '900', fontSize: 11 },
+    countBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
+    countBadgeText: { fontWeight: '800', fontSize: 11 },
 
     squadPlayerCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.04)',
         borderRadius: 14,
         padding: 10,
         marginBottom: 8,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
     },
     squadAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    squadPlayerName: { color: '#FFF', fontSize: 14, fontWeight: '800' },
-    squadPlayerMeta: { color: Colors.primary, fontSize: 12, fontWeight: '700', marginTop: 2 },
+    squadPlayerName: { fontSize: 14, fontWeight: '700' },
+    squadPlayerMeta: { fontSize: 12, fontWeight: '500', marginTop: 2 },
     removeSquadBtn: { padding: 6 },
 
     addSquadBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 14,
+        paddingVertical: 12,
         borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
+        borderWidth: 1,
         borderStyle: 'dashed',
-        backgroundColor: 'rgba(0, 255, 102, 0.04)',
         marginTop: 6,
     },
-    addSquadBtnText: { color: Colors.primary, fontWeight: '900', fontSize: 13 },
-
-    submitBtn: {
-        backgroundColor: Colors.primary,
-        height: 52,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 10,
-        shadowColor: Colors.primary,
-        shadowOpacity: 0.4,
-        shadowRadius: 10,
-    },
-    submitBtnDisabled: { opacity: 0.5 },
-    submitBtnText: { color: '#000', fontSize: 15, fontWeight: '900', letterSpacing: 1 },
+    addSquadBtnText: { fontWeight: '700', fontSize: 13 },
 
     // Modal
-    modalBackdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.85)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 16,
-    },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.85)',
-        justifyContent: 'center',
-        padding: 16,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end',
     },
     modalContainer: {
-        backgroundColor: 'rgba(20, 25, 40, 0.95)',
-        borderRadius: 24,
-        overflow: 'hidden',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
+        borderBottomWidth: 0,
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 16,
     },
-    modalTitle: { color: Colors.primary, fontSize: 15, fontWeight: '900', letterSpacing: 1 },
+    modalTitle: { fontSize: 16, fontWeight: '700' },
     photoUploadBoxSmall: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(255,255,255,0.06)',
+        height: 70,
+        width: 70,
+        borderRadius: 35,
+        borderWidth: 1.5,
+        borderStyle: 'dashed',
+        alignSelf: 'center',
         justifyContent: 'center',
         alignItems: 'center',
-        alignSelf: 'center',
-        marginBottom: 14,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
+        marginBottom: 16,
     },
     saveModalBtn: {
-        backgroundColor: Colors.primary,
-        height: 46,
-        borderRadius: 12,
+        height: 48,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 14,
     },
-    saveModalBtnText: { color: '#000', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+    saveModalBtnText: { fontSize: 14, fontWeight: '700' },
 
-    // Org option styles
-    orgOptionCard: {
-        flexDirection: 'row',
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        padding: 16,
     },
-    orgOptionCardActive: {
-        backgroundColor: 'rgba(0, 255, 102, 0.12)',
-        borderColor: '#00FF66',
-    },
-    orgOptionText: {
-        color: Colors.textMuted,
-        fontSize: 13,
-        fontWeight: '700',
-    },
-    orgOptionTextActive: {
-        color: '#00FF66',
-        fontWeight: '900',
-    },
-
-    // Custom Status Notice Modal Styles
     noticeModalCard: {
-        width: '84%',
-        backgroundColor: '#0E1217',
+        width: '100%',
+        maxWidth: 340,
         borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
         padding: 20,
+        borderWidth: 1,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-        elevation: 10,
     },
     noticeCloseBtn: {
         position: 'absolute',
         top: 14,
         right: 14,
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10,
+        padding: 4,
     },
     noticeHeaderRow: {
-        flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 12,
-        marginTop: 4,
     },
     noticeIconBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         justifyContent: 'center',
-        marginRight: 10,
+        alignItems: 'center',
+        marginBottom: 10,
     },
-    noticeTitleText: {
-        color: '#FFF',
-        fontSize: 14,
-        fontWeight: '900',
-        letterSpacing: 0.8,
-    },
-    noticeBodyText: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 13,
-        fontWeight: '500',
-        textAlign: 'center',
-        lineHeight: 18,
-        marginBottom: 20,
-    },
+    noticeTitleText: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
+    noticeBodyText: { fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 18 },
     noticeActionBtn: {
-        width: 44,
         height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
+        paddingHorizontal: 24,
+        borderRadius: 12,
         justifyContent: 'center',
+        alignItems: 'center',
     },
 });
