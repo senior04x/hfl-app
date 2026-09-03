@@ -32,7 +32,7 @@ import SmartImage from '../components/SmartImage';
 import Skeleton from '../components/Skeleton';
 import { SlideButton } from '../components/SlideButton';
 import { useTranslation } from 'react-i18next';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import CustomDatePickerModal from '../components/CustomDatePickerModal';
 
 const { width } = Dimensions.get('window');
 
@@ -206,41 +206,18 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     // DatePicker State
     const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
     const [datePickerTarget, setDatePickerTarget] = useState<'main' | 'modal'>('main');
-    const [tempSelectedDate, setTempSelectedDate] = useState<Date>(new Date(2000, 0, 1));
 
     const openDatePicker = (target: 'main' | 'modal') => {
         setDatePickerTarget(target);
-        const currentDateStr = target === 'main' ? formData.birthDate : modalPlayerData.birthDate;
-        setTempSelectedDate(parseStringToDate(currentDateStr));
         setIsDatePickerVisible(true);
     };
 
-    const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
-        if (Platform.OS === 'android') {
-            setIsDatePickerVisible(false);
-            if (event.type === 'set' && date) {
-                const dateStr = formatDateToString(date);
-                if (datePickerTarget === 'main') {
-                    setFormData(prev => ({ ...prev, birthDate: dateStr }));
-                } else {
-                    setModalPlayerData(prev => ({ ...prev, birthDate: dateStr }));
-                }
-            }
-        } else {
-            if (date) {
-                setTempSelectedDate(date);
-            }
-        }
-    };
-
-    const confirmIosDate = () => {
-        const dateStr = formatDateToString(tempSelectedDate);
+    const handleDateSelect = (dateStr: string) => {
         if (datePickerTarget === 'main') {
             setFormData(prev => ({ ...prev, birthDate: dateStr }));
         } else {
             setModalPlayerData(prev => ({ ...prev, birthDate: dateStr }));
         }
-        setIsDatePickerVisible(false);
     };
 
     const handleNumberChange = (num: string) => {
@@ -2089,51 +2066,13 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 </View>
             </Modal>
 
-            {/* ANDROID NATIVE DATE PICKER */}
-            {isDatePickerVisible && Platform.OS === 'android' && (
-                <DateTimePicker
-                    value={tempSelectedDate}
-                    mode="date"
-                    display="default"
-                    maximumDate={new Date()}
-                    minimumDate={new Date(1950, 0, 1)}
-                    onChange={handleDateChange}
-                />
-            )}
-
-            {/* IOS DATE PICKER MODAL */}
-            {Platform.OS === 'ios' && (
-                <Modal
-                    visible={isDatePickerVisible}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => setIsDatePickerVisible(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <View style={[styles.iosPickerContainer, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
-                            <View style={[styles.iosPickerHeader, { borderBottomColor: homeColors.border }]}>
-                                <TouchableOpacity onPress={() => setIsDatePickerVisible(false)}>
-                                    <Text style={[styles.iosPickerBtnCancel, { color: homeColors.textSecondary }]}>Bekor qilish</Text>
-                                </TouchableOpacity>
-                                <Text style={[styles.iosPickerTitle, { color: homeColors.textPrimary }]}>Tug'ilgan sana</Text>
-                                <TouchableOpacity onPress={confirmIosDate}>
-                                    <Text style={[styles.iosPickerBtnDone, { color: isDark ? '#FFFFFF' : '#000000' }]}>Tayyor</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <DateTimePicker
-                                value={tempSelectedDate}
-                                mode="date"
-                                display="spinner"
-                                maximumDate={new Date()}
-                                minimumDate={new Date(1950, 0, 1)}
-                                onChange={handleDateChange}
-                                textColor={homeColors.textPrimary}
-                                themeVariant={isDark ? 'dark' : 'light'}
-                            />
-                        </View>
-                    </View>
-                </Modal>
-            )}
+            {/* CUSTOM UNIVERSAL DATE PICKER MODAL */}
+            <CustomDatePickerModal
+                visible={isDatePickerVisible}
+                initialDate={datePickerTarget === 'main' ? formData.birthDate : modalPlayerData.birthDate}
+                onClose={() => setIsDatePickerVisible(false)}
+                onSelectDate={handleDateSelect}
+            />
             </Animated.View>
         </View>
     );
