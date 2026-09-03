@@ -637,7 +637,7 @@ export default function FifaPlayerCard({
                             </View>
                         </View>
 
-                        {/* Bottom Pinned Section: Separator + Stats Row (Gol, Asist, O'yin) + 5px gap + Micro Amatora Seal */}
+                        {/* Bottom Pinned Section: Separator + Stats Row (Gol, Asist, O'yin) + 10px gap + Micro Amatora Seal */}
                         <View
                             style={{
                                 position: 'absolute',
@@ -690,12 +690,12 @@ export default function FifaPlayerCard({
                                 </View>
                             )}
 
-                            {/* Micro Amatora Seal Glued exactly 5px below stats row at the absolute bottom */}
+                            {/* Micro Amatora Seal Glued exactly 10px below stats row at the absolute bottom */}
                             <View
                                 style={[
                                     styles.cardFooterBrand,
                                     {
-                                        marginTop: 5,
+                                        marginTop: 10,
                                         height: L.footerH,
                                         justifyContent: 'center',
                                         alignItems: 'center',
