@@ -291,6 +291,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
     // Profile Update & Modals
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
+    const [originalPlayerData, setOriginalPlayerData] = useState<any>(null);
     const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [showComparisonModal, setShowComparisonModal] = useState(false);
@@ -526,6 +527,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 }
             }
 
+            setOriginalPlayerData(freshPlayer);
             setUpdateForm({
                 photoUrl: freshPlayer?.photo_url || freshPlayer?.photo || freshPlayer?.avatar || '',
                 phone: freshPlayer?.phone || '',
@@ -619,7 +621,10 @@ export default function MyStatsScreen({ route, navigation }: any) {
             const cleanInsta = (updateForm.instagramUsername || '').trim().replace(/^@/, '');
             const instaUrl = cleanInsta ? `https://www.instagram.com/${cleanInsta}/` : '';
 
-            const pData = extractPlayerData(player) || {};
+            const oldSource = originalPlayerData || player;
+            const oldPData = extractPlayerData(oldSource) || {};
+            const oldPhotoUrl = oldSource?.photo_url || oldSource?.photo || oldSource?.avatar || '';
+
             const metaObj = {
                 citizenship: updateForm.citizenship || "O'zbekiston",
                 height: updateForm.height || '',
@@ -629,20 +634,20 @@ export default function MyStatsScreen({ route, navigation }: any) {
             const payload = {
                 playerId: targetPlayerId,
                 oldData: {
-                    firstName: player?.firstName || player?.first_name || '',
-                    lastName: player?.lastName || player?.last_name || '',
-                    fatherName: pData.fatherName || player?.father_name || '',
-                    phone: player?.phone || '',
-                    position: player?.position || '',
-                    playerNumber: player?.number || player?.player_number || '',
-                    photoUrl: player?.photo || player?.avatar || '',
-                    passportSeries: player?.passport_series || player?.passportSeries || '',
-                    passportNumber: player?.passport_number || player?.passportNumber || '',
-                    citizenship: pData.citizenship || player?.citizenship || '',
-                    height: String(pData.height || player?.height || ''),
-                    weight: String(pData.weight || player?.weight || ''),
-                    instagramUsername: pData.instagram_username || player?.instagram_username || '',
-                    birthDate: player?.birth_date || player?.birthDate || ''
+                    firstName: oldSource?.first_name || oldSource?.firstName || '',
+                    lastName: oldSource?.last_name || oldSource?.lastName || '',
+                    fatherName: oldSource?.father_name || oldSource?.fatherName || oldPData.fatherName || '',
+                    phone: oldSource?.phone || '',
+                    position: oldSource?.position || '',
+                    playerNumber: oldSource?.player_number || oldSource?.number || oldSource?.shirt_number || '',
+                    photoUrl: oldPhotoUrl,
+                    passportSeries: oldSource?.passport_series || oldSource?.passportSeries || '',
+                    passportNumber: oldSource?.passport_number || oldSource?.passportNumber || '',
+                    citizenship: oldPData.citizenship || oldSource?.citizenship || '',
+                    height: String(oldPData.height || oldSource?.height || ''),
+                    weight: String(oldPData.weight || oldSource?.weight || ''),
+                    instagramUsername: oldPData.instagram_username || oldSource?.instagram_username || '',
+                    birthDate: oldSource?.birth_date || oldSource?.birthDate || ''
                 },
                 newData: {
                     ...updateForm,
