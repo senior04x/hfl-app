@@ -42,10 +42,11 @@ interface FifaPlayerCardProps {
 }
 
 // =============================================================================
-// MATEMATIK MAKET (LAYOUT) TIZIMI
+// MATEMATIK MAKET (3:4 ASPEKT NISIYI LAYOUT) TIZIMI
 // -----------------------------------------------------------------------------
 function computeCardLayout(cardW: number, showAttrs: boolean) {
     const sf = cardW / 260;
+    const cardHeight = Math.round(cardW * (4 / 3)); // Aniq 3x4 o'lcham nisbati
 
     const outerRadiusTop = Math.round(18 * sf);
     const outerRadiusBottom = Math.round(18 * sf);
@@ -53,53 +54,45 @@ function computeCardLayout(cardW: number, showAttrs: boolean) {
     const innerRadiusTop = Math.max(0, outerRadiusTop - borderPad);
     const innerRadiusBottom = Math.max(0, outerRadiusBottom - borderPad);
 
-    const bodyPadH = Math.round(10 * sf);
+    const bodyPadH = Math.round(12 * sf);
     const bodyPadTop = Math.round(14 * sf);
-    const bodyPadBottom = Math.round(14 * sf);
+    const bodyPadBottom = Math.round(12 * sf);
 
-    const heroRowH = Math.round(142 * sf);
-    const leftColW = Math.round(62 * sf);
+    const availableInnerH = cardHeight - (borderPad * 2) - bodyPadTop - bodyPadBottom;
+    const heroRowH = Math.round(availableInnerH * 0.54); // Fotosurat va OVR maydoni
+    const leftColW = Math.round(66 * sf);
     const leftColGap = Math.round(4 * sf);
     const photoW = cardW - (borderPad * 2) - (bodyPadH * 2) - leftColW;
 
-    const ovrFont = Math.round(30 * sf);
-    const ovrLineH = Math.round(32 * sf);
+    const ovrFont = Math.round(32 * sf);
+    const ovrLineH = Math.round(34 * sf);
     const posFont = Math.round(8.5 * sf);
     const posLineH = Math.round(11 * sf);
     const posBorder = Math.max(1, Math.round(1 * sf));
     const posPadV = Math.max(1, Math.round(2 * sf));
     const dividerH = Math.max(1, Math.round(1.5 * sf));
-    const clubBadgeD = Math.round(36 * sf);
+    const clubBadgeD = Math.round(38 * sf);
 
     const gapHeroToName = Math.round(6 * sf);
     const namePadV = Math.max(2, Math.round(4 * sf));
-    const nameFont = Math.round(13 * sf);
-    const nameLineH = Math.round(15 * sf);
+    const nameFont = Math.round(14 * sf);
+    const nameLineH = Math.round(16 * sf);
 
     const gapNameToSep = Math.round(5 * sf);
     const sepH = Math.round(6 * sf);
     const gapSepToStats = Math.round(5 * sf);
 
-    const statNumFont = Math.round(15 * sf);
-    const statNumLineH = Math.round(17 * sf);
-    const statLabelFont = Math.round(8.5 * sf);
-    const statLabelLineH = Math.round(10 * sf);
+    const statNumFont = Math.round(16 * sf);
+    const statNumLineH = Math.round(18 * sf);
+    const statLabelFont = Math.round(9 * sf);
+    const statLabelLineH = Math.round(11 * sf);
     const gapStatNumToLabel = Math.max(1, Math.round(2 * sf));
     const statColItemH = statNumLineH + gapStatNumToLabel + statLabelLineH;
 
     const gapStatsToFooter = Math.round(6 * sf);
-    const footerH = Math.round(13 * sf);
-    const footerLogo = Math.round(10 * sf);
-    const footerFont = Math.round(8 * sf);
-
-    const namePlateH = nameLineH + (namePadV * 2);
-
-    let bottomInfoH = namePlateH;
-    if (showAttrs) {
-        bottomInfoH += gapNameToSep + sepH + gapSepToStats + statColItemH + gapStatsToFooter + footerH;
-    }
-
-    const cardHeight = (borderPad * 2) + bodyPadTop + heroRowH + gapHeroToName + bottomInfoH + bodyPadBottom;
+    const footerH = Math.round(14 * sf);
+    const footerLogo = Math.round(11 * sf);
+    const footerFont = Math.round(8.5 * sf);
 
     return {
         sf,
@@ -154,7 +147,7 @@ export function FifaCardSkeleton({
     size?: 'sm' | 'md' | 'lg';
     showAttributes?: boolean;
 }) {
-    const cardWidth = size === 'sm' ? 160 : size === 'lg' ? Math.min(SCREEN_WIDTH - 84, 260) : 220;
+    const cardWidth = size === 'sm' ? 180 : size === 'lg' ? Math.min(SCREEN_WIDTH - 32, 340) : 260;
     const L = computeCardLayout(cardWidth, showAttributes);
     const scaleFactor = L.sf;
 
@@ -305,7 +298,7 @@ export default function FifaPlayerCard({
     const assistsCount = player?.stats?.assists ?? player?.assists ?? 0;
     const matchesCount = player?.stats?.matchesPlayed ?? player?.stats?.matches ?? player?.matchesPlayed ?? 0;
 
-    const cardWidth = size === 'sm' ? 160 : size === 'lg' ? Math.min(SCREEN_WIDTH - 84, 260) : 220;
+    const cardWidth = size === 'sm' ? 180 : size === 'lg' ? Math.min(SCREEN_WIDTH - 32, 340) : 260;
     const L = computeCardLayout(cardWidth, showAttributes);
     const cardHeight = L.cardHeight;
     const scaleFactor = L.sf;
