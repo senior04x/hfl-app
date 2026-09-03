@@ -20,7 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
-import { getHomeScreenColors } from '../theme/homeScreenColors';
+import { getHomeScreenColors } from '../constants/homeTheme';
 import { apiService, supabase } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 
