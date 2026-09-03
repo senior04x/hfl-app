@@ -186,6 +186,41 @@ export default function FormationBoard({ route, navigation }: any) {
         }
     }, [selectedFormat]);
 
+    // Sorted Players List: Primary by Rating Descending, Secondary by Position (GK -> DEF -> MID -> ATT)
+    const sortedAvailablePlayers = useMemo(() => {
+        const positionOrderMap: Record<string, number> = {
+            GK: 1,
+            DEF: 2,
+            MID: 3,
+            ATT: 4,
+        };
+
+        return [...availablePlayers].sort((a, b) => {
+            // 1. Rating comparison (Highest rating first)
+            const ratingA = parseFloat(String(a.rating || a.stats?.rating || getPlayerRatingScore(a) || '0'));
+            const ratingB = parseFloat(String(b.rating || b.stats?.rating || getPlayerRatingScore(b) || '0'));
+
+            if (Math.abs(ratingB - ratingA) > 0.01) {
+                return ratingB - ratingA;
+            }
+
+            // 2. Position comparison (GK -> DEF -> MID -> ATT)
+            const catA = getPositionCategory(a.position || a.role);
+            const catB = getPositionCategory(b.position || b.role);
+            const orderA = positionOrderMap[catA] || 5;
+            const orderB = positionOrderMap[catB] || 5;
+
+            if (orderA !== orderB) {
+                return orderA - orderB;
+            }
+
+            // 3. Name comparison (alphabetical)
+            const nameA = (a.firstName || a.name || '').toLowerCase();
+            const nameB = (b.firstName || b.name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+    }, [availablePlayers]);
+
     useEffect(() => {
         fetchData();
 
@@ -771,7 +806,7 @@ export default function FormationBoard({ route, navigation }: any) {
                         </View>
 
                         <View style={styles.subsListVertical}>
-                            {availablePlayers.map(player => {
+                            {sortedAvailablePlayers.map(player => {
                                 const id = String(player._id || player.id);
                                 const isOnPitch = playersOnPitch.some(p => p.id === id);
                                 const firstName = player.firstName || player.first_name || player.name || 'O\'yinchi';
