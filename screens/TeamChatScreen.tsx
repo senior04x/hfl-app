@@ -19,6 +19,7 @@ import {
     Alert,
     Keyboard,
     Easing,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
@@ -1354,82 +1355,91 @@ function TeamChatScreen({ route, navigation }: any) {
                     {(loading && messages.length === 0) ? (
                         <ChatSkeleton />
                     ) : (
-                        <FlatList
-                            ref={flatListRef}
-                            data={messages}
-                            extraData={[messages, typingUsers]}
-                            inverted={true}
-                            renderItem={renderMessage}
-                            keyExtractor={(item, index) => item.localId || item._id || item.id || `msg-${index}`}
-                            contentContainerStyle={styles.messageList}
-                            onRefresh={() => fetchMessages(1, true, false)}
-                            refreshing={false}
-                            onEndReached={handleLoadMore}
-                            onEndReachedThreshold={0.1}
-                            onScroll={(e) => {
-                                const offsetY = e.nativeEvent.contentOffset.y;
-                                const atBottom = offsetY <= 40;
-                                isAtBottomRef.current = atBottom;
-                                if (atBottom && unreadNewCount > 0) {
-                                    setUnreadNewCount(0);
-                                }
-                            }}
-                            scrollEventThrottle={16}
-                            ListHeaderComponent={
-                                Object.keys(typingUsers).length > 0 ? (
-                                    <View style={styles.typingMessagesContainer}>
-                                        {Object.entries(typingUsers).map(([tUserId, tUserData]) => {
-                                            const foundPlayer = teamPlayers.find((p: any) => String(p._id || p.id) === String(tUserId));
-                                            const isTeamAccount = foundPlayer?.role === 'team' || String(tUserId).includes('team') || tUserData.name === teamInfo?.name;
-                                            const avatarUri = isTeamAccount ? teamInfo?.logo : (tUserData.photo || foundPlayer?.photo || foundPlayer?.photo_url || foundPlayer?.avatar);
-                                            const displayName = (isTeamAccount ? (teamInfo?.name || tUserData.name || 'TEAM') : (tUserData.name || (foundPlayer?.firstName ? `${foundPlayer.firstName} ${foundPlayer.lastName || ''}`.trim() : 'O\'yinchi'))).toUpperCase();
+                        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                            <View style={{ flex: 1 }}>
+                                <FlatList
+                                    ref={flatListRef}
+                                    data={messages}
+                                    extraData={[messages, typingUsers]}
+                                    inverted={true}
+                                    renderItem={renderMessage}
+                                    keyExtractor={(item, index) => item.localId || item._id || item.id || `msg-${index}`}
+                                    contentContainerStyle={styles.messageList}
+                                    onRefresh={() => fetchMessages(1, true, false)}
+                                    refreshing={false}
+                                    onEndReached={handleLoadMore}
+                                    onEndReachedThreshold={0.1}
+                                    onTouchStart={() => {
+                                        if (isKeyboardOpen) {
+                                            Keyboard.dismiss();
+                                        }
+                                    }}
+                                    onScroll={(e) => {
+                                        const offsetY = e.nativeEvent.contentOffset.y;
+                                        const atBottom = offsetY <= 40;
+                                        isAtBottomRef.current = atBottom;
+                                        if (atBottom && unreadNewCount > 0) {
+                                            setUnreadNewCount(0);
+                                        }
+                                    }}
+                                    scrollEventThrottle={16}
+                                    ListHeaderComponent={
+                                        Object.keys(typingUsers).length > 0 ? (
+                                            <View style={styles.typingMessagesContainer}>
+                                                {Object.entries(typingUsers).map(([tUserId, tUserData]) => {
+                                                    const foundPlayer = teamPlayers.find((p: any) => String(p._id || p.id) === String(tUserId));
+                                                    const isTeamAccount = foundPlayer?.role === 'team' || String(tUserId).includes('team') || tUserData.name === teamInfo?.name;
+                                                    const avatarUri = isTeamAccount ? teamInfo?.logo : (tUserData.photo || foundPlayer?.photo || foundPlayer?.photo_url || foundPlayer?.avatar);
+                                                    const displayName = (isTeamAccount ? (teamInfo?.name || tUserData.name || 'TEAM') : (tUserData.name || (foundPlayer?.firstName ? `${foundPlayer.firstName} ${foundPlayer.lastName || ''}`.trim() : 'O\'yinchi'))).toUpperCase();
 
-                                            return (
-                                                <View key={`typing-${tUserId}`} style={styles.typingMessageRow}>
-                                                    <View style={styles.avatarContainer}>
-                                                        <SmartImage
-                                                            uri={avatarUri}
-                                                            style={[
-                                                                styles.avatar,
-                                                                isTeamAccount && { borderRadius: 0, backgroundColor: 'transparent' }
-                                                            ]}
-                                                            contentFit={isTeamAccount ? "contain" : "cover"}
-                                                            fallbackIcon="person"
-                                                        />
-                                                    </View>
-                                                    <View style={styles.otherMessageWrapper}>
-                                                        <Text style={[styles.senderName, { color: homeColors.textSecondary }]}>{displayName}</Text>
-                                                        <View style={[
-                                                            styles.messageBubble,
-                                                            styles.otherBubble,
-                                                            styles.typingBubble,
-                                                            { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }
-                                                        ]}>
-                                                            <View style={styles.typingDotsContainer}>
-                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot1Y }], opacity: typingDot1Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
-                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot2Y }], opacity: typingDot2Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
-                                                                <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot3Y }], opacity: typingDot3Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
+                                                    return (
+                                                        <View key={`typing-${tUserId}`} style={styles.typingMessageRow}>
+                                                            <View style={styles.avatarContainer}>
+                                                                <SmartImage
+                                                                    uri={avatarUri}
+                                                                    style={[
+                                                                        styles.avatar,
+                                                                        isTeamAccount && { borderRadius: 0, backgroundColor: 'transparent' }
+                                                                    ]}
+                                                                    contentFit={isTeamAccount ? "contain" : "cover"}
+                                                                    fallbackIcon="person"
+                                                                />
+                                                            </View>
+                                                            <View style={styles.otherMessageWrapper}>
+                                                                <Text style={[styles.senderName, { color: homeColors.textSecondary }]}>{displayName}</Text>
+                                                                <View style={[
+                                                                    styles.messageBubble,
+                                                                    styles.otherBubble,
+                                                                    styles.typingBubble,
+                                                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }
+                                                                ]}>
+                                                                    <View style={styles.typingDotsContainer}>
+                                                                        <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot1Y }], opacity: typingDot1Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
+                                                                        <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot2Y }], opacity: typingDot2Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
+                                                                        <Animated.View style={[styles.typingBlinkDot, { transform: [{ translateY: typingDot3Y }], opacity: typingDot3Opacity, backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} />
+                                                                    </View>
+                                                                </View>
                                                             </View>
                                                         </View>
-                                                    </View>
-                                                </View>
-                                            );
-                                        })}
-                                    </View>
-                                ) : null
-                            }
-                            ListFooterComponent={isFetchingMore ? (
-                                <View style={{ paddingVertical: 20 }}>
-                                    <ActivityIndicator size="small" color={isDark ? '#FFFFFF' : '#000000'} />
-                                </View>
-                            ) : null}
-                            keyboardShouldPersistTaps="handled"
-                            keyboardDismissMode="interactive"
-                            initialNumToRender={15}
-                            removeClippedSubviews={Platform.OS === 'android'}
-                            maxToRenderPerBatch={10}
-                            windowSize={11}
-                        />
+                                                    );
+                                                })}
+                                            </View>
+                                        ) : null
+                                    }
+                                    ListFooterComponent={isFetchingMore ? (
+                                        <View style={{ paddingVertical: 20 }}>
+                                            <ActivityIndicator size="small" color={isDark ? '#FFFFFF' : '#000000'} />
+                                        </View>
+                                    ) : null}
+                                    keyboardShouldPersistTaps="handled"
+                                    keyboardDismissMode="on-drag"
+                                    initialNumToRender={15}
+                                    removeClippedSubviews={Platform.OS === 'android'}
+                                    maxToRenderPerBatch={10}
+                                    windowSize={11}
+                                />
+                            </View>
+                        </TouchableWithoutFeedback>
                     )}
 
                     {/* Floating Unread New Messages Pill */}
