@@ -29,7 +29,6 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
 import { useAuthStore } from '../store/useAuthStore';
-import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
 import FifaPlayerCard from '../components/FifaPlayerCard';
 import PlayerComparisonModal from '../components/PlayerComparisonModal';
@@ -754,22 +753,38 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 <View style={styles.physicalGrid}>
                     <View style={styles.physicalItem}>
                         <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.age', 'YOSHI')}</Text>
-                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{computedAge !== '—' ? `${computedAge}` : '—'}</Text>
+                        {loading && computedAge === '—' ? (
+                            <InlineSkeleton width={24} height={15} style={{ marginTop: 2 }} />
+                        ) : (
+                            <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{computedAge !== '—' ? `${computedAge}` : '—'}</Text>
+                        )}
                     </View>
                     <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
                     <View style={styles.physicalItem}>
                         <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.height', 'BO\'YI')}</Text>
-                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{player?.height ? `${player.height} CM` : '—'}</Text>
+                        {loading && !player?.height ? (
+                            <InlineSkeleton width={32} height={15} style={{ marginTop: 2 }} />
+                        ) : (
+                            <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{player?.height ? `${player.height} CM` : '—'}</Text>
+                        )}
                     </View>
                     <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
                     <View style={styles.physicalItem}>
                         <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.weight', 'VAZNI')}</Text>
-                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{player?.weight ? `${player.weight} KG` : '—'}</Text>
+                        {loading && !player?.weight ? (
+                            <InlineSkeleton width={32} height={15} style={{ marginTop: 2 }} />
+                        ) : (
+                            <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{player?.weight ? `${player.weight} KG` : '—'}</Text>
+                        )}
                     </View>
                     <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
                     <View style={styles.physicalItem}>
                         <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.citizenship', 'DAVLAT')}</Text>
-                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]} numberOfLines={1}>{player?.citizenship || 'UZB'}</Text>
+                        {loading && !player?.citizenship ? (
+                            <InlineSkeleton width={28} height={15} style={{ marginTop: 2 }} />
+                        ) : (
+                            <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]} numberOfLines={1}>{player?.citizenship || 'UZB'}</Text>
+                        )}
                     </View>
                 </View>
 
@@ -1088,26 +1103,42 @@ export default function MyStatsScreen({ route, navigation }: any) {
                         <View style={[styles.infoStatsCard, cardSurface, { marginBottom: 8 }]}>
                             <View style={styles.infoTopRow}>
                                 <View style={styles.infoStat}>
-                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.goals || 0}</Text>
+                                    {loading ? (
+                                        <InlineSkeleton width={20} height={16} />
+                                    ) : (
+                                        <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.goals || 0}</Text>
+                                    )}
                                     <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.goals', 'GOL').toUpperCase()}</Text>
                                 </View>
                                 <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
                                 <View style={styles.infoStat}>
-                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.assists || 0}</Text>
+                                    {loading ? (
+                                        <InlineSkeleton width={20} height={16} />
+                                    ) : (
+                                        <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.assists || 0}</Text>
+                                    )}
                                     <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.assists', 'ASIST').toUpperCase()}</Text>
                                 </View>
                                 <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
                                 <View style={styles.infoStat}>
-                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.matchesPlayed || stats.matches || 0}</Text>
+                                    {loading ? (
+                                        <InlineSkeleton width={20} height={16} />
+                                    ) : (
+                                        <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.matchesPlayed || stats.matches || 0}</Text>
+                                    )}
                                     <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.matches_played', 'O\'YIN').toUpperCase()}</Text>
                                 </View>
                                 <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
                                 <View style={styles.infoStat}>
-                                    <Text style={styles.infoStatValue}>
-                                        <Text style={{ color: '#EAB308' }}>{stats.yellowCards || 0}</Text>
-                                        <Text style={{ color: isDark ? '#FFFFFF' : '#94A3B8' }}> / </Text>
-                                        <Text style={{ color: '#EF4444' }}>{stats.redCards || 0}</Text>
-                                    </Text>
+                                    {loading ? (
+                                        <InlineSkeleton width={32} height={16} />
+                                    ) : (
+                                        <Text style={styles.infoStatValue}>
+                                            <Text style={{ color: '#EAB308' }}>{stats.yellowCards || 0}</Text>
+                                            <Text style={{ color: isDark ? '#FFFFFF' : '#94A3B8' }}> / </Text>
+                                            <Text style={{ color: '#EF4444' }}>{stats.redCards || 0}</Text>
+                                        </Text>
+                                    )}
                                     <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>KARTA</Text>
                                 </View>
                             </View>
