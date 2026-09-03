@@ -61,7 +61,7 @@ export default function FifaPlayerCard({
 
     // Optimized Card Aspect Ratio
     const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
-    const cardHeight = showAttributes ? cardWidth * 1.32 : cardWidth * 1.06;
+    const cardHeight = showAttributes ? cardWidth * 1.20 : cardWidth * 1.02;
     const scaleFactor = cardWidth / 260;
 
     // 3D Parallax & Tilt animations
@@ -342,73 +342,76 @@ export default function FifaPlayerCard({
                             </View>
                         </View>
 
-                        {/* Player Name Plaque (Positioned cleanly below Photo) */}
-                        <View style={styles.namePlateWrapper}>
-                            <LinearGradient
-                                colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.namePlateGradient}
-                            >
-                                <Text
-                                    numberOfLines={1}
-                                    ellipsizeMode="tail"
-                                    style={[
-                                        styles.playerNameText,
-                                        {
-                                            fontSize: Math.min(14.5 * scaleFactor, 16),
-                                            color: theme.textPrimary,
-                                        },
-                                    ]}
+                        {/* Bottom Container: Player Name Plaque + Real Football Stats */}
+                        <View style={[styles.bottomInfoSection, { marginTop: 2 * scaleFactor }]}>
+                            {/* Player Name Plaque */}
+                            <View style={styles.namePlateWrapper}>
+                                <LinearGradient
+                                    colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.namePlateGradient}
                                 >
-                                    {playerName.toUpperCase()}
-                                </Text>
-                            </LinearGradient>
+                                    <Text
+                                        numberOfLines={1}
+                                        ellipsizeMode="tail"
+                                        style={[
+                                            styles.playerNameText,
+                                            {
+                                                fontSize: Math.min(14 * scaleFactor, 15.5),
+                                                color: theme.textPrimary,
+                                            },
+                                        ]}
+                                    >
+                                        {playerName.toUpperCase()}
+                                    </Text>
+                                </LinearGradient>
+                            </View>
+
+                            {/* Real Football Stats (GOL, ASIST, O'YIN) */}
+                            {showAttributes && (
+                                <View style={{ width: '100%', marginTop: 1 * scaleFactor }}>
+                                    <View style={[styles.separatorContainer, { marginVertical: 2 * scaleFactor }]}>
+                                        <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
+                                        <View style={[styles.separatorDiamond, { backgroundColor: theme.textGold }]} />
+                                        <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
+                                    </View>
+
+                                    <View style={[styles.statsRowThree, { paddingHorizontal: 12 * scaleFactor, marginTop: 1 * scaleFactor }]}>
+                                        <View style={styles.statColItem}>
+                                            <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
+                                                {goalsCount}
+                                            </Text>
+                                            <Text style={[styles.statLabelSmall, { fontSize: 8.5 * scaleFactor, color: theme.textPrimary }]}>
+                                                GOL
+                                            </Text>
+                                        </View>
+
+                                        <View style={[styles.statsVerticalDivider, { height: 22 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+
+                                        <View style={styles.statColItem}>
+                                            <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
+                                                {assistsCount}
+                                            </Text>
+                                            <Text style={[styles.statLabelSmall, { fontSize: 8.5 * scaleFactor, color: theme.textPrimary }]}>
+                                                ASIST
+                                            </Text>
+                                        </View>
+
+                                        <View style={[styles.statsVerticalDivider, { height: 22 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+
+                                        <View style={styles.statColItem}>
+                                            <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
+                                                {matchesCount}
+                                            </Text>
+                                            <Text style={[styles.statLabelSmall, { fontSize: 8.5 * scaleFactor, color: theme.textPrimary }]}>
+                                                O'YIN
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
                         </View>
-
-                        {/* Real Football Stats (GOL, ASIST, O'YIN) */}
-                        {showAttributes && (
-                            <>
-                                <View style={[styles.separatorContainer, { marginVertical: 3.5 * scaleFactor }]}>
-                                    <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
-                                    <View style={[styles.separatorDiamond, { backgroundColor: theme.textGold }]} />
-                                    <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
-                                </View>
-
-                                <View style={[styles.statsRowThree, { paddingHorizontal: 12 * scaleFactor, marginVertical: 2 * scaleFactor }]}>
-                                    <View style={styles.statColItem}>
-                                        <Text style={[styles.statNumBig, { fontSize: 16 * scaleFactor, color: theme.textGold }]}>
-                                            {goalsCount}
-                                        </Text>
-                                        <Text style={[styles.statLabelSmall, { fontSize: 9 * scaleFactor, color: theme.textPrimary }]}>
-                                            GOL
-                                        </Text>
-                                    </View>
-
-                                    <View style={[styles.statsVerticalDivider, { height: 26 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.18)' }]} />
-
-                                    <View style={styles.statColItem}>
-                                        <Text style={[styles.statNumBig, { fontSize: 16 * scaleFactor, color: theme.textGold }]}>
-                                            {assistsCount}
-                                        </Text>
-                                        <Text style={[styles.statLabelSmall, { fontSize: 9 * scaleFactor, color: theme.textPrimary }]}>
-                                            ASIST
-                                        </Text>
-                                    </View>
-
-                                    <View style={[styles.statsVerticalDivider, { height: 26 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.18)' }]} />
-
-                                    <View style={styles.statColItem}>
-                                        <Text style={[styles.statNumBig, { fontSize: 16 * scaleFactor, color: theme.textGold }]}>
-                                            {matchesCount}
-                                        </Text>
-                                        <Text style={[styles.statLabelSmall, { fontSize: 9 * scaleFactor, color: theme.textPrimary }]}>
-                                            O'YIN
-                                        </Text>
-                                    </View>
-                                </View>
-                            </>
-                        )}
                     </LinearGradient>
                 </LinearGradient>
             </TouchableOpacity>
@@ -587,6 +590,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-around',
+        zIndex: 10,
+    },
+    bottomInfoSection: {
+        width: '100%',
+        alignItems: 'center',
         zIndex: 10,
     },
     statColItem: {
