@@ -370,14 +370,14 @@ export default function FifaPlayerCard({
 
                             {/* Real Football Stats (GOL, ASIST, O'YIN) */}
                             {showAttributes && (
-                                <View style={{ width: '100%', marginTop: 1 * scaleFactor }}>
-                                    <View style={[styles.separatorContainer, { marginVertical: 1.5 * scaleFactor }]}>
+                                <View style={{ width: '100%', marginTop: 0 }}>
+                                    <View style={[styles.separatorContainer, { marginTop: -1 * scaleFactor, marginBottom: 1 * scaleFactor }]}>
                                         <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
                                         <View style={[styles.separatorDiamond, { backgroundColor: theme.textGold }]} />
                                         <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
                                     </View>
 
-                                    <View style={[styles.statsRowThree, { paddingHorizontal: 12 * scaleFactor, marginTop: 0 }]}>
+                                    <View style={[styles.statsRowThree, { paddingHorizontal: 12 * scaleFactor, marginTop: -1 * scaleFactor }]}>
                                         <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
                                                 {goalsCount}
@@ -387,7 +387,7 @@ export default function FifaPlayerCard({
                                             </Text>
                                         </View>
 
-                                        <View style={[styles.statsVerticalDivider, { height: 20 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+                                        <View style={[styles.statsVerticalDivider, { height: 19 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.2)' }]} />
 
                                         <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
@@ -398,7 +398,7 @@ export default function FifaPlayerCard({
                                             </Text>
                                         </View>
 
-                                        <View style={[styles.statsVerticalDivider, { height: 20 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+                                        <View style={[styles.statsVerticalDivider, { height: 19 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.2)' }]} />
 
                                         <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
@@ -411,7 +411,7 @@ export default function FifaPlayerCard({
                                     </View>
 
                                     {/* Subtle Amatora Footer Seal */}
-                                    <View style={[styles.cardFooterBrand, { marginTop: 2 * scaleFactor }]}>
+                                    <View style={[styles.cardFooterBrand, { marginTop: 1 * scaleFactor }]}>
                                         <Image
                                             source={require('../assets/logo.png')}
                                             style={{ width: 8.5 * scaleFactor, height: 8.5 * scaleFactor, opacity: 0.5, marginRight: 4 * scaleFactor }}
