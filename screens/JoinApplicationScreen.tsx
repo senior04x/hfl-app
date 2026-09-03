@@ -863,7 +863,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                         {/* TARGET TEAM HEADER BANNER */}
                         {targetTeamId && (
-                            <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border, marginBottom: 14 }]}>
+                            <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000', marginBottom: 14 }]}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                                     <SmartImage
                                         uri={targetTeamData?.logo_url || targetTeamData?.logo || formData.selectedOrgLogo}
@@ -885,7 +885,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                         {/* STEP 1: TASHKILOT TANLASH */}
                         {!targetTeamId && organizations.length > 0 && (
-                            <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                            <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                 <View style={styles.cardTitleRow}>
                                     <Ionicons name="business-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                     <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Tashkilotni tanlang</Text>
@@ -987,7 +987,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                         {/* STEP 2: TURNIR TANLASH */}
                         {!targetTeamId && (
-                            <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                            <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                 <View style={styles.cardTitleRow}>
                                     <Ionicons name="trophy-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                     <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Turnir (Liga) tanlash</Text>
@@ -1090,7 +1090,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                         {/* STEP 3: JAMOA TANLASH */}
                         {!targetTeamId && applicationType === 'player' && (
-                            <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                            <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                 <View style={styles.cardTitleRow}>
                                     <Ionicons name="shield-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                     <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Jamoa tanlash</Text>
@@ -1199,7 +1199,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                         {applicationType === 'player' ? (
                             <>
                                 {/* DASTLABKI TEKSHIRUV: ISM, FAMILIYA & TELEFON */}
-                                <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                     <View style={styles.cardTitleRow}>
                                         <Ionicons name="shield-checkmark-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                         <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Dastlabki tekshiruv</Text>
@@ -1258,7 +1258,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                 {validationResult.isChecked && validationResult.isValid && (
                                     <>
                                         {/* FATHER NAME */}
-                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                             <View style={styles.cardTitleRow}>
                                                 <Ionicons name="person-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                                 <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Qo'shimcha ma'lumotlar</Text>
@@ -1277,7 +1277,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                         </View>
 
                                         {/* PHOTO UPLOAD & BIRTH DATE */}
-                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                             <View style={styles.cardTitleRow}>
                                                 <Ionicons name="camera-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                                 <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Rasm va tug'ilgan sana</Text>
@@ -1309,7 +1309,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                         </View>
 
                                         {/* POSITION & NUMBER */}
-                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                             <View style={styles.cardTitleRow}>
                                                 <Ionicons name="football-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                                 <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Amplua va raqam</Text>
@@ -1411,7 +1411,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                         </View>
 
                                         {/* PASSPORT & COMMENT */}
-                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                             <View style={styles.cardTitleRow}>
                                                 <Ionicons name="card-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                                 <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Pasport va izoh</Text>
@@ -1499,7 +1499,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                             /* MODE 2: JAMOA REGISTRATION FORM */
                             <>
                                 {/* TEAM INITIAL DETAILS & CHECK */}
-                                <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                     <View style={styles.cardTitleRow}>
                                         <Ionicons name="shield-checkmark-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                         <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Jamoa tekshiruvi</Text>
@@ -1543,7 +1543,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                 {/* CONDITIONAL TEAM FIELDS (REVEALED ONLY IF VALIDATION PASSED) */}
                                 {validationResult.isChecked && validationResult.isValid && (
                                     <>
-                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                             <View style={styles.cardTitleRow}>
                                                 <Ionicons name="image-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
                                                 <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>Jamoa logotipi va mas'ul shaxs</Text>
@@ -1603,7 +1603,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                         </View>
 
                                         {/* SQUAD PLAYERS LIST SECTION */}
-                                        <View style={[styles.card, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                                        <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                                 <View style={styles.cardTitleRow}>
                                                     <Ionicons name="people-outline" size={18} color={homeColors.textPrimary} style={{ marginRight: 8 }} />
@@ -1677,7 +1677,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 onRequestClose={() => setIsPlayerModalOpen(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                    <View style={[styles.modalContainer, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' }]}>
                         <View style={{ padding: 20 }}>
                             <View style={styles.modalHeader}>
                                 <Text style={[styles.modalTitle, { color: homeColors.textPrimary }]}>O'yinchi qo'shish</Text>
@@ -1824,7 +1824,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                 <View style={styles.modalBackdrop}>
                     <View style={[
                         styles.noticeModalCard,
-                        { backgroundColor: homeColors.surface, borderColor: homeColors.border },
+                        { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000' },
                         statusModal.type === 'success' && { borderColor: 'rgba(16, 185, 129, 0.4)' },
                         statusModal.type === 'error' && { borderColor: 'rgba(239, 68, 68, 0.4)' }
                     ]}>
@@ -1923,7 +1923,16 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 16,
         marginBottom: 14,
-        borderWidth: 1,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 3,
+            },
+        }),
     },
     cardTitleRow: {
         flexDirection: 'row',
@@ -1940,7 +1949,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         borderRadius: 14,
-        borderWidth: 1,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 2,
+            },
+        }),
     },
     leagueTriggerLeft: {
         flexDirection: 'row',
@@ -1972,7 +1989,15 @@ const styles = StyleSheet.create({
 
     leagueDropdownContainer: {
         borderRadius: 14,
-        borderWidth: 1,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 4,
+            },
+        }),
     },
     leagueOptionItem: {
         flexDirection: 'row',
