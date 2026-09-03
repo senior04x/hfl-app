@@ -33,6 +33,7 @@ import { getHomeScreenColors } from '../constants/homeTheme';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
 import AppNavbar from '../components/AppNavbar';
 import EditTeamModal from '../components/EditTeamModal';
+import RegistrationClosedModal from '../components/RegistrationClosedModal';
 import { useNavBarScroll } from '../context/NavBarScrollContext';
 
 export default function AccountScreen({ navigation }: any) {
@@ -49,6 +50,8 @@ export default function AccountScreen({ navigation }: any) {
     const [showOrgSelectModal, setShowOrgSelectModal] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showEditTeamModal, setShowEditTeamModal] = useState(false);
+    const [showRegClosedModal, setShowRegClosedModal] = useState(false);
+    const [closedOrgInfo, setClosedOrgInfo] = useState<{ name: string; contact_phone: string } | null>(null);
     const [pinInput, setPinInput] = useState('');
     const [targetJuniorState, setTargetJuniorState] = useState<boolean>(false);
 
@@ -285,6 +288,31 @@ export default function AccountScreen({ navigation }: any) {
 
     const currentLangItem = SUPPORTED_LANGUAGES.find(l => l.code === i18n.language);
     const totalAppsCount = userTransfers.length + userProfileApps.length;
+
+    const handleAddPlayerPress = async () => {
+        try {
+            const orgId = user?.organization_id || user?.organizationId || selectedOrganizationId || 1;
+            const { data: orgData } = await apiService.supabase
+                .from('organizations')
+                .select('id, name, contact_phone, is_registration_open')
+                .eq('id', orgId)
+                .single();
+
+            if (orgData && orgData.is_registration_open === false) {
+                setClosedOrgInfo({
+                    name: orgData.name || '',
+                    contact_phone: orgData.contact_phone || '',
+                });
+                setShowRegClosedModal(true);
+                return;
+            }
+
+            navigation.navigate('JoinApplication', { initialType: 'player', teamId: currentTeamId });
+        } catch (error) {
+            console.error('Error checking organization registration:', error);
+            navigation.navigate('JoinApplication', { initialType: 'player', teamId: currentTeamId });
+        }
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: homeColors.background }}>
@@ -543,7 +571,7 @@ export default function AccountScreen({ navigation }: any) {
                                                 <SettingRow
                                                     icon="person-add-outline"
                                                     title={t('teams.add_player', 'O\'yinchi qo\'shish')}
-                                                    onPress={() => navigation.navigate('JoinApplication', { initialType: 'player', teamId: currentTeamId })}
+                                                    onPress={handleAddPlayerPress}
                                                     isLast={true}
                                                 />
                                             </>
@@ -637,6 +665,14 @@ export default function AccountScreen({ navigation }: any) {
                         onSaved={loadDetailedData}
                     />
                 )}
+
+                {/* Organization Registration Closed Modal */}
+                <RegistrationClosedModal
+                    visible={showRegClosedModal}
+                    organizationName={closedOrgInfo?.name}
+                    contactPhone={closedOrgInfo?.contact_phone}
+                    onClose={() => setShowRegClosedModal(false)}
+                />
 
 
 
