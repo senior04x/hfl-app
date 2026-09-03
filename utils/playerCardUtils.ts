@@ -15,7 +15,7 @@ export interface FifaAttributes {
     hasScoutedVideo?: boolean;
 }
 
-export type CardRarity = 'unrated' | 'silver' | 'gold' | 'holographic' | 'icon' | 'amatora_elite';
+export type CardRarity = 'unrated' | 'bronze' | 'silver' | 'gold' | 'amatora_elite' | 'holographic' | 'icon';
 
 export interface PlayStyle {
     id: string;
@@ -142,12 +142,32 @@ export function getCardRarity(player: any): CardRarity {
     const matches = Number(player?.stats?.matchesPlayed ?? player?.matchesPlayed ?? player?.careerMatches ?? 0);
     if (matches === 0) return 'unrated';
 
+    const rawRating = player?.rating !== undefined && player?.rating !== null && Number(player?.rating) !== 0
+        ? Number(player.rating)
+        : (player?.stats?.rating ? Number(player.stats.rating) : 0);
+
     const attrs = calculateFifaAttributes(player);
-    if (attrs.ovr >= 91) return 'amatora_elite';
-    if (attrs.ovr >= 87) return 'icon';
-    if (attrs.ovr >= 82) return 'holographic';
-    if (attrs.ovr >= 70) return 'gold';
-    return 'silver';
+
+    let effRating = 0;
+    if (rawRating > 0) {
+        effRating = rawRating <= 10 ? rawRating * 10 : rawRating;
+    } else if (attrs.ovr > 0) {
+        effRating = attrs.ovr;
+    }
+
+    // High-end EA FC tier hierarchy based on rating score:
+    // 9.4+ (94+) -> Supreme TOTY Icon (Black Onyx & 24K Pure Auric Gold)
+    if (effRating >= 94) return 'icon';
+    // 8.7 - 9.3 (87-93) -> Champions TOTS Hologram (Sapphire, Violet & Cyan)
+    if (effRating >= 87) return 'holographic';
+    // 8.0 - 8.6 (80-86) -> Amatora Emerald Elite (Cyber Neon Emerald)
+    if (effRating >= 80) return 'amatora_elite';
+    // 7.0 - 7.9 (70-79) -> EA FC Imperial Gold Rare (Championship Gold)
+    if (effRating >= 70) return 'gold';
+    // 6.0 - 6.9 (60-69) -> Sterling Platinum Silver
+    if (effRating >= 60) return 'silver';
+    // < 6.0 (<60) -> Metallic Copper Bronze
+    return 'bronze';
 }
 
 /**
@@ -269,12 +289,38 @@ export function getCardPosition(rawPos: string | undefined | null, lang: string 
  * Card theme presets
  */
 export const CARD_THEMES: Record<CardRarity, any> = {
+    icon: {
+        id: 'icon',
+        name: 'Supreme TOTY Icon',
+        cardBg: ['#07070B', '#141026', '#0B0916', '#020205'],
+        accentGlow: '#FDE047',
+        borderGradient: ['#FFFFFF', '#FDE047', '#EAB308', '#67E8F9', '#FEF08A', '#F59E0B'],
+        textPrimary: '#FFFFFF',
+        textGold: '#FDE047',
+        foilOverlay: 'rgba(253, 224, 71, 0.28)',
+        badgeBg: 'rgba(253, 224, 71, 0.25)',
+        shadowColor: '#FDE047',
+        ratingColor: '#FFFFFF',
+    },
+    holographic: {
+        id: 'holographic',
+        name: 'Champions TOTS Hologram',
+        cardBg: ['#0B112C', '#1E1B4B', '#172554', '#060919'],
+        accentGlow: '#38BDF8',
+        borderGradient: ['#38BDF8', '#818CF8', '#C084FC', '#F472B6', '#38BDF8'],
+        textPrimary: '#FFFFFF',
+        textGold: '#7DD3FC',
+        foilOverlay: 'rgba(56, 189, 248, 0.25)',
+        badgeBg: 'rgba(56, 189, 248, 0.25)',
+        shadowColor: '#38BDF8',
+        ratingColor: '#38BDF8',
+    },
     amatora_elite: {
         id: 'amatora_elite',
-        name: 'Amatora Elite Neon',
-        cardBg: ['#042017', '#0A3B2A', '#061D15', '#020C08'],
+        name: 'Amatora Emerald Elite',
+        cardBg: ['#021B13', '#063826', '#032318', '#010E0A'],
         accentGlow: '#00DF82',
-        borderGradient: ['#00DF82', '#00F0FF', '#00A862', '#10B981'],
+        borderGradient: ['#00DF82', '#10B981', '#6EE7B7', '#047857', '#A7F3D0'],
         textPrimary: '#FFFFFF',
         textGold: '#00DF82',
         foilOverlay: 'rgba(0, 223, 130, 0.25)',
@@ -282,62 +328,49 @@ export const CARD_THEMES: Record<CardRarity, any> = {
         shadowColor: '#00DF82',
         ratingColor: '#00DF82',
     },
-    holographic: {
-        id: 'holographic',
-        name: 'Holographic TOTW',
-        cardBg: ['#1e1035', '#2c1654', '#1a0e33', '#0a0514'],
-        accentGlow: '#8B5CF6',
-        borderGradient: ['#C084FC', '#38BDF8', '#F472B6', '#FBBF24'],
-        textPrimary: '#FFFFFF',
-        textGold: '#F3E8FF',
-        foilOverlay: 'rgba(192, 132, 252, 0.2)',
-        badgeBg: 'rgba(139, 92, 246, 0.3)',
-        shadowColor: '#C084FC',
-        ratingColor: '#F472B6',
-    },
     gold: {
         id: 'gold',
         name: 'EA FC Gold Rare',
-        cardBg: ['#2b220d', '#4a3b12', '#2f240b', '#1a1406'],
+        cardBg: ['#211805', '#45320C', '#281E07', '#120D03'],
         accentGlow: '#F59E0B',
-        borderGradient: ['#FDE047', '#CA8A04', '#FEF08A', '#A16207'],
+        borderGradient: ['#FDE047', '#EAB308', '#CA8A04', '#FEF08A', '#A16207'],
         textPrimary: '#FEF08A',
         textGold: '#FBBF24',
-        foilOverlay: 'rgba(251, 191, 36, 0.15)',
+        foilOverlay: 'rgba(251, 191, 36, 0.18)',
         badgeBg: 'rgba(234, 179, 8, 0.25)',
         shadowColor: '#F59E0B',
         ratingColor: '#FDE047',
     },
-    icon: {
-        id: 'icon',
-        name: 'Amatora Icon',
-        cardBg: ['#1a1f2c', '#2c3345', '#161922', '#0c0e14'],
-        accentGlow: '#E2E8F0',
-        borderGradient: ['#FFFFFF', '#94A3B8', '#F8FAFC', '#64748B'],
-        textPrimary: '#FFFFFF',
-        textGold: '#E2E8F0',
-        foilOverlay: 'rgba(248, 250, 252, 0.2)',
-        badgeBg: 'rgba(255, 255, 255, 0.2)',
-        shadowColor: '#38BDF8',
-        ratingColor: '#FFFFFF',
-    },
     silver: {
         id: 'silver',
-        name: 'Silver Rare',
-        cardBg: ['#1e293b', '#334155', '#1e293b', '#0f172a'],
+        name: 'Silver Platinum Rare',
+        cardBg: ['#111827', '#1F2937', '#162032', '#0B0F19'],
         accentGlow: '#94A3B8',
-        borderGradient: ['#CBD5E1', '#64748B', '#E2E8F0', '#475569'],
-        textPrimary: '#F1F5F9',
-        textGold: '#CBD5E1',
-        foilOverlay: 'rgba(203, 213, 225, 0.15)',
+        borderGradient: ['#F8FAFC', '#94A3B8', '#E2E8F0', '#475569', '#CBD5E1'],
+        textPrimary: '#F8FAFC',
+        textGold: '#E2E8F0',
+        foilOverlay: 'rgba(226, 232, 240, 0.16)',
         badgeBg: 'rgba(148, 163, 184, 0.25)',
-        shadowColor: '#64748B',
-        ratingColor: '#F1F5F9',
+        shadowColor: '#94A3B8',
+        ratingColor: '#FFFFFF',
+    },
+    bronze: {
+        id: 'bronze',
+        name: 'Metallic Bronze',
+        cardBg: ['#1C120B', '#331E12', '#21140D', '#0F0906'],
+        accentGlow: '#D97706',
+        borderGradient: ['#F59E0B', '#B45309', '#D97706', '#78350F', '#FCD34D'],
+        textPrimary: '#FDE68A',
+        textGold: '#FBBF24',
+        foilOverlay: 'rgba(217, 119, 6, 0.15)',
+        badgeBg: 'rgba(180, 83, 9, 0.25)',
+        shadowColor: '#B45309',
+        ratingColor: '#FDE68A',
     },
     unrated: {
         id: 'unrated',
         name: 'Unrated Base',
-        cardBg: ['#0f172a', '#1e293b', '#0f172a', '#020617'],
+        cardBg: ['#0B0F19', '#162032', '#0F172A', '#030712'],
         accentGlow: 'rgba(255, 255, 255, 0.2)',
         borderGradient: ['rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.05)'],
         textPrimary: '#94A3B8',
