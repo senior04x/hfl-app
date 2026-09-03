@@ -1459,11 +1459,12 @@ function TeamChatScreen({ route, navigation }: any) {
                     )}
 
                     <View style={[
-                        styles.inputContainer,
+                        styles.floatingInputDock,
                         {
-                            backgroundColor: homeColors.background,
-                            borderTopColor: homeColors.border,
-                            paddingBottom: Platform.OS === 'ios' ? 12 : Math.max(insets.bottom ? 6 : 8, 8)
+                            backgroundColor: homeColors.card,
+                            borderColor: homeColors.border,
+                            shadowColor: isDark ? '#FFFFFF' : '#000000',
+                            marginBottom: Platform.OS === 'ios' ? Math.max(insets.bottom ? insets.bottom - 4 : 10, 10) : 12,
                         }
                     ]}>
                         <View style={styles.inputWrapper}>
@@ -1471,8 +1472,6 @@ function TeamChatScreen({ route, navigation }: any) {
                                 style={[
                                     styles.input,
                                     {
-                                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                                        borderColor: homeColors.border,
                                         color: homeColors.textPrimary,
                                     }
                                 ]}
@@ -1511,7 +1510,7 @@ function TeamChatScreen({ route, navigation }: any) {
                                 onPress={sendMessage}
                                 disabled={!inputText.trim() || isRateLimited}
                             >
-                                <Ionicons name="paper-plane" size={18} color={isDark ? '#000000' : '#FFFFFF'} />
+                                <Ionicons name="paper-plane" size={17} color={isDark ? '#000000' : '#FFFFFF'} />
                             </TouchableOpacity>
                         </Animated.View>
                     </View>
@@ -1711,7 +1710,7 @@ const styles = StyleSheet.create({
     headerLogoContainer: { width: 36, height: 36, borderRadius: 10, overflow: 'hidden', borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
     headerLogo: { width: '100%', height: '100%' },
 
-    messageList: { padding: 14, paddingBottom: 20 },
+    messageList: { padding: 14, paddingBottom: 28 },
     messageRow: { flexDirection: 'row', marginBottom: 12, alignItems: 'flex-end' },
     myMessageRow: { justifyContent: 'flex-end' },
     otherMessageRow: { justifyContent: 'flex-start' },
@@ -1748,39 +1747,42 @@ const styles = StyleSheet.create({
     myTimestamp: { textAlign: 'right' },
     otherTimestamp: { textAlign: 'left' },
 
-    inputContainer: { 
+    floatingInputDock: { 
         flexDirection: 'row', 
-        paddingHorizontal: 12, 
-        paddingTop: 8,
         alignItems: 'center', 
-        borderTopWidth: StyleSheet.hairlineWidth,
+        marginHorizontal: 12,
+        borderRadius: 24,
+        paddingLeft: 14,
+        paddingRight: 5,
+        paddingVertical: 4,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 6,
+            },
+        }),
     },
     inputWrapper: {
         flex: 1,
-        marginRight: 8,
+        marginRight: 6,
         position: 'relative',
         justifyContent: 'center',
     },
     input: { 
-        minHeight: 42, 
+        minHeight: 40, 
         maxHeight: 110, 
-        borderRadius: 21, 
-        paddingHorizontal: 16, 
-        paddingVertical: 9, 
+        paddingHorizontal: 0, 
+        paddingVertical: 8, 
         fontSize: 15, 
-        ...Platform.select({
-            ios: {
-                borderWidth: 1,
-            },
-            android: {
-                borderWidth: 0,
-                elevation: 1,
-            },
-        }),
+        fontWeight: '500',
     },
     animatedPlaceholderContainer: {
         position: 'absolute',
-        left: 16,
+        left: 0,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -1798,7 +1800,7 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         marginLeft: 1.5,
     },
-    sendButton: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
+    sendButton: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
     errorText: { marginTop: 16, fontSize: 15, textAlign: 'center', fontWeight: '600' },
 
     memberItem: {
@@ -1925,7 +1927,7 @@ const styles = StyleSheet.create({
     },
     newMessagesPillContainer: {
         position: 'absolute',
-        bottom: 12,
+        bottom: 72,
         alignSelf: 'center',
         zIndex: 50,
         elevation: 6,
