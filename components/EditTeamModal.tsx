@@ -116,6 +116,7 @@ export default function EditTeamModal({
     const [playerSearch, setPlayerSearch] = useState('');
     const [editingPlayerId, setEditingPlayerId] = useState<string | number | null>(null);
     const [uploadingPlayerId, setUploadingPlayerId] = useState<string | number | null>(null);
+    const [savingPhonePlayerId, setSavingPhonePlayerId] = useState<string | number | null>(null);
 
     // Initial load
     useEffect(() => {
@@ -288,7 +289,7 @@ export default function EditTeamModal({
     const handleSavePlayerPhone = async (player: any, newPhone: string) => {
         const pId = player.id || player._id;
         try {
-            setSaving(true);
+            setSavingPhonePlayerId(pId);
             const res = await apiService.updatePlayerInfo(pId, { phone: newPhone.trim() });
             if (res && res.error) {
                 throw new Error(res.error);
@@ -304,7 +305,7 @@ export default function EditTeamModal({
             console.error('Save player phone error:', error);
             showToast(error?.message || t('teams.phone_save_error', 'Telefon raqamni saqlashda xatolik.'), 'error');
         } finally {
-            setSaving(false);
+            setSavingPhonePlayerId(null);
         }
     };
 
@@ -631,6 +632,7 @@ export default function EditTeamModal({
                                             const pId = player.id || player._id;
                                             const isEditingThis = editingPlayerId === pId;
                                             const isUploadingThis = uploadingPlayerId === pId;
+                                            const isSavingThis = savingPhonePlayerId === pId;
 
                                             return (
                                                 <PlayerEditCard
@@ -638,6 +640,7 @@ export default function EditTeamModal({
                                                     player={player}
                                                     isEditing={isEditingThis}
                                                     isUploading={isUploadingThis}
+                                                    isSavingPhone={isSavingThis}
                                                     homeColors={homeColors}
                                                     isDark={isDark}
                                                     t={t}
@@ -662,6 +665,7 @@ function PlayerEditCard({
     player,
     isEditing,
     isUploading,
+    isSavingPhone,
     homeColors,
     isDark,
     t,
@@ -672,6 +676,7 @@ function PlayerEditCard({
     player: any;
     isEditing: boolean;
     isUploading: boolean;
+    isSavingPhone: boolean;
     homeColors: any;
     isDark: boolean;
     t: any;
@@ -755,10 +760,24 @@ function PlayerEditCard({
                     />
                     <TouchableOpacity
                         onPress={() => onSavePhone(phoneText)}
-                        style={[styles.savePhoneBtn, { backgroundColor: homeColors.accent }]}
+                        disabled={isSavingPhone}
+                        style={[
+                            styles.savePhoneBtn,
+                            {
+                                backgroundColor: homeColors.accent,
+                                opacity: isSavingPhone ? 0.75 : 1,
+                                minWidth: 85,
+                            }
+                        ]}
                     >
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                        <Text style={styles.savePhoneBtnText}>{t('common.save', 'Saqlash')}</Text>
+                        {isSavingPhone ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" style={{ transform: [{ scale: 0.75 }] }} />
+                        ) : (
+                            <>
+                                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                <Text style={styles.savePhoneBtnText}>{t('common.save', 'Saqlash')}</Text>
+                            </>
+                        )}
                     </TouchableOpacity>
                 </View>
             )}
