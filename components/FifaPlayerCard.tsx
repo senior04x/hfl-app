@@ -586,6 +586,23 @@ export default function FifaPlayerCard({
         ? `${rawFirstName} ${rawLastName}`
         : player?.name || player?.fullName || rawFirstName || 'O\'YINCHI';
 
+    const cleanName = playerName.trim().toUpperCase();
+    const nameLen = cleanName.length;
+    const isVeryLong = nameLen > 20;
+    const isLong = nameLen > 14;
+
+    const dynamicNameFont = isVeryLong
+        ? L.nameFont * 0.72
+        : isLong
+        ? L.nameFont * 0.84
+        : L.nameFont;
+
+    const dynamicNameLineH = isVeryLong
+        ? L.nameLineH * 0.82
+        : isLong
+        ? L.nameLineH * 0.9
+        : L.nameLineH;
+
     const avatarUri = player?.avatar || player?.photo || player?.photo_url || player?.image_url;
     const teamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo;
 
@@ -787,18 +804,20 @@ export default function FifaPlayerCard({
                                     style={[styles.namePlateGradient, { paddingVertical: L.namePadV }]}
                                 >
                                     <Text
-                                        numberOfLines={1}
-                                        ellipsizeMode="tail"
+                                        numberOfLines={2}
+                                        adjustsFontSizeToFit={true}
+                                        minimumFontScale={0.65}
                                         style={[
                                             styles.playerNameText,
                                             {
-                                                fontSize: L.nameFont,
-                                                lineHeight: L.nameLineH,
+                                                fontSize: dynamicNameFont,
+                                                lineHeight: dynamicNameLineH,
                                                 color: theme.textPrimary,
+                                                width: '100%',
                                             },
                                         ]}
                                     >
-                                        {playerName.toUpperCase()}
+                                        {cleanName}
                                     </Text>
                                 </LinearGradient>
                             </View>
@@ -970,14 +989,15 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     namePlateGradient: {
-        width: '94%',
+        width: '98%',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 6,
+        paddingHorizontal: 4,
     },
     playerNameText: {
         fontWeight: '900',
-        letterSpacing: 0.8,
+        letterSpacing: 0.4,
         textAlign: 'center',
         includeFontPadding: false,
     },
