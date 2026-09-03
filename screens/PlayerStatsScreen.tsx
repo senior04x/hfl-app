@@ -862,7 +862,11 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                                 </View>
                                 <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
                                 <View style={styles.infoStat}>
-                                    <Text style={[styles.infoStatValue, { color: '#EF4444' }]}>{stats.yellowCards || 0} / {stats.redCards || 0}</Text>
+                                    <Text style={styles.infoStatValue}>
+                                        <Text style={{ color: '#EAB308' }}>{stats.yellowCards || 0}</Text>
+                                        <Text style={{ color: isDark ? '#FFFFFF' : '#94A3B8' }}> / </Text>
+                                        <Text style={{ color: '#EF4444' }}>{stats.redCards || 0}</Text>
+                                    </Text>
                                     <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>KARTA</Text>
                                 </View>
                             </View>

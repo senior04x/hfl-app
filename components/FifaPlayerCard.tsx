@@ -38,6 +38,157 @@ interface FifaPlayerCardProps {
     onPress?: () => void;
 }
 
+// =============================================================================
+// MATEMATIK MAKET (LAYOUT) TIZIMI
+// -----------------------------------------------------------------------------
+// Kartaning balandligi endi "cardWidth * 1.18" kabi taxminiy (heuristik)
+// ko'paytiruvchi EMAS — u pastdagi BASE konstantalarning ANIQ YIG'INDISI
+// orqali hisoblanadi. Har bir bo'sh joy (gap), padding, matn balandligi
+// (lineHeight) alohida belgilangan va bir marta shu yerda yig'iladi, so'ng
+// kartaHeight xuddi shu yig'indidan olinadi — shuning uchun tarkib bilan
+// konteyner o'lchami har doim BIR XIL manbadan kelib chiqadi: hech qachon
+// ortiqcha bo'sh joy qolmaydi va hech qachon tarkib konteynerga sig'may
+// qolib, "overflow:hidden" tomonidan kesib tashlanmaydi.
+//
+// Barcha qiymatlar REF_WIDTH=260 uchun asosiy (BASE) o'lchov — boshqa
+// o'lchamlarda (`sm`/`lg`) hammasi BITTA scaleFactor bilan bir xilda
+// kattalashadi/kichraytiriladi, ya'ni karta xuddi bir xil fotosuratning
+// kattalashtirilgan nusxasidek ishlaydi — proporsiyalar hech qachon
+// buzilmaydi.
+// =============================================================================
+
+const REF_WIDTH = 260;
+
+const BASE = {
+    // Tashqi metall ramka va korpus paddingi
+    borderPad: 4,
+    bodyPadH: 13,
+    bodyPadTop: 14,
+    bodyPadBottom: 10,
+
+    // Yuqori qator: chap statistika ustuni + o'ng foto hudud
+    leftColW: 76,
+    heroRowH: 168,
+
+    // Chap ustun ichki tarkibi (heroRowH ichida vertikal markazlashtiriladi)
+    ovrFont: 32,
+    ovrLineH: 36,
+    posFont: 9.5,
+    posLineH: 12,
+    posPadV: 2,
+    posBorder: 0.8,
+    leftColGap: 4,
+    dividerH: 2,
+    clubBadgeD: 30,
+
+    // Ism plitasi
+    gapHeroToName: 6,
+    namePadV: 5,
+    nameFont: 14,
+    nameLineH: 17,
+
+    // Ajratuvchi chiziq
+    gapNameToSep: 7,
+    sepH: 8,
+
+    // Statistika qatori (GOL / ASSIST / O'YIN)
+    gapSepToStats: 7,
+    statNumFont: 16,
+    statNumLineH: 20,
+    gapStatNumToLabel: 3,
+    statLabelFont: 8.5,
+    statLabelLineH: 11,
+
+    // Pastki AMATORA muhri
+    gapStatsToFooter: 7,
+    footerH: 12,
+    footerLogo: 10,
+    footerFont: 7.5,
+
+    // Burchak radiuslari
+    outerRadiusTop: 36,
+    outerRadiusBottom: 28,
+    innerRadiusTop: 33,
+    innerRadiusBottom: 25,
+} as const;
+
+function computeCardLayout(cardWidth: number, showAttributes: boolean) {
+    const sf = cardWidth / REF_WIDTH;
+    const s = (v: number) => v * sf;
+
+    // Pastki blokning ANIQ balandligi — statistika ko'rsatilsa yoki
+    // ko'rsatilmasa, ikkala holatda ham haqiqiy tarkibdan hisoblanadi.
+    const bottomBlockBase = showAttributes
+        ? BASE.gapHeroToName +
+          (BASE.namePadV * 2 + BASE.nameLineH) +
+          BASE.gapNameToSep +
+          BASE.sepH +
+          BASE.gapSepToStats +
+          (BASE.statNumLineH + BASE.gapStatNumToLabel + BASE.statLabelLineH) +
+          BASE.gapStatsToFooter +
+          BASE.footerH
+        : BASE.gapHeroToName + (BASE.namePadV * 2 + BASE.nameLineH);
+
+    const totalBase =
+        BASE.borderPad * 2 + BASE.bodyPadTop + BASE.bodyPadBottom + BASE.heroRowH + bottomBlockBase;
+
+    const leftColW = s(BASE.leftColW);
+    const heroRowH = s(BASE.heroRowH);
+    const bodyPadH = s(BASE.bodyPadH);
+    const borderPad = s(BASE.borderPad);
+
+    return {
+        sf,
+        cardHeight: Math.round(s(totalBase)),
+
+        borderPad,
+        bodyPadH,
+        bodyPadTop: s(BASE.bodyPadTop),
+        bodyPadBottom: s(BASE.bodyPadBottom),
+
+        leftColW,
+        heroRowH,
+        // Foto hudud kengligi — qolgan barcha joy shu yerga aniq (formula
+        // bilan) beriladi, taxmin qilinmaydi: hech qachon sig'may qolmaydi.
+        photoW: Math.max(0, cardWidth - borderPad * 2 - bodyPadH * 2 - leftColW),
+
+        ovrFont: s(BASE.ovrFont),
+        ovrLineH: s(BASE.ovrLineH),
+        posFont: s(BASE.posFont),
+        posLineH: s(BASE.posLineH),
+        posPadV: s(BASE.posPadV),
+        posBorder: Math.max(0.6, s(BASE.posBorder)),
+        leftColGap: s(BASE.leftColGap),
+        dividerH: Math.max(1, s(BASE.dividerH)),
+        clubBadgeD: s(BASE.clubBadgeD),
+
+        gapHeroToName: s(BASE.gapHeroToName),
+        namePadV: s(BASE.namePadV),
+        nameFont: s(BASE.nameFont),
+        nameLineH: s(BASE.nameLineH),
+
+        gapNameToSep: s(BASE.gapNameToSep),
+        sepH: s(BASE.sepH),
+
+        gapSepToStats: s(BASE.gapSepToStats),
+        statNumFont: s(BASE.statNumFont),
+        statNumLineH: s(BASE.statNumLineH),
+        gapStatNumToLabel: s(BASE.gapStatNumToLabel),
+        statLabelFont: s(BASE.statLabelFont),
+        statLabelLineH: s(BASE.statLabelLineH),
+
+        gapStatsToFooter: s(BASE.gapStatsToFooter),
+        footerH: s(BASE.footerH),
+        footerLogo: s(BASE.footerLogo),
+        footerFont: s(BASE.footerFont),
+
+        outerRadiusTop: s(BASE.outerRadiusTop),
+        outerRadiusBottom: s(BASE.outerRadiusBottom),
+        innerRadiusTop: s(BASE.innerRadiusTop),
+        innerRadiusBottom: s(BASE.innerRadiusBottom),
+    };
+}
+
 export default function FifaPlayerCard({
     player,
     rarity: customRarity,
@@ -59,10 +210,13 @@ export default function FifaPlayerCard({
     const assistsCount = player?.stats?.assists ?? player?.assists ?? 0;
     const matchesCount = player?.stats?.matchesPlayed ?? player?.stats?.matches ?? player?.matchesPlayed ?? 0;
 
-    // Optimized Card Aspect Ratio
+    // Karta kengligi (o'zgarmadi) + shu kenglikdan MATEMATIK yo'l bilan
+    // olingan to'liq maket — balandlik shu maketning o'zidan keladi, shuning
+    // uchun tarkib va konteyner o'lchami hech qachon bir-biridan ajralmaydi.
     const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
-    const cardHeight = showAttributes ? cardWidth * 1.18 : cardWidth * 1.02;
-    const scaleFactor = cardWidth / 260;
+    const L = computeCardLayout(cardWidth, showAttributes);
+    const cardHeight = L.cardHeight;
+    const scaleFactor = L.sf;
 
     // 3D Parallax & Tilt animations
     const tiltX = useRef(new Animated.Value(0)).current;
@@ -208,7 +362,16 @@ export default function FifaPlayerCard({
                     colors={theme.borderGradient as [string, string, ...string[]]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.borderLayer}
+                    style={[
+                        styles.borderLayer,
+                        {
+                            padding: L.borderPad,
+                            borderTopLeftRadius: L.outerRadiusTop,
+                            borderTopRightRadius: L.outerRadiusTop,
+                            borderBottomLeftRadius: L.outerRadiusBottom,
+                            borderBottomRightRadius: L.outerRadiusBottom,
+                        },
+                    ]}
                 >
                     {/* Card Body Background */}
                     <LinearGradient
@@ -218,31 +381,35 @@ export default function FifaPlayerCard({
                         style={[
                             styles.bodyLayer,
                             {
-                                paddingHorizontal: 12 * scaleFactor,
-                                paddingTop: 10 * scaleFactor,
-                                paddingBottom: 6 * scaleFactor,
+                                borderTopLeftRadius: L.innerRadiusTop,
+                                borderTopRightRadius: L.innerRadiusTop,
+                                borderBottomLeftRadius: L.innerRadiusBottom,
+                                borderBottomRightRadius: L.innerRadiusBottom,
+                                paddingHorizontal: L.bodyPadH,
+                                paddingTop: L.bodyPadTop,
+                                paddingBottom: L.bodyPadBottom,
                             },
                         ]}
                     >
                         {/* Background Geometric Facets */}
                         <View style={styles.geometricPattern}>
-                            <View style={[styles.geoLine, { borderColor: theme.accentGlow }]} />
-                            <View style={[styles.geoLine2, { borderColor: theme.accentGlow }]} />
-                            <View style={[styles.geoCircle, { borderColor: theme.accentGlow }]} />
+                            <View style={[styles.geoLine, { borderColor: theme.accentGlow, width: 200 * scaleFactor, height: 200 * scaleFactor, top: -30 * scaleFactor, right: -30 * scaleFactor }]} />
+                            <View style={[styles.geoLine2, { borderColor: theme.accentGlow, width: 180 * scaleFactor, height: 180 * scaleFactor, bottom: 20 * scaleFactor, left: -40 * scaleFactor }]} />
+                            <View style={[styles.geoCircle, { borderColor: theme.accentGlow, width: 140 * scaleFactor, height: 140 * scaleFactor, borderRadius: 70 * scaleFactor, top: 60 * scaleFactor, left: 40 * scaleFactor }]} />
                         </View>
 
-                        {/* Top Hero Row (Left Stats Column + Right Photo Cutout) */}
-                        <View style={[styles.topHeroRow, { marginTop: 1 * scaleFactor }]}>
+                        {/* Top Hero Row (Left Stats Column + Right Photo Cutout) — ANIQ balandlik: L.heroRowH */}
+                        <View style={[styles.topHeroRow, { height: L.heroRowH }]}>
                             {/* Left Column (OVR, Full Position, Circular Club Badge) */}
-                            <View style={[styles.topLeftColumn, { width: 76 * scaleFactor }]}>
+                            <View style={[styles.topLeftColumn, { width: L.leftColW, gap: L.leftColGap }]}>
                                 <Text
                                     numberOfLines={1}
                                     adjustsFontSizeToFit
                                     style={[
                                         styles.ovrText,
                                         {
-                                            fontSize: 30 * scaleFactor,
-                                            lineHeight: Math.round(38 * scaleFactor),
+                                            fontSize: L.ovrFont,
+                                            lineHeight: L.ovrLineH,
                                             color: theme.ratingColor,
                                             textShadowColor: theme.accentGlow,
                                         },
@@ -252,14 +419,15 @@ export default function FifaPlayerCard({
                                 </Text>
 
                                 {/* Full Localized Position Pill */}
-                                <View style={[styles.posBadge, { borderColor: theme.accentGlow, paddingHorizontal: 4 * scaleFactor, paddingVertical: 1.5 * scaleFactor }]}>
+                                <View style={[styles.posBadge, { borderColor: theme.accentGlow, borderWidth: L.posBorder, paddingVertical: L.posPadV }]}>
                                     <Text
                                         numberOfLines={1}
                                         adjustsFontSizeToFit
                                         style={[
                                             styles.posText,
                                             {
-                                                fontSize: Math.min(8.5 * scaleFactor, 9.5),
+                                                fontSize: L.posFont,
+                                                lineHeight: L.posLineH,
                                                 color: theme.textGold,
                                             },
                                         ]}
@@ -269,48 +437,47 @@ export default function FifaPlayerCard({
                                 </View>
 
                                 {/* Divider Line */}
-                                <View style={[styles.miniDivider, { backgroundColor: theme.accentGlow, width: 22 * scaleFactor }]} />
+                                <View style={[styles.miniDivider, { backgroundColor: theme.accentGlow, height: L.dividerH, width: L.leftColW * 0.7 }]} />
 
                                 {/* PERFECT CIRCULAR Club Crest Badge */}
                                 <View
                                     style={[
                                         styles.clubBadgeCircle,
                                         {
-                                            width: 28 * scaleFactor,
-                                            height: 28 * scaleFactor,
-                                            borderRadius: 14 * scaleFactor,
+                                            width: L.clubBadgeD,
+                                            height: L.clubBadgeD,
+                                            borderRadius: L.clubBadgeD / 2,
                                             borderColor: theme.accentGlow,
+                                            borderWidth: Math.max(1, 1.5 * scaleFactor),
                                         },
                                     ]}
                                 >
                                     {teamLogo ? (
                                         <Image
                                             source={{ uri: teamLogo }}
-                                            style={[
-                                                styles.clubLogoImg,
-                                                {
-                                                    width: 24 * scaleFactor,
-                                                    height: 24 * scaleFactor,
-                                                    borderRadius: 12 * scaleFactor,
-                                                },
-                                            ]}
+                                            style={{
+                                                width: L.clubBadgeD - 4 * scaleFactor,
+                                                height: L.clubBadgeD - 4 * scaleFactor,
+                                                borderRadius: (L.clubBadgeD - 4 * scaleFactor) / 2,
+                                            }}
                                             resizeMode="cover"
                                         />
                                     ) : (
-                                        <Ionicons name="shield-outline" size={14 * scaleFactor} color={theme.textGold} />
+                                        <Ionicons name="shield-outline" size={L.clubBadgeD * 0.5} color={theme.textGold} />
                                     )}
                                 </View>
                             </View>
 
-                            {/* Player Photo Cutout with Ambient Glow */}
-                            <View style={styles.photoContainer}>
+                            {/* Player Photo Cutout with Ambient Glow — hudud L.photoW x L.heroRowH ga ANIQ mos */}
+                            <View style={[styles.photoContainer, { width: L.photoW, height: L.heroRowH }]}>
                                 <View
                                     style={[
                                         styles.photoGlow,
                                         {
                                             backgroundColor: theme.accentGlow,
-                                            width: 120 * scaleFactor,
-                                            height: 120 * scaleFactor,
+                                            width: L.heroRowH * 0.82,
+                                            height: L.heroRowH * 0.82,
+                                            borderRadius: L.heroRowH * 0.41,
                                         },
                                     ]}
                                 />
@@ -320,8 +487,9 @@ export default function FifaPlayerCard({
                                         style={[
                                             styles.playerPhoto,
                                             {
-                                                width: 148 * scaleFactor,
-                                                height: 148 * scaleFactor,
+                                                width: '100%',
+                                                height: '100%',
+                                                borderRadius: 16 * scaleFactor,
                                             },
                                         ]}
                                         contentFit="contain"
@@ -331,26 +499,26 @@ export default function FifaPlayerCard({
                                         style={[
                                             styles.playerPhotoPlaceholder,
                                             {
-                                                width: 136 * scaleFactor,
-                                                height: 136 * scaleFactor,
+                                                width: L.photoW * 0.86,
+                                                height: L.heroRowH * 0.86,
                                             },
                                         ]}
                                     >
-                                        <FontAwesome5 name="user-alt" size={54 * scaleFactor} color="rgba(255,255,255,0.3)" />
+                                        <FontAwesome5 name="user-alt" size={L.heroRowH * 0.32} color="rgba(255,255,255,0.3)" />
                                     </View>
                                 )}
                             </View>
                         </View>
 
                         {/* Bottom Container: Player Name Plaque + Real Football Stats + Amatora Seal */}
-                        <View style={[styles.bottomInfoSection, { marginTop: -10 * scaleFactor }]}>
+                        <View style={[styles.bottomInfoSection, { marginTop: L.gapHeroToName }]}>
                             {/* Player Name Plaque */}
                             <View style={styles.namePlateWrapper}>
                                 <LinearGradient
                                     colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
-                                    style={styles.namePlateGradient}
+                                    style={[styles.namePlateGradient, { paddingVertical: L.namePadV }]}
                                 >
                                     <Text
                                         numberOfLines={1}
@@ -358,7 +526,8 @@ export default function FifaPlayerCard({
                                         style={[
                                             styles.playerNameText,
                                             {
-                                                fontSize: Math.min(14 * scaleFactor, 15.5),
+                                                fontSize: L.nameFont,
+                                                lineHeight: L.nameLineH,
                                                 color: theme.textPrimary,
                                             },
                                         ]}
@@ -370,54 +539,54 @@ export default function FifaPlayerCard({
 
                             {/* Real Football Stats (GOL, ASIST, O'YIN) */}
                             {showAttributes && (
-                                <View style={{ width: '100%', marginTop: 0 }}>
-                                    <View style={[styles.separatorContainer, { marginTop: -1 * scaleFactor, marginBottom: 1 * scaleFactor }]}>
-                                        <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
-                                        <View style={[styles.separatorDiamond, { backgroundColor: theme.textGold }]} />
-                                        <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
+                                <View style={{ width: '100%' }}>
+                                    <View style={[styles.separatorContainer, { height: L.sepH, marginTop: L.gapNameToSep }]}>
+                                        <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow, height: Math.max(1, scaleFactor) }]} />
+                                        <View style={[styles.separatorDiamond, { backgroundColor: theme.textGold, width: L.sepH * 0.55, height: L.sepH * 0.55, marginHorizontal: 6 * scaleFactor }]} />
+                                        <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow, height: Math.max(1, scaleFactor) }]} />
                                     </View>
 
-                                    <View style={[styles.statsRowThree, { paddingHorizontal: 12 * scaleFactor, marginTop: -1 * scaleFactor }]}>
-                                        <View style={styles.statColItem}>
-                                            <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
+                                    <View style={[styles.statsRowThree, { paddingHorizontal: L.bodyPadH, marginTop: L.gapSepToStats }]}>
+                                        <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
+                                            <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {goalsCount}
                                             </Text>
-                                            <Text style={[styles.statLabelSmall, { fontSize: 8.5 * scaleFactor, color: theme.textPrimary }]}>
+                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary }]}>
                                                 GOL
                                             </Text>
                                         </View>
 
-                                        <View style={[styles.statsVerticalDivider, { height: 19 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
 
-                                        <View style={styles.statColItem}>
-                                            <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
+                                        <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
+                                            <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {assistsCount}
                                             </Text>
-                                            <Text style={[styles.statLabelSmall, { fontSize: 8.5 * scaleFactor, color: theme.textPrimary }]}>
+                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary }]}>
                                                 ASIST
                                             </Text>
                                         </View>
 
-                                        <View style={[styles.statsVerticalDivider, { height: 19 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
 
-                                        <View style={styles.statColItem}>
-                                            <Text style={[styles.statNumBig, { fontSize: 15 * scaleFactor, color: theme.textGold }]}>
+                                        <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
+                                            <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {matchesCount}
                                             </Text>
-                                            <Text style={[styles.statLabelSmall, { fontSize: 8.5 * scaleFactor, color: theme.textPrimary }]}>
+                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary }]}>
                                                 O'YIN
                                             </Text>
                                         </View>
                                     </View>
 
                                     {/* Subtle Amatora Footer Seal */}
-                                    <View style={[styles.cardFooterBrand, { marginTop: 1 * scaleFactor }]}>
+                                    <View style={[styles.cardFooterBrand, { marginTop: L.gapStatsToFooter, height: L.footerH }]}>
                                         <Image
                                             source={require('../assets/logo.png')}
-                                            style={{ width: 8.5 * scaleFactor, height: 8.5 * scaleFactor, opacity: 0.5, marginRight: 4 * scaleFactor }}
+                                            style={{ width: L.footerLogo, height: L.footerLogo, opacity: 0.5, marginRight: 4 * scaleFactor }}
                                             resizeMode="contain"
                                         />
-                                        <Text style={[styles.footerBrandText, { fontSize: 7 * scaleFactor, color: theme.textGold }]}>
+                                        <Text style={[styles.footerBrandText, { fontSize: L.footerFont, lineHeight: L.footerH, color: theme.textGold }]}>
                                             AMATORA
                                         </Text>
                                     </View>
@@ -448,22 +617,12 @@ const styles = StyleSheet.create({
     borderLayer: {
         width: '100%',
         height: '100%',
-        padding: 3.5,
-        borderTopLeftRadius: 36,
-        borderTopRightRadius: 36,
-        borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
     },
     bodyLayer: {
         width: '100%',
         height: '100%',
-        borderTopLeftRadius: 33,
-        borderTopRightRadius: 33,
-        borderBottomLeftRadius: 25,
-        borderBottomRightRadius: 25,
         overflow: 'hidden',
         position: 'relative',
-        justifyContent: 'space-between',
         alignItems: 'center',
     },
     geometricPattern: {
@@ -472,29 +631,16 @@ const styles = StyleSheet.create({
     },
     geoLine: {
         position: 'absolute',
-        top: -30,
-        right: -30,
-        width: 200,
-        height: 200,
         borderWidth: 1,
         transform: [{ rotate: '45deg' }],
     },
     geoLine2: {
         position: 'absolute',
-        bottom: 20,
-        left: -40,
-        width: 180,
-        height: 180,
         borderWidth: 1,
         transform: [{ rotate: '30deg' }],
     },
     geoCircle: {
         position: 'absolute',
-        top: 60,
-        left: 40,
-        width: 140,
-        height: 140,
-        borderRadius: 70,
         borderWidth: 0.8,
     },
     topHeroRow: {
@@ -507,57 +653,47 @@ const styles = StyleSheet.create({
     topLeftColumn: {
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 3,
     },
     ovrText: {
         fontWeight: '900',
         letterSpacing: -0.5,
         includeFontPadding: false,
-        paddingTop: 2,
+        textAlign: 'center',
     },
     posBadge: {
         borderRadius: 6,
-        borderWidth: 0.8,
         backgroundColor: 'rgba(0,0,0,0.3)',
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
+        paddingHorizontal: 4,
     },
     posText: {
         fontWeight: '900',
         letterSpacing: 0.5,
         textAlign: 'center',
+        includeFontPadding: false,
     },
     miniDivider: {
-        height: 1.5,
         borderRadius: 1,
-        marginVertical: 2,
         opacity: 0.6,
     },
     clubBadgeCircle: {
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1.5,
         backgroundColor: 'rgba(0,0,0,0.5)',
         overflow: 'hidden',
     },
-    clubLogoImg: {
-        overflow: 'hidden',
-    },
     photoContainer: {
-        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 5,
     },
     photoGlow: {
         position: 'absolute',
-        borderRadius: 60,
         opacity: 0.18,
     },
-    playerPhoto: {
-        borderRadius: 16,
-    },
+    playerPhoto: {},
     playerPhotoPlaceholder: {
         alignItems: 'center',
         justifyContent: 'center',
@@ -569,7 +705,6 @@ const styles = StyleSheet.create({
     },
     namePlateGradient: {
         width: '94%',
-        paddingVertical: 3.5,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 6,
@@ -578,6 +713,7 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 0.8,
         textAlign: 'center',
+        includeFontPadding: false,
     },
     separatorContainer: {
         flexDirection: 'row',
@@ -588,14 +724,10 @@ const styles = StyleSheet.create({
     },
     separatorLine: {
         flex: 1,
-        height: 1,
         opacity: 0.4,
     },
     separatorDiamond: {
-        width: 4,
-        height: 4,
         transform: [{ rotate: '45deg' }],
-        marginHorizontal: 6,
     },
     statsRowThree: {
         width: '100%',
@@ -612,33 +744,20 @@ const styles = StyleSheet.create({
     statColItem: {
         alignItems: 'center',
         justifyContent: 'center',
-        minWidth: 44,
     },
     statNumBig: {
         fontWeight: '900',
         includeFontPadding: false,
+        textAlign: 'center',
     },
     statsVerticalDivider: {
-        width: 1,
         marginHorizontal: 4,
     },
-    statRow: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    statLine: {
-        textAlign: 'center',
-        includeFontPadding: false,
-    },
-    statNum: {
-        fontWeight: '900',
-        includeFontPadding: false,
-    },
-    statLabel: {
+    statLabelSmall: {
         fontWeight: '800',
-        color: '#CBD5E1',
         letterSpacing: 0.5,
         includeFontPadding: false,
+        textAlign: 'center',
     },
     cardFooterBrand: {
         flexDirection: 'row',
@@ -646,25 +765,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         opacity: 0.5,
         zIndex: 10,
-        paddingBottom: 2,
     },
     footerBrandText: {
         fontWeight: '900',
         letterSpacing: 1.5,
-    },
-    sealContainer: {
-        width: '100%',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10,
-    },
-    sealBadge: {
-        borderRadius: 4,
-        borderWidth: 0.6,
-        backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-    sealText: {
-        fontWeight: '900',
-        letterSpacing: 1.5,
+        includeFontPadding: false,
     },
 });
