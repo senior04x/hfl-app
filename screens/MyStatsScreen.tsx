@@ -76,7 +76,8 @@ const extractPlayerData = (data: any) => {
         weight,
         fatherName: data.fatherName || data.father_name || '',
         instagram_username: instaUser,
-        instagram_url: instaUrl
+        instagram_url: instaUrl,
+        team_logo: data.teams?.logo_url || data.teams?.logo || data.team?.logo_url || data.team?.logo || data.team_logo || data.teamLogo || data.team_logo_url || ''
     };
 };
 
@@ -811,6 +812,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                 <FifaPlayerCard
                     player={player}
+                    teamLogo={currentTeamLogo}
                     isLoading={loading}
                     size="lg"
                     interactive3D={false}
@@ -1360,8 +1362,9 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                         <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={{ padding: 6, borderRadius: 20, overflow: 'hidden', alignItems: 'center', backgroundColor: 'transparent' }}>
                             <FifaPlayerCard
-                    player={player}
-                    isLoading={loading}
+                                player={player}
+                                teamLogo={currentTeamLogo}
+                                isLoading={loading}
                                 size="lg"
                                 interactive3D={false}
                                 showPlayStyles={false}

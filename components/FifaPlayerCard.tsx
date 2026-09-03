@@ -52,6 +52,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 interface FifaPlayerCardProps {
     isLoading?: boolean;
     player: any;
+    teamLogo?: string;
     rarity?: CardRarity;
     size?: 'sm' | 'md' | 'lg';
     interactive3D?: boolean;
@@ -445,6 +446,7 @@ export function FifaCardSkeleton({
 export default function FifaPlayerCard({
     isLoading = false,
     player,
+    teamLogo: customTeamLogo,
     rarity: customRarity,
     size = 'md',
     interactive3D = false,
@@ -604,7 +606,15 @@ export default function FifaPlayerCard({
         : L.nameLineH;
 
     const avatarUri = player?.avatar || player?.photo || player?.photo_url || player?.image_url;
-    const teamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo;
+    const teamLogo = customTeamLogo ||
+        player?.team_logo ||
+        player?.teamLogo ||
+        player?.teams?.logo_url ||
+        player?.teams?.logo ||
+        player?.team?.logo_url ||
+        player?.team?.logo ||
+        player?.team_logo_url ||
+        player?.teamLogoUrl;
 
     const rawRating = player?.rating !== undefined && player?.rating !== null && Number(player?.rating) !== 0
         ? Number(player.rating)
@@ -736,14 +746,16 @@ export default function FifaPlayerCard({
                                     ]}
                                 >
                                     {teamLogo ? (
-                                        <Image
-                                            source={{ uri: teamLogo }}
+                                        <SmartImage
+                                            uri={teamLogo}
                                             style={{
                                                 width: L.clubBadgeD - 4 * scaleFactor,
                                                 height: L.clubBadgeD - 4 * scaleFactor,
                                                 borderRadius: (L.clubBadgeD - 4 * scaleFactor) / 2,
                                             }}
-                                            resizeMode="cover"
+                                            contentFit="contain"
+                                            priority="high"
+                                            fallbackIcon="shield-outline"
                                         />
                                     ) : (
                                         <Ionicons name="shield-outline" size={L.clubBadgeD * 0.5} color={theme.textGold} />
