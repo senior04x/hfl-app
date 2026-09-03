@@ -66,6 +66,23 @@ const LEAGUE_OPTIONS = [
     { id: '7x7 liga', label: '7x7 liga', subLabel: 'Kichik Maydon Musobaqasi' },
 ];
 
+const format9Digits = (val: string) => {
+    const d = String(val || '').replace(/\D/g, '').slice(0, 9);
+    if (!d) return '';
+    if (d.length <= 2) return d;
+    if (d.length <= 5) return `${d.slice(0, 2)} ${d.slice(2)}`;
+    if (d.length <= 7) return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}`;
+    return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 7)} ${d.slice(7, 9)}`;
+};
+
+const cleanPhone9Digits = (raw: string) => {
+    let clean = String(raw || '').replace(/\D/g, '');
+    if (clean.startsWith('998') && clean.length > 9) {
+        clean = clean.slice(3);
+    }
+    return clean.slice(0, 9);
+};
+
 export default function JoinApplicationScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { user } = useAuthStore();
@@ -1304,20 +1321,25 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                                         <View style={styles.inputGroup}>
                                             <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Telefon raqam *</Text>
-                                            <TextInput
-                                                style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
-                                                value={formatUzPhone(formData.phone)}
-                                                onChangeText={(t) => {
-                                                    const formatted = formatUzPhone(t);
-                                                    const clean = cleanPhoneForDb(formatted).replace('+998', '');
-                                                    setFormData(prev => ({ ...prev, phone: clean }));
-                                                    triggerValidation('player', formData.teamName, clean, formData.firstName, formData.lastName);
-                                                }}
-                                                placeholder="+998 90 123 45 67"
-                                                keyboardType="phone-pad"
-                                                maxLength={17}
-                                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
-                                            />
+                                            <View style={[styles.phoneInputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border }]}>
+                                                <View style={styles.phonePrefixBox}>
+                                                    <Text style={[styles.phonePrefixText, { color: homeColors.textPrimary }]}>+998</Text>
+                                                </View>
+                                                <View style={[styles.phoneDivider, { backgroundColor: homeColors.border }]} />
+                                                <TextInput
+                                                    style={[styles.phoneInputField, { color: homeColors.textPrimary }]}
+                                                    value={format9Digits(formData.phone)}
+                                                    onChangeText={(t) => {
+                                                        const clean = cleanPhone9Digits(t);
+                                                        setFormData(prev => ({ ...prev, phone: clean }));
+                                                        triggerValidation('player', formData.teamName, clean, formData.firstName, formData.lastName);
+                                                    }}
+                                                    placeholder="90 123 45 67"
+                                                    keyboardType="phone-pad"
+                                                    maxLength={12}
+                                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                                                />
+                                            </View>
                                         </View>
 
                                         {renderValidationBadge()}
@@ -1625,20 +1647,25 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                                         <View style={styles.inputGroup}>
                                             <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Sardor telefoni *</Text>
-                                            <TextInput
-                                                style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
-                                                value={formatUzPhone(formData.phone)}
-                                                onChangeText={(t) => {
-                                                    const formatted = formatUzPhone(t);
-                                                    const clean = cleanPhoneForDb(formatted).replace('+998', '');
-                                                    setFormData({ ...formData, phone: clean });
-                                                    triggerValidation('team', formData.teamName, clean);
-                                                }}
-                                                placeholder="+998 90 123 45 67"
-                                                keyboardType="phone-pad"
-                                                maxLength={17}
-                                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
-                                            />
+                                            <View style={[styles.phoneInputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border }]}>
+                                                <View style={styles.phonePrefixBox}>
+                                                    <Text style={[styles.phonePrefixText, { color: homeColors.textPrimary }]}>+998</Text>
+                                                </View>
+                                                <View style={[styles.phoneDivider, { backgroundColor: homeColors.border }]} />
+                                                <TextInput
+                                                    style={[styles.phoneInputField, { color: homeColors.textPrimary }]}
+                                                    value={format9Digits(formData.phone)}
+                                                    onChangeText={(t) => {
+                                                        const clean = cleanPhone9Digits(t);
+                                                        setFormData(prev => ({ ...prev, phone: clean }));
+                                                        triggerValidation('team', formData.teamName, clean);
+                                                    }}
+                                                    placeholder="90 123 45 67"
+                                                    keyboardType="phone-pad"
+                                                    maxLength={12}
+                                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                                                />
+                                            </View>
                                         </View>
 
                                         {renderValidationBadge()}
@@ -1888,19 +1915,24 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                                     <View style={styles.inputGroup}>
                                         <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Telefon raqami (ixtiyoriy)</Text>
-                                        <TextInput
-                                            style={[styles.inputField, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border, color: homeColors.textPrimary }]}
-                                            value={formatUzPhone(modalPlayerData.phone)}
-                                            onChangeText={(t) => {
-                                                const formatted = formatUzPhone(t);
-                                                const clean = cleanPhoneForDb(formatted).replace('+998', '');
-                                                setModalPlayerData({ ...modalPlayerData, phone: clean });
-                                            }}
-                                            placeholder="+998 90 123 45 67"
-                                            keyboardType="phone-pad"
-                                            maxLength={17}
-                                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
-                                        />
+                                        <View style={[styles.phoneInputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: homeColors.border }]}>
+                                            <View style={styles.phonePrefixBox}>
+                                                <Text style={[styles.phonePrefixText, { color: homeColors.textPrimary }]}>+998</Text>
+                                            </View>
+                                            <View style={[styles.phoneDivider, { backgroundColor: homeColors.border }]} />
+                                            <TextInput
+                                                style={[styles.phoneInputField, { color: homeColors.textPrimary }]}
+                                                value={format9Digits(modalPlayerData.phone)}
+                                                onChangeText={(t) => {
+                                                    const clean = cleanPhone9Digits(t);
+                                                    setModalPlayerData(prev => ({ ...prev, phone: clean }));
+                                                }}
+                                                placeholder="90 123 45 67"
+                                                keyboardType="phone-pad"
+                                                maxLength={12}
+                                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                                            />
+                                        </View>
                                     </View>
                                 </ScrollView>
 
@@ -2194,6 +2226,37 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         borderWidth: 1,
+    },
+
+    phoneInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 12,
+        height: 46,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    phonePrefixBox: {
+        paddingHorizontal: 12,
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    phonePrefixText: {
+        fontSize: 14,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    phoneDivider: {
+        width: 1,
+        height: '55%',
+    },
+    phoneInputField: {
+        flex: 1,
+        height: '100%',
+        paddingHorizontal: 12,
+        fontSize: 14,
+        fontWeight: '600',
     },
 
     inputGroupCompact: {
