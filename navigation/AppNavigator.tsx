@@ -469,13 +469,25 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                     <Animated.View
                         style={[
                             styles.switcherModalCard,
-                            { backgroundColor: colors.surface, borderColor: colors.border },
+                            {
+                                backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                                ...(Platform.OS === 'ios'
+                                    ? {
+                                        borderTopWidth: 1,
+                                        borderLeftWidth: 1,
+                                        borderRightWidth: 1,
+                                        borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                                    }
+                                    : {
+                                        elevation: 24,
+                                        shadowColor: '#000000',
+                                        borderWidth: 0,
+                                    }),
+                            },
                             { transform: [{ translateY: Animated.add(sheetSlideAnim, modalY) }] }
                         ]}
                         {...modalPanResponder.panHandlers}
                     >
-                        {Platform.OS === 'ios' && isDark && <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
-                        
                         <View style={styles.headerDragZone}>
                             <View style={[styles.grabberBar, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]} />
                             <View style={styles.modalHeaderRow}>
@@ -758,11 +770,6 @@ const styles = StyleSheet.create({
         borderBottomLeftRadius: 0,
         borderBottomRightRadius: 0,
         overflow: 'hidden',
-        borderTopWidth: 1,
-        borderLeftWidth: 1,
-        borderRightWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.14)',
-        backgroundColor: Platform.OS === 'android' ? '#141414' : 'transparent',
     },
     headerDragZone: {
         paddingTop: 12,
