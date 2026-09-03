@@ -970,9 +970,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
                     <Ionicons name="finger-print-outline" size={17} color={homeColors.textPrimary} />
                     <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.personal_info', 'MA\'LUMOTLAR').toUpperCase()}</Text>
-                    <TouchableOpacity onPress={handleOpenUpdateModal} hitSlop={10} style={{ marginLeft: 'auto' }}>
-                        <Ionicons name="create-outline" size={18} color={homeColors.textPrimary} />
-                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.physicalGrid}>
