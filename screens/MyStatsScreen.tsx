@@ -813,6 +813,21 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }
     };
 
+    const onRefresh = async () => {
+        setRefreshing(true);
+        try {
+            clearApiCache();
+            await Promise.all([
+                fetchPlayer(true),
+                fetchPlayerMatches(),
+            ]);
+        } catch (error) {
+            console.error('Error refreshing my stats:', error);
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
     const fetchPlayerMatches = async () => {
         try {
             setMatchesLoading(true);
