@@ -214,7 +214,17 @@ function App() {
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
-                                    <Stack.Screen name="TeamChat" component={TeamChatScreen} />
+                                    <Stack.Screen 
+                                        name="TeamChat" 
+                                        component={TeamChatScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
                                     <Stack.Screen name="Standings" component={StandingsScreen} />
                                     <Stack.Screen 
                                         name="TournamentDetail" 

@@ -90,8 +90,54 @@ function TeamChatScreen({ route, navigation }: any) {
       }
     } catch (_) {}
 
-    const { height } = Dimensions.get('window');
+    const { width, height } = Dimensions.get('window');
     const pan = useRef(new Animated.ValueXY()).current;
+
+    // Swipe back animation (matching MatchDetailScreen)
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+    const chatExitPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: width,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            },
+            onPanResponderTerminationRequest: () => true,
+        })
+    ).current;
 
     // Bouncing Dots Animation for Placeholder ("Xabar yozing . . .")
     const dot1Y = useRef(new Animated.Value(0)).current;
@@ -1206,10 +1252,43 @@ function TeamChatScreen({ route, navigation }: any) {
         );
     }, [user, teamInfo, teamPlayers, t]);
 
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, width * 0.8, width],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
+
     return (
-        <View style={{ flex: 1, backgroundColor: homeColors.background }}>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={[styles.header, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
+            />
+
+            <Animated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
+                {...chatExitPanResponder.panHandlers}
+            >
+                <SafeAreaView style={styles.container} edges={['top']}>
+                    <View style={[styles.header, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                         <Ionicons name="arrow-back" size={24} color={homeColors.textPrimary} />
                     </TouchableOpacity>
@@ -1438,6 +1517,7 @@ function TeamChatScreen({ route, navigation }: any) {
                     </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
+            </Animated.View>
 
             {/* Context Menu Modal */}
             <Modal
