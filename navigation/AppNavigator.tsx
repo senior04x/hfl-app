@@ -169,7 +169,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
             },
             onPanResponderRelease: (_, gestureState) => {
                 if (gestureState.dy > 40 || gestureState.vy > 0.2) {
-                    setShowSwitcherModal(false);
+                    closeSwitcherModal();
                 } else {
                     Animated.spring(modalY, {
                         toValue: 0,
@@ -283,7 +283,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
         const initialValidAccounts = deduplicateAccountsList(storedAccounts);
         setAccountOptions(initialValidAccounts);
         setLoadingAccounts(false);
-        setShowSwitcherModal(true);
+        openSwitcherModal();
 
         // 2. Orqa fonda (jimjit, spinner ko'rsatmasdan) yangi akkauntlarni tekshirib yangilaydi
         const phone = user?.phone || user?.phoneNumber || user?.phone_number;
