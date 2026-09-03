@@ -596,7 +596,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
             setPickerLoading(true);
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permissionResult.granted) {
-                Alert.alert('Ruxsat kerak', 'Rasmni tanlash uchun galereyaga ruxsat bering');
+                Alert.alert(t('profile.permission_needed', 'Ruxsat kerak'), t('profile.gallery_permission_desc', 'Rasmni tanlash uchun galereyaga ruxsat bering'));
                 return;
             }
 
@@ -622,7 +622,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
             }
         } catch (err: any) {
             console.error('Error picking image:', err);
-            Alert.alert(t('common.notice', 'Xatolik'), 'Rasmni tanlashda xatolik yuz berdi');
+            Alert.alert(t('common.notice', 'Xatolik'), t('profile.photo_pick_error', 'Rasmni tanlashda xatolik yuz berdi'));
         } finally {
             setPickerLoading(false);
         }
@@ -630,7 +630,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
         const handleSubmitProfileUpdate = async () => {
         if (!updateForm.firstName?.trim() || !updateForm.lastName?.trim()) {
-            Alert.alert(t('common.notice', 'Eslatma'), 'Iltimos, ism va familiyangizni kiriting');
+            Alert.alert(t('common.notice', 'Eslatma'), t('profile.required_fields_error', 'Iltimos, ism va familiyangizni kiriting'));
             setUpdateSubmitStatus('idle');
             return;
         }
@@ -763,7 +763,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
         } catch (err: any) {
             setUpdateSubmitStatus('error');
             console.error('Error submitting profile update:', err);
-            Alert.alert(t('common.notice', 'Xatolik'), 'Arizani yuborishda xatolik yuz berdi');
+            Alert.alert(t('common.notice', 'Xatolik'), t('profile.submit_error', 'Arizani yuborishda xatolik yuz berdi'));
         } finally {
             setSubmittingUpdate(false);
         }
