@@ -292,9 +292,8 @@ export default function MyStatsScreen({ route, navigation }: any) {
     // Profile Update & Modals
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
     const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
-        const [showComparisonModal, setShowComparisonModal] = useState(false);
+    const [showComparisonModal, setShowComparisonModal] = useState(false);
     const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
 
     // Export State & ViewShot Ref
@@ -719,7 +718,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
             setUpdateSubmitStatus('success');
             setTimeout(() => {
                 setShowProfileUpdateModal(false);
-                setShowSuccessModal(true);
             }, 600);
         } catch (err: any) {
             setUpdateSubmitStatus('error');
@@ -1604,26 +1602,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
 
 
-            {/* SUCCESS MODAL */}
-            <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => setShowSuccessModal(false)}>
-                <View style={[styles.exportModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
-                    <View style={[styles.exportModalCard, cardSurface, { alignItems: 'center', paddingVertical: 24 }]}>
-                        <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(16, 185, 129, 0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 14 }}>
-                            <Ionicons name="checkmark-circle" size={36} color="#10B981" />
-                        </View>
-                        <Text style={[styles.exportModalTitle, { color: homeColors.textPrimary, fontSize: 16, textAlign: 'center' }]}>Arizangiz qabul qilindi!</Text>
-                        <Text style={{ color: homeColors.textSecondary, fontSize: 12.5, textAlign: 'center', marginTop: 6, lineHeight: 18, paddingHorizontal: 12 }}>
-                            O'zgarishlar admin tomonidan tasdiqlangandan so'ng profilingizda aks etadi.
-                        </Text>
-                        <TouchableOpacity
-                            style={[styles.sharePosterBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000', width: '100%', marginTop: 20 }]}
-                            onPress={() => setShowSuccessModal(false)}
-                        >
-                            <Text style={[styles.sharePosterBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>Tushunarli</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+
 
             {/* COMPARISON MODAL */}
             <PlayerComparisonModal
