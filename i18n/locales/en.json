@@ -277,7 +277,7 @@
     "pitch_count": "On pitch: {{count}}",
     "bench_count": "Bench: {{count}}",
     "phone_length_error": "Please enter a 9-digit phone number.",
-    "phone_saved_success": "Phone number saved!",
+    "phone_saved_success": "Phone number saved.",
     "no_teams": "No teams available yet",
     "team_not_found": "TEAM NOT FOUND",
     "view_teams": "VIEW TEAMS",
@@ -299,7 +299,8 @@
     "load_error": "Failed to load team data.",
     "photo_permission_error": "Permission to access photo gallery is required.",
     "photo_upload_error": "Error uploading photo.",
-    "phone_save_error": "Error saving phone number."
+    "phone_save_error": "Error saving phone number.",
+    "photo_updated_success": "Photo updated successfully."
   },
   "players": {
     "title": "Players",

@@ -277,7 +277,7 @@
     "pitch_count": "Maydonda: {{count}}",
     "bench_count": "Zaxira: {{count}}",
     "phone_length_error": "Iltimos, 9 xonali telefon raqamini kiriting.",
-    "phone_saved_success": "Telefon raqami saqlandi!",
+    "phone_saved_success": "Telefon raqam saqlandi.",
     "no_teams": "Hozircha jamoalar mavjud emas",
     "team_not_found": "JAMOA TOPILMADI",
     "view_teams": "JAMOALARNI KO'RISH",
@@ -299,7 +299,8 @@
     "load_error": "Jamoa ma\\'lumotlarini yuklab bo\\'lmadi.",
     "photo_permission_error": "Galereyadan rasm tanlash uchun ruxsat berishingiz kerak.",
     "photo_upload_error": "Rasmni yuklashda xatolik yuz berdi.",
-    "phone_save_error": "Telefon raqamni saqlashda xatolik."
+    "phone_save_error": "Telefon raqamni saqlashda xatolik.",
+    "photo_updated_success": "Rasm muvaffaqiyatli yuklandi."
   },
   "players": {
     "title": "O'yinchilar",

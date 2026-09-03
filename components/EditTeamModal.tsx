@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     View,
     Text,
@@ -12,6 +12,7 @@ import {
     Dimensions,
     KeyboardAvoidingView,
     Platform,
+    Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -47,6 +48,58 @@ export default function EditTeamModal({
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploadingLogo, setUploadingLogo] = useState(false);
+
+    // Toast state
+    const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+    const toastAnim = useRef(new Animated.Value(-80)).current;
+    const toastOpacity = useRef(new Animated.Value(0)).current;
+    const toastTimerRef = useRef<any>(null);
+
+    const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        setToastMessage({ text, type });
+        toastAnim.setValue(-80);
+        toastOpacity.setValue(0);
+
+        try {
+            if (type === 'success') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+            } else {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+            }
+        } catch (e) {}
+
+        Animated.parallel([
+            Animated.spring(toastAnim, {
+                toValue: 16,
+                useNativeDriver: true,
+                tension: 85,
+                friction: 9,
+            }),
+            Animated.timing(toastOpacity, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+        ]).start();
+
+        toastTimerRef.current = setTimeout(() => {
+            Animated.parallel([
+                Animated.timing(toastAnim, {
+                    toValue: -80,
+                    duration: 220,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(toastOpacity, {
+                    toValue: 0,
+                    duration: 180,
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                setToastMessage(null);
+            });
+        }, 2500);
+    };
 
     // Team form state
     const [teamName, setTeamName] = useState('');
@@ -111,7 +164,7 @@ export default function EditTeamModal({
             }
         } catch (error) {
             console.error('Error loading team data for edit:', error);
-            Alert.alert(t('common.error', 'Xatolik'), t('teams.load_error', 'Jamoa ma\'lumotlarini yuklab bo\'lmadi.'));
+            showToast(t('teams.load_error', 'Jamoa ma\'lumotlarini yuklab bo\'lmadi.'), 'error');
         } finally {
             setLoading(false);
         }
@@ -122,10 +175,7 @@ export default function EditTeamModal({
         try {
             const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permission.granted) {
-                Alert.alert(
-                    t('common.permission_denied', 'Ruxsat berilmadi'),
-                    t('teams.photo_permission_error', 'Galereyadan rasm tanlash uchun ruxsat berishingiz kerak.')
-                );
+                showToast(t('teams.photo_permission_error', 'Galereyadan rasm tanlash uchun ruxsat berishingiz kerak.'), 'error');
                 return;
             }
 
@@ -146,13 +196,14 @@ export default function EditTeamModal({
                 const uploadRes = await apiService.uploadPhoto(localUri);
                 if (uploadRes && uploadRes.url) {
                     setLogoUrl(uploadRes.url);
+                    showToast(t('teams.photo_updated_success', 'Rasm muvaffaqiyatli yuklandi.'), 'success');
                 } else {
-                    Alert.alert(t('common.error', 'Xato'), t('teams.photo_upload_error', 'Rasmni yuklashda xatolik yuz berdi.'));
+                    showToast(t('teams.photo_upload_error', 'Rasmni yuklashda xatolik yuz berdi.'), 'error');
                 }
             }
         } catch (error) {
             console.error('Logo upload error:', error);
-            Alert.alert(t('common.error', 'Xato'), t('teams.photo_upload_error', 'Rasm tanlashda xatolik.'));
+            showToast(t('teams.photo_upload_error', 'Rasm tanlashda xatolik.'), 'error');
         } finally {
             setUploadingLogo(false);
         }
@@ -179,20 +230,15 @@ export default function EditTeamModal({
 
             if (error) throw error;
 
-            try {
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } catch (e) {}
-
-            Alert.alert(
-                t('common.success', 'Muvaffaqiyatli'),
-                t('teams.team_updated_success', 'Jamoa ma\'lumotlari yangilandi.')
-            );
+            showToast(t('teams.team_updated_success', 'Jamoa ma\'lumotlari yangilandi.'), 'success');
 
             if (onSaved) onSaved();
-            onClose();
+            setTimeout(() => {
+                onClose();
+            }, 900);
         } catch (error: any) {
             console.error('Save team error:', error);
-            Alert.alert(t('common.error', 'Xato'), error?.message || t('teams.save_error', 'Ma\'lumotlarni saqlashda xatolik.'));
+            showToast(error?.message || t('teams.save_error', 'Ma\'lumotlarni saqlashda xatolik.'), 'error');
         } finally {
             setSaving(false);
         }
@@ -203,10 +249,7 @@ export default function EditTeamModal({
         try {
             const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permission.granted) {
-                Alert.alert(
-                    t('common.permission_denied', 'Ruxsat berilmadi'),
-                    t('teams.photo_permission_error', 'Galereyadan rasm tanlash uchun ruxsat kerak.')
-                );
+                showToast(t('teams.photo_permission_error', 'Galereyadan rasm tanlash uchun ruxsat kerak.'), 'error');
                 return;
             }
 
@@ -241,14 +284,12 @@ export default function EditTeamModal({
                         .update({ photo_url: newPhotoUrl, photo: newPhotoUrl })
                         .eq('id', queryId);
 
-                    try {
-                        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    } catch (e) {}
+                    showToast(t('teams.photo_updated_success', 'Rasm muvaffaqiyatli yuklandi.'), 'success');
                 }
             }
         } catch (error) {
             console.error('Player photo upload error:', error);
-            Alert.alert(t('common.error', 'Xato'), t('teams.photo_upload_error', 'O\'yinchi rasmini yuklashda xatolik.'));
+            showToast(t('teams.photo_upload_error', 'O\'yinchi rasmini yuklashda xatolik.'), 'error');
         } finally {
             setUploadingPlayerId(null);
         }
@@ -276,12 +317,10 @@ export default function EditTeamModal({
             );
             setEditingPlayerId(null);
 
-            try {
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } catch (e) {}
+            showToast(t('teams.phone_saved_success', 'Telefon raqam saqlandi.'), 'success');
         } catch (error: any) {
             console.error('Save player phone error:', error);
-            Alert.alert(t('common.error', 'Xato'), error?.message || t('teams.phone_save_error', 'Telefon raqamni saqlashda xatolik.'));
+            showToast(error?.message || t('teams.phone_save_error', 'Telefon raqamni saqlashda xatolik.'), 'error');
         } finally {
             setSaving(false);
         }
@@ -316,6 +355,38 @@ export default function EditTeamModal({
                 style={styles.modalOverlay}
             >
                 <View style={[styles.modalCard, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
+                    {/* FLOATING IN-MODAL TOAST NOTIFICATION */}
+                    {toastMessage && (
+                        <Animated.View
+                            pointerEvents="none"
+                            style={[
+                                styles.toastContainer,
+                                {
+                                    transform: [{ translateY: toastAnim }],
+                                    opacity: toastOpacity,
+                                    backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                                    borderColor: toastMessage.type === 'success' ? '#10B981' : '#EF4444',
+                                }
+                            ]}
+                        >
+                            <View
+                                style={[
+                                    styles.toastIconBadge,
+                                    { backgroundColor: toastMessage.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)' }
+                                ]}
+                            >
+                                <Ionicons
+                                    name={toastMessage.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                                    size={18}
+                                    color={toastMessage.type === 'success' ? '#10B981' : '#EF4444'}
+                                />
+                            </View>
+                            <Text style={[styles.toastText, { color: homeColors.textPrimary }]} numberOfLines={2}>
+                                {toastMessage.text}
+                            </Text>
+                        </Animated.View>
+                    )}
+
                     {/* Header */}
                     <View style={[styles.header, { borderBottomColor: homeColors.border }]}>
                         <View>
@@ -725,6 +796,38 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 24,
         borderWidth: 1,
         overflow: 'hidden',
+        position: 'relative',
+    },
+    toastContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 20,
+        right: 20,
+        zIndex: 9999,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 10,
+    },
+    toastIconBadge: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    toastText: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: '700',
     },
     header: {
         flexDirection: 'row',
