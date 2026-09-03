@@ -1587,19 +1587,22 @@ export default function MyStatsScreen({ route, navigation }: any) {
                             />
                         </View>
                     </View>
+
+                    {/* INLINE DATE PICKER OVERLAY */}
+                    <CustomDatePickerModal
+                        visible={isDatePickerVisible}
+                        initialDate={updateForm.birthDate}
+                        inline={true}
+                        onClose={() => setIsDatePickerVisible(false)}
+                        onSelectDate={(dateStr) => {
+                            setUpdateForm(p => ({ ...p, birthDate: dateStr }));
+                            setIsDatePickerVisible(false);
+                        }}
+                    />
                 </View>
             </Modal>
 
-            {/* CUSTOM DATE PICKER MODAL */}
-            <CustomDatePickerModal
-                visible={isDatePickerVisible}
-                initialDate={updateForm.birthDate}
-                onClose={() => setIsDatePickerVisible(false)}
-                onSelectDate={(dateStr) => {
-                    setUpdateForm(p => ({ ...p, birthDate: dateStr }));
-                    setIsDatePickerVisible(false);
-                }}
-            />
+
 
             {/* SUCCESS MODAL */}
             <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => setShowSuccessModal(false)}>

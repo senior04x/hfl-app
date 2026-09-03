@@ -41,6 +41,7 @@ interface CustomDatePickerModalProps {
     initialDate?: string; // "DD.MM.YYYY" or "YYYY-MM-DD"
     onClose: () => void;
     onSelectDate: (dateStr: string) => void;
+    inline?: boolean;
 }
 
 export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
@@ -48,6 +49,7 @@ export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
     initialDate,
     onClose,
     onSelectDate,
+    inline = false,
 }) => {
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
