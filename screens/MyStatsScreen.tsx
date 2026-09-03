@@ -523,110 +523,90 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }
     };
 
-    // Open Profile Update Modal with lazy loading check for pending applications
+    // Open Profile Update Modal with lazy loading check for pending applications & 3-week cooldown
     const handleOpenUpdateModal = async () => {
         if (checkingPendingUpdate) return;
         try {
             setCheckingPendingUpdate(true);
             try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
 
-            const targetPhone = player?.phone || updateForm.phone;
-            const playerIdStr = String(targetPlayerId || player?.id || player?._id || '');
+            const user = useAuthStore.getState().user;
+            const targetPhone = String(player?.phone || user?.phone || updateForm?.phone || '').trim();
+            const cleanTargetPhone = targetPhone.replace(/\D/g, '');
+            const playerIdStr = String(targetPlayerId || player?.id || player?._id || user?.id || user?.playerId || '');
 
-            // 1. Check if user already has an active pending profile update application
-            let hasPendingApp = false;
+            // 1. Query applications to check for pending and latest approved/rejected requests
+            let pendingAppFound = false;
+            let latestCompletedApp: any = null;
+            const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
+
             try {
-                const { data: pendingApps } = await supabase
+                const { data: allUserApps, error: fetchErr } = await supabase
                     .from('applications')
                     .select('id, comment, status, phone, first_name, last_name, created_at')
-                    .or('status.eq.pending,status.eq.PENDING,status.ilike.pending')
                     .order('created_at', { ascending: false })
-                    .limit(60);
+                    .limit(100);
 
-                if (pendingApps && pendingApps.length > 0) {
-                    hasPendingApp = pendingApps.some((app: any) => {
+                if (!fetchErr && allUserApps && allUserApps.length > 0) {
+                    for (const app of allUserApps) {
                         const comment = String(app.comment || '');
-                        const isProfileUpdate = comment.includes('[PROFILE_UPDATE]');
-                        if (!isProfileUpdate) return false;
+                        if (!comment.includes('[PROFILE_UPDATE]')) continue;
 
-                        if (playerIdStr && (comment.includes(`"playerId":${playerIdStr}`) || comment.includes(`"playerId":"${playerIdStr}"`))) {
-                            return true;
+                        const cleanAppPhone = String(app.phone || '').replace(/\D/g, '');
+                        const matchesPhone = cleanTargetPhone && cleanAppPhone && (
+                            cleanAppPhone.endsWith(cleanTargetPhone) || cleanTargetPhone.endsWith(cleanAppPhone)
+                        );
+                        const matchesId = playerIdStr && comment.includes(playerIdStr);
+
+                        if (matchesPhone || matchesId) {
+                            const status = String(app.status || '').toLowerCase().trim();
+                            if (status === 'pending' || status === 'kutilmoqda') {
+                                pendingAppFound = true;
+                                break;
+                            } else if (['approved', 'accepted', 'tasdiqlangan', 'rejected', 'rad etilgan'].includes(status)) {
+                                if (!latestCompletedApp) {
+                                    latestCompletedApp = app;
+                                }
+                            }
                         }
-                        if (targetPhone && app.phone && app.phone.replace(/\D/g, '') === targetPhone.replace(/\D/g, '')) {
-                            return true;
-                        }
-                        return false;
-                    });
+                    }
                 }
             } catch (checkErr) {
-                console.warn('Error checking pending applications:', checkErr);
+                console.warn('Error checking application status:', checkErr);
             }
 
-            if (hasPendingApp) {
+            // If active pending application exists -> show pending modal
+            if (pendingAppFound) {
                 setCheckingPendingUpdate(false);
                 try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
                 setShowPendingAppModal(true);
                 return;
             }
 
-            // 2. Check the most recent completed profile update application (3-week cooldown check)
-            const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
-            let cooldownRemainingMs = 0;
+            // If recent completed application within 3 weeks exists -> show cooldown modal
+            if (latestCompletedApp && latestCompletedApp.created_at) {
+                const appTime = new Date(latestCompletedApp.created_at).getTime();
+                const timeDiff = Date.now() - appTime;
+                if (timeDiff < THREE_WEEKS_MS) {
+                    const remainingMs = THREE_WEEKS_MS - timeDiff;
+                    const days = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((remainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
 
-            try {
-                const { data: allUserApps } = await supabase
-                    .from('applications')
-                    .select('id, comment, status, phone, created_at, updated_at')
-                    .order('created_at', { ascending: false })
-                    .limit(100);
-
-                if (allUserApps && allUserApps.length > 0) {
-                    const matchedApps = allUserApps.filter((app: any) => {
-                        const comment = String(app.comment || '');
-                        const isProfileUpdate = comment.includes('[PROFILE_UPDATE]');
-                        if (!isProfileUpdate) return false;
-
-                        if (playerIdStr && (comment.includes(`"playerId":${playerIdStr}`) || comment.includes(`"playerId":"${playerIdStr}"`))) {
-                            return true;
-                        }
-                        if (targetPhone && app.phone && app.phone.replace(/\D/g, '') === targetPhone.replace(/\D/g, '')) {
-                            return true;
-                        }
-                        return false;
-                    });
-
-                    if (matchedApps.length > 0) {
-                        const latestApp = matchedApps[0]; // Most recent application
-                        const appDate = new Date(latestApp.created_at || latestApp.updated_at || Date.now()).getTime();
-                        const timeDiff = Date.now() - appDate;
-                        if (timeDiff < THREE_WEEKS_MS) {
-                            cooldownRemainingMs = THREE_WEEKS_MS - timeDiff;
-                        }
+                    let timeStr = '';
+                    if (currentLang === 'ru') {
+                        timeStr = days > 0 ? `${days} дн. ${hours > 0 ? `${hours} ч.` : ''}` : `${hours} ч.`;
+                    } else if (currentLang === 'en') {
+                        timeStr = days > 0 ? `${days} days ${hours > 0 ? `${hours} hrs` : ''}` : `${hours} hours`;
+                    } else {
+                        timeStr = days > 0 ? `${days} kun ${hours > 0 ? `${hours} soat` : ''}` : `${hours} soat`;
                     }
+
+                    setCooldownRemainingTime(timeStr.trim());
+                    setCheckingPendingUpdate(false);
+                    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
+                    setShowCooldownModal(true);
+                    return;
                 }
-            } catch (cdErr) {
-                console.warn('Error checking application cooldown:', cdErr);
-            }
-
-            if (cooldownRemainingMs > 0) {
-                setCheckingPendingUpdate(false);
-                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
-
-                const days = Math.floor(cooldownRemainingMs / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((cooldownRemainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
-                let timeStr = '';
-                if (currentLang === 'ru') {
-                    timeStr = days > 0 ? `${days} дн. ${hours > 0 ? `${hours} ч.` : ''}` : `${hours} ч.`;
-                } else if (currentLang === 'en') {
-                    timeStr = days > 0 ? `${days} days ${hours > 0 ? `${hours} hrs` : ''}` : `${hours} hours`;
-                } else {
-                    timeStr = days > 0 ? `${days} kun ${hours > 0 ? `${hours} soat` : ''}` : `${hours} soat`;
-                }
-
-                setCooldownRemainingTime(timeStr.trim());
-                setShowCooldownModal(true);
-                return;
             }
 
             const pData = extractPlayerData(player) || {};
