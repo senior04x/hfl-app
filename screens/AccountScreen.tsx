@@ -562,8 +562,6 @@ export default function AccountScreen({ navigation }: any) {
                                         <SettingRow
                                             icon="paper-plane-outline"
                                             title={t('profile.applications', 'Arizalar')}
-                                            value={totalAppsCount > 0 ? `${totalAppsCount} ${t('nav.applications', 'ariza').toLowerCase()}` : ''}
-                                            badgeCount={totalAppsCount}
                                             onPress={() => navigation.navigate('Applications')}
                                         />
                                         {transferWindowOpen && (
