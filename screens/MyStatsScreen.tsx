@@ -58,9 +58,23 @@ const extractPlayerData = (data: any) => {
         if (metaMatch?.[1]) {
             try {
                 const obj = JSON.parse(metaMatch[1]);
-                if (obj.citizenship && !citizenship) citizenship = obj.citizenship;
-                if (obj.height && !height) height = obj.height;
-                if (obj.weight && !weight) weight = obj.weight;
+                if (obj.citizenship) citizenship = obj.citizenship;
+                if (obj.height) height = String(obj.height);
+                if (obj.weight) weight = String(obj.weight);
+            } catch (e) {}
+        }
+
+        if (data.comment.includes('[PROFILE_UPDATE]')) {
+            try {
+                const parts = data.comment.split('[PROFILE_UPDATE]');
+                let jsonStr = parts[1] || '';
+                const tagIdx = jsonStr.indexOf(' [');
+                if (tagIdx !== -1) jsonStr = jsonStr.substring(0, tagIdx);
+                const pObj = JSON.parse(jsonStr.trim());
+                const target = pObj.newData || pObj;
+                if (target.citizenship && !citizenship) citizenship = target.citizenship;
+                if (target.height && !height) height = String(target.height);
+                if (target.weight && !weight) weight = String(target.weight);
             } catch (e) {}
         }
 
@@ -74,7 +88,7 @@ const extractPlayerData = (data: any) => {
 
     return {
         ...data,
-        citizenship,
+        citizenship: citizenship || "O'zbekiston",
         height,
         weight,
         fatherName: data.fatherName || data.father_name || '',
