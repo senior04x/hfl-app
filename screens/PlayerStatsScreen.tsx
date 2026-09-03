@@ -615,6 +615,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
 
                 <FifaPlayerCard
                     player={player}
+                    isLoading={loading}
                     size="lg"
                     interactive3D={false}
                     showPlayStyles={false}
@@ -1034,7 +1035,8 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
 
                         <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={{ padding: 6, borderRadius: 20, overflow: 'hidden', alignItems: 'center', backgroundColor: 'transparent' }}>
                             <FifaPlayerCard
-                                player={player}
+                    player={player}
+                    isLoading={loading}
                                 size="lg"
                                 interactive3D={false}
                                 showPlayStyles={false}

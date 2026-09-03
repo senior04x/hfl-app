@@ -15,6 +15,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Accelerometer } from 'expo-sensors';
 import { useTranslation } from 'react-i18next';
+import { useThemeStore } from '../store/useThemeStore';
 import SmartImage from './SmartImage';
 import {
     calculateFifaAttributes,
@@ -49,6 +50,7 @@ const RARITY_BADGE_ICON: Record<number, string> = {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface FifaPlayerCardProps {
+    isLoading?: boolean;
     player: any;
     rarity?: CardRarity;
     size?: 'sm' | 'md' | 'lg';
@@ -209,7 +211,239 @@ function computeCardLayout(cardWidth: number, showAttributes: boolean) {
     };
 }
 
+
+export function FifaCardSkeleton({
+    size = 'md',
+    showAttributes = true,
+}: {
+    size?: 'sm' | 'md' | 'lg';
+    showAttributes?: boolean;
+}) {
+    const isDark = useThemeStore((state) => state.isDark);
+    const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
+    const L = computeCardLayout(cardWidth, showAttributes);
+    const scaleFactor = L.sf;
+
+    const pulseAnim = useRef(new Animated.Value(0.35)).current;
+
+    useEffect(() => {
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 0.8,
+                    duration: 750,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 0.35,
+                    duration: 750,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+        loop.start();
+        return () => loop.stop();
+    }, []);
+
+    const blockBg = isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.09)';
+    const cardBgColors = isDark
+        ? ['#111827', '#1E293B', '#0F172A', '#0B0F19']
+        : ['#FFFFFF', '#F8FAFC', '#F1F5F9', '#E2E8F0'];
+    const borderColors = isDark
+        ? ['rgba(255, 255, 255, 0.22)', 'rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.16)', 'rgba(255, 255, 255, 0.05)']
+        : ['rgba(0, 0, 0, 0.14)', 'rgba(0, 0, 0, 0.05)', 'rgba(0, 0, 0, 0.10)', 'rgba(0, 0, 0, 0.03)'];
+
+    return (
+        <View
+            style={[
+                styles.container,
+                {
+                    width: cardWidth,
+                    height: L.cardHeight,
+                    shadowColor: isDark ? '#000000' : '#64748B',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: isDark ? 0.35 : 0.12,
+                    shadowRadius: 12,
+                    elevation: 6,
+                },
+            ]}
+        >
+            <View style={styles.cardInner}>
+                {/* 3D Chamfered Outer Border Gradient */}
+                <LinearGradient
+                    colors={borderColors as [string, string, ...string[]]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[
+                        styles.borderLayer,
+                        {
+                            padding: L.borderPad,
+                            borderTopLeftRadius: L.outerRadiusTop,
+                            borderTopRightRadius: L.outerRadiusTop,
+                            borderBottomLeftRadius: L.outerRadiusBottom,
+                            borderBottomRightRadius: L.outerRadiusBottom,
+                        },
+                    ]}
+                >
+                    {/* Card Body Background */}
+                    <LinearGradient
+                        colors={cardBgColors as [string, string, ...string[]]}
+                        start={{ x: 0.1, y: 0 }}
+                        end={{ x: 0.9, y: 1 }}
+                        style={[
+                            styles.bodyLayer,
+                            {
+                                borderTopLeftRadius: L.innerRadiusTop,
+                                borderTopRightRadius: L.innerRadiusTop,
+                                borderBottomLeftRadius: L.innerRadiusBottom,
+                                borderBottomRightRadius: L.innerRadiusBottom,
+                                paddingHorizontal: L.bodyPadH,
+                                paddingTop: L.bodyPadTop,
+                                paddingBottom: L.bodyPadBottom,
+                            },
+                        ]}
+                    >
+                        {/* Top Hero Row */}
+                        <View style={[styles.topHeroRow, { height: L.heroRowH }]}>
+                            {/* Left Column Placeholders */}
+                            <View style={[styles.topLeftColumn, { width: L.leftColW, gap: L.leftColGap, alignItems: 'center' }]}>
+                                {/* Rating placeholder */}
+                                <Animated.View
+                                    style={{
+                                        width: L.leftColW * 0.85,
+                                        height: L.ovrLineH * 0.88,
+                                        borderRadius: 6 * scaleFactor,
+                                        backgroundColor: blockBg,
+                                        opacity: pulseAnim,
+                                    }}
+                                />
+                                {/* Pos badge placeholder */}
+                                <Animated.View
+                                    style={{
+                                        width: L.leftColW * 0.92,
+                                        height: L.posFont * 1.4,
+                                        borderRadius: 4 * scaleFactor,
+                                        backgroundColor: blockBg,
+                                        opacity: pulseAnim,
+                                    }}
+                                />
+                                {/* Club badge placeholder */}
+                                <Animated.View
+                                    style={{
+                                        width: L.clubBadgeD,
+                                        height: L.clubBadgeD,
+                                        borderRadius: L.clubBadgeD / 2,
+                                        backgroundColor: blockBg,
+                                        opacity: pulseAnim,
+                                    }}
+                                />
+                            </View>
+
+                            {/* Right Photo Cutout Placeholder */}
+                            <View style={[styles.photoContainer, { width: L.photoW, height: L.heroRowH, alignItems: 'center', justifyContent: 'center' }]}>
+                                <Animated.View
+                                    style={{
+                                        width: L.photoW * 0.88,
+                                        height: L.heroRowH * 0.88,
+                                        borderRadius: 16 * scaleFactor,
+                                        backgroundColor: blockBg,
+                                        opacity: pulseAnim,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <FontAwesome5
+                                        name="user-alt"
+                                        size={L.heroRowH * 0.28}
+                                        color={isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.12)'}
+                                    />
+                                </Animated.View>
+                            </View>
+                        </View>
+
+                        {/* Bottom Container: Player Name + Real Football Stats */}
+                        <View style={[styles.bottomInfoSection, { marginTop: L.gapHeroToName }]}>
+                            {/* Name Plaque Placeholder */}
+                            <Animated.View
+                                style={{
+                                    width: '75%',
+                                    height: L.nameLineH * 0.9,
+                                    borderRadius: 6 * scaleFactor,
+                                    backgroundColor: blockBg,
+                                    opacity: pulseAnim,
+                                }}
+                            />
+
+                            {/* Stats */}
+                            {showAttributes && (
+                                <View style={{ width: '100%', marginTop: L.gapNameToSep }}>
+                                    <View style={[styles.separatorContainer, { height: L.sepH }]}>
+                                        <View style={[styles.separatorLine, { backgroundColor: blockBg, height: Math.max(1, scaleFactor) }]} />
+                                    </View>
+
+                                    <View style={[styles.statsRowThree, { paddingHorizontal: L.bodyPadH, marginTop: L.gapSepToStats }]}>
+                                        {[1, 2, 3].map((item, idx) => (
+                                            <React.Fragment key={item}>
+                                                <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
+                                                    <Animated.View
+                                                        style={{
+                                                            width: 28 * scaleFactor,
+                                                            height: L.statNumLineH * 0.85,
+                                                            borderRadius: 4 * scaleFactor,
+                                                            backgroundColor: blockBg,
+                                                            opacity: pulseAnim,
+                                                        }}
+                                                    />
+                                                    <Animated.View
+                                                        style={{
+                                                            width: 24 * scaleFactor,
+                                                            height: L.statLabelFont * 0.8,
+                                                            borderRadius: 3 * scaleFactor,
+                                                            backgroundColor: blockBg,
+                                                            opacity: pulseAnim,
+                                                        }}
+                                                    />
+                                                </View>
+                                                {idx < 2 && (
+                                                    <View
+                                                        style={[
+                                                            styles.statsVerticalDivider,
+                                                            {
+                                                                height: L.statNumLineH,
+                                                                backgroundColor: blockBg,
+                                                                width: Math.max(1, scaleFactor),
+                                                            },
+                                                        ]}
+                                                    />
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </View>
+
+                                    {/* Footer Brand Placeholder */}
+                                    <View style={[styles.cardFooterBrand, { marginTop: L.gapStatsToFooter, height: L.footerH }]}>
+                                        <Animated.View
+                                            style={{
+                                                width: 50 * scaleFactor,
+                                                height: L.footerH * 0.65,
+                                                borderRadius: 3 * scaleFactor,
+                                                backgroundColor: blockBg,
+                                                opacity: pulseAnim,
+                                            }}
+                                        />
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    </LinearGradient>
+                </LinearGradient>
+            </View>
+        </View>
+    );
+}
+
 export default function FifaPlayerCard({
+    isLoading = false,
     player,
     rarity: customRarity,
     size = 'md',
@@ -218,6 +452,10 @@ export default function FifaPlayerCard({
     showAttributes = true,
     onPress,
 }: FifaPlayerCardProps) {
+    if (isLoading || !player) {
+        return <FifaCardSkeleton size={size} showAttributes={showAttributes} />;
+    }
+
     const { i18n } = useTranslation();
     const currentLang = i18n.language || 'uz';
 
