@@ -28,6 +28,7 @@ import { supabase } from '../services/supabase';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
 import FifaPlayerCard from '../components/FifaPlayerCard';
 import PlayerComparisonModal from '../components/PlayerComparisonModal';
+import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import { aiScoutService, PlayerAiStats } from '../services/aiScoutService';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
