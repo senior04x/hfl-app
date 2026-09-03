@@ -28,12 +28,18 @@ export const useAuthStore = create<AuthState>()(
             unreadCount: 0,
             isChatMuted: false,
             setGuest: (isGuest) => set({ isGuest, isAuthenticated: false, user: null, userAccounts: [], unreadCount: 0, isChatMuted: false }),
-            setAuth: (user, accounts) => set((state) => ({ 
-                user, 
-                isAuthenticated: true, 
-                isGuest: false,
-                userAccounts: accounts && accounts.length > 0 ? accounts : (state.userAccounts && state.userAccounts.length > 0 ? state.userAccounts : [user])
-            })),
+            setAuth: (user, accounts) => set((state) => {
+                let mergedAccounts = accounts && accounts.length > 0 ? accounts : state.userAccounts;
+                if (!mergedAccounts || mergedAccounts.length === 0) {
+                    mergedAccounts = user ? [user] : [];
+                }
+                return {
+                    user,
+                    isAuthenticated: true,
+                    isGuest: false,
+                    userAccounts: mergedAccounts,
+                };
+            }),
             setUserAccounts: (accounts) => set({ userAccounts: accounts }),
             logout: () => set({ user: null, userAccounts: [], isAuthenticated: false, isGuest: false, unreadCount: 0, isChatMuted: false }),
             incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),

@@ -227,6 +227,19 @@ export default function WelcomeScreen({ navigation }: any) {
         setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) }, finalAccounts);
         setShowAccountModal(false);
         setShowBotModal(false);
+
+        // Qurilma xotirasiga telefon raqamiga bog'langan barcha akkauntlarni saqlash
+        const phone = acc?.phone || acc?.phoneNumber || acc?.phone_number;
+        if (phone) {
+            const fullPhone = `+998${phone.replace(/\D/g, '').slice(-9)}`;
+            apiService.findAccountsByPhone(fullPhone)
+                .then((res: any) => {
+                    if (res?.accounts && Array.isArray(res.accounts) && res.accounts.length > 0) {
+                        useAuthStore.getState().setUserAccounts(res.accounts);
+                    }
+                })
+                .catch(() => {});
+        }
     };
 
 const formatPhoneInput = (val: string) => {

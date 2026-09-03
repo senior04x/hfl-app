@@ -96,7 +96,7 @@ interface CustomFloatingTabBarProps {
 }
 
 function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: CustomFloatingTabBarProps) {
-    const { user, setAuth, isGuest } = useAuthStore();
+    const { user, setAuth, userAccounts, isGuest } = useAuthStore();
     const { colors, isDark } = useThemeStore();
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
@@ -266,29 +266,39 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
         });
     };
 
-    const handleProfilLongPress = async () => {
+    const handleProfilLongPress = () => {
         try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         } catch (e) {}
 
+        if (isGuest) {
+            return;
+        }
+
+        // 1. Qurilma xotirasidan (local cache) birdaniga yuklash (0ms kechikish, yuklanishsiz)
+        const storedAccounts = (userAccounts && userAccounts.length > 0)
+            ? userAccounts
+            : (user ? [user] : []);
+        
+        const initialValidAccounts = deduplicateAccountsList(storedAccounts);
+        setAccountOptions(initialValidAccounts);
+        setLoadingAccounts(false);
         setShowSwitcherModal(true);
-        setLoadingAccounts(true);
-        try {
-            const phone = user?.phone || user?.phoneNumber || user?.phone_number;
-            if (!phone) {
-                setAccountOptions(deduplicateAccountsList([user]));
-                setLoadingAccounts(false);
-                return;
-            }
+
+        // 2. Orqa fonda (jimjit, spinner ko'rsatmasdan) yangi akkauntlarni tekshirib yangilaydi
+        const phone = user?.phone || user?.phoneNumber || user?.phone_number;
+        if (phone) {
             const fullPhone = `+998${phone.replace(/\D/g, '').slice(-9)}`;
-            const res = await apiService.findAccountsByPhone(fullPhone).catch(() => ({ success: false, accounts: [] }));
-            const accounts = res?.accounts || [];
-            const validAccounts = Array.isArray(accounts) && accounts.length > 0 ? accounts : [user];
-            setAccountOptions(deduplicateAccountsList(validAccounts));
-        } catch (e) {
-            setAccountOptions(deduplicateAccountsList([user]));
-        } finally {
-            setLoadingAccounts(false);
+            apiService.findAccountsByPhone(fullPhone)
+                .then((res: any) => {
+                    const accounts = res?.accounts || [];
+                    if (Array.isArray(accounts) && accounts.length > 0) {
+                        const deduped = deduplicateAccountsList(accounts);
+                        setAccountOptions(deduped);
+                        useAuthStore.getState().setUserAccounts(deduped);
+                    }
+                })
+                .catch(() => {});
         }
     };
 
@@ -303,11 +313,16 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
 
         const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || acc.organizations?.id || 1;
         useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
+        
+        const currentAccounts = useAuthStore.getState().userAccounts;
+        const finalAccounts = currentAccounts && currentAccounts.length > 0 ? currentAccounts : accountOptions;
+
         setAuth({
             ...acc,
             organizationId: Number(orgId),
             organization_id: Number(orgId),
-        });
+        }, finalAccounts);
+        
         setShowSwitcherModal(false);
     };
 
