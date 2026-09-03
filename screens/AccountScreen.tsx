@@ -634,7 +634,7 @@ export default function AccountScreen({ navigation }: any) {
                         visible={showEditTeamModal}
                         teamId={currentTeamId}
                         onClose={() => setShowEditTeamModal(false)}
-                        onSaved={fetchProfileData}
+                        onSaved={loadDetailedData}
                     />
                 )}
 

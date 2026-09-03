@@ -73,24 +73,40 @@ export default function EditTeamModal({
     const loadTeamAndPlayers = async () => {
         try {
             setLoading(true);
-            const [tData, pData] = await Promise.all([
-                apiService.getTeamById(String(teamId)),
-                apiService.getPlayersByTeam(String(teamId)),
+            const [tRes, pRes] = await Promise.all([
+                supabase.from('teams').select('*').eq('id', teamId).single(),
+                supabase.from('applications').select('*').eq('team_id', teamId).eq('status', 'approved'),
             ]);
 
-            if (tData) {
+            if (tRes.data) {
+                const tData = tRes.data;
                 setTeamName(tData.name || '');
-                setLogoUrl(tData.logo_url || tData.logo || '');
-                setCaptainName(tData.captain_name || tData.captainName || '');
-                setCaptainPhone(tData.captain_phone || tData.captainPhone || '');
-                setCoachName(tData.coach_name || tData.coachName || '');
-                setCoachPhone(tData.coach_phone || tData.coachPhone || '');
-                setPresidentName(tData.president_name || tData.presidentName || '');
-                setPresidentPhone(tData.president_phone || tData.presidentPhone || '');
+                setLogoUrl(tData.logo_url || '');
+                setCaptainName(tData.captain_name || '');
+                setCaptainPhone(tData.captain_phone || '');
+                setCoachName(tData.coach_name || '');
+                setCoachPhone(tData.coach_phone || '');
+                setPresidentName(tData.president_name || '');
+                setPresidentPhone(tData.president_phone || '');
             }
 
-            if (pData) {
-                setPlayers(pData);
+            if (pRes.data) {
+                const activeTeamPlayers = (pRes.data || []).filter((p: any) => {
+                    const st = String(p.status || '').toLowerCase().trim();
+                    const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
+                    return !isArchived && st === 'approved';
+                }).map((p: any) => ({
+                    ...p,
+                    id: p.id,
+                    firstName: p.first_name || '',
+                    lastName: p.last_name || '',
+                    photo: p.photo_url || '',
+                    photo_url: p.photo_url || '',
+                    position: p.position || 'O\'yinchi',
+                    number: p.player_number || '',
+                    phone: p.phone || '',
+                }));
+                setPlayers(activeTeamPlayers);
             }
         } catch (error) {
             console.error('Error loading team data for edit:', error);
@@ -148,7 +164,6 @@ export default function EditTeamModal({
             setSaving(true);
             const updates = {
                 logo_url: logoUrl,
-                logo: logoUrl,
                 captain_phone: captainPhone.trim(),
                 coach_phone: coachPhone.trim(),
                 president_phone: presidentPhone.trim(),
@@ -174,6 +189,7 @@ export default function EditTeamModal({
             );
 
             if (onSaved) onSaved();
+            onClose();
         } catch (error: any) {
             console.error('Save team error:', error);
             Alert.alert(t('common.error', 'Xato'), error?.message || 'Ma\'lumotlarni saqlashda xatolik.');
