@@ -61,7 +61,7 @@ export default function FifaPlayerCard({
 
     // Optimized Card Aspect Ratio
     const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
-    const cardHeight = showAttributes ? cardWidth * 1.25 : cardWidth * 1.04;
+    const cardHeight = showAttributes ? cardWidth * 1.18 : cardWidth * 1.02;
     const scaleFactor = cardWidth / 260;
 
     // 3D Parallax & Tilt animations
@@ -343,7 +343,7 @@ export default function FifaPlayerCard({
                         </View>
 
                         {/* Bottom Container: Player Name Plaque + Real Football Stats + Amatora Seal */}
-                        <View style={[styles.bottomInfoSection, { marginTop: 1 * scaleFactor }]}>
+                        <View style={[styles.bottomInfoSection, { marginTop: -10 * scaleFactor }]}>
                             {/* Player Name Plaque */}
                             <View style={styles.namePlateWrapper}>
                                 <LinearGradient
