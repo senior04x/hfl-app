@@ -320,7 +320,7 @@ export default function AccountScreen({ navigation }: any) {
                 >
                     {/* Modern Profile Hero Card */}
                     <View style={styles.profileSection}>
-                        <View
+                        <TouchableOpacity
                             style={[
                                 styles.profileCard,
                                 {
@@ -328,6 +328,9 @@ export default function AccountScreen({ navigation }: any) {
                                     borderColor: isDark ? 'rgba(255,255,255,0.08)' : homeColors.border,
                                 }
                             ]}
+                            activeOpacity={currentTeamId ? 0.75 : 1}
+                            onPress={currentTeamId ? () => navigation.navigate('MyTeam', { teamId: currentTeamId }) : undefined}
+                            disabled={!currentTeamId}
                         >
                             <View style={styles.profileCardHeader}>
                                 {/* Avatar */}
@@ -389,8 +392,15 @@ export default function AccountScreen({ navigation }: any) {
                                         </Text>
                                     ) : null}
                                 </View>
+
+                                {/* Right Arrow Navigation Icon */}
+                                {!!currentTeamId && (
+                                    <View style={styles.profileCardChevron}>
+                                        <Ionicons name="chevron-forward" size={18} color={homeColors.textSecondary} style={{ opacity: 0.6 }} />
+                                    </View>
+                                )}
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Guest Login Banner */}
@@ -495,11 +505,6 @@ export default function AccountScreen({ navigation }: any) {
 
                                 {currentTeamId && (
                                     <>
-                                        <SettingRow
-                                            icon="shield-outline"
-                                            title={t('profile.my_team', 'Mening jamoam')}
-                                            onPress={() => navigation.navigate('MyTeam', { teamId: currentTeamId })}
-                                        />
                                         {(user?.role === 'manager' || user?.role === 'coach' || user?.role === 'trainer' || user?.role === 'captain' || user?.role === 'admin' || user?.role === 'team_admin') && (
                                             <>
                                                 <SettingRow
@@ -833,6 +838,11 @@ const styles = StyleSheet.create({
     profileInfoColumn: {
         flex: 1,
         marginLeft: 14,
+        justifyContent: 'center',
+    },
+    profileCardChevron: {
+        marginLeft: 8,
+        alignItems: 'center',
         justifyContent: 'center',
     },
     userNameText: {
