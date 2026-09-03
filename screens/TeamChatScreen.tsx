@@ -82,6 +82,22 @@ function TeamChatScreen({ route, navigation }: any) {
     const menuFadeAnim = useRef(new Animated.Value(0)).current;
     const messageRefs = useRef<{ [key: string]: any }>({});
     const [isRateLimited, setIsRateLimited] = useState(false);
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+    useEffect(() => {
+        const showSub = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => setIsKeyboardOpen(true)
+        );
+        const hideSub = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => setIsKeyboardOpen(false)
+        );
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
 
     // Initialize LayoutAnimation for Android (safely ignore in New Architecture)
     try {
@@ -1331,9 +1347,9 @@ function TeamChatScreen({ route, navigation }: any) {
                 </View>
 
                 <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={{ flex: 1 }}
-                    keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 0}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
                 >
                     {(loading && messages.length === 0) ? (
                         <ChatSkeleton />
@@ -1464,7 +1480,9 @@ function TeamChatScreen({ route, navigation }: any) {
                             backgroundColor: homeColors.card,
                             borderColor: homeColors.border,
                             shadowColor: isDark ? '#FFFFFF' : '#000000',
-                            marginBottom: Platform.OS === 'ios' ? Math.max(insets.bottom ? insets.bottom - 4 : 10, 10) : 12,
+                            marginBottom: isKeyboardOpen 
+                                ? (Platform.OS === 'ios' ? 6 : 8) 
+                                : (Platform.OS === 'ios' ? Math.max(insets.bottom ? insets.bottom - 4 : 10, 10) : 12),
                         }
                     ]}>
                         <View style={styles.inputWrapper}>
@@ -1749,12 +1767,12 @@ const styles = StyleSheet.create({
 
     floatingInputDock: { 
         flexDirection: 'row', 
-        alignItems: 'center', 
+        alignItems: 'flex-end', 
         marginHorizontal: 12,
         borderRadius: 24,
         paddingLeft: 14,
         paddingRight: 5,
-        paddingVertical: 4,
+        paddingVertical: 5,
         ...Platform.select({
             ios: {
                 borderWidth: 1,
@@ -1771,18 +1789,21 @@ const styles = StyleSheet.create({
         marginRight: 6,
         position: 'relative',
         justifyContent: 'center',
+        minHeight: 38,
     },
     input: { 
-        minHeight: 40, 
+        minHeight: 38, 
         maxHeight: 110, 
         paddingHorizontal: 0, 
-        paddingVertical: 8, 
+        paddingTop: 8,
+        paddingBottom: 8, 
         fontSize: 15, 
         fontWeight: '500',
     },
     animatedPlaceholderContainer: {
         position: 'absolute',
         left: 0,
+        top: 8,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -1800,7 +1821,7 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         marginLeft: 1.5,
     },
-    sendButton: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+    sendButton: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginBottom: 1 },
     errorText: { marginTop: 16, fontSize: 15, textAlign: 'center', fontWeight: '600' },
 
     memberItem: {
