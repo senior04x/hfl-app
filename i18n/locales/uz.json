@@ -386,7 +386,7 @@
     "russian": "Русский",
     "english": "English",
     "notifications": "Bildirishnomalar",
-    "security_title": "XAVFSIZLIK VA HUJJATLAR",
+    "security_title": "Xavfsizlik va hujjatlar",
     "security_sub": "Maxfiylik siyosati, foydalanish shartlari va hisob sozlamalari",
     "change_pin": "PIN-kodni o'zgartirish",
     "legal_docs": "HUJJATLAR VA MA'LUMOTLAR",
@@ -414,7 +414,9 @@
     "delete_account_modal_warning": "Ushbu amalni ortga qaytarib bo'lmaydi! Profilingiz, o'yinchi statistikangiz, arizalaringiz va barcha shaxsiy ma'lumotlaringiz butunlay o'chiriladi.",
     "deleting_data": "Ma'lumotlar o'chirilmoqda...",
     "account_deleted": "Hisob o'chirildi",
-    "account_deleted_sub": "Sizning hisobingiz va barcha shaxsiy ma'lumotlaringiz muvaffaqiyatli o'chirildi."
+    "account_deleted_sub": "Sizning hisobingiz va barcha shaxsiy ma'lumotlaringiz muvaffaqiyatli o'chirildi.",
+    "dark_mode_sub": "OLED qora fon va yuqori kontrast",
+    "light_mode_sub": "Klassik oq fon va yorqin ranglar"
   },
   "stats": {
     "title": "Statistika",

@@ -237,7 +237,7 @@ export default function SystemSettingsScreen({ navigation }: any) {
                                                 {t('settings.dark_mode', "Qorong'u rejim")}
                                             </Text>
                                             <Text style={[styles.optionSubtitle, { color: homeColors.textSecondary }]}>
-                                                OLED qora fon va yuqori kontrast
+                                                {t('settings.dark_mode_sub', 'OLED qora fon va yuqori kontrast')}
                                             </Text>
                                         </View>
                                     </View>
@@ -279,7 +279,7 @@ export default function SystemSettingsScreen({ navigation }: any) {
                                                 {t('settings.light_mode', "Yorug' rejim")}
                                             </Text>
                                             <Text style={[styles.optionSubtitle, { color: homeColors.textSecondary }]}>
-                                                Klassik oq fon va yorqin ranglar
+                                                {t('settings.light_mode_sub', 'Klassik oq fon va yorqin ranglar')}
                                             </Text>
                                         </View>
                                     </View>

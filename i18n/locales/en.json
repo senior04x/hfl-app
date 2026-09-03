@@ -374,8 +374,8 @@
     "theme": "Theme",
     "dark_mode": "Dark Mode",
     "light_mode": "Light Mode",
-    "system_mode": "Device Theme (Auto)",
-    "system_mode_sub": "Matches your device system theme",
+    "system_mode": "System Default (Auto)",
+    "system_mode_sub": "Adapts automatically to your device system settings",
     "system_auto": "Auto",
     "dark": "Dark",
     "light": "Light",
@@ -386,8 +386,8 @@
     "russian": "Русский",
     "english": "English",
     "notifications": "Notifications",
-    "security_title": "SECURITY & DOCUMENTS",
-    "security_sub": "Privacy policy, terms of use and account settings",
+    "security_title": "Security & Legal",
+    "security_sub": "Privacy policy, terms of service, and account settings",
     "change_pin": "Change PIN code",
     "legal_docs": "DOCUMENTS & INFORMATION",
     "privacy_policy": "Privacy Policy",
@@ -414,7 +414,9 @@
     "delete_account_modal_warning": "This action cannot be undone! Your profile, player stats, applications, and all personal data will be permanently deleted.",
     "deleting_data": "Deleting data...",
     "account_deleted": "Account deleted",
-    "account_deleted_sub": "Your account and all personal data have been successfully deleted."
+    "account_deleted_sub": "Your account and all personal data have been successfully deleted.",
+    "dark_mode_sub": "OLED black background and high contrast",
+    "light_mode_sub": "Classic white background and crisp colors"
   },
   "stats": {
     "title": "Statistics",
