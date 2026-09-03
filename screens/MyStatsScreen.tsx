@@ -1012,13 +1012,18 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                 {instagramUrl && (
                     <TouchableOpacity
-                        style={[styles.instagramBtn, { borderTopColor: homeColors.border }]}
+                        style={[styles.instagramBtn, { borderTopColor: homeColors.border, opacity: openingInstagram ? 0.7 : 1 }]}
                         activeOpacity={0.75}
+                        disabled={openingInstagram}
                         onPress={() => handleOpenInstagram(instagramUrl)}
                     >
                         <Ionicons name="logo-instagram" size={18} color="#E1306C" />
                         <Text style={[styles.instagramBtnText, { color: homeColors.textPrimary }]}>@{instagramUsername}</Text>
-                        <Ionicons name="open-outline" size={14} color={homeColors.textSecondary} style={{ marginLeft: 'auto' }} />
+                        {openingInstagram ? (
+                            <ActivityIndicator size="small" color={homeColors.textPrimary} style={{ marginLeft: 'auto' }} />
+                        ) : (
+                            <Ionicons name="open-outline" size={14} color={homeColors.textSecondary} style={{ marginLeft: 'auto' }} />
+                        )}
                     </TouchableOpacity>
                 )}
             </View>
