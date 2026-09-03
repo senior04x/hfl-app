@@ -32,7 +32,7 @@ import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
 import AppNavbar from '../components/AppNavbar';
-import TeamStoryReplayPickerModal from '../components/TeamStoryReplayPickerModal';
+import EditTeamModal from '../components/EditTeamModal';
 import { useNavBarScroll } from '../context/NavBarScrollContext';
 
 export default function AccountScreen({ navigation }: any) {
@@ -48,6 +48,7 @@ export default function AccountScreen({ navigation }: any) {
     const [showLanguageModal, setShowLanguageModal] = useState(false);
     const [showOrgSelectModal, setShowOrgSelectModal] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [showEditTeamModal, setShowEditTeamModal] = useState(false);
     const [pinInput, setPinInput] = useState('');
     const [targetJuniorState, setTargetJuniorState] = useState<boolean>(false);
 
@@ -510,7 +511,7 @@ export default function AccountScreen({ navigation }: any) {
                                                 <SettingRow
                                                     icon="pencil-outline"
                                                     title={t('profile.edit_team_info', 'Jamoa ma\'lumotlarini tahrirlash')}
-                                                    onPress={() => navigation.navigate('MyTeam', { teamId: currentTeamId, autoOpenEdit: true })}
+                                                    onPress={() => setShowEditTeamModal(true)}
                                                 />
                                             </>
                                         )}
@@ -626,6 +627,16 @@ export default function AccountScreen({ navigation }: any) {
                     onClose={() => setShowOrgSelectModal(false)}
                     onSelect={handleSelectOrganizationForApply}
                 />
+
+                {/* Team & Players Edit Modal */}
+                {currentTeamId && (
+                    <EditTeamModal
+                        visible={showEditTeamModal}
+                        teamId={currentTeamId}
+                        onClose={() => setShowEditTeamModal(false)}
+                        onSaved={fetchProfileData}
+                    />
+                )}
 
 
 
