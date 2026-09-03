@@ -403,19 +403,21 @@ export default function FifaPlayerCard({
         firstName = parts[0] || 'AMATORA';
         lastName = parts.slice(1).join(' ') || '';
     }
-    const maxLen = Math.max(firstName.length, lastName.length);
-    const isVeryLong = maxLen > 13;
-    const isLong = maxLen > 9;
-    const dynamicNameFont = isVeryLong
-        ? L.nameFont * 0.78
-        : isLong
-        ? L.nameFont * 0.88
-        : L.nameFont;
-    const dynamicNameLineH = isVeryLong
-        ? L.nameLineH * 0.85
-        : isLong
-        ? L.nameLineH * 0.92
-        : L.nameLineH;
+
+    // Adaptive font scaling: Large by default, scales down if long
+    const getDynamicFontSize = (str: string) => {
+        const len = str.length;
+        if (len <= 6) return Math.round(18.5 * scaleFactor);
+        if (len <= 9) return Math.round(16 * scaleFactor);
+        if (len <= 12) return Math.round(13.5 * scaleFactor);
+        if (len <= 15) return Math.round(11.5 * scaleFactor);
+        return Math.round(9.5 * scaleFactor);
+    };
+
+    const firstNameFont = getDynamicFontSize(firstName);
+    const lastNameFont = getDynamicFontSize(lastName);
+    const firstNameLineH = Math.round(firstNameFont * 1.16);
+    const lastNameLineH = Math.round(lastNameFont * 1.16);
 
     const avatarUri = player?.avatar || player?.photo || player?.photo_url || player?.image_url;
     const teamLogo = customTeamLogo ||
@@ -627,12 +629,12 @@ export default function FifaPlayerCard({
                                     <Text
                                         numberOfLines={1}
                                         adjustsFontSizeToFit={true}
-                                        minimumFontScale={0.7}
+                                        minimumFontScale={0.55}
                                         style={[
                                             styles.playerNameText,
                                             {
-                                                fontSize: dynamicNameFont,
-                                                lineHeight: dynamicNameLineH,
+                                                fontSize: firstNameFont,
+                                                lineHeight: firstNameLineH,
                                                 color: theme.textPrimary,
                                                 width: '100%',
                                             },
@@ -644,15 +646,15 @@ export default function FifaPlayerCard({
                                         <Text
                                             numberOfLines={1}
                                             adjustsFontSizeToFit={true}
-                                            minimumFontScale={0.7}
+                                            minimumFontScale={0.55}
                                             style={[
                                                 styles.playerNameText,
                                                 {
-                                                    fontSize: dynamicNameFont,
-                                                    lineHeight: dynamicNameLineH,
+                                                    fontSize: lastNameFont,
+                                                    lineHeight: lastNameLineH,
                                                     color: theme.textPrimary,
                                                     width: '100%',
-                                                    marginTop: 1,
+                                                    marginTop: 2,
                                                 },
                                             ]}
                                         >
