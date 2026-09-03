@@ -656,33 +656,38 @@ export default function FifaPlayerCard({
                                     </View>
 
                                     <View style={[styles.statsRowThree, { paddingHorizontal: L.bodyPadH }]}>
-                                        <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
+                                        {/* GOL (Left) */}
+                                        <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {goalsCount}
                                             </Text>
-                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary }]}>
+                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary, marginTop: L.gapStatNumToLabel }]}>
                                                 {labelGoals}
                                             </Text>
                                         </View>
 
+                                        {/* Divider Left */}
                                         <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
 
-                                        <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
+                                        {/* ASIST (Dead Center) */}
+                                        <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {assistsCount}
                                             </Text>
-                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary }]}>
+                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary, marginTop: L.gapStatNumToLabel }]}>
                                                 {labelAssists}
                                             </Text>
                                         </View>
 
+                                        {/* Divider Right */}
                                         <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
 
-                                        <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
+                                        {/* O'YIN (Right) */}
+                                        <View style={styles.statColItem}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {matchesCount}
                                             </Text>
-                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary }]}>
+                                            <Text style={[styles.statLabelSmall, { fontSize: L.statLabelFont, lineHeight: L.statLabelLineH, color: theme.textPrimary, marginTop: L.gapStatNumToLabel }]}>
                                                 {labelMatches}
                                             </Text>
                                         </View>
@@ -877,6 +882,7 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     statColItem: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -886,7 +892,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     statsVerticalDivider: {
-        marginHorizontal: 4,
+        marginHorizontal: 2,
     },
     statLabelSmall: {
         fontWeight: '800',
