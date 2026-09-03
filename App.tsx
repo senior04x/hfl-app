@@ -199,7 +199,17 @@ function App() {
                                     <Stack.Screen name="MyStats" component={MyStatsScreen} />
                                     <Stack.Screen name="TransferRequest" component={TransferRequestScreen} />
                                     <Stack.Screen name="Applications" component={ApplicationsScreen} />
-                                    <Stack.Screen name="FormationBoard" component={FormationBoard} />
+                                    <Stack.Screen 
+                                        name="FormationBoard" 
+                                        component={FormationBoard} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
                                     <Stack.Screen name="TeamChat" component={TeamChatScreen} />
                                     <Stack.Screen name="Standings" component={StandingsScreen} />
                                     <Stack.Screen 

@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService, supabase } from '../services/apiService';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import SmartImage from '../components/SmartImage';
+import Skeleton from '../components/Skeleton';
 import {
     GestureHandlerRootView,
     GestureDetector,
@@ -650,33 +651,100 @@ export default function FormationBoard({ route, navigation }: any) {
 
     if (loading) {
         return (
-            <View style={[styles.loadingContainer, { backgroundColor: homeColors.background }]}>
-                <ActivityIndicator size="large" color={homeColors.textPrimary} />
-            </View>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                    {/* HEADER SKELETON — real header bilan bir xil o'lcham */}
+                    <View style={styles.header}>
+                        <Skeleton width={38} height={38} borderRadius={12} />
+                        <View style={{ alignItems: 'center' }}>
+                            <Skeleton width={130} height={14} borderRadius={4} style={{ marginBottom: 5 }} />
+                            <Skeleton width={80} height={11} borderRadius={4} />
+                        </View>
+                        {!isReadOnly ? (
+                            <Skeleton width={76} height={34} borderRadius={10} />
+                        ) : (
+                            <View style={{ width: 40 }} />
+                        )}
+                    </View>
+
+                    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                        {/* FORMAT CONTROLS SKELETON */}
+                        {!isReadOnly && (
+                            <View style={styles.controlBarContainer}>
+                                <View style={[styles.formatScroll, { flexDirection: 'row' }]}>
+                                    {[0, 1, 2, 3, 4].map((i) => (
+                                        <Skeleton key={i} width={52} height={28} borderRadius={8} />
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* FORMATION PRESETS SKELETON */}
+                        {!isReadOnly && (
+                            <View style={styles.presetsTrayContainer}>
+                                <View style={[styles.presetsScroll, { flexDirection: 'row' }]}>
+                                    {[0, 1, 2].map((i) => (
+                                        <Skeleton key={i} width={90} height={30} borderRadius={10} />
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* TACTICAL PITCH SKELETON — haqiqiy maydon bilan AYNAN bir xil o'lcham */}
+                        <View style={styles.fieldWrapper}>
+                            <Skeleton width={FIELD_WIDTH} height={FIELD_HEIGHT} borderRadius={16} />
+                        </View>
+
+                        {/* SQUAD STATUS BAR SKELETON */}
+                        <View style={[styles.squadStatusBar, cardSurface]}>
+                            <View style={styles.statusItem}>
+                                <Skeleton width={55} height={9} borderRadius={3} style={{ marginBottom: 4 }} />
+                                <Skeleton width={30} height={13} borderRadius={4} />
+                            </View>
+                            <View style={[styles.statusDivider, { backgroundColor: homeColors.border }]} />
+                            <View style={styles.statusItem}>
+                                <Skeleton width={65} height={9} borderRadius={3} style={{ marginBottom: 4 }} />
+                                <Skeleton width={30} height={13} borderRadius={4} />
+                            </View>
+                            <View style={[styles.statusDivider, { backgroundColor: homeColors.border }]} />
+                            <View style={styles.statusItem}>
+                                <Skeleton width={45} height={9} borderRadius={3} style={{ marginBottom: 4 }} />
+                                <Skeleton width={40} height={13} borderRadius={4} />
+                            </View>
+                        </View>
+
+                        {/* BENCH / SUBSTITUTES SKELETON */}
+                        <View style={styles.subsSection}>
+                            <View style={styles.subsHeader}>
+                                <Skeleton width={90} height={13} borderRadius={4} />
+                                <Skeleton width={34} height={18} borderRadius={8} />
+                            </View>
+
+                            <View style={styles.subsListVertical}>
+                                {[0, 1, 2, 3, 4, 5].map((i) => (
+                                    <View key={i} style={[styles.subRowCard, cardSurface]}>
+                                        <View style={styles.subRowPhotoContainer}>
+                                            <Skeleton width={40} height={40} circle />
+                                        </View>
+                                        <View style={styles.subRowInfo}>
+                                            <Skeleton width="65%" height={13} borderRadius={4} style={{ marginBottom: 5 }} />
+                                            <Skeleton width="35%" height={10} borderRadius={3} />
+                                        </View>
+                                        <Skeleton width={44} height={22} borderRadius={8} style={{ marginRight: 4 }} />
+                                        <Skeleton width={26} height={26} borderRadius={13} />
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    </ScrollView>
+                </SafeAreaView>
+            </GestureHandlerRootView>
         );
     }
-
-    const backdropOpacity = swipeBackAnim.interpolate({
-        inputRange: [0, SCREEN_WIDTH * 0.8, SCREEN_WIDTH],
-        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
-        extrapolate: 'clamp',
-    });
 
     return (
         <View style={{ flex: 1, backgroundColor: 'transparent' }}>
             <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
-
-            {/* Fading Backdrop Overlay */}
-            <RNAnimated.View
-                pointerEvents="none"
-                style={[
-                    StyleSheet.absoluteFillObject,
-                    {
-                        backgroundColor: '#000000',
-                        opacity: backdropOpacity,
-                    },
-                ]}
-            />
 
             <RNAnimated.View
                 style={{
@@ -685,7 +753,7 @@ export default function FormationBoard({ route, navigation }: any) {
                     transform: [{ translateX: swipeBackAnim }],
                     shadowColor: '#000000',
                     shadowOffset: { width: -4, height: 0 },
-                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowOpacity: isDark ? 0.4 : 0.15,
                     shadowRadius: 10,
                     elevation: 10,
                 }}
