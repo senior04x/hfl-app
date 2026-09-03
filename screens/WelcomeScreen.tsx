@@ -427,59 +427,6 @@ const formatPhoneInput = (val: string) => {
         <AnimatedBackground overlayOpacity={0.6} backgroundImage={backgroundImage}>
             <StatusBar barStyle="light-content" />
             <SafeAreaView style={styles.container}>
-                {/* Top Header Controls: Left (Language) & Right (Guest Mode) */}
-                <View style={{ 
-                    position: 'absolute', 
-                    top: Platform.OS === 'ios' ? 54 : 24, 
-                    left: 20, 
-                    right: 20, 
-                    zIndex: 100,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                }}>
-                    {/* Language Switcher Pill on the LEFT */}
-                    <TouchableOpacity
-                        onPress={() => setShowLanguageModal(true)}
-                        activeOpacity={0.7}
-                        style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: 'rgba(20, 25, 35, 0.85)',
-                            borderWidth: 1,
-                            borderColor: 'rgba(255, 255, 255, 0.15)',
-                            paddingHorizontal: 12,
-                            paddingVertical: 7,
-                            borderRadius: 20,
-                            gap: 6
-                        }}
-                    >
-                        <Text style={{ fontSize: 14 }}>{SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.flag || '🇺🇿'}</Text>
-                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>{(SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label || "O'zbekcha")}</Text>
-                        <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.6)" />
-                    </TouchableOpacity>
-
-                    {/* Guest Login Pill on the RIGHT */}
-                    <TouchableOpacity
-                        onPress={handleGuestLogin}
-                        activeOpacity={0.7}
-                        style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: 'rgba(0, 223, 130, 0.15)',
-                            borderWidth: 1,
-                            borderColor: 'rgba(0, 223, 130, 0.35)',
-                            paddingHorizontal: 13,
-                            paddingVertical: 7,
-                            borderRadius: 20,
-                            gap: 6
-                        }}
-                    >
-                        <Ionicons name="person-outline" size={14} color="#00FF9D" />
-                        <Text style={{ color: '#00FF9D', fontSize: 12, fontWeight: '800' }}>{t('auth.guest_mode', "Mehmon bo'lib kirish")}</Text>
-                        <Ionicons name="arrow-forward" size={12} color="#00FF9D" />
-                    </TouchableOpacity>
-                </View>
 
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -604,7 +551,8 @@ const formatPhoneInput = (val: string) => {
                         {!isLoginMode && (
                             <>
                                 <ShimmerLogo visible={!isKeyboardVisible} />
-                                
+
+                                {/* Main Login Button */}
                                 <TouchableOpacity
                                     style={styles.mainButton}
                                     onPress={handleLoginPress}
@@ -612,12 +560,71 @@ const formatPhoneInput = (val: string) => {
                                     <Text style={styles.mainButtonText}>{t('auth.login')}</Text>
                                 </TouchableOpacity>
 
+                                {/* Register Button */}
                                 <TouchableOpacity
                                     style={styles.guestButton}
                                     onPress={handleRegisterPress}
                                 >
                                     <Text style={styles.guestButtonText}>{t('auth.register')}</Text>
                                 </TouchableOpacity>
+
+                                {/* Bottom Row: Language + Guest */}
+                                <View style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginTop: 8,
+                                    gap: 10,
+                                }}>
+                                    {/* Language Switcher */}
+                                    <TouchableOpacity
+                                        onPress={() => setShowLanguageModal(true)}
+                                        activeOpacity={0.7}
+                                        style={{
+                                            flex: 1,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: 'rgba(20, 25, 35, 0.82)',
+                                            borderWidth: 1,
+                                            borderColor: 'rgba(255, 255, 255, 0.15)',
+                                            paddingHorizontal: 14,
+                                            paddingVertical: 11,
+                                            borderRadius: 18,
+                                            gap: 6,
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 14 }}>{SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.flag || '🇺🇿'}</Text>
+                                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>
+                                            {SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label || "O'zbekcha"}
+                                        </Text>
+                                        <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.6)" />
+                                    </TouchableOpacity>
+
+                                    {/* Guest Mode Button */}
+                                    <TouchableOpacity
+                                        onPress={handleGuestLogin}
+                                        activeOpacity={0.7}
+                                        style={{
+                                            flex: 1,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: 'rgba(255, 107, 0, 0.12)',
+                                            borderWidth: 1,
+                                            borderColor: 'rgba(255, 107, 0, 0.35)',
+                                            paddingHorizontal: 14,
+                                            paddingVertical: 11,
+                                            borderRadius: 18,
+                                            gap: 6,
+                                        }}
+                                    >
+                                        <Ionicons name="person-outline" size={14} color="#FF6B00" />
+                                        <Text style={{ color: '#FF6B00', fontSize: 12, fontWeight: '800' }}>
+                                            {t('auth.guest_mode', "Mehmon")}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </>
                         )}
                     </View>
