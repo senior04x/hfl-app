@@ -753,11 +753,11 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }
     };
 
-    const fetchPlayer = async () => {
+    const fetchPlayer = async (bypassCache = false) => {
         try {
-            setLoading(true);
+            if (!player) setLoading(true);
             const [playerData, statsData, transfersData] = await Promise.all([
-                apiService.getPlayerById(targetPlayerId),
+                apiService.getPlayerById(targetPlayerId, bypassCache),
                 apiService.getPlayerStats(targetPlayerId).catch(() => null),
                 apiService.getPlayerTransfers(targetPlayerId).catch(() => [])
             ]);
