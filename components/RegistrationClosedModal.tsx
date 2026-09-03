@@ -76,51 +76,30 @@ export default function RegistrationClosedModal({
                     {/* Header Icon */}
                     <View style={styles.iconContainer}>
                         <View style={styles.iconRing}>
-                            <Ionicons name="lock-closed" size={32} color="#EF4444" />
+                            <Ionicons name="lock-closed" size={30} color="#EF4444" />
                         </View>
                     </View>
 
-                    {/* Organization Name (if available) */}
+                    {/* Modal Title */}
+                    <Text style={[styles.titleText, { color: homeColors.textPrimary }]}>
+                        {t('teams.registration_closed_title', 'Ro\'yxatdan o\'tish yopilgan')}
+                    </Text>
+
+                    {/* Organization Name Badge */}
                     {organizationName ? (
-                        <Text style={[styles.orgNameText, { color: homeColors.textSecondary }]} numberOfLines={1}>
-                            {organizationName}
-                        </Text>
+                        <View style={[styles.orgBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9', borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }]}>
+                            <Ionicons name="business-outline" size={13} color={homeColors.accent} />
+                            <Text style={[styles.orgNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                {organizationName}
+                            </Text>
+                        </View>
                     ) : null}
 
-                    {/* 3-Language Notice Cards */}
-                    <View style={styles.noticesContainer}>
-                        {/* Uzbek */}
-                        <View style={[styles.langItem, { backgroundColor: isDark ? '#1C1C1E' : '#F8FAFC', borderColor: isDark ? '#2C2C2E' : '#E2E8F0' }]}>
-                            <View style={styles.langHeader}>
-                                <Text style={styles.flag}>🇺🇿</Text>
-                                <Text style={[styles.langLabel, { color: homeColors.textPrimary }]}>O'zbekcha</Text>
-                            </View>
-                            <Text style={[styles.noticeText, { color: homeColors.textSecondary }]}>
-                                Tashkilotingiz ro'yxatdan o'tishni yopgan. Tashkilotingiz bilan bog'laning.
-                            </Text>
-                        </View>
-
-                        {/* Russian */}
-                        <View style={[styles.langItem, { backgroundColor: isDark ? '#1C1C1E' : '#F8FAFC', borderColor: isDark ? '#2C2C2E' : '#E2E8F0' }]}>
-                            <View style={styles.langHeader}>
-                                <Text style={styles.flag}>🇷🇺</Text>
-                                <Text style={[styles.langLabel, { color: homeColors.textPrimary }]}>Русский</Text>
-                            </View>
-                            <Text style={[styles.noticeText, { color: homeColors.textSecondary }]}>
-                                Ваша организация закрыла регистрацию. Свяжитесь с вашей организацией.
-                            </Text>
-                        </View>
-
-                        {/* English */}
-                        <View style={[styles.langItem, { backgroundColor: isDark ? '#1C1C1E' : '#F8FAFC', borderColor: isDark ? '#2C2C2E' : '#E2E8F0' }]}>
-                            <View style={styles.langHeader}>
-                                <Text style={styles.flag}>🇬🇧</Text>
-                                <Text style={[styles.langLabel, { color: homeColors.textPrimary }]}>English</Text>
-                            </View>
-                            <Text style={[styles.noticeText, { color: homeColors.textSecondary }]}>
-                                Your organization has closed registration. Please contact your organization.
-                            </Text>
-                        </View>
+                    {/* Localized Warning Description */}
+                    <View style={[styles.descCard, { backgroundColor: isDark ? '#1A1A1A' : '#F8FAFC', borderColor: isDark ? '#262626' : '#E2E8F0' }]}>
+                        <Text style={[styles.descText, { color: homeColors.textSecondary }]}>
+                            {t('teams.registration_closed_desc', 'Tashkilotingiz ro\'yxatdan o\'tishni yopgan. Tashkilotingiz bilan bog\'laning.')}
+                        </Text>
                     </View>
 
                     {/* Action Buttons */}
@@ -180,53 +159,53 @@ const styles = StyleSheet.create({
         elevation: 15,
     },
     iconContainer: {
-        marginBottom: 12,
+        marginBottom: 10,
     },
     iconRing: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: 'rgba(239, 68, 68, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1.5,
         borderColor: 'rgba(239, 68, 68, 0.25)',
     },
-    orgNameText: {
-        fontSize: 13,
-        fontWeight: '700',
-        marginBottom: 12,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
+    titleText: {
+        fontSize: 18,
+        fontWeight: '800',
+        letterSpacing: -0.3,
+        textAlign: 'center',
+        marginBottom: 8,
     },
-    noticesContainer: {
-        width: '100%',
-        gap: 10,
-        marginBottom: 20,
-    },
-    langItem: {
-        padding: 12,
-        borderRadius: 14,
-        borderWidth: 1,
-    },
-    langHeader: {
+    orgBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        marginBottom: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+        borderWidth: 1,
+        marginBottom: 14,
     },
-    flag: {
-        fontSize: 14,
-    },
-    langLabel: {
+    orgNameText: {
         fontSize: 12,
         fontWeight: '700',
-        letterSpacing: 0.3,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-    noticeText: {
-        fontSize: 12.5,
-        lineHeight: 18,
+    descCard: {
+        width: '100%',
+        padding: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        marginBottom: 20,
+    },
+    descText: {
+        fontSize: 13.5,
+        lineHeight: 20,
         fontWeight: '500',
+        textAlign: 'center',
     },
     actionsContainer: {
         width: '100%',

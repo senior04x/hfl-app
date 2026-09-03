@@ -300,7 +300,10 @@
     "photo_permission_error": "Permission to access photo gallery is required.",
     "photo_upload_error": "Error uploading photo.",
     "phone_save_error": "Error saving phone number.",
-    "photo_updated_success": "Photo updated successfully."
+    "photo_updated_success": "Photo updated successfully.",
+    "registration_closed_title": "Registration Closed",
+    "registration_closed_desc": "Your organization has closed registration. Please contact your organization.",
+    "call_organization": "Contact Organization"
   },
   "players": {
     "title": "Players",

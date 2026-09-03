@@ -300,7 +300,10 @@
     "photo_permission_error": "Необходимо предоставить разрешение на доступ к галерее.",
     "photo_upload_error": "Ошибка при загрузке фото.",
     "phone_save_error": "Ошибка при сохранении номера телефона.",
-    "photo_updated_success": "Фотография успешно обновлена."
+    "photo_updated_success": "Фотография успешно обновлена.",
+    "registration_closed_title": "Регистрация закрыта",
+    "registration_closed_desc": "Ваша организация закрыла регистрацию. Свяжитесь с вашей организацией.",
+    "call_organization": "Связаться с организацией"
   },
   "players": {
     "title": "Игроки",

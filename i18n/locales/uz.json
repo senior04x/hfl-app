@@ -300,7 +300,10 @@
     "photo_permission_error": "Galereyadan rasm tanlash uchun ruxsat berishingiz kerak.",
     "photo_upload_error": "Rasmni yuklashda xatolik yuz berdi.",
     "phone_save_error": "Telefon raqamni saqlashda xatolik.",
-    "photo_updated_success": "Rasm muvaffaqiyatli yuklandi."
+    "photo_updated_success": "Rasm muvaffaqiyatli yuklandi.",
+    "registration_closed_title": "Ro'yxatdan o'tish yopilgan",
+    "registration_closed_desc": "Tashkilotingiz ro'yxatdan o'tishni yopgan. Tashkilotingiz bilan bog'laning.",
+    "call_organization": "Tashkilot bilan bog'lanish"
   },
   "players": {
     "title": "O'yinchilar",
