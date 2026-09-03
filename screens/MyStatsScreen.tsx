@@ -131,6 +131,131 @@ const calculateAgeFromBirthDate = (birthStr?: string, defaultAge?: any) => {
     return age > 0 ? `${age}` : (defaultAge ? `${defaultAge}` : '—');
 };
 
+const InlineSkeleton = ({ width = 36, height = 14, borderRadius = 4, style }: any) => {
+    const isDark = useThemeStore((state) => state.isDark);
+    const opacityAnim = useRef(new Animated.Value(0.35)).current;
+
+    useEffect(() => {
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(opacityAnim, {
+                    toValue: 0.8,
+                    duration: 700,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacityAnim, {
+                    toValue: 0.35,
+                    duration: 700,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+        loop.start();
+        return () => loop.stop();
+    }, []);
+
+    return (
+        <Animated.View
+            style={[
+                {
+                    width,
+                    height,
+                    borderRadius,
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.12)',
+                    opacity: opacityAnim,
+                },
+                style,
+            ]}
+        />
+    );
+};
+
+const MyStatsScreenSkeleton = () => {
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+    const cardSurface = {
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF',
+        borderColor: homeColors.border,
+        borderWidth: 1,
+    };
+
+    return (
+        <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+            <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
+                {/* Top Row */}
+                <View style={styles.topRow}>
+                    <InlineSkeleton width={36} height={36} borderRadius={10} />
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <InlineSkeleton width={36} height={36} borderRadius={10} />
+                        <InlineSkeleton width={36} height={36} borderRadius={10} />
+                    </View>
+                </View>
+
+                {/* Identity Row */}
+                <View style={styles.identityRowSticky}>
+                    <InlineSkeleton width={68} height={68} borderRadius={16} />
+                    <View style={{ flex: 1, paddingLeft: 12, gap: 6 }}>
+                        <InlineSkeleton width={140} height={18} borderRadius={4} />
+                        <InlineSkeleton width={100} height={14} borderRadius={4} />
+                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                            <InlineSkeleton width={60} height={20} borderRadius={6} />
+                            <InlineSkeleton width={45} height={20} borderRadius={6} />
+                        </View>
+                    </View>
+                </View>
+
+                {/* Info Stats Card */}
+                <View style={[styles.infoStatsCard, cardSurface, { marginBottom: 8 }]}>
+                    <View style={styles.infoTopRow}>
+                        {[1, 2, 3, 4].map((i) => (
+                            <React.Fragment key={i}>
+                                <View style={styles.infoStat}>
+                                    <InlineSkeleton width={24} height={16} borderRadius={4} />
+                                    <InlineSkeleton width={32} height={10} borderRadius={3} style={{ marginTop: 4 }} />
+                                </View>
+                                {i < 4 && <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />}
+                            </React.Fragment>
+                        ))}
+                    </View>
+                </View>
+
+                {/* Tab switcher */}
+                <View style={[styles.tabBarContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
+                    {[1, 2, 3].map((i) => (
+                        <View key={i} style={[styles.tabBtn, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                            <InlineSkeleton width={55} height={14} borderRadius={4} />
+                        </View>
+                    ))}
+                </View>
+            </View>
+
+            {/* Scroll body with FIFA card skeleton */}
+            <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+                <View style={[styles.infoSectionCard, cardSurface, { width: '100%' }]}>
+                    <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                        <InlineSkeleton width={110} height={16} borderRadius={4} />
+                    </View>
+                    <View style={styles.physicalGrid}>
+                        {[1, 2, 3, 4].map((i) => (
+                            <React.Fragment key={i}>
+                                <View style={styles.physicalItem}>
+                                    <InlineSkeleton width={32} height={10} borderRadius={3} />
+                                    <InlineSkeleton width={30} height={14} borderRadius={4} style={{ marginTop: 4 }} />
+                                </View>
+                                {i < 4 && <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />}
+                            </React.Fragment>
+                        ))}
+                    </View>
+                </View>
+
+                <View style={[styles.infoSectionCard, cardSurface, { width: '100%', marginTop: 14, alignItems: 'center', paddingVertical: 18 }]}>
+                    <FifaCardSkeleton size="lg" showAttributes={true} />
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
+};
+
 export default function MyStatsScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { user } = useAuthStore();
