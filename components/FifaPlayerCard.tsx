@@ -154,7 +154,7 @@ export function FifaCardSkeleton({
     size?: 'sm' | 'md' | 'lg';
     showAttributes?: boolean;
 }) {
-    const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
+    const cardWidth = size === 'sm' ? 160 : size === 'lg' ? Math.min(SCREEN_WIDTH - 84, 260) : 220;
     const L = computeCardLayout(cardWidth, showAttributes);
     const scaleFactor = L.sf;
 
@@ -305,7 +305,7 @@ export default function FifaPlayerCard({
     const assistsCount = player?.stats?.assists ?? player?.assists ?? 0;
     const matchesCount = player?.stats?.matchesPlayed ?? player?.stats?.matches ?? player?.matchesPlayed ?? 0;
 
-    const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
+    const cardWidth = size === 'sm' ? 160 : size === 'lg' ? Math.min(SCREEN_WIDTH - 84, 260) : 220;
     const L = computeCardLayout(cardWidth, showAttributes);
     const cardHeight = L.cardHeight;
     const scaleFactor = L.sf;
