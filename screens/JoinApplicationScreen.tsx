@@ -316,26 +316,6 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
         setStatusModal({ visible: true, type, title, message, onClose });
     };
 
-    const openTelegramBot = async (phone?: string) => {
-        try {
-            const cleanDigits = (phone || formData.phone || '').replace(/\D/g, '').slice(-9);
-            const startParam = cleanDigits ? `status_${cleanDigits}` : '';
-            const webUrl = `https://t.me/amatora_bot${startParam ? `?start=${startParam}` : ''}`;
-            const nativeUrl = `tg://resolve?domain=amatora_bot${startParam ? `&start=${startParam}` : ''}`;
-
-            try {
-                await Linking.openURL(nativeUrl);
-            } catch (nativeErr) {
-                await Linking.openURL(webUrl);
-            }
-        } catch (e) {
-            console.warn('Telegram deep link error:', e);
-            try {
-                await Linking.openURL('https://t.me/amatora_bot');
-            } catch (err2) {}
-        }
-    };
-
     // Dropdown animation state
     const [isOrgDropdownOpen, setIsOrgDropdownOpen] = useState(false);
     const orgAnimVal = useRef(new Animated.Value(0)).current;
@@ -767,9 +747,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     showNotice(
                         'success',
                         'ARIZANGIZ QABUL QILINDI',
-                        'Arizangiz qabul qilindi. Tashkilotchilar tomonidan ko\'rib chiqilib sizga xabar beriladi.',
+                        'Arizangiz muvaffaqiyatli qabul qilindi. Tashkilotchilar tomonidan ko\'rib chiqilib sizga xabar beriladi.',
                         () => {
-                            openTelegramBot(formattedPhone);
                             navigation.goBack();
                         }
                     );
@@ -817,9 +796,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     showNotice(
                         'success',
                         'ARIZANGIZ QABUL QILINDI',
-                        'Arizangiz qabul qilindi. Tashkilotchilar tomonidan ko\'rib chiqilib sizga xabar beriladi.',
+                        'Arizangiz muvaffaqiyatli qabul qilindi. Tashkilotchilar tomonidan ko\'rib chiqilib sizga xabar beriladi.',
                         () => {
-                            openTelegramBot(formattedPhone);
                             navigation.goBack();
                         }
                     );
@@ -2021,50 +1999,43 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                     if (statusModal.onClose) statusModal.onClose();
                                 }}
                             >
-                                <Ionicons name="close" size={18} color={homeColors.textSecondary} />
+                                <Ionicons name="close" size={20} color={homeColors.textSecondary} />
                             </TouchableOpacity>
 
-                            <View style={styles.noticeHeaderRow}>
-                                <View style={[
-                                    styles.noticeIconBox,
-                                    statusModal.type === 'success' && { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
-                                    statusModal.type === 'error' && { backgroundColor: 'rgba(239, 68, 68, 0.15)' }
-                                ]}>
+                            <View style={[
+                                styles.noticeIconBox,
+                                statusModal.type === 'success' && { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.12)' },
+                                statusModal.type === 'error' && { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.12)' },
+                                statusModal.type === 'info' && { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)' }
+                            ]}>
                                 <Ionicons
-                                    name={statusModal.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
-                                    size={24}
-                                    color={statusModal.type === 'success' ? '#10B981' : '#EF4444'}
+                                    name={statusModal.type === 'success' ? 'checkmark-circle' : (statusModal.type === 'error' ? 'alert-circle' : 'information-circle')}
+                                    size={36}
+                                    color={statusModal.type === 'success' ? '#10B981' : (statusModal.type === 'error' ? '#EF4444' : homeColors.textPrimary)}
                                 />
                             </View>
+
                             <Text style={[styles.noticeTitleText, { color: homeColors.textPrimary }]}>{statusModal.title}</Text>
+                            <Text style={[styles.noticeBodyText, { color: homeColors.textSecondary }]}>{statusModal.message}</Text>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.noticeActionBtn,
+                                    { backgroundColor: isDark ? '#FFFFFF' : '#000000' }
+                                ]}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                    setStatusModal(prev => ({ ...prev, visible: false }));
+                                    if (statusModal.onClose) statusModal.onClose();
+                                }}
+                            >
+                                <Text style={[styles.noticeActionBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                                    {statusModal.type === 'success' ? "Tushunarli" : "Qayta urinish"}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
-
-                        <Text style={[styles.noticeBodyText, { color: homeColors.textSecondary }]}>{statusModal.message}</Text>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.noticeActionBtn,
-                                statusModal.type === 'success' && { backgroundColor: '#0088cc', width: '100%', borderRadius: 14, height: 46, flexDirection: 'row' },
-                                statusModal.type === 'error' && { backgroundColor: '#EF4444' }
-                            ]}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                                setStatusModal(prev => ({ ...prev, visible: false }));
-                                if (statusModal.onClose) statusModal.onClose();
-                            }}
-                        >
-                            {statusModal.type === 'success' ? (
-                                <>
-                                    <Ionicons name="paper-plane" size={16} color="#FFF" style={{ marginRight: 8 }} />
-                                    <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Botga o'tish</Text>
-                                </>
-                            ) : (
-                                <Ionicons name="checkmark" size={18} color="#FFF" />
-                            )}
-                        </TouchableOpacity>
                     </View>
-                </View>
-            </Modal>
+                </Modal>
 
             {/* CUSTOM UNIVERSAL DATE PICKER MODAL */}
             <CustomDatePickerModal
@@ -2537,73 +2508,68 @@ const styles = StyleSheet.create({
 
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0, 0, 0, 0.72)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 16,
+        padding: 24,
     },
     noticeModalCard: {
         width: '100%',
         maxWidth: 340,
-        borderRadius: 20,
-        padding: 20,
-        borderWidth: 1,
+        borderRadius: 24,
+        padding: 24,
         alignItems: 'center',
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 8,
+            },
+        }),
     },
     noticeCloseBtn: {
         position: 'absolute',
-        top: 14,
-        right: 14,
-        padding: 4,
-    },
-    noticeHeaderRow: {
-        alignItems: 'center',
-        marginBottom: 12,
+        top: 16,
+        right: 16,
+        padding: 6,
+        zIndex: 10,
     },
     noticeIconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 16,
+        marginTop: 6,
     },
-    noticeTitleText: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
-    noticeBodyText: { fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 18 },
+    noticeTitleText: {
+        fontSize: 17,
+        fontWeight: '800',
+        textAlign: 'center',
+        marginBottom: 8,
+        letterSpacing: 0.2,
+    },
+    noticeBodyText: {
+        fontSize: 13.5,
+        lineHeight: 20,
+        textAlign: 'center',
+        marginBottom: 22,
+        paddingHorizontal: 6,
+    },
     noticeActionBtn: {
-        height: 44,
-        paddingHorizontal: 24,
-        borderRadius: 12,
+        width: '100%',
+        height: 48,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
     },
-
-    // iOS DatePicker Styles
-    iosPickerContainer: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        borderWidth: 1,
-        borderBottomWidth: 0,
-        paddingBottom: 30,
-    },
-    iosPickerHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    iosPickerTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    iosPickerBtnCancel: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    iosPickerBtnDone: {
+    noticeActionBtnText: {
         fontSize: 14,
         fontWeight: '800',
+        letterSpacing: 0.2,
     },
 });
