@@ -276,7 +276,8 @@ const MyStatsScreenSkeleton = () => {
 };
 
 export default function MyStatsScreen({ route, navigation }: any) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const currentLang = i18n?.language || 'uz';
     const { user } = useAuthStore();
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
