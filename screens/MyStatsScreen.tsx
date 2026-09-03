@@ -684,8 +684,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 }
             };
 
-            let commentPayload = '[PROFILE_UPDATE]' + JSON.stringify({ oldData: payload.oldData, newData: payload.newData, playerId: targetPlayerId });
-            commentPayload += ` [METADATA:${JSON.stringify(metaObj)}]`;
+            let commentPayload = '[PROFILE_UPDATE]' + JSON.stringify({ playerId: targetPlayerId, oldData: payload.oldData, newData: payload.newData });
             if (targetLeague) {
                 commentPayload += ` [LEAGUE:${targetLeague}]`;
             }
