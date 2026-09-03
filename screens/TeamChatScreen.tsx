@@ -85,6 +85,50 @@ function TeamChatScreen({ route, navigation }: any) {
     const [isRateLimited, setIsRateLimited] = useState(false);
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
+    // Reply-to-message (swipe yoki context-menyu orqali) — { id, text, senderName, senderId }
+    const [replyingTo, setReplyingTo] = useState<any>(null);
+
+    // Yuborilgan javob xabaridagi iqtibosga bosilganda — original xabarga
+    // sakrab o'tish va uni Telegram/Instagram uslubida "yaltiratib" ko'rsatish
+    const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+    const highlightTimeoutRef = useRef<any>(null);
+
+    useEffect(() => {
+        return () => {
+            if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+        };
+    }, []);
+
+    const scrollToMessage = React.useCallback((targetId: string | number) => {
+        if (!targetId) return;
+        const idx = messages.findIndex((m: any) =>
+            String(m._id) === String(targetId) || String(m.id) === String(targetId)
+        );
+
+        if (idx === -1) {
+            // Xabar hozir yuklangan sahifalar orasida yo'q (juda eski) — sokin chiqamiz
+            try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); } catch (e) {}
+            return;
+        }
+
+        try {
+            flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+        } catch (e) {
+            // scrollToIndex teskarilangan (inverted) va o'zgaruvchan balandlikdagi
+            // ro'yxatda ba'zan darhol ishlamasligi mumkin — onScrollToIndexFailed
+            // pastda muqobil (fallback) urinishni bajaradi.
+        }
+
+        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+
+        const idStr = String(targetId);
+        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+        setHighlightedMessageId(idStr);
+        highlightTimeoutRef.current = setTimeout(() => {
+            setHighlightedMessageId(null);
+        }, 1300);
+    }, [messages]);
+
     useEffect(() => {
         const showSub = Keyboard.addListener(
             Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
@@ -452,10 +496,11 @@ function TeamChatScreen({ route, navigation }: any) {
                 },
                 (payload) => {
                     const m = payload.new;
-                    const cleanReplyTo = m.reply_to 
-                        ? (String(m.reply_to).replace('EDITED_', '').replace('EDITED', '').trim() || null) 
-                        : null;
-                    const isEdited = Boolean(m.is_edited || m.edited || String(m.reply_to || '').includes('EDITED'));
+                    // reply_to — jsonb ustun, xabarga javob yozilganda { id, text, senderName, senderId }
+                    // shaklida to'liq nusxa (snapshot) saqlanadi — shuning uchun bu yerda string
+                    // sifatida emas, to'g'ridan-to'g'ri OBYEKT sifatida o'tkazamiz (eski "EDITED"
+                    // matn-hack endi ishlatilmaydi, tahrirlangan holat is_edited ustuni orqali aniqlanadi).
+                    const isEdited = Boolean(m.is_edited || m.edited);
 
                     const newMsg = {
                         _id: m.id,
@@ -466,7 +511,8 @@ function TeamChatScreen({ route, navigation }: any) {
                         senderPhoto: m.sender_photo || '',
                         text: m.text,
                         timestamp: m.created_at,
-                        replyTo: cleanReplyTo,
+                        replyTo: m.reply_to || null,
+                        is_edited: isEdited,
                         edited: isEdited
                     };
 
@@ -902,6 +948,18 @@ function TeamChatScreen({ route, navigation }: any) {
                 ? (teamInfo?.name || 'TEAM') 
                 : ((user.firstName || user.name || '') + (user.lastName ? ` ${user.lastName}` : '') || 'Foydalanuvchi').trim();
             
+            // Javob rejimida bo'lsa — nusxa (snapshot) sifatida reply_to (jsonb) ga
+            // yoziladi, shunda foydalanuvchi chatdan chiqib qayta kirganda ham
+            // qaysi xabarga javob berilgani doim ko'rinib turadi.
+            const replyToPayload = replyingTo
+                ? {
+                    id: replyingTo.id,
+                    text: replyingTo.text,
+                    senderName: replyingTo.senderName,
+                    senderId: replyingTo.senderId,
+                }
+                : null;
+
             const messageData = {
                 _id: `temp-${Date.now()}`,
                 localId,
@@ -915,6 +973,7 @@ function TeamChatScreen({ route, navigation }: any) {
                 edited: false,
                 is_edited: false,
                 edited_at: null,
+                replyTo: replyToPayload,
                 role: user.role
             };
 
@@ -960,6 +1019,7 @@ function TeamChatScreen({ route, navigation }: any) {
         setInputText('');
         setIsEditing(false);
         setEditMessageId(null);
+        setReplyingTo(null);
     };
 
     const copyToClipboard = async (text: string) => {
@@ -1067,12 +1127,56 @@ function TeamChatScreen({ route, navigation }: any) {
         }
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
+        // Bir vaqtning o'zida faqat bitta rejim (tahrirlash YOKI javob berish)
+        setReplyingTo(null);
+
         setInputText(msg.text);
         setIsEditing(true);
         setEditMessageId(realId);
     };
 
-    const MessageBubble = React.memo(({ item, isMe, isTeamMsg, senderDisplayName, senderDisplayPhoto, shouldAnimate }: any) => {
+    // Swipe (chapga surish) yoki context-menyudagi "Javob berish" orqali
+    // chaqiriladi — Telegram/Instagram uslubidagi javob rejimini yoqadi.
+    const startReply = (msg: any) => {
+        const realId = (msg.id && !String(msg.id).startsWith('temp-') && !String(msg.id).startsWith('local-'))
+            ? msg.id
+            : ((msg._id && !String(msg._id).startsWith('temp-') && !String(msg._id).startsWith('local-')) ? msg._id : null);
+
+        if (!realId) return; // Hali serverga yozilmagan xabarga javob berib bo'lmaydi
+
+        // Bir vaqtning o'zida faqat bitta rejim (tahrirlash YOKI javob berish)
+        if (isEditing) {
+            setIsEditing(false);
+            setEditMessageId(null);
+            setInputText('');
+        }
+
+        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (e) {}
+
+        if (Platform.OS === 'ios') {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+        }
+
+        const senderDisplayName = String(msg.senderId) === String(user?._id || user?.id)
+            ? (t('chat.you') || 'Siz')
+            : (msg.senderName || 'Foydalanuvchi');
+
+        setReplyingTo({
+            id: realId,
+            text: msg.text,
+            senderName: senderDisplayName,
+            senderId: msg.senderId,
+        });
+    };
+
+    const cancelReply = () => {
+        if (Platform.OS === 'ios') {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        }
+        setReplyingTo(null);
+    };
+
+    const MessageBubble = React.memo(({ item, isMe, isTeamMsg, senderDisplayName, senderDisplayPhoto, shouldAnimate, onReply, onJumpToReply, isHighlighted }: any) => {
         const isItemEdited = Boolean(item.is_edited || item.edited);
 
         // Natural micro-animations (180-220ms easeOut, bottom-right for me, bottom-left for others)
@@ -1083,6 +1187,79 @@ function TeamChatScreen({ route, navigation }: any) {
 
         // Subtle pulse for edits (scale: 1 -> 1.02 -> 1)
         const editPulseAnim = useRef(new Animated.Value(1)).current;
+
+        // Javob iqtibosiga bosib "sakrab o'tilgan" xabarni Telegram/Instagram
+        // uslubida bir lahzalik yaltiroq (highlight) tus bilan ajratib ko'rsatish.
+        // Faqat opacity va scale — ikkalasi ham native-driver bilan xavfsiz
+        // ishlaydi, shuning uchun Android'da ham, iOS'da ham JS-thread'ni
+        // band qilmaydi va UI qotib qolmaydi.
+        const highlightOpacityAnim = useRef(new Animated.Value(0)).current;
+        const highlightScaleAnim = useRef(new Animated.Value(1)).current;
+
+        // Swipe-to-reply (Telegram/Instagram uslubida: xabarni CHAPGA surish javob rejimini yoqadi)
+        const swipeX = useRef(new Animated.Value(0)).current;
+        const hasTriggeredReplyRef = useRef(false);
+        const SWIPE_TRIGGER = -56;
+        const SWIPE_MAX = -76;
+
+        const swipePanResponder = useRef(
+            PanResponder.create({
+                onStartShouldSetPanResponderCapture: () => false,
+                // Faqat aniq CHAPGA va gorizontal ustunlik bilan bo'lgan harakatni ushlaymiz —
+                // shu bilan ekranni orqaga qaytarish (o'ngga surish) va tik scroll bilan
+                // hech qanday to'qnashuv bo'lmaydi.
+                onMoveShouldSetPanResponderCapture: (_, g) => {
+                    return g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+                },
+                onPanResponderGrant: () => {
+                    hasTriggeredReplyRef.current = false;
+                },
+                onPanResponderMove: (_, g) => {
+                    let dx = g.dx > 0 ? 0 : g.dx;
+                    if (dx < SWIPE_MAX) {
+                        dx = SWIPE_MAX + (dx - SWIPE_MAX) * 0.2; // limitdan keyin "rezina" effekti
+                    }
+                    swipeX.setValue(dx);
+
+                    if (dx <= SWIPE_TRIGGER && !hasTriggeredReplyRef.current) {
+                        hasTriggeredReplyRef.current = true;
+                        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+                    } else if (dx > SWIPE_TRIGGER && hasTriggeredReplyRef.current) {
+                        hasTriggeredReplyRef.current = false;
+                    }
+                },
+                onPanResponderRelease: (_, g) => {
+                    const shouldReply = g.dx <= SWIPE_TRIGGER;
+                    Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, friction: 7, tension: 65 }).start();
+                    if (shouldReply && onReply) {
+                        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (e) {}
+                        onReply(item);
+                    }
+                },
+                onPanResponderTerminate: () => {
+                    Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, friction: 7, tension: 65 }).start();
+                },
+                onPanResponderTerminationRequest: () => false,
+            })
+        ).current;
+
+        const replyIconOpacity = swipeX.interpolate({
+            inputRange: [SWIPE_MAX, -40, -14, 0],
+            outputRange: [1, 1, 0, 0],
+            extrapolate: 'clamp',
+        });
+        const replyIconScale = swipeX.interpolate({
+            inputRange: [SWIPE_MAX, SWIPE_TRIGGER, -40, -14, 0],
+            outputRange: [1.12, 1.05, 0.85, 0.5, 0.5],
+            extrapolate: 'clamp',
+        });
+
+        // Bu xabar biror boshqa xabarga javob bo'lsa — reply_to (jsonb) ichida
+        // { id, text, senderName, senderId } snapshot saqlangan bo'ladi.
+        const replyToInfo = item.replyTo && typeof item.replyTo === 'object' ? item.replyTo : null;
+        const replyToSenderLabel = replyToInfo
+            ? (String(replyToInfo.senderId) === String(user?._id || user?.id) ? (t('chat.you') || 'Siz') : (replyToInfo.senderName || ''))
+            : '';
 
         useEffect(() => {
             if (shouldAnimate) {
@@ -1116,6 +1293,26 @@ function TeamChatScreen({ route, navigation }: any) {
         }, [shouldAnimate]);
 
         useEffect(() => {
+            if (isHighlighted) {
+                highlightOpacityAnim.stopAnimation();
+                highlightScaleAnim.stopAnimation();
+                highlightOpacityAnim.setValue(1);
+                highlightScaleAnim.setValue(1);
+                Animated.sequence([
+                    Animated.timing(highlightScaleAnim, { toValue: 1.035, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+                    Animated.timing(highlightScaleAnim, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+                ]).start();
+                Animated.timing(highlightOpacityAnim, {
+                    toValue: 0,
+                    duration: 1100,
+                    delay: 80,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }).start();
+            }
+        }, [isHighlighted]);
+
+        useEffect(() => {
             if (isItemEdited && !shouldAnimate) {
                 Animated.sequence([
                     Animated.timing(editPulseAnim, { toValue: 1.02, duration: 80, useNativeDriver: true }),
@@ -1126,104 +1323,160 @@ function TeamChatScreen({ route, navigation }: any) {
 
         return (
             <Animated.View style={[
-                styles.messageRow, 
+                styles.messageRow,
                 isMe ? styles.myMessageRow : styles.otherMessageRow,
                 {
                     opacity: animOpacity,
                     transform: [
-                        { scale: Animated.multiply(animScale, editPulseAnim) },
+                        { scale: Animated.multiply(Animated.multiply(animScale, editPulseAnim), highlightScaleAnim) },
                         { translateX: animTranslateX },
                         { translateY: animTranslateY },
                     ]
                 }
             ]}>
-                <TouchableOpacity 
-                    activeOpacity={0.9}
-                    onLongPress={() => {
-                        Keyboard.dismiss();
-                        try {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        } catch (e) {}
-                        setSelectedMessage(item);
-                        setIsMenuVisible(true);
-                        
-                        // Trigger smooth animation
-                        menuScaleAnim.setValue(0.85);
-                        menuFadeAnim.setValue(0);
-                        Animated.parallel([
-                            Animated.spring(menuScaleAnim, {
-                                toValue: 1,
-                                tension: 60,
-                                friction: 8,
-                                useNativeDriver: true
-                            }),
-                            Animated.timing(menuFadeAnim, {
-                                toValue: 1,
-                                duration: 200,
-                                useNativeDriver: true
-                            })
-                        ]).start();
-                    }}
-                    delayLongPress={250}
-                    style={{ width: '100%', flexDirection: isMe ? 'row-reverse' : 'row' }}
+                {/* Chapga surilganda paydo bo'ladigan "Javob berish" belgisi */}
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.replyRevealIcon,
+                        { opacity: replyIconOpacity, transform: [{ scale: replyIconScale }] }
+                    ]}
                 >
-                    <View 
-                        ref={el => { messageRefs.current[item._id || item.id] = el; }}
-                        style={{ flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end', width: '100%' }}
+                    <View style={[styles.replyRevealCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }]}>
+                        <Ionicons name="arrow-undo" size={16} color={isDark ? '#FFFFFF' : '#000000'} />
+                    </View>
+                </Animated.View>
+
+                <Animated.View
+                    {...swipePanResponder.panHandlers}
+                    style={{ width: '100%', transform: [{ translateX: swipeX }] }}
+                >
+                    <TouchableOpacity
+                        activeOpacity={0.9}
+                        onLongPress={() => {
+                            Keyboard.dismiss();
+                            try {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            } catch (e) {}
+                            setSelectedMessage(item);
+                            setIsMenuVisible(true);
+
+                            // Trigger smooth animation
+                            menuScaleAnim.setValue(0.85);
+                            menuFadeAnim.setValue(0);
+                            Animated.parallel([
+                                Animated.spring(menuScaleAnim, {
+                                    toValue: 1,
+                                    tension: 60,
+                                    friction: 8,
+                                    useNativeDriver: true
+                                }),
+                                Animated.timing(menuFadeAnim, {
+                                    toValue: 1,
+                                    duration: 200,
+                                    useNativeDriver: true
+                                })
+                            ]).start();
+                        }}
+                        delayLongPress={250}
+                        style={{ width: '100%', flexDirection: isMe ? 'row-reverse' : 'row' }}
                     >
-                    {!isMe && (
-                        <TouchableOpacity 
-                            style={styles.avatarContainer}
-                            onPress={() => {
-                                if (!isTeamMsg && item.senderId) {
-                                    navigation.navigate('PlayerStats', { playerId: item.senderId });
-                                }
-                            }}
+                        <View
+                            ref={el => { messageRefs.current[item._id || item.id] = el; }}
+                            style={{ flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end', width: '100%' }}
                         >
-                            <SmartImage
-                                uri={senderDisplayPhoto || (isTeamMsg ? teamInfo?.logo : null)}
-                                style={[
-                                    styles.avatar,
-                                    isTeamMsg && { borderRadius: 0, backgroundColor: 'transparent' }
-                                ]}
-                                contentFit={isTeamMsg ? "contain" : "cover"}
-                                fallbackIcon="person"
-                            />
-                        </TouchableOpacity>
-                    )}
-                    
-                    <View style={[styles.messageWrapper, isMe ? styles.myMessageWrapper : styles.otherMessageWrapper]}>
-                        {!isMe && <Text style={[styles.senderName, { color: homeColors.textSecondary }]}>{senderDisplayName.toUpperCase()}</Text>}
-                        <View style={[
-                            styles.messageBubble,
-                            isMe 
-                                ? [styles.myBubble, { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }] 
-                                : [styles.otherBubble, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }],
-                            { shadowColor: isDark ? '#FFFFFF' : '#000000' }
-                        ]}>
-                            <Text style={[styles.messageText, { color: isMe ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textPrimary }]}>{item.text}</Text>
-                            <View style={styles.messageFooter}>
-                                {isItemEdited && (
-                                    <Text style={[styles.editedLabel, { color: isMe ? (isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)') : homeColors.textSecondary }]}>
-                                        {t('chat.edited')}
-                                    </Text>
+                        {!isMe && (
+                            <TouchableOpacity
+                                style={styles.avatarContainer}
+                                onPress={() => {
+                                    if (!isTeamMsg && item.senderId) {
+                                        navigation.navigate('PlayerStats', { playerId: item.senderId });
+                                    }
+                                }}
+                            >
+                                <SmartImage
+                                    uri={senderDisplayPhoto || (isTeamMsg ? teamInfo?.logo : null)}
+                                    style={[
+                                        styles.avatar,
+                                        isTeamMsg && { borderRadius: 0, backgroundColor: 'transparent' }
+                                    ]}
+                                    contentFit={isTeamMsg ? "contain" : "cover"}
+                                    fallbackIcon="person"
+                                />
+                            </TouchableOpacity>
+                        )}
+
+                        <View style={[styles.messageWrapper, isMe ? styles.myMessageWrapper : styles.otherMessageWrapper]}>
+                            {!isMe && <Text style={[styles.senderName, { color: homeColors.textSecondary }]}>{senderDisplayName.toUpperCase()}</Text>}
+                            <View style={[
+                                styles.messageBubble,
+                                isMe
+                                    ? [styles.myBubble, { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]
+                                    : [styles.otherBubble, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }],
+                                { shadowColor: isDark ? '#FFFFFF' : '#000000' }
+                            ]}>
+                                {/* "Sakrab o'tilgan" xabarni bir lahzalik yaltiroq tus bilan ajratish
+                                    (Telegram/Instagram uslubi) — faqat opacity, native-driver bilan
+                                    xavfsiz, overflow:'hidden' tufayli bubble shaklidan chiqmaydi. */}
+                                {isHighlighted && (
+                                    <Animated.View
+                                        pointerEvents="none"
+                                        style={[
+                                            StyleSheet.absoluteFillObject,
+                                            { backgroundColor: homeColors.accent, opacity: highlightOpacityAnim }
+                                        ]}
+                                    />
                                 )}
-                                <Text style={[styles.timestamp, { color: isMe ? (isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)') : homeColors.textSecondary }]}>
-                                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </Text>
-                            </View>
-                            {item.isError && (
-                                <TouchableOpacity onPress={() => retryMessage(item)} style={{ marginTop: 4, alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center' }}>
-                                    <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: 'bold', marginRight: 4 }}>
-                                        {t('chat.send_failed_retry')}
+                                {replyToInfo && (
+                                    <TouchableOpacity
+                                        activeOpacity={0.6}
+                                        onPress={() => onJumpToReply && onJumpToReply(replyToInfo.id)}
+                                        style={[
+                                            styles.replyQuoteBlock,
+                                            {
+                                                borderLeftColor: isMe ? (isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)') : homeColors.accent,
+                                                backgroundColor: isMe ? (isDark ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.14)') : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.035)'),
+                                            }
+                                        ]}
+                                    >
+                                        <Text numberOfLines={1} style={[
+                                            styles.replyQuoteSender,
+                                            { color: isMe ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)') : homeColors.accent }
+                                        ]}>
+                                            {replyToSenderLabel}
+                                        </Text>
+                                        <Text numberOfLines={1} style={[
+                                            styles.replyQuoteText,
+                                            { color: isMe ? (isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.7)') : homeColors.textSecondary }
+                                        ]}>
+                                            {replyToInfo.text}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                                <Text style={[styles.messageText, { color: isMe ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textPrimary }]}>{item.text}</Text>
+                                <View style={styles.messageFooter}>
+                                    {isItemEdited && (
+                                        <Text style={[styles.editedLabel, { color: isMe ? (isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)') : homeColors.textSecondary }]}>
+                                            {t('chat.edited')}
+                                        </Text>
+                                    )}
+                                    <Text style={[styles.timestamp, { color: isMe ? (isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)') : homeColors.textSecondary }]}>
+                                        {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </Text>
-                                    <Ionicons name="refresh-circle" size={14} color="#EF4444" />
-                                </TouchableOpacity>
-                            )}
+                                </View>
+                                {item.isError && (
+                                    <TouchableOpacity onPress={() => retryMessage(item)} style={{ marginTop: 4, alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: 'bold', marginRight: 4 }}>
+                                            {t('chat.send_failed_retry')}
+                                        </Text>
+                                        <Ionicons name="refresh-circle" size={14} color="#EF4444" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         </View>
-                    </View>
-                    </View>
-                </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </Animated.View>
             </Animated.View>
         );
     });
@@ -1256,18 +1509,23 @@ function TeamChatScreen({ route, navigation }: any) {
 
         const senderDisplayName = isTeamMsg ? (teamInfo?.name || item.senderName || 'TEAM') : getSenderName();
         const senderDisplayPhoto = isTeamMsg ? (teamInfo?.logo || item.senderPhoto) : item.senderPhoto;
+        const isHighlighted = highlightedMessageId !== null &&
+            (String(item._id) === highlightedMessageId || String(item.id) === highlightedMessageId);
 
         return (
-            <MessageBubble 
-                item={item} 
-                isMe={isMe} 
-                isTeamMsg={isTeamMsg} 
-                senderDisplayName={senderDisplayName} 
-                senderDisplayPhoto={senderDisplayPhoto} 
+            <MessageBubble
+                item={item}
+                isMe={isMe}
+                isTeamMsg={isTeamMsg}
+                senderDisplayName={senderDisplayName}
+                senderDisplayPhoto={senderDisplayPhoto}
                 shouldAnimate={shouldAnimate}
+                onReply={startReply}
+                onJumpToReply={scrollToMessage}
+                isHighlighted={isHighlighted}
             />
         );
-    }, [user, teamInfo, teamPlayers, t]);
+    }, [user, teamInfo, teamPlayers, t, startReply, scrollToMessage, highlightedMessageId]);
 
     const backdropOpacity = swipeBackAnim.interpolate({
         inputRange: [0, width * 0.8, width],
@@ -1360,7 +1618,7 @@ function TeamChatScreen({ route, navigation }: any) {
                                 <FlatList
                                     ref={flatListRef}
                                     data={messages}
-                                    extraData={[messages, typingUsers]}
+                                    extraData={[messages, typingUsers, highlightedMessageId]}
                                     inverted={true}
                                     renderItem={renderMessage}
                                     keyExtractor={(item, index) => item.localId || item._id || item.id || `msg-${index}`}
@@ -1369,6 +1627,26 @@ function TeamChatScreen({ route, navigation }: any) {
                                     refreshing={false}
                                     onEndReached={handleLoadMore}
                                     onEndReachedThreshold={0.1}
+                                    onScrollToIndexFailed={(info) => {
+                                        // Teskarilangan (inverted) ro'yxatda o'zgaruvchan balandlikdagi
+                                        // elementlar tufayli scrollToIndex ba'zan darhol ishlamaydi —
+                                        // React Native'ning rasmiy tavsiyasiga ko'ra: taxminiy joyga
+                                        // sekin o'tib, layout tugagach qayta urinamiz (hech qachon qotib
+                                        // qolmasligi uchun setTimeout bilan asinxron, va try/catch bilan xavfsiz).
+                                        setTimeout(() => {
+                                            try {
+                                                flatListRef.current?.scrollToOffset({
+                                                    offset: info.averageItemLength * info.index,
+                                                    animated: false,
+                                                });
+                                                setTimeout(() => {
+                                                    try {
+                                                        flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+                                                    } catch (e) {}
+                                                }, 120);
+                                            } catch (e) {}
+                                        }, 100);
+                                    }}
                                     onTouchStart={() => {
                                         if (isKeyboardOpen) {
                                             Keyboard.dismiss();
@@ -1479,6 +1757,26 @@ function TeamChatScreen({ route, navigation }: any) {
                                 <Text style={[styles.editingText, { color: homeColors.textPrimary }]} numberOfLines={1}>{t('chat.editing_title')}: {inputText}</Text>
                             </View>
                             <TouchableOpacity onPress={() => { setIsEditing(false); setInputText(''); }}>
+                                <Ionicons name="close-circle" size={20} color={homeColors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {!isEditing && replyingTo && (
+                        <View style={[styles.editingBanner, styles.replyBanner, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderTopColor: homeColors.border }]}>
+                            <View style={[styles.replyBannerAccent, { backgroundColor: homeColors.accent }]} />
+                            <View style={styles.editingInfo}>
+                                <Ionicons name="arrow-undo" size={16} color={homeColors.accent} />
+                                <View style={{ marginLeft: 8, flex: 1 }}>
+                                    <Text style={[styles.replyBannerSender, { color: homeColors.accent }]} numberOfLines={1}>
+                                        {t('chat.replying_to')} {replyingTo.senderName}
+                                    </Text>
+                                    <Text style={[styles.editingText, { color: homeColors.textSecondary, marginLeft: 0 }]} numberOfLines={1}>
+                                        {replyingTo.text}
+                                    </Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={cancelReply}>
                                 <Ionicons name="close-circle" size={20} color={homeColors.textSecondary} />
                             </TouchableOpacity>
                         </View>
@@ -1601,6 +1899,21 @@ function TeamChatScreen({ route, navigation }: any) {
                                     }
                                 ]}>
                                     <View style={{ paddingVertical: 4 }}>
+                                        {/* Reply Action */}
+                                        <TouchableOpacity
+                                            style={styles.menuActionItem}
+                                            onPress={() => {
+                                                closeMenu();
+                                                startReply(selectedMessage);
+                                            }}
+                                            activeOpacity={0.75}
+                                        >
+                                            <Ionicons name="arrow-undo-outline" size={16} color={homeColors.textPrimary} />
+                                            <Text style={[styles.menuActionText, { color: homeColors.textPrimary }]}>{t('chat.reply')}</Text>
+                                        </TouchableOpacity>
+
+                                        <View style={[styles.menuDivider, { backgroundColor: homeColors.border }]} />
+
                                         {/* Copy Action */}
                                         <TouchableOpacity
                                             style={styles.menuActionItem}
@@ -1742,6 +2055,32 @@ const styles = StyleSheet.create({
     messageRow: { flexDirection: 'row', marginBottom: 12, alignItems: 'flex-end' },
     myMessageRow: { justifyContent: 'flex-end' },
     otherMessageRow: { justifyContent: 'flex-start' },
+    // Chapga surilganda o'ng chetda paydo bo'ladigan "Javob berish" belgisi
+    replyRevealIcon: {
+        position: 'absolute',
+        right: 10,
+        top: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    replyRevealCircle: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    // Xabar ichida ko'rsatiladigan javob-iqtibos bloki (bubble ichida, matndan yuqorida)
+    replyQuoteBlock: {
+        borderLeftWidth: 2.5,
+        borderRadius: 6,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        marginBottom: 6,
+    },
+    replyQuoteSender: { fontSize: 11.5, fontWeight: '800', marginBottom: 1 },
+    replyQuoteText: { fontSize: 12, fontWeight: '500' },
     avatarContainer: { marginRight: 8, marginBottom: 2 },
     avatar: { width: 32, height: 32, borderRadius: 16 },
     messageWrapper: { maxWidth: '78%' },
@@ -1933,6 +2272,16 @@ const styles = StyleSheet.create({
     },
     editingInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
     editingText: { fontSize: 12, marginLeft: 8, fontWeight: '600' },
+    replyBanner: { paddingLeft: 10 },
+    replyBannerAccent: {
+        position: 'absolute',
+        left: 0,
+        top: 6,
+        bottom: 6,
+        width: 3,
+        borderRadius: 2,
+    },
+    replyBannerSender: { fontSize: 12, fontWeight: '800', marginBottom: 1 },
     typingMessagesContainer: {
         marginBottom: 6,
         marginTop: 2,

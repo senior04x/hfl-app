@@ -297,6 +297,16 @@ export default function AccountScreen({ navigation }: any) {
     const currentLangItem = SUPPORTED_LANGUAGES.find(l => l.code === i18n.language);
     const totalAppsCount = userTransfers.length + userProfileApps.length;
 
+    const handleProfileCardPress = () => {
+        if (isPlayer) {
+            navigation.navigate('MyStats', { playerId: user?._id || user?.id, player: user });
+        } else if (currentTeamId) {
+            navigation.navigate('MyTeam', { teamId: currentTeamId });
+        }
+    };
+
+    const isProfileCardClickable = isPlayer || !!currentTeamId;
+
     const handleAddPlayerPress = async () => {
         if (isCheckingReg) return;
         try {
@@ -385,9 +395,9 @@ export default function AccountScreen({ navigation }: any) {
                                     borderColor: isDark ? 'rgba(255,255,255,0.08)' : homeColors.border,
                                 }
                             ]}
-                            activeOpacity={currentTeamId ? 0.75 : 1}
-                            onPress={currentTeamId ? () => navigation.navigate('MyTeam', { teamId: currentTeamId }) : undefined}
-                            disabled={!currentTeamId}
+                            activeOpacity={isProfileCardClickable ? 0.75 : 1}
+                            onPress={isProfileCardClickable ? handleProfileCardPress : undefined}
+                            disabled={!isProfileCardClickable}
                         >
                             <View style={styles.profileCardHeader}>
                                 {/* Avatar */}
@@ -451,7 +461,7 @@ export default function AccountScreen({ navigation }: any) {
                                 </View>
 
                                 {/* Right Arrow Navigation Icon */}
-                                {!!currentTeamId && (
+                                {isProfileCardClickable && (
                                     <View style={styles.profileCardChevron}>
                                         <Ionicons name="chevron-forward" size={18} color={homeColors.textSecondary} style={{ opacity: 0.6 }} />
                                     </View>
@@ -539,9 +549,15 @@ export default function AccountScreen({ navigation }: any) {
                                 {isPlayer && (
                                     <>
                                         <SettingRow
-                                            icon="stats-chart-outline"
-                                            title={t('profile.my_stats', 'Mening statistikam')}
-                                            onPress={() => navigation.navigate('MyStats', { playerId: user?.id })}
+                                            icon="shield-outline"
+                                            title={t('profile.my_team', 'Mening jamoam')}
+                                            onPress={() => {
+                                                if (currentTeamId) {
+                                                    navigation.navigate('MyTeam', { teamId: currentTeamId });
+                                                } else {
+                                                    Alert.alert(t('common.notice', 'Eslatma'), t('teams.no_team', 'Siz hali birorta jamoaga a\'zo emassiz'));
+                                                }
+                                            }}
                                         />
                                         <SettingRow
                                             icon="paper-plane-outline"
