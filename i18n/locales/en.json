@@ -357,7 +357,9 @@
     "permission_needed": "Permission needed",
     "gallery_permission_desc": "Allow gallery access to choose a photo",
     "photo_pick_error": "Error occurred while choosing photo",
-    "submit_error": "Error occurred while submitting application"
+    "submit_error": "Error occurred while submitting application",
+    "pending_application_title": "Active Application Pending",
+    "pending_application_msg": "You have an active pending application under review. Please wait for administrator approval."
   },
   "settings": {
     "title": "Settings",

@@ -357,7 +357,9 @@
     "permission_needed": "Ruxsat kerak",
     "gallery_permission_desc": "Rasmni tanlash uchun galereyaga ruxsat bering",
     "photo_pick_error": "Rasmni tanlashda xatolik yuz berdi",
-    "submit_error": "Arizani yuborishda xatolik yuz berdi"
+    "submit_error": "Arizani yuborishda xatolik yuz berdi",
+    "pending_application_title": "Arizangiz mavjud",
+    "pending_application_msg": "Sizda ko'rib chiqilayotgan faol ariza mavjud. Administrator tasdiqlashini kuting."
   },
   "settings": {
     "title": "Sozlamalar",

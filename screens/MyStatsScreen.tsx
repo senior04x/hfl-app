@@ -306,6 +306,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
     const [matchesLoading, setMatchesLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [openingInstagram, setOpeningInstagram] = useState(false);
+    const [checkingPendingUpdate, setCheckingPendingUpdate] = useState(false);
 
     // Profile Update & Modals
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
@@ -519,9 +520,56 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }
     };
 
-    // Open Profile Update Modal (Instantly opens with local cache + silent DB refresh)
-    const handleOpenUpdateModal = () => {
+    // Open Profile Update Modal with lazy loading check for pending applications
+    const handleOpenUpdateModal = async () => {
+        if (checkingPendingUpdate) return;
         try {
+            setCheckingPendingUpdate(true);
+            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
+
+            const targetPhone = player?.phone || updateForm.phone;
+            const playerIdStr = String(targetPlayerId || player?.id || player?._id || '');
+
+            // 1. Check if user already has an active pending profile update application
+            let hasPendingApp = false;
+            try {
+                const { data: pendingApps } = await supabase
+                    .from('applications')
+                    .select('id, comment, status, phone, first_name, last_name, created_at')
+                    .or('status.eq.pending,status.eq.PENDING,status.ilike.pending')
+                    .order('created_at', { ascending: false })
+                    .limit(60);
+
+                if (pendingApps && pendingApps.length > 0) {
+                    hasPendingApp = pendingApps.some((app: any) => {
+                        const comment = String(app.comment || '');
+                        const isProfileUpdate = comment.includes('[PROFILE_UPDATE]');
+                        if (!isProfileUpdate) return false;
+
+                        if (playerIdStr && (comment.includes(`"playerId":${playerIdStr}`) || comment.includes(`"playerId":"${playerIdStr}"`))) {
+                            return true;
+                        }
+                        if (targetPhone && app.phone && app.phone.replace(/\D/g, '') === targetPhone.replace(/\D/g, '')) {
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+            } catch (checkErr) {
+                console.warn('Error checking pending applications:', checkErr);
+            }
+
+            if (hasPendingApp) {
+                setCheckingPendingUpdate(false);
+                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
+                Alert.alert(
+                    t('profile.pending_application_title', 'Arizangiz mavjud'),
+                    t('profile.pending_application_msg', 'Sizda ko\'rib chiqilayotgan faol ariza mavjud. Administrator tasdiqlashini kuting.'),
+                    [{ text: t('common.close', 'Yopish'), style: 'cancel' }]
+                );
+                return;
+            }
+
             const pData = extractPlayerData(player) || {};
             const bDate = player?.birth_date || player?.birthDate || '15.05.1998';
             let formattedBDate = String(bDate);
@@ -588,6 +636,8 @@ export default function MyStatsScreen({ route, navigation }: any) {
         } catch (e) {
             console.error('Error opening update modal:', e);
             setShowProfileUpdateModal(true);
+        } finally {
+            setCheckingPendingUpdate(false);
         }
     };
 
@@ -1354,8 +1404,14 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                 <TouchableOpacity
                                     style={[styles.iconBtn, cardSurface]}
                                     onPress={handleOpenUpdateModal}
+                                    disabled={checkingPendingUpdate}
+                                    activeOpacity={0.7}
                                 >
-                                    <Ionicons name="create-outline" size={18} color={homeColors.textPrimary} />
+                                    {checkingPendingUpdate ? (
+                                        <ActivityIndicator size="small" color={homeColors.textPrimary} />
+                                    ) : (
+                                        <Ionicons name="create-outline" size={18} color={homeColors.textPrimary} />
+                                    )}
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.iconBtn, cardSurface]}
