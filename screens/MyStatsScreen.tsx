@@ -1729,6 +1729,8 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                     loading={submittingUpdate}
                                     status={updateSubmitStatus}
                                     disabled={submittingUpdate}
+                                    compact={true}
+                                    showHelperText={false}
                                 />
                             </View>
                         </View>
@@ -2143,9 +2145,9 @@ const styles = StyleSheet.create({
     editModalStickyFooter: {
         width: '100%',
         alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingVertical: 6,
+        paddingHorizontal: 14,
+        borderTopWidth: 1,
     },
     positionPillBtn: {
         flex: 1,

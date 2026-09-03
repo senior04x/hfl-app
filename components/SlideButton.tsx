@@ -42,6 +42,8 @@ export interface SlideButtonProps {
     successTitle?: string;
     errorTitle?: string;
     helperText?: string;
+    showHelperText?: boolean;
+    compact?: boolean;
     onSwipeSuccess: () => void | Promise<void>;
     disabled?: boolean;
     loading?: boolean;
@@ -55,6 +57,8 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
     successTitle,
     errorTitle,
     helperText,
+    showHelperText = false,
+    compact = false,
     onSwipeSuccess,
     disabled = false,
     loading = false,
@@ -320,7 +324,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                 )}
             </Animated.View>
 
-            {!completed && !disabled && (
+            {!completed && !disabled && showHelperText && (
                 <Text style={[styles.helperText, { color: homeColors.textSecondary }]}>{effectiveHelperText}</Text>
             )}
         </View>
@@ -332,7 +336,7 @@ export default SlideButton;
 const styles = StyleSheet.create({
     wrapper: {
         alignItems: 'center',
-        marginVertical: 16,
+        marginVertical: 0,
     },
     track: {
         height: TRACK_HEIGHT,
