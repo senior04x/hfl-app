@@ -29,6 +29,7 @@ import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { formatUzPhone, cleanPhoneForDb } from '../utils/stringUtils';
 import SmartImage from '../components/SmartImage';
+import Skeleton from '../components/Skeleton';
 import { SlideButton } from '../components/SlideButton';
 import { useTranslation } from 'react-i18next';
 
@@ -137,7 +138,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const [leagues, setLeagues] = useState<any[]>(LEAGUE_OPTIONS);
     const [tournaments, setTournaments] = useState<any[]>([]);
     const [teams, setTeams] = useState<any[]>([]);
-    const [loadingData, setLoadingData] = useState(false);
+    const [loadingData, setLoadingData] = useState(Boolean(targetTeamId));
     const [applicationType, setApplicationType] = useState<ApplicationType>(route?.params?.initialType || 'player');
 
     // Validation state
@@ -914,26 +915,38 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                         >
                             {!route?.params?.initialType && renderTypeSelector()}
 
-                            {/* TARGET TEAM HEADER BANNER */}
+                            {/* TARGET TEAM HEADER BANNER (WITH SKELETON LOADER) */}
                             {targetTeamId && (
-                                <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000', marginBottom: 14 }]}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                                        <SmartImage
-                                            uri={targetTeamData?.logo_url || targetTeamData?.logo || formData.selectedOrgLogo}
-                                            style={{ width: 48, height: 48, borderRadius: 14 }}
-                                            contentFit="cover"
-                                            fallbackIcon="shield-outline"
-                                        />
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 16, fontWeight: '700', color: homeColors.textPrimary }}>
-                                                {targetTeamData?.name || formData.teamName || t('teams.my_team', 'Mening jamoam')}
-                                            </Text>
-                                            <Text style={{ fontSize: 13, color: homeColors.textSecondary, marginTop: 2 }}>
-                                                {t('teams.add_player_to_squad', 'Jamoa tarkibiga yangi o\'yinchi qo\'shish')}
-                                            </Text>
+                                (loadingData || !targetTeamData) ? (
+                                    <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000', marginBottom: 14 }]}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                                            <Skeleton width={48} height={48} borderRadius={14} />
+                                            <View style={{ flex: 1 }}>
+                                                <Skeleton width="55%" height={16} borderRadius={4} style={{ marginBottom: 6 }} />
+                                                <Skeleton width="80%" height={12} borderRadius={4} />
+                                            </View>
                                         </View>
                                     </View>
-                                </View>
+                                ) : (
+                                    <View style={[styles.card, { backgroundColor: homeColors.background, borderColor: homeColors.border, shadowColor: isDark ? '#FFFFFF' : '#000000', marginBottom: 14 }]}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                                            <SmartImage
+                                                uri={targetTeamData?.logo_url || targetTeamData?.logo || formData.selectedOrgLogo}
+                                                style={{ width: 48, height: 48, borderRadius: 14 }}
+                                                contentFit="cover"
+                                                fallbackIcon="shield-outline"
+                                            />
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ fontSize: 16, fontWeight: '700', color: homeColors.textPrimary }}>
+                                                    {targetTeamData?.name || formData.teamName || t('teams.my_team', 'Mening jamoam')}
+                                                </Text>
+                                                <Text style={{ fontSize: 13, color: homeColors.textSecondary, marginTop: 2 }}>
+                                                    {t('teams.add_player_to_squad', 'Jamoa tarkibiga yangi o\'yinchi qo\'shish')}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                )
                             )}
 
                             {/* STEP 1: TASHKILOT TANLASH */}
