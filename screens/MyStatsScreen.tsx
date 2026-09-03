@@ -497,46 +497,68 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }
     };
 
-    // Open Profile Update Modal
-    const handleOpenUpdateModal = () => {
-        const bDate = player?.birth_date || player?.birthDate || '1998-05-15';
-        let day = '15', month = '05', year = '1998';
+        // Open Profile Update Modal (Fetches fresh live data directly from DB)
+    const handleOpenUpdateModal = async () => {
+        try {
+            setLoading(true);
+            let freshPlayer = player;
+            if (targetPlayerId) {
+                const { data: dbData } = await supabase
+                    .from('applications')
+                    .select('*')
+                    .eq('id', targetPlayerId)
+                    .maybeSingle();
+                if (dbData) {
+                    freshPlayer = { ...player, ...dbData };
+                }
+            }
 
-        if (String(bDate).includes('.')) {
-            const p = String(bDate).split('.');
-            day = p[0] || '15';
-            month = p[1] || '05';
-            year = p[2] || '1998';
-        } else if (String(bDate).includes('-')) {
-            const p = String(bDate).split('-');
-            year = p[0] || '1998';
-            month = p[1] || '05';
-            day = p[2] || '15';
-        } else if (/^\d{8}$/.test(String(bDate))) {
-            day = String(bDate).substring(0, 2);
-            month = String(bDate).substring(2, 4);
-            year = String(bDate).substring(4, 8);
+            const pData = extractPlayerData(freshPlayer) || {};
+            const bDate = freshPlayer?.birth_date || freshPlayer?.birthDate || '1998-05-15';
+            let day = '15', month = '05', year = '1998';
+
+            if (String(bDate).includes('.')) {
+                const p = String(bDate).split('.');
+                day = p[0] || '15';
+                month = p[1] || '05';
+                year = p[2] || '1998';
+            } else if (String(bDate).includes('-')) {
+                const p = String(bDate).split('-');
+                year = p[0] || '1998';
+                month = p[1] || '05';
+                day = p[2] || '15';
+            } else if (/^\d{8}$/.test(String(bDate))) {
+                day = String(bDate).substring(0, 2);
+                month = String(bDate).substring(2, 4);
+                year = String(bDate).substring(4, 8);
+            }
+
+            setUpdateForm({
+                photoUrl: freshPlayer?.photo_url || freshPlayer?.photo || freshPlayer?.avatar || '',
+                phone: freshPlayer?.phone || '',
+                firstName: freshPlayer?.first_name || freshPlayer?.firstName || '',
+                lastName: freshPlayer?.last_name || freshPlayer?.lastName || '',
+                fatherName: freshPlayer?.father_name || freshPlayer?.fatherName || pData.fatherName || '',
+                position: freshPlayer?.position || 'Hujumchi',
+                playerNumber: String(freshPlayer?.player_number || freshPlayer?.number || freshPlayer?.shirt_number || ''),
+                passportSeries: freshPlayer?.passport_series || freshPlayer?.passportSeries || '',
+                passportNumber: freshPlayer?.passport_number || freshPlayer?.passportNumber || '',
+                citizenship: freshPlayer?.citizenship || pData.citizenship || "O'zbekiston",
+                height: String(freshPlayer?.height || pData.height || ''),
+                weight: String(freshPlayer?.weight || pData.weight || ''),
+                instagramUsername: freshPlayer?.instagram_username || pData.instagram_username || '',
+                birthDay: day.padStart(2, '0'),
+                birthMonth: month.padStart(2, '0'),
+                birthYear: year
+            });
+            setUpdateSubmitStatus('idle');
+            setShowProfileUpdateModal(true);
+        } catch (e) {
+            console.error('Error fetching live player for edit:', e);
+            setShowProfileUpdateModal(true);
+        } finally {
+            setLoading(false);
         }
-
-        setUpdateForm({
-            photoUrl: player?.photo || player?.avatar || '',
-            phone: player?.phone || '',
-            firstName: player?.firstName || player?.first_name || '',
-            lastName: player?.lastName || player?.last_name || '',
-            fatherName: player?.fatherName || player?.father_name || '',
-            position: player?.position || '',
-            playerNumber: String(player?.number || player?.player_number || ''),
-            passportSeries: player?.passport_series || player?.passportSeries || '',
-            passportNumber: player?.passport_number || player?.passportNumber || '',
-            citizenship: player?.citizenship || '',
-            height: String(player?.height || ''),
-            weight: String(player?.weight || ''),
-            instagramUsername: player?.instagram_username || '',
-            birthDay: day.padStart(2, '0'),
-            birthMonth: month.padStart(2, '0'),
-            birthYear: year
-        });
-        setShowProfileUpdateModal(true);
     };
 
     const handlePickImage = async () => {
@@ -576,7 +598,13 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }
     };
 
-    const handleSubmitProfileUpdate = async () => {
+        const handleSubmitProfileUpdate = async () => {
+        if (!updateForm.firstName?.trim() || !updateForm.lastName?.trim()) {
+            Alert.alert(t('common.notice', 'Eslatma'), 'Iltimos, ism va familiyangizni kiriting');
+            setUpdateSubmitStatus('idle');
+            return;
+        }
+
         setSubmittingUpdate(true);
         setUpdateSubmitStatus('loading');
         try {
@@ -585,12 +613,12 @@ export default function MyStatsScreen({ route, navigation }: any) {
             const targetLeague = player?.league || player?.teams?.league || '';
 
             let finalPhotoUrl = updateForm.photoUrl || player?.photo || player?.avatar || null;
-            if (finalPhotoUrl && (finalPhotoUrl.startsWith('file:') || finalPhotoUrl.startsWith('content:') || finalPhotoUrl.startsWith('ph:') || finalPhotoUrl.startsWith('blob:'))) {
+            if (finalPhotoUrl && (finalPhotoUrl.startsWith('file:') || finalPhotoUrl.startsWith('content:') || finalPhotoUrl.startsWith('ph:') || finalPhotoUrl.startsWith('blob:') || finalPhotoUrl.startsWith('data:image'))) {
                 const uRes: any = await apiService.uploadPhoto(finalPhotoUrl);
                 if (uRes && uRes.url && uRes.url.startsWith('http')) {
                     finalPhotoUrl = uRes.url;
                 } else {
-                    const existingPhoto = player?.photo || player?.avatar || '';
+                    const existingPhoto = player?.photo_url || player?.photo || player?.avatar || '';
                     finalPhotoUrl = existingPhoto.startsWith('http') ? existingPhoto : null;
                 }
             }
@@ -601,6 +629,12 @@ export default function MyStatsScreen({ route, navigation }: any) {
             const instaUrl = cleanInsta ? `https://www.instagram.com/${cleanInsta}/` : '';
 
             const pData = extractPlayerData(player) || {};
+            const metaObj = {
+                citizenship: updateForm.citizenship || "O'zbekiston",
+                height: updateForm.height || '',
+                weight: updateForm.weight || ''
+            };
+
             const payload = {
                 playerId: targetPlayerId,
                 oldData: {
@@ -626,11 +660,15 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     instagramUrl: instaUrl,
                     birthDate: formattedBirthDate,
                     passportSeries: pSeries,
-                    passportNumber: pNumber
+                    passportNumber: pNumber,
+                    citizenship: metaObj.citizenship,
+                    height: metaObj.height,
+                    weight: metaObj.weight
                 }
             };
 
             let commentPayload = '[PROFILE_UPDATE]' + JSON.stringify({ oldData: payload.oldData, newData: payload.newData, playerId: targetPlayerId });
+            commentPayload += ` [METADATA:${JSON.stringify(metaObj)}]`;
             if (targetLeague) {
                 commentPayload += ` [LEAGUE:${targetLeague}]`;
             }
@@ -643,6 +681,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 .insert([{
                     organization_id: targetOrgId,
                     team_id: null,
+                    type: 'player',
                     first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
                     last_name: updateForm.lastName || player?.last_name || '',
                     father_name: updateForm.fatherName || player?.father_name || '',
@@ -663,6 +702,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     .insert([{
                         organization_id: targetOrgId,
                         team_id: null,
+                        type: 'player',
                         first_name: updateForm.firstName || player?.first_name || 'Futbolchi',
                         last_name: updateForm.lastName || player?.last_name || '',
                         father_name: updateForm.fatherName || player?.father_name || '',
@@ -687,8 +727,10 @@ export default function MyStatsScreen({ route, navigation }: any) {
             }
 
             setUpdateSubmitStatus('success');
-            setShowProfileUpdateModal(false);
-            setShowSuccessModal(true);
+            setTimeout(() => {
+                setShowProfileUpdateModal(false);
+                setShowSuccessModal(true);
+            }, 600);
         } catch (err: any) {
             setUpdateSubmitStatus('error');
             console.error('Error submitting profile update:', err);
@@ -1347,59 +1389,142 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 onRequestClose={() => setShowProfileUpdateModal(false)}
             >
                 <View style={[styles.editModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
-                    <View style={[styles.editModalCard, cardSurface]}>
+                    <View style={[styles.editModalCard, cardSurface, { maxHeight: '90%' }]}>
                         <View style={styles.editModalHeader}>
                             <Text style={[styles.editModalTitle, { color: homeColors.textPrimary }]}>{t('profile.edit_profile', 'PROFILNI TAHRIRLASH')}</Text>
-                            <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)}>
+                            <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                 <Ionicons name="close" size={22} color={homeColors.textPrimary} />
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                        <ScrollView style={{ maxHeight: 440 }} showsVerticalScrollIndicator={false}>
                             {/* Photo upload row */}
                             <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                                <TouchableOpacity onPress={handlePickImage} style={styles.editAvatarWrapper}>
-                                    <SmartImage uri={updateForm.photoUrl || player.photo || player.avatar} style={{ width: 80, height: 80, borderRadius: 20 }} contentFit="cover" fallbackIcon="person" />
-                                    <View style={styles.cameraIconBadge}>
-                                        <Ionicons name="camera" size={14} color="#FFF" />
+                                <TouchableOpacity onPress={handlePickImage} style={styles.editAvatarWrapper} activeOpacity={0.8}>
+                                    <SmartImage uri={updateForm.photoUrl || player.photo || player.avatar} style={{ width: 88, height: 88, borderRadius: 22 }} contentFit="cover" fallbackIcon="person" />
+                                    <View style={[styles.cameraIconBadge, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}>
+                                        <Ionicons name="camera" size={14} color={isDark ? '#000000' : '#FFFFFF'} />
                                     </View>
                                 </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Ism</Text>
-                                <TextInput
-                                    style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                    value={updateForm.firstName}
-                                    onChangeText={(v) => setUpdateForm(p => ({ ...p, firstName: v }))}
-                                />
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Familiya</Text>
-                                <TextInput
-                                    style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                    value={updateForm.lastName}
-                                    onChangeText={(v) => setUpdateForm(p => ({ ...p, lastName: v }))}
-                                />
+                                <Text style={{ color: homeColors.textSecondary, fontSize: 11.5, marginTop: 6, fontWeight: '600' }}>
+                                    {pickerLoading ? 'Rasm yuklanmoqda...' : 'Rasmni o\'zgartirish'}
+                                </Text>
                             </View>
 
                             <View style={styles.formRow}>
                                 <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Raqam (#)</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Ism *</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.firstName}
+                                        placeholder="Ismingiz"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, firstName: v }))}
+                                    />
+                                </View>
+                                <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Familiya *</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.lastName}
+                                        placeholder="Familiyangiz"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, lastName: v }))}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.formRow}>
+                                <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Otasining ismi</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.fatherName}
+                                        placeholder="Sharifingiz"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, fatherName: v }))}
+                                    />
+                                </View>
+                                <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Telefon raqam</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.phone}
+                                        keyboardType="phone-pad"
+                                        placeholder="+998901234567"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, phone: v }))}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.formRow}>
+                                <View style={[styles.formGroup, { flex: 1.2 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pozitsiya</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.position}
+                                        placeholder="Masalan: Hujumchi"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, position: v }))}
+                                    />
+                                </View>
+                                <View style={[styles.formGroup, { flex: 0.8 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Forma (#)</Text>
                                     <TextInput
                                         style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                         value={updateForm.playerNumber}
                                         keyboardType="numeric"
+                                        placeholder="10"
+                                        placeholderTextColor={homeColors.textSecondary}
                                         onChangeText={(v) => setUpdateForm(p => ({ ...p, playerNumber: v }))}
                                     />
                                 </View>
+                            </View>
+
+                            {/* Birth date row: Day / Month / Year */}
+                            <View style={styles.formGroup}>
+                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug\'ilgan sana (Kun / Oy / Yil)</Text>
+                                <View style={{ flexDirection: 'row', gap: 8 }}>
+                                    <TextInput
+                                        style={[styles.modalInput, { flex: 1, textAlign: 'center', color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.birthDay}
+                                        maxLength={2}
+                                        keyboardType="numeric"
+                                        placeholder="15"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, birthDay: v }))}
+                                    />
+                                    <TextInput
+                                        style={[styles.modalInput, { flex: 1, textAlign: 'center', color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.birthMonth}
+                                        maxLength={2}
+                                        keyboardType="numeric"
+                                        placeholder="05"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, birthMonth: v }))}
+                                    />
+                                    <TextInput
+                                        style={[styles.modalInput, { flex: 1.5, textAlign: 'center', color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.birthYear}
+                                        maxLength={4}
+                                        keyboardType="numeric"
+                                        placeholder="1998"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, birthYear: v }))}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.formRow}>
                                 <View style={[styles.formGroup, { flex: 1 }]}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Bo'yi (sm)</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Bo\'yi (sm)</Text>
                                     <TextInput
                                         style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                         value={updateForm.height}
                                         keyboardType="numeric"
+                                        placeholder="180"
+                                        placeholderTextColor={homeColors.textSecondary}
                                         onChangeText={(v) => setUpdateForm(p => ({ ...p, height: v }))}
                                     />
                                 </View>
@@ -1409,34 +1534,77 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                         value={updateForm.weight}
                                         keyboardType="numeric"
+                                        placeholder="75"
+                                        placeholderTextColor={homeColors.textSecondary}
                                         onChangeText={(v) => setUpdateForm(p => ({ ...p, weight: v }))}
                                     />
                                 </View>
                             </View>
 
-                            <View style={styles.formGroup}>
-                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Instagram Username</Text>
-                                <TextInput
-                                    style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                    value={updateForm.instagramUsername}
-                                    placeholder="username"
-                                    placeholderTextColor={homeColors.textSecondary}
-                                    onChangeText={(v) => setUpdateForm(p => ({ ...p, instagramUsername: v }))}
-                                />
+                            <View style={styles.formRow}>
+                                <View style={[styles.formGroup, { flex: 0.8 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pasport Seriya</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.passportSeries}
+                                        autoCapitalize="characters"
+                                        maxLength={2}
+                                        placeholder="AA"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, passportSeries: v }))}
+                                    />
+                                </View>
+                                <View style={[styles.formGroup, { flex: 1.2 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pasport Raqam</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.passportNumber}
+                                        keyboardType="numeric"
+                                        maxLength={7}
+                                        placeholder="1234567"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, passportNumber: v }))}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.formRow}>
+                                <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Millati / Fuqaroligi</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.citizenship}
+                                        placeholder="O'zbekiston"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, citizenship: v }))}
+                                    />
+                                </View>
+                                <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Instagram Username</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.instagramUsername}
+                                        placeholder="username"
+                                        placeholderTextColor={homeColors.textSecondary}
+                                        autoCapitalize="none"
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, instagramUsername: v }))}
+                                    />
+                                </View>
                             </View>
                         </ScrollView>
 
-                        <TouchableOpacity
-                            style={[styles.submitUpdateBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
-                            onPress={handleSubmitProfileUpdate}
-                            disabled={submittingUpdate}
-                        >
-                            {submittingUpdate ? (
-                                <ActivityIndicator size="small" color={isDark ? '#000000' : '#FFFFFF'} />
-                            ) : (
-                                <Text style={[styles.submitUpdateBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>ARIZANI YUBORISH</Text>
-                            )}
-                        </TouchableOpacity>
+                        {/* Interactive Slide To Send Button */}
+                        <View style={{ marginTop: 14, alignItems: 'center', width: '100%' }}>
+                            <SlideButton
+                                title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
+                                loadingTitle={t('common.loading', 'Yuborilmoqda...')}
+                                successTitle={t('common.success', 'Muvaffaqiyatli!')}
+                                onSwipeSuccess={handleSubmitProfileUpdate}
+                                loading={submittingUpdate}
+                                status={updateSubmitStatus}
+                                disabled={submittingUpdate}
+                            />
+                        </View>
                     </View>
                 </View>
             </Modal>
