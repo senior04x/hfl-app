@@ -61,7 +61,7 @@ export default function FifaPlayerCard({
 
     // Optimized Card Aspect Ratio
     const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
-    const cardHeight = showAttributes ? cardWidth * 1.15 : cardWidth * 0.98;
+    const cardHeight = showAttributes ? cardWidth * 1.34 : cardWidth * 1.06;
     const scaleFactor = cardWidth / 260;
 
     // 3D Parallax & Tilt animations
@@ -342,8 +342,8 @@ export default function FifaPlayerCard({
                             </View>
                         </View>
 
-                        {/* Bottom Container: Player Name Plaque + Real Football Stats */}
-                        <View style={[styles.bottomInfoSection, { marginTop: 2 * scaleFactor }]}>
+                        {/* Bottom Container: Player Name Plaque + Real Football Stats + Amatora Seal */}
+                        <View style={[styles.bottomInfoSection, { marginTop: 4 * scaleFactor }]}>
                             {/* Player Name Plaque */}
                             <View style={styles.namePlateWrapper}>
                                 <LinearGradient
@@ -370,8 +370,8 @@ export default function FifaPlayerCard({
 
                             {/* Real Football Stats (GOL, ASIST, O'YIN) */}
                             {showAttributes && (
-                                <View style={{ width: '100%', marginTop: 1 * scaleFactor }}>
-                                    <View style={[styles.separatorContainer, { marginVertical: 2 * scaleFactor }]}>
+                                <View style={{ width: '100%', marginTop: 2 * scaleFactor }}>
+                                    <View style={[styles.separatorContainer, { marginVertical: 3 * scaleFactor }]}>
                                         <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
                                         <View style={[styles.separatorDiamond, { backgroundColor: theme.textGold }]} />
                                         <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
@@ -408,6 +408,18 @@ export default function FifaPlayerCard({
                                                 O'YIN
                                             </Text>
                                         </View>
+                                    </View>
+
+                                    {/* Subtle Amatora Footer Seal */}
+                                    <View style={[styles.cardFooterBrand, { marginTop: 4 * scaleFactor }]}>
+                                        <Image
+                                            source={require('../assets/logo.png')}
+                                            style={{ width: 9 * scaleFactor, height: 9 * scaleFactor, opacity: 0.5, marginRight: 4 * scaleFactor }}
+                                            resizeMode="contain"
+                                        />
+                                        <Text style={[styles.footerBrandText, { fontSize: 7.5 * scaleFactor, color: theme.textGold }]}>
+                                            AMATORA
+                                        </Text>
                                     </View>
                                 </View>
                             )}
@@ -451,7 +463,7 @@ const styles = StyleSheet.create({
         borderBottomRightRadius: 25,
         overflow: 'hidden',
         position: 'relative',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         alignItems: 'center',
     },
     geometricPattern: {
@@ -627,6 +639,18 @@ const styles = StyleSheet.create({
         color: '#CBD5E1',
         letterSpacing: 0.5,
         includeFontPadding: false,
+    },
+    cardFooterBrand: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: 0.5,
+        zIndex: 10,
+        paddingBottom: 2,
+    },
+    footerBrandText: {
+        fontWeight: '900',
+        letterSpacing: 1.5,
     },
     sealContainer: {
         width: '100%',
