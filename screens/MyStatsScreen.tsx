@@ -308,6 +308,8 @@ export default function MyStatsScreen({ route, navigation }: any) {
     const [openingInstagram, setOpeningInstagram] = useState(false);
     const [checkingPendingUpdate, setCheckingPendingUpdate] = useState(false);
     const [showPendingAppModal, setShowPendingAppModal] = useState(false);
+    const [showCooldownModal, setShowCooldownModal] = useState(false);
+    const [cooldownRemainingTime, setCooldownRemainingTime] = useState('');
 
     // Profile Update & Modals
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
@@ -564,6 +566,66 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 setCheckingPendingUpdate(false);
                 try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
                 setShowPendingAppModal(true);
+                return;
+            }
+
+            // 2. Check the most recent completed profile update application (3-week cooldown check)
+            const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
+            let cooldownRemainingMs = 0;
+
+            try {
+                const { data: allUserApps } = await supabase
+                    .from('applications')
+                    .select('id, comment, status, phone, created_at, updated_at')
+                    .order('created_at', { ascending: false })
+                    .limit(100);
+
+                if (allUserApps && allUserApps.length > 0) {
+                    const matchedApps = allUserApps.filter((app: any) => {
+                        const comment = String(app.comment || '');
+                        const isProfileUpdate = comment.includes('[PROFILE_UPDATE]');
+                        if (!isProfileUpdate) return false;
+
+                        if (playerIdStr && (comment.includes(`"playerId":${playerIdStr}`) || comment.includes(`"playerId":"${playerIdStr}"`))) {
+                            return true;
+                        }
+                        if (targetPhone && app.phone && app.phone.replace(/\D/g, '') === targetPhone.replace(/\D/g, '')) {
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    if (matchedApps.length > 0) {
+                        const latestApp = matchedApps[0]; // Most recent application
+                        const appDate = new Date(latestApp.created_at || latestApp.updated_at || Date.now()).getTime();
+                        const timeDiff = Date.now() - appDate;
+                        if (timeDiff < THREE_WEEKS_MS) {
+                            cooldownRemainingMs = THREE_WEEKS_MS - timeDiff;
+                        }
+                    }
+                }
+            } catch (cdErr) {
+                console.warn('Error checking application cooldown:', cdErr);
+            }
+
+            if (cooldownRemainingMs > 0) {
+                setCheckingPendingUpdate(false);
+                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
+
+                const days = Math.floor(cooldownRemainingMs / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((cooldownRemainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+                let timeStr = '';
+                if (currentLang === 'ru') {
+                    timeStr = days > 0 ? `${days} дн. ${hours > 0 ? `${hours} ч.` : ''}` : `${hours} ч.`;
+                } else if (currentLang === 'en') {
+                    timeStr = days > 0 ? `${days} days ${hours > 0 ? `${hours} hrs` : ''}` : `${hours} hours`;
+                } else {
+                    timeStr = days > 0 ? `${days} kun ${hours > 0 ? `${hours} soat` : ''}` : `${hours} soat`;
+                }
+
+                setCooldownRemainingTime(timeStr.trim());
+                setShowCooldownModal(true);
                 return;
             }
 
@@ -2057,6 +2119,132 @@ export default function MyStatsScreen({ route, navigation }: any) {
                             onPress={() => {
                                 try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
                                 setShowPendingAppModal(false);
+                            }}
+                            style={{
+                                width: '100%',
+                                paddingVertical: 13,
+                                borderRadius: 14,
+                                backgroundColor: isDark ? '#FFFFFF' : '#000000',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 14.5,
+                                    fontWeight: '800',
+                                    color: isDark ? '#000000' : '#FFFFFF',
+                                    letterSpacing: 0.4,
+                                }}
+                            >
+                                {t('common.understood', 'Tushundim')}
+                            </Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* 3-WEEK COOLDOWN WARNING MODAL */}
+            <Modal
+                visible={showCooldownModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowCooldownModal(false)}
+            >
+                <TouchableOpacity
+                    style={[styles.editModalOverlay, { backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 24 }]}
+                    activeOpacity={1}
+                    onPress={() => setShowCooldownModal(false)}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={[
+                            cardSurface,
+                            {
+                                width: '100%',
+                                maxWidth: 360,
+                                borderRadius: 24,
+                                padding: 22,
+                                alignItems: 'center',
+                                backgroundColor: homeColors.background,
+                                borderColor: homeColors.border,
+                                borderWidth: 1,
+                            }
+                        ]}
+                    >
+                        {/* Glowing Time / Cooldown Icon Badge */}
+                        <View
+                            style={{
+                                width: 68,
+                                height: 68,
+                                borderRadius: 34,
+                                backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(56, 189, 248, 0.12)',
+                                borderWidth: 1.5,
+                                borderColor: 'rgba(56, 189, 248, 0.35)',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: 16,
+                            }}
+                        >
+                            <Ionicons name="time-outline" size={32} color="#38BDF8" />
+                        </View>
+
+                        {/* Title */}
+                        <Text
+                            style={{
+                                fontSize: 18,
+                                fontWeight: '800',
+                                color: homeColors.textPrimary,
+                                textAlign: 'center',
+                                marginBottom: 8,
+                                letterSpacing: 0.3,
+                            }}
+                        >
+                            {t('profile.cooldown_title', 'Ariza topshirish cheklovi')}
+                        </Text>
+
+                        {/* Status Badge */}
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: isDark ? 'rgba(56, 189, 248, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                                paddingHorizontal: 12,
+                                paddingVertical: 5,
+                                borderRadius: 12,
+                                marginBottom: 14,
+                            }}
+                        >
+                            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#38BDF8' }} />
+                            <Text style={{ color: '#38BDF8', fontSize: 11.5, fontWeight: '800', letterSpacing: 0.5 }}>
+                                {t('profile.cooldown_badge', '3 HAFTALIK CHEKLOV')}
+                            </Text>
+                        </View>
+
+                        {/* Description */}
+                        <Text
+                            style={{
+                                fontSize: 13.5,
+                                lineHeight: 20,
+                                color: homeColors.textSecondary,
+                                textAlign: 'center',
+                                marginBottom: 22,
+                                fontWeight: '500',
+                            }}
+                        >
+                            {t('profile.cooldown_msg', {
+                                time: cooldownRemainingTime,
+                                defaultValue: `Siz yaqinda ma'lumotlarni o'zgartirish uchun ariza topshirgansiz. Qayta ariza topshirish uchun ${cooldownRemainingTime} dan so'ng urinib ko'ring.`
+                            })}
+                        </Text>
+
+                        {/* Close / Understood Button */}
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
+                                setShowCooldownModal(false);
                             }}
                             style={{
                                 width: '100%',

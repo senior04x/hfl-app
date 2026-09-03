@@ -360,7 +360,10 @@
     "photo_pick_error": "Error occurred while choosing photo",
     "submit_error": "Error occurred while submitting application",
     "pending_application_title": "Active Application Pending",
-    "pending_application_msg": "You have an active pending application under review. Please wait for administrator approval."
+    "pending_application_msg": "You have an active pending application under review. Please wait for administrator approval.",
+    "cooldown_title": "Application Cooldown",
+    "cooldown_badge": "3-WEEK COOLDOWN",
+    "cooldown_msg": "You recently submitted a profile update request. You can apply again in {{time}}."
   },
   "settings": {
     "title": "Settings",
