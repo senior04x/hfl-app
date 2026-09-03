@@ -7,7 +7,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -18,12 +18,15 @@ import Animated, {
     Extrapolate,
     runOnJS,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 const TRACK_WIDTH = 300;
-const TRACK_HEIGHT = 64;
-const HANDLE_SIZE = 54;
+const TRACK_HEIGHT = 58;
+const HANDLE_SIZE = 48;
 const TRACK_PADDING = 5;
-const MAX_DRAG = TRACK_WIDTH - HANDLE_SIZE - TRACK_PADDING * 2; // 236
+const MAX_DRAG = TRACK_WIDTH - HANDLE_SIZE - TRACK_PADDING * 2; // 242
 
 const springConfig = {
     stiffness: 420,
@@ -46,20 +49,6 @@ export interface SlideButtonProps {
     onReset?: () => void;
 }
 
-function SendIcon() {
-    return <Feather name="send" size={20} color="#0b0e17" style={{ marginLeft: 1 }} />;
-}
-
-import { useTranslation } from 'react-i18next';
-
-function CheckIcon() {
-    return <Feather name="check" size={22} color="#0b0e17" />;
-}
-
-function ErrorIcon() {
-    return <Feather name="x" size={22} color="#FFFFFF" />;
-}
-
 export const SlideButton: React.FC<SlideButtonProps> = ({
     title,
     loadingTitle,
@@ -73,11 +62,14 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
     onReset,
 }) => {
     const { t } = useTranslation();
-    const effectiveTitle = title || t('common.slide_to_send');
-    const effectiveLoadingTitle = loadingTitle || t('common.loading');
-    const effectiveSuccessTitle = successTitle || t('common.success');
-    const effectiveErrorTitle = errorTitle || t('common.error');
-    const effectiveHelperText = helperText || t('common.slide_hint');
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+
+    const effectiveTitle = title || t('common.slide_to_send', 'Arizani yuborish uchun suring');
+    const effectiveLoadingTitle = loadingTitle || t('common.loading', 'Yuborilmoqda...');
+    const effectiveSuccessTitle = successTitle || t('common.success', 'Muvaffaqiyatli!');
+    const effectiveErrorTitle = errorTitle || t('common.error', 'Xatolik yuz berdi');
+    const effectiveHelperText = helperText || t('common.slide_hint', 'Arizani yuborish uchun suring yoki bosing');
 
     const [completed, setCompleted] = useState<boolean>(false);
 
@@ -86,11 +78,12 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
     const isDragging = useSharedValue(false);
     const trackWidthAnim = useSharedValue(TRACK_WIDTH);
 
-    const triggerHaptics = (type: 'light' | 'medium' | 'success') => {
+    const triggerHaptics = (type: 'light' | 'medium' | 'success' | 'error') => {
         try {
             if (type === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            else if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         } catch (e) {}
     };
 
@@ -141,7 +134,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
             if (disabled || completed || loading) return;
             isDragging.value = false;
 
-            if (translateX.value >= MAX_DRAG * 0.42) {
+            if (translateX.value >= MAX_DRAG * 0.4) {
                 translateX.value = withSpring(MAX_DRAG, springConfig, (finished) => {
                     if (finished) {
                         trackWidthAnim.value = withSpring(165, springConfig);
@@ -157,10 +150,16 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
         });
 
     useEffect(() => {
-        if (status === 'idle' && completed && !loading) {
+        if (status === 'idle' && (completed || translateX.value > 0) && !loading) {
             reset();
+        } else if (status === 'error') {
+            triggerHaptics('error');
+            const timer = setTimeout(() => {
+                reset();
+            }, 2500);
+            return () => clearTimeout(timer);
         }
-    }, [status]);
+    }, [status, loading]);
 
     // Reanimated Styles
     const trackStyle = useAnimatedStyle(() => ({
@@ -177,7 +176,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
         const opacity = interpolate(
             translateX.value,
             [0, MAX_DRAG],
-            [0.35, 1],
+            [0.2, 0.8],
             Extrapolate.CLAMP
         );
         return {
@@ -189,14 +188,14 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
     const labelStyle = useAnimatedStyle(() => {
         const opacity = interpolate(
             translateX.value,
-            [0, MAX_DRAG * 0.65],
+            [0, MAX_DRAG * 0.6],
             [1, 0],
             Extrapolate.CLAMP
         );
         const labelX = interpolate(
             translateX.value,
             [0, MAX_DRAG],
-            [0, 24],
+            [0, 20],
             Extrapolate.CLAMP
         );
         return {
@@ -206,7 +205,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
     });
 
     const handleStyle = useAnimatedStyle(() => {
-        const scale = isDragging.value ? withSpring(1.07, springConfig) : withSpring(1, springConfig);
+        const scale = isDragging.value ? withSpring(1.05, springConfig) : withSpring(1, springConfig);
         return {
             transform: [
                 { translateX: translateX.value },
@@ -229,6 +228,10 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
             <Animated.View
                 style={[
                     styles.track,
+                    {
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                        borderColor: homeColors.border,
+                    },
                     disabled && styles.trackDisabled,
                     completed && styles.trackCompleted,
                     trackStyle,
@@ -238,20 +241,20 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                     <>
                         <Animated.View style={[styles.progress, progressStyle]}>
                             <LinearGradient
-                                colors={['rgba(0, 255, 102, 0.6)', 'rgba(0, 204, 82, 0.3)']}
+                                colors={isDark ? ['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.05)'] : ['rgba(0, 0, 0, 0.15)', 'rgba(0, 0, 0, 0.03)']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={StyleSheet.absoluteFill}
                             />
                         </Animated.View>
 
-                        <Animated.View style={[styles.label, labelStyle]}>
+                        <Animated.View style={[styles.labelWrapper, labelStyle]}>
                             <TouchableOpacity
                                 style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
                                 onPress={triggerSwipeAction}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.label} numberOfLines={1}>
+                                <Text style={[styles.labelText, { color: isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.75)' }]} numberOfLines={1}>
                                     {effectiveTitle}
                                 </Text>
                             </TouchableOpacity>
@@ -260,20 +263,22 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                         <GestureDetector gesture={panGesture}>
                             <Animated.View style={[styles.handle, handleStyle]}>
                                 <TouchableOpacity
-                                    style={styles.handleInnerContainer}
+                                    style={[
+                                        styles.handleInnerContainer,
+                                        {
+                                            backgroundColor: isDark ? '#FFFFFF' : '#000000',
+                                            borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)',
+                                        }
+                                    ]}
                                     onPress={triggerSwipeAction}
                                     activeOpacity={0.9}
                                 >
-                                    <LinearGradient
-                                        colors={['#00FF66', '#00CC52', '#008833']}
-                                        locations={[0, 0.65, 1]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        style={StyleSheet.absoluteFill}
-                                    />
-                                    <View style={styles.handleShine} pointerEvents="none" />
                                     <View style={styles.iconCenterWrapper} pointerEvents="none">
-                                        <SendIcon />
+                                        <Feather
+                                            name="arrow-right"
+                                            size={20}
+                                            color={isDark ? '#000000' : '#FFFFFF'}
+                                        />
                                     </View>
                                 </TouchableOpacity>
                             </Animated.View>
@@ -283,28 +288,31 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
 
                 {completed && (
                     <TouchableOpacity
-                        activeOpacity={status === 'success' || status === 'error' ? 0.8 : 1}
-                        onPress={status === 'success' || status === 'error' ? reset : undefined}
+                        activeOpacity={0.8}
+                        onPress={reset}
                         style={styles.statusTouch}
                     >
                         <LinearGradient
                             colors={
                                 status === 'success'
-                                    ? ['#00FF66', '#00AA44']
+                                    ? ['#10B981', '#059669']
                                     : status === 'error'
-                                        ? ['#FF3B30', '#CC0000']
-                                        : ['#00FF66', '#00AA44']
+                                        ? ['#EF4444', '#DC2626']
+                                        : isDark ? ['#333333', '#222222'] : ['#E5E7EB', '#D1D5DB']
                             }
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={styles.statusGradient}
                         >
                             <View style={styles.statusIconWrapper}>
-                                {status === 'loading' && <ActivityIndicator color="#0b0e17" size="small" />}
-                                {status === 'success' && <CheckIcon />}
-                                {status === 'error' && <ErrorIcon />}
+                                {status === 'loading' && <ActivityIndicator color={isDark ? '#FFFFFF' : '#000000'} size="small" />}
+                                {status === 'success' && <Feather name="check" size={20} color="#FFFFFF" />}
+                                {status === 'error' && <Feather name="x" size={20} color="#FFFFFF" />}
                             </View>
-                            <Text style={[styles.statusText, status === 'error' && { color: '#FFFFFF' }]}>
+                            <Text style={[
+                                styles.statusText,
+                                { color: (status === 'success' || status === 'error') ? '#FFFFFF' : (isDark ? '#FFFFFF' : '#000000') }
+                            ]}>
                                 {currentStatusText}
                             </Text>
                         </LinearGradient>
@@ -313,7 +321,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
             </Animated.View>
 
             {!completed && !disabled && (
-                <Text style={styles.helperText}>{effectiveHelperText}</Text>
+                <Text style={[styles.helperText, { color: homeColors.textSecondary }]}>{effectiveHelperText}</Text>
             )}
         </View>
     );
@@ -329,9 +337,7 @@ const styles = StyleSheet.create({
     track: {
         height: TRACK_HEIGHT,
         borderRadius: 999,
-        backgroundColor: 'rgba(0, 255, 102, 0.065)',
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.2)',
         justifyContent: 'center',
         overflow: 'hidden',
         position: 'relative',
@@ -350,15 +356,17 @@ const styles = StyleSheet.create({
         borderRadius: 999,
         overflow: 'hidden',
     },
-    label: {
+    labelWrapper: {
         position: 'absolute',
         width: '100%',
-        textAlign: 'center',
-        paddingLeft: 42,
-        color: 'rgba(255, 255, 255, 0.75)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingLeft: 38,
+    },
+    labelText: {
         fontSize: 13,
         fontWeight: '700',
-        letterSpacing: 0.2,
+        letterSpacing: 0.1,
     },
     handle: {
         position: 'absolute',
@@ -367,36 +375,23 @@ const styles = StyleSheet.create({
         width: HANDLE_SIZE,
         height: HANDLE_SIZE,
         borderRadius: HANDLE_SIZE / 2,
-        shadowColor: '#00FF66',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 8,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 6,
     },
     handleInnerContainer: {
         width: '100%',
         height: '100%',
         borderRadius: HANDLE_SIZE / 2,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.4)',
-        position: 'relative',
-        overflow: 'hidden',
-    },
-    handleShine: {
-        position: 'absolute',
-        top: -8,
-        left: -4,
-        width: 44,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.35)',
-        transform: [{ rotate: '-20deg' }],
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     iconCenterWrapper: {
-        ...StyleSheet.absoluteFillObject,
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 2,
     },
     statusTouch: {
         position: 'absolute',
@@ -413,8 +408,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 999,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
         paddingHorizontal: 12,
     },
     statusIconWrapper: {
@@ -425,15 +418,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     statusText: {
-        color: '#0b0e17',
         fontSize: 13,
         fontWeight: '800',
         letterSpacing: 0.1,
     },
     helperText: {
-        marginTop: 12,
-        color: 'rgba(255, 255, 255, 0.35)',
-        fontSize: 11,
+        marginTop: 10,
+        fontSize: 11.5,
         fontWeight: '500',
     },
 });
