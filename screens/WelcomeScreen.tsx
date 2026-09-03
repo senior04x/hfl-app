@@ -35,6 +35,8 @@ import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
 import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService, clearApiCache, supabase } from '../services/apiService';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,6 +47,7 @@ import LanguageSelectModal from '../components/LanguageSelectModal';
 import { SUPPORTED_LANGUAGES } from '../store/useLanguageStore';
 
 const { width } = Dimensions.get('window');
+const BRAND_ORANGE = '#FF6B00';
 
 const ShimmerLogo = ({ visible }: { visible: boolean }) => {
     const shineProgress = useSharedValue(-1);
@@ -124,6 +127,8 @@ export default function WelcomeScreen({ navigation }: any) {
     const { t, i18n } = useTranslation();
     const setAuth = useAuthStore((state) => state.setAuth);
     const setGuest = useAuthStore((state) => state.setGuest);
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
     
     // Login Auth States
     const [isLoginMode, setIsLoginMode] = useState(false);
@@ -434,24 +439,36 @@ const formatPhoneInput = (val: string) => {
                 >
                     <View style={styles.mainContent}>
                         {isLoginMode && (
-                            <View style={styles.loginCard}>
-                                <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={[
+                                styles.loginCard,
+                                {
+                                    backgroundColor: isDark ? 'rgba(18, 22, 34, 0.92)' : '#FFFFFF',
+                                    borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                                }
+                            ]}>
+                                <BlurView intensity={isDark ? 60 : 20} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
                                 <View style={{ padding: 24 }}>
                                     {loginStep === 'phone' ? (
                                         <>
-                                            <Text style={styles.cardTitle}>{t('auth.login_title')}</Text>
-                                            <Text style={styles.cardSubTitle}>
+                                            <Text style={[styles.cardTitle, { color: homeColors.textPrimary }]}>{t('auth.login_title')}</Text>
+                                            <Text style={[styles.cardSubTitle, { color: homeColors.textSecondary }]}>
                                                 {t('auth.login_subtitle')}
                                             </Text>
 
                                             <View style={styles.inputWrapper}>
-                                                <Text style={styles.inputLabel}>{t('auth.phone_label')}</Text>
-                                                <View style={styles.inputContainer}>
-                                                    <Text style={styles.phonePrefix}>+998</Text>
+                                                <Text style={[styles.inputLabel, { color: BRAND_ORANGE }]}>{t('auth.phone_label')}</Text>
+                                                <View style={[
+                                                    styles.inputContainer,
+                                                    {
+                                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.03)',
+                                                        borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                                                    }
+                                                ]}>
+                                                    <Text style={[styles.phonePrefix, { color: homeColors.textPrimary }]}>+998</Text>
                                                     <TextInput
-                                                        style={styles.phoneInput}
+                                                        style={[styles.phoneInput, { color: homeColors.textPrimary }]}
                                                         placeholder={t('auth.phone_placeholder')}
-                                                        placeholderTextColor={Colors.textMuted}
+                                                        placeholderTextColor={homeColors.textSecondary}
                                                         keyboardType="number-pad"
                                                         value={phone}
                                                         onChangeText={(t) => setPhone(formatPhoneInput(t))}
@@ -462,26 +479,33 @@ const formatPhoneInput = (val: string) => {
 
                                             <View style={styles.actionButtons}>
                                                 <TouchableOpacity
-                                                    style={styles.backButton}
+                                                    style={[
+                                                        styles.backButton,
+                                                        {
+                                                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                                            borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+                                                        }
+                                                    ]}
                                                     onPress={() => setIsLoginMode(false)}
                                                 >
-                                                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                                                    <Ionicons name="arrow-back" size={22} color={homeColors.textPrimary} />
                                                 </TouchableOpacity>
 
                                                 <TouchableOpacity
                                                     style={[
                                                         styles.confirmButton,
+                                                        { backgroundColor: BRAND_ORANGE },
                                                         (phone.replace(/\D/g, '').length < 9 || loading) && styles.confirmButtonDisabled
                                                     ]}
                                                     onPress={handleSendOTP}
                                                     disabled={phone.replace(/\D/g, '').length < 9 || loading}
                                                 >
                                                     {loading ? (
-                                                        <ActivityIndicator color="#000" />
+                                                        <ActivityIndicator color="#FFFFFF" />
                                                     ) : (
                                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                            <Text style={styles.confirmButtonText}>{t('auth.login')}</Text>
-                                                            <Ionicons name="arrow-forward" size={16} color="#000" style={{ marginLeft: 6 }} />
+                                                            <Text style={[styles.confirmButtonText, { color: '#FFFFFF' }]}>{t('auth.login')}</Text>
+                                                            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
                                                         </View>
                                                     )}
                                                 </TouchableOpacity>
@@ -489,16 +513,35 @@ const formatPhoneInput = (val: string) => {
                                         </>
                                     ) : (
                                         <>
-                                            <Text style={styles.cardSubTitle}>
+                                            <Text style={[styles.cardTitle, { color: homeColors.textPrimary, textAlign: 'center', marginBottom: 4 }]}>
+                                                {t('auth.otp_title', 'Tasdiqlash kodi')}
+                                            </Text>
+                                            <Text style={[styles.cardSubTitle, { color: homeColors.textSecondary, textAlign: 'center' }]}>
                                                 {t('auth.otp_sent_to')}
                                             </Text>
 
                                             <View style={styles.inputWrapper}>
-                                                <View style={styles.inputContainer}>
+                                                <View style={[
+                                                    styles.inputContainer,
+                                                    {
+                                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.03)',
+                                                        borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                                                        height: 56,
+                                                    }
+                                                ]}>
                                                     <TextInput
-                                                        style={[styles.phoneInput, { textAlign: 'center', letterSpacing: 8, fontSize: 20, fontWeight: '900' }]}
+                                                        style={[
+                                                            styles.phoneInput,
+                                                            {
+                                                                textAlign: 'center',
+                                                                letterSpacing: 10,
+                                                                fontSize: 22,
+                                                                fontWeight: '900',
+                                                                color: homeColors.textPrimary,
+                                                            }
+                                                        ]}
                                                         placeholder="0000"
-                                                        placeholderTextColor={Colors.textMuted}
+                                                        placeholderTextColor={homeColors.textSecondary}
                                                         keyboardType="number-pad"
                                                         value={otpCode}
                                                         onChangeText={setOtpCode}
@@ -509,34 +552,41 @@ const formatPhoneInput = (val: string) => {
                                             </View>
 
                                             {resendTimer > 0 ? (
-                                                <Text style={styles.timerText}>{t('auth.resend_timer', { seconds: resendTimer })}</Text>
+                                                <Text style={[styles.timerText, { color: homeColors.textSecondary }]}>{t('auth.resend_timer', { seconds: resendTimer })}</Text>
                                             ) : (
                                                 <TouchableOpacity onPress={handleSendOTP} style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <Ionicons name="refresh" size={16} color="#00FF87" style={{ marginRight: 6 }} />
-                                                    <Text style={styles.resendBtnText}>{t('auth.resend_code')}</Text>
+                                                    <Ionicons name="refresh" size={16} color={BRAND_ORANGE} style={{ marginRight: 6 }} />
+                                                    <Text style={[styles.resendBtnText, { color: BRAND_ORANGE }]}>{t('auth.resend_code')}</Text>
                                                 </TouchableOpacity>
                                             )}
 
                                             <View style={styles.actionButtons}>
                                                 <TouchableOpacity
-                                                    style={styles.backButton}
+                                                    style={[
+                                                        styles.backButton,
+                                                        {
+                                                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                                            borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+                                                        }
+                                                    ]}
                                                     onPress={() => setLoginStep('phone')}
                                                 >
-                                                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                                                    <Ionicons name="arrow-back" size={22} color={homeColors.textPrimary} />
                                                 </TouchableOpacity>
 
                                                 <TouchableOpacity
                                                     style={[
                                                         styles.confirmButton,
+                                                        { backgroundColor: BRAND_ORANGE },
                                                         (otpCode.length < 4 || loading) && styles.confirmButtonDisabled
                                                     ]}
                                                     onPress={handleVerifyOTP}
                                                     disabled={otpCode.length < 4 || loading}
                                                 >
                                                     {loading ? (
-                                                        <ActivityIndicator color="#000" />
+                                                        <ActivityIndicator color="#FFFFFF" />
                                                     ) : (
-                                                        <Text style={styles.confirmButtonText}>{t('auth.login')}</Text>
+                                                        <Text style={[styles.confirmButtonText, { color: '#FFFFFF' }]}>{t('auth.login')}</Text>
                                                     )}
                                                 </TouchableOpacity>
                                             </View>
@@ -790,41 +840,85 @@ const formatPhoneInput = (val: string) => {
                 onRequestClose={handleSkipBotModal}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.botModalCard}>
-                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={[
+                        styles.botModalCard,
+                        {
+                            backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                        }
+                    ]}>
                         <View style={{ padding: 24, alignItems: 'center' }}>
-                            <View style={styles.botIconBadge}>
-                                <Ionicons name="paper-plane" size={30} color="#00FF87" />
+                            {/* Brand Orange Telegram Icon Badge */}
+                            <View style={[
+                                styles.botIconBadge,
+                                {
+                                    backgroundColor: isDark ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 107, 0, 0.08)',
+                                    borderColor: isDark ? 'rgba(255, 107, 0, 0.3)' : 'rgba(255, 107, 0, 0.25)',
+                                }
+                            ]}>
+                                <Ionicons name="paper-plane" size={28} color={BRAND_ORANGE} />
                             </View>
 
-                            <Text style={styles.botModalTitle}>{t('auth.bot_modal_title')}</Text>
-
-                            <Text style={styles.botModalSubtitle}>
-                                <Text style={{ color: '#00FF87', fontWeight: '900' }}>+998 {phone}</Text> raqamingizga 4 xonali tasdiqlash kodini olish uchun Telegram botimizga o'ting.
+                            {/* Modal Title */}
+                            <Text style={[styles.botModalTitle, { color: homeColors.textPrimary }]}>
+                                {t('auth.bot_modal_title', 'TELEGRAM BOT ORQALI KOD OLISH')}
                             </Text>
 
-                            <View style={styles.botModalNoticeBox}>
-                                <Ionicons name="information-circle-outline" size={18} color="#FFD700" style={{ marginRight: 8 }} />
-                                <Text style={styles.botModalNoticeText}>
-                                    Botda <Text style={{ fontWeight: 'bold', color: '#FFF' }}>"📱 Telefon raqamni yuborish"</Text> tugmasini bosing.
+                            {/* Subtitle with dynamic phone number */}
+                            <Text style={[styles.botModalSubtitle, { color: homeColors.textSecondary }]}>
+                                {i18n.language === 'ru' ? (
+                                    <>
+                                        {t('auth.bot_modal_sub')}{' '}
+                                        <Text style={{ color: BRAND_ORANGE, fontWeight: '800' }}>+998 {phone}</Text>.
+                                    </>
+                                ) : i18n.language === 'en' ? (
+                                    <>
+                                        {t('auth.bot_modal_sub')}{' '}
+                                        <Text style={{ color: BRAND_ORANGE, fontWeight: '800' }}>+998 {phone}</Text>.
+                                    </>
+                                ) : (
+                                    <>
+                                        <Text style={{ color: BRAND_ORANGE, fontWeight: '800' }}>+998 {phone}</Text>{' '}
+                                        {t('auth.bot_modal_sub')}
+                                    </>
+                                )}
+                            </Text>
+
+                            {/* Info Notice Box */}
+                            <View style={[
+                                styles.botModalNoticeBox,
+                                {
+                                    backgroundColor: isDark ? 'rgba(255, 107, 0, 0.08)' : 'rgba(255, 107, 0, 0.05)',
+                                    borderColor: isDark ? 'rgba(255, 107, 0, 0.2)' : 'rgba(255, 107, 0, 0.15)',
+                                }
+                            ]}>
+                                <Ionicons name="information-circle-outline" size={18} color={BRAND_ORANGE} style={{ marginRight: 8 }} />
+                                <Text style={[styles.botModalNoticeText, { color: homeColors.textPrimary }]}>
+                                    {t('auth.bot_modal_notice')}
                                 </Text>
                             </View>
 
+                            {/* Primary Button: Go to bot */}
                             <TouchableOpacity
-                                style={styles.botPrimaryBtn}
-                                activeOpacity={0.8}
+                                style={[styles.botPrimaryBtn, { backgroundColor: BRAND_ORANGE }]}
+                                activeOpacity={0.85}
                                 onPress={handleGoToBot}
                             >
-                                <Ionicons name="paper-plane-outline" size={20} color="#050A14" style={{ marginRight: 8 }} />
-                                <Text style={styles.botPrimaryBtnText}>BOTGA O'TISH</Text>
+                                <Ionicons name="paper-plane-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                <Text style={[styles.botPrimaryBtnText, { color: '#FFFFFF' }]}>
+                                    {t('auth.go_to_bot', "BOTGA O'TISH")}
+                                </Text>
                             </TouchableOpacity>
 
+                            {/* Secondary Button: Enter code */}
                             <TouchableOpacity
                                 style={styles.botSecondaryBtn}
                                 activeOpacity={0.7}
                                 onPress={handleSkipBotModal}
                             >
-                                <Text style={styles.botSecondaryBtnText}>Kodni kiritish</Text>
+                                <Text style={[styles.botSecondaryBtnText, { color: homeColors.textSecondary }]}>
+                                    {t('auth.enter_code', 'Kodni kiritish')}
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -849,7 +943,7 @@ const formatPhoneInput = (val: string) => {
                             <Text style={styles.notFoundModalTitle}>{t('auth.application_not_found')}</Text>
 
                             <Text style={styles.notFoundModalSubtitle}>
-                                <Text style={{ color: '#00FF87', fontWeight: '900' }}>+998 {phone}</Text> {t('errors.PHONE_NOT_FOUND')}
+                                <Text style={{ color: BRAND_ORANGE, fontWeight: '900' }}>+998 {phone}</Text> {t('errors.PHONE_NOT_FOUND')}
                             </Text>
 
                             <View style={styles.notFoundNoticeBox}>
@@ -1244,19 +1338,19 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#00FF87',
+        backgroundColor: BRAND_ORANGE,
         width: '100%',
         height: 50,
         borderRadius: 16,
         marginBottom: 10,
-        shadowColor: '#00FF87',
+        shadowColor: BRAND_ORANGE,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 10,
         elevation: 6,
     },
     botPrimaryBtnText: {
-        color: '#050A14',
+        color: '#FFFFFF',
         fontWeight: '900',
         fontSize: 14,
         letterSpacing: 1,

@@ -100,8 +100,11 @@
     "apply_first_notice": "To use the system, you must first submit an application to our league.",
     "bot_modal_title": "GET CODE VIA TELEGRAM BOT",
     "bot_modal_desc": "For security purposes, verification codes are delivered via our official Telegram bot.",
-    "go_to_bot": "OPEN BOT",
-    "skip": "Skip"
+    "go_to_bot": "OPEN TELEGRAM BOT",
+    "skip": "Skip",
+    "bot_modal_sub": "Open our Telegram bot to receive your 4-digit verification code for",
+    "bot_modal_notice": "In the bot, tap the \"📱 Send phone number\" button.",
+    "enter_code": "Enter code"
   },
   "home": {
     "welcome": "Welcome",

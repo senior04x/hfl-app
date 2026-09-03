@@ -101,7 +101,10 @@
     "bot_modal_title": "TELEGRAM BOT ORQALI KOD OLISH",
     "bot_modal_desc": "SMS xavfsizligi uchun tasdiqlash kodi bizning rasmiy Telegram botimiz orqali yuboriladi.",
     "go_to_bot": "BOTGA O'TISH",
-    "skip": "O'tkazib yuborish"
+    "skip": "O'tkazib yuborish",
+    "bot_modal_sub": "raqamingizga 4 xonali tasdiqlash kodini olish uchun Telegram botimizga o'ting.",
+    "bot_modal_notice": "Botda \"📱 Telefon raqamni yuborish\" tugmasini bosing.",
+    "enter_code": "Kodni kiritish"
   },
   "home": {
     "welcome": "Xush kelibsiz",
