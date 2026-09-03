@@ -52,6 +52,7 @@ export default function AccountScreen({ navigation }: any) {
     const [showEditTeamModal, setShowEditTeamModal] = useState(false);
     const [showRegClosedModal, setShowRegClosedModal] = useState(false);
     const [closedOrgInfo, setClosedOrgInfo] = useState<{ name: string; contact_phone: string } | null>(null);
+    const [isCheckingReg, setIsCheckingReg] = useState(false);
     const [pinInput, setPinInput] = useState('');
     const [targetJuniorState, setTargetJuniorState] = useState<boolean>(false);
 
@@ -183,6 +184,7 @@ export default function AccountScreen({ navigation }: any) {
         isLast = false,
         iconColor,
         textColor,
+        isLoading = false,
     }: any) => (
         <TouchableOpacity
             style={[
@@ -193,7 +195,7 @@ export default function AccountScreen({ navigation }: any) {
                 }
             ]}
             onPress={onPress}
-            disabled={type === 'switch'}
+            disabled={isLoading || type === 'switch'}
             activeOpacity={0.7}
         >
             <View style={styles.settingLeft}>
@@ -226,27 +228,33 @@ export default function AccountScreen({ navigation }: any) {
                 />
             ) : (
                 <View style={styles.settingRight}>
-                    {badgeCount > 0 && (
-                        <View
-                            style={[
-                                styles.rightBadge,
-                                { backgroundColor: isMuted ? homeColors.textSecondary : Colors.danger }
-                            ]}
-                        >
-                            <Text style={styles.rightBadgeText}>{badgeCount}</Text>
-                        </View>
+                    {isLoading ? (
+                        <ActivityIndicator size="small" color={homeColors.accent} style={{ marginRight: 2 }} />
+                    ) : (
+                        <>
+                            {badgeCount > 0 && (
+                                <View
+                                    style={[
+                                        styles.rightBadge,
+                                        { backgroundColor: isMuted ? homeColors.textSecondary : Colors.danger }
+                                    ]}
+                                >
+                                    <Text style={styles.rightBadgeText}>{badgeCount}</Text>
+                                </View>
+                            )}
+                            {value ? (
+                                <Text
+                                    style={[
+                                        styles.settingValue,
+                                        { color: homeColors.textSecondary }
+                                    ]}
+                                >
+                                    {value}
+                                </Text>
+                            ) : null}
+                            <Ionicons name="chevron-forward" size={16} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
+                        </>
                     )}
-                    {value ? (
-                        <Text
-                            style={[
-                                styles.settingValue,
-                                { color: homeColors.textSecondary }
-                            ]}
-                        >
-                            {value}
-                        </Text>
-                    ) : null}
-                    <Ionicons name="chevron-forward" size={16} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
                 </View>
             )}
         </TouchableOpacity>
@@ -290,7 +298,9 @@ export default function AccountScreen({ navigation }: any) {
     const totalAppsCount = userTransfers.length + userProfileApps.length;
 
     const handleAddPlayerPress = async () => {
+        if (isCheckingReg) return;
         try {
+            setIsCheckingReg(true);
             let orgId = user?.organization_id || user?.organizationId || selectedOrganizationId || detailedData?.organization_id || detailedData?.organizationId;
 
             // If orgId not found yet but currentTeamId exists, fetch team's organization_id
@@ -327,6 +337,8 @@ export default function AccountScreen({ navigation }: any) {
         } catch (error) {
             console.error('Error checking organization registration:', error);
             navigation.navigate('JoinApplication', { initialType: 'player', teamId: currentTeamId });
+        } finally {
+            setIsCheckingReg(false);
         }
     };
 
@@ -588,6 +600,7 @@ export default function AccountScreen({ navigation }: any) {
                                                     icon="person-add-outline"
                                                     title={t('teams.add_player', 'O\'yinchi qo\'shish')}
                                                     onPress={handleAddPlayerPress}
+                                                    isLoading={isCheckingReg}
                                                     isLast={true}
                                                 />
                                             </>
