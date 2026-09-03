@@ -863,6 +863,9 @@ const PesDraggablePlayer = ({
     isReadOnly,
     homeColors,
 }: any) => {
+    const cat = getPositionCategory(player.position || player.role);
+    const posStyle = PES_POSITION_THEMES[cat];
+
     const translateX = useSharedValue((player.x / 100) * FIELD_WIDTH);
     const translateY = useSharedValue((player.y / 100) * FIELD_HEIGHT);
     const context = useSharedValue({ x: 0, y: 0 });
@@ -923,10 +926,10 @@ const PesDraggablePlayer = ({
                             fallbackIconSize={22}
                         />
 
-                        {/* NUMBER BADGE (BOTTOM RIGHT) */}
+                        {/* NUMBER BADGE (BOTTOM RIGHT) WITH POSITION COLOR */}
                         {!!player.number && (
-                            <View style={[styles.rectNumberBadge, { backgroundColor: 'rgba(0,0,0,0.8)' }]}>
-                                <Text style={styles.rectNumberBadgeText}>{player.number}</Text>
+                            <View style={[styles.rectNumberBadge, { backgroundColor: posStyle.bg }]}>
+                                <Text style={[styles.rectNumberBadgeText, { color: posStyle.text }]}>{player.number}</Text>
                             </View>
                         )}
                     </View>

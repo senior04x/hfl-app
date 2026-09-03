@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-nati
 import SmartImage from './SmartImage';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
+import { getPositionCategory, PES_POSITION_THEMES } from '../utils/formationPresets';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const FIELD_WIDTH = SCREEN_WIDTH - 32;
@@ -68,6 +69,9 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, onPlayerPress }) =
                         const left = (safeX / 100) * FIELD_WIDTH;
                         const top = (safeY / 100) * FIELD_HEIGHT;
 
+                        const cat = getPositionCategory(player.position || player.role);
+                        const posStyle = PES_POSITION_THEMES[cat];
+
                         return (
                             <TouchableOpacity
                                 key={player.id}
@@ -88,10 +92,10 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, onPlayerPress }) =
                                         fallbackIconSize={22}
                                     />
 
-                                    {/* NUMBER BADGE */}
+                                    {/* NUMBER BADGE WITH POSITION COLOR */}
                                     {!!player.number && (
-                                        <View style={[styles.rectNumberBadge, { backgroundColor: 'rgba(0,0,0,0.8)' }]}>
-                                            <Text style={styles.rectNumberBadgeText}>{player.number}</Text>
+                                        <View style={[styles.rectNumberBadge, { backgroundColor: posStyle.bg }]}>
+                                            <Text style={[styles.rectNumberBadgeText, { color: posStyle.text }]}>{player.number}</Text>
                                         </View>
                                     )}
                                 </View>
