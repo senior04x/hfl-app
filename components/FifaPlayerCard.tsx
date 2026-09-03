@@ -543,7 +543,7 @@ export default function FifaPlayerCard({
                             {/* Player Name Plaque */}
                             <View style={styles.namePlateWrapper}>
                                 <LinearGradient
-                                    colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
+                                    colors={theme.isLightCard ? ['rgba(255,255,255,0.0)', 'rgba(0,0,0,0.06)', 'rgba(255,255,255,0.0)'] : ['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                     style={[styles.namePlateGradient, { paddingVertical: L.namePadV }]}
@@ -584,7 +584,7 @@ export default function FifaPlayerCard({
                                             </Text>
                                         </View>
 
-                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
+                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: theme.isLightCard ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
 
                                         <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
@@ -595,7 +595,7 @@ export default function FifaPlayerCard({
                                             </Text>
                                         </View>
 
-                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
+                                        <View style={[styles.statsVerticalDivider, { height: L.statNumLineH, backgroundColor: theme.isLightCard ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.2)', width: Math.max(1, scaleFactor) }]} />
 
                                         <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
