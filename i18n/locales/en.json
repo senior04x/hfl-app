@@ -49,7 +49,8 @@
     "clear": "Clear",
     "copy": "Copy",
     "version": "VERSION",
-    "understood": "Understood"
+    "understood": "Understood",
+    "logout": "Log Out"
   },
   "nav": {
     "home": "Home",

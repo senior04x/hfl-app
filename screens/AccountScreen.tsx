@@ -667,7 +667,7 @@ export default function AccountScreen({ navigation }: any) {
                             {!isGuest && (
                                 <SettingRow
                                     icon="log-out-outline"
-                                    title={t('common.logout', 'Chiqish')}
+                                    title={t('common.logout', t('auth.logout', 'Chiqish'))}
                                     iconColor={Colors.danger}
                                     textColor={Colors.danger}
                                     onPress={() => setShowLogoutModal(true)}
