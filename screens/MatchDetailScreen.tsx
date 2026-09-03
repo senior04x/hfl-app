@@ -1257,6 +1257,28 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
         const hasAnyReplays = replayEvents.length > 0 || extraStorageClips.length > 0;
 
+        if (!videoUrl && !hasAnyReplays) {
+            return (
+                <ScrollView 
+                    style={styles.tabContent} 
+                    contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={Colors.primary}
+                            colors={[Colors.primary]}
+                        />
+                    }
+                >
+                    <View style={styles.notStartedContainer}>
+                        <Ionicons name="film-outline" size={42} color={homeColors.textSecondary} style={{ opacity: 0.4 }} />
+                        <Text style={[styles.notStartedText, { color: homeColors.textSecondary, marginTop: 12 }]}>{t('match_detail.no_media', 'Media materiallar mavjud emas')}</Text>
+                    </View>
+                </ScrollView>
+            );
+        }
+
         return (
             <ScrollView 
                 style={styles.tabContent} 
@@ -1272,7 +1294,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             >
                 {/* 1. YouTube Online Stream */}
                 {videoUrl && (
-                    <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
+                    <View style={{ width: '100%', alignItems: 'center', marginBottom: hasAnyReplays ? 20 : 0 }}>
                         <YoutubePlayerCard videoUrl={videoUrl} />
                         <TouchableOpacity
                             style={styles.openYtLinkBtn}
@@ -1286,73 +1308,66 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     </View>
                 )}
 
-                {/* 2. 20s Goal & Replay Clips Feed */}
-                <View style={{ marginTop: 10, width: '100%' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 }}>
-                        <Ionicons name="videocam-outline" size={22} color={Colors.primary || '#7c3aed'} />
-                        <Text style={{ color: homeColors.textPrimary, fontSize: 16, fontWeight: '800' }}>
-                            {t('match_detail.match_highlights_replays')}
-                        </Text>
-                    </View>
-
-                    {hasAnyReplays ? (
-                        <>
-                            {replayEvents.map((ev: any, idx: number) => {
-                                const isHome = ev.team_id ? (ev.team_id === (match?.homeTeamId || match?.home_team_id)) : ev.isHomeTeam;
-                                const currentTeamName = ev.team_name || (isHome ? (match?.homeTeamName || match?.home_team?.name) : (match?.awayTeamName || match?.away_team?.name));
-                                const currentTeamLogo = isHome ? (match?.homeTeamLogo || match?.home_team?.logo_url) : (match?.awayTeamLogo || match?.away_team?.logo_url);
-                                const scorer = ev.player_name || (ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : null);
-                                const scorerPhoto = ev.player_photo || ev.player?.photo_url || ev.player?.photo || ev.player?.avatar || null;
-                                const assistant = ev.assist_player_name || (ev.assistant ? `${ev.assistant.first_name || ''} ${ev.assistant.last_name || ''}`.trim() : null);
-                                const assistantPhoto = ev.assist_player_photo || ev.assistant?.photo_url || ev.assistant?.photo || null;
-                                const videoKey = ev.id || `replay_event_${idx}`;
-
-                                return (
-                                    <ReplayVideoCard
-                                        key={videoKey}
-                                        id={videoKey}
-                                        videoUrl={ev.replay_video_url || ev.video_url || ev.replay_url}
-                                        minute={ev.minute}
-                                        teamName={currentTeamName}
-                                        teamLogo={currentTeamLogo}
-                                        scorerName={scorer}
-                                        scorerPhoto={scorerPhoto}
-                                        assistantName={assistant}
-                                        assistantPhoto={assistantPhoto}
-                                        eventType={ev.event_type || ev.type || 'goal'}
-                                        activePlayingId={activePlayingVideoId}
-                                        onPlay={(vId) => setActivePlayingVideoId(vId)}
-                                        onPause={() => setActivePlayingVideoId(null)}
-                                    />
-                                );
-                            })}
-
-                            {/* Bazadagi hech bir gol voqeasiga bog'lanmagan, lekin storage'da
-                                mavjud qo'shimcha video parchalari — qaysi golga tegishli ekani
-                                noma'lum bo'lgani uchun daqiqa/muallif TAXMIN QILINMAYDI. */}
-                            {extraStorageClips.map((clip: any, idx: number) => {
-                                const storageKey = clip.id || `storage_${idx}`;
-                                return (
-                                    <ReplayVideoCard
-                                        key={storageKey}
-                                        id={storageKey}
-                                        videoUrl={clip.publicUrl}
-                                        scorerName="Qo'shimcha video"
-                                        eventType="goal"
-                                        activePlayingId={activePlayingVideoId}
-                                        onPlay={(vId) => setActivePlayingVideoId(vId)}
-                                        onPause={() => setActivePlayingVideoId(null)}
-                                    />
-                                );
-                            })}
-                        </>
-                    ) : (
-                        <View style={styles.placeholderContainer}>
-                            <Ionicons name="film-outline" size={42} color={homeColors.textSecondary} />
-                            <Text style={[styles.placeholderText, { color: homeColors.textSecondary }]}>{t('match_detail.replays_placeholder')}</Text>
+                {/* 2. 20s Goal & Replay Clips Feed (ONLY IF REPLAYS EXIST) */}
+                {hasAnyReplays && (
+                    <View style={{ marginTop: videoUrl ? 10 : 0, width: '100%' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                            <Ionicons name="videocam-outline" size={22} color={Colors.primary || '#7c3aed'} />
+                            <Text style={{ color: homeColors.textPrimary, fontSize: 16, fontWeight: '800' }}>
+                                {t('match_detail.match_highlights_replays')}
+                            </Text>
                         </View>
-                    )}
-                </View>
+
+                        {replayEvents.map((ev: any, idx: number) => {
+                            const isHome = ev.team_id ? (ev.team_id === (match?.homeTeamId || match?.home_team_id)) : ev.isHomeTeam;
+                            const currentTeamName = ev.team_name || (isHome ? (match?.homeTeamName || match?.home_team?.name) : (match?.awayTeamName || match?.away_team?.name));
+                            const currentTeamLogo = isHome ? (match?.homeTeamLogo || match?.home_team?.logo_url) : (match?.awayTeamLogo || match?.away_team?.logo_url);
+                            const scorer = ev.player_name || (ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : null);
+                            const scorerPhoto = ev.player_photo || ev.player?.photo_url || ev.player?.photo || ev.player?.avatar || null;
+                            const assistant = ev.assist_player_name || (ev.assistant ? `${ev.assistant.first_name || ''} ${ev.assistant.last_name || ''}`.trim() : null);
+                            const assistantPhoto = ev.assist_player_photo || ev.assistant?.photo_url || ev.assistant?.photo || null;
+                            const videoKey = ev.id || `replay_event_${idx}`;
+
+                            return (
+                                <ReplayVideoCard
+                                    key={videoKey}
+                                    id={videoKey}
+                                    videoUrl={ev.replay_video_url || ev.video_url || ev.replay_url}
+                                    minute={ev.minute}
+                                    teamName={currentTeamName}
+                                    teamLogo={currentTeamLogo}
+                                    scorerName={scorer}
+                                    scorerPhoto={scorerPhoto}
+                                    assistantName={assistant}
+                                    assistantPhoto={assistantPhoto}
+                                    eventType={ev.event_type || ev.type || 'goal'}
+                                    activePlayingId={activePlayingVideoId}
+                                    onPlay={(vId) => setActivePlayingVideoId(vId)}
+                                    onPause={() => setActivePlayingVideoId(null)}
+                                />
+                            );
+                        })}
+
+                        {/* Bazadagi hech bir gol voqeasiga bog'lanmagan, lekin storage'da
+                            mavjud qo'shimcha video parchalari — qaysi golga tegishli ekani
+                            noma'lum bo'lgani uchun daqiqa/muallif TAXMIN QILINMAYDI. */}
+                        {extraStorageClips.map((clip: any, idx: number) => {
+                            const storageKey = clip.id || `storage_${idx}`;
+                            return (
+                                <ReplayVideoCard
+                                    key={storageKey}
+                                    id={storageKey}
+                                    videoUrl={clip.publicUrl}
+                                    scorerName="Qo'shimcha video"
+                                    eventType="goal"
+                                    activePlayingId={activePlayingVideoId}
+                                    onPlay={(vId) => setActivePlayingVideoId(vId)}
+                                    onPause={() => setActivePlayingVideoId(null)}
+                                />
+                            );
+                        })}
+                    </View>
+                )}
             </ScrollView>
         );
     };

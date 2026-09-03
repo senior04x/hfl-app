@@ -838,31 +838,28 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 })}
             </View>
 
-            {/* PLAYER'S REPLAY HIGHLIGHTS FEED */}
-            <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14 }]}>
-                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
-                    <Ionicons name="videocam-outline" size={17} color={homeColors.textPrimary} />
-                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.personal_replays', 'GOLLAR & REPLAYLAR').toUpperCase()}</Text>
-                </View>
-
-                {replaysLoading ? (
-                    <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 20 }} />
-                ) : groupedMatches.length > 0 ? (
-                    groupedMatches.map((group: any, idx: number) => (
-                        <PlayerMatchReplayCard
-                            key={group.match?.id || idx}
-                            match={group.match}
-                            replays={group.replays}
-                            playerName={playerNameFull}
-                        />
-                    ))
-                ) : (
-                    <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="videocam-outline" size={32} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
-                        <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 8, fontWeight: '600' }}>{t('stats.no_replays', 'Replaylar mavjud emas')}</Text>
+            {/* PLAYER'S REPLAY HIGHLIGHTS FEED (ONLY RENDER IF REPLAYS EXIST OR LOADING) */}
+            {(replaysLoading || groupedMatches.length > 0) && (
+                <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14 }]}>
+                    <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                        <Ionicons name="videocam-outline" size={17} color={homeColors.textPrimary} />
+                        <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.personal_replays', 'GOLLAR & REPLAYLAR').toUpperCase()}</Text>
                     </View>
-                )}
-            </View>
+
+                    {replaysLoading ? (
+                        <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 20 }} />
+                    ) : (
+                        groupedMatches.map((group: any, idx: number) => (
+                            <PlayerMatchReplayCard
+                                key={group.match?.id || idx}
+                                match={group.match}
+                                replays={group.replays}
+                                playerName={playerNameFull}
+                            />
+                        ))
+                    )}
+                </View>
+            )}
         </ScrollView>
     );
 
