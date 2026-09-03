@@ -15,16 +15,23 @@ import {
     ActionSheetIOS,
     KeyboardAvoidingView,
     Linking,
+    PanResponder,
+    StatusBar,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import VideoBackground from '../components/VideoBackground';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
+import { formatUzPhone, cleanPhoneForDb } from '../utils/stringUtils';
+import SmartImage from '../components/SmartImage';
 import { SlideButton } from '../components/SlideButton';
 import { useTranslation } from 'react-i18next';
 
@@ -69,7 +76,69 @@ const LEAGUE_OPTIONS = [
 export default function JoinApplicationScreen({ route, navigation }: any) {
     const { t } = useTranslation();
     const { user } = useAuthStore();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
     const targetTeamId = route?.params?.teamId || user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
+    const [targetTeamData, setTargetTeamData] = useState<any>(null);
+
+    // Swipe back animation (matching MatchDetailScreen)
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+    const exitPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: width,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            },
+            onPanResponderTerminationRequest: () => true,
+        })
+    ).current;
+
+    const handleBack = () => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        } catch (e) {}
+        Animated.timing(swipeBackAnim, {
+            toValue: width,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => {
+            navigation.goBack();
+        });
+    };
 
     const [loading, setLoading] = useState(false);
     const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -212,6 +281,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             setLoadingData(true);
             const teamData = await apiService.getTeamById(tId);
             if (teamData) {
+                setTargetTeamData(teamData);
                 const leagueName = teamData.league_name || teamData.league || teamData.leagueName || 'Super liga';
                 const orgId = teamData.organization_id || teamData.org_id || 1;
                 const teamList = await apiService.getTeams(1, 100, leagueName);
@@ -614,14 +684,20 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
     const renderHeader = () => (
         <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                <Ionicons name="arrow-back" size={24} color="#FFF" />
+            <TouchableOpacity
+                style={styles.backButton}
+                onPress={handleBack}
+                activeOpacity={0.7}
+            >
+                <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
             </TouchableOpacity>
             <View style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={styles.headerTitle}>{t('applications.submit_app')}</Text>
-                <Text style={styles.headerSubtitle}>AMATORA</Text>
+                <Text style={styles.headerTitle}>
+                    {targetTeamId ? t('teams.add_player', "O'YINCHI QO'SHISH") : t('applications.submit_app', 'ARIZA TOPSHIRISH')}
+                </Text>
+                <Text style={styles.headerSubtitle}>AMATORA LEAGUE</Text>
             </View>
-            <View style={{ width: 40 }} />
+            <View style={{ width: 42 }} />
         </View>
     );
 
@@ -676,7 +752,16 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     };
 
     return (
-        <View style={styles.container}>
+        <Animated.View
+            style={[
+                styles.container,
+                {
+                    transform: [{ translateX: swipeBackAnim }],
+                }
+            ]}
+            {...exitPanResponder.panHandlers}
+        >
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
             <VideoBackground
                 source={require('../assets/images/welcomeScreenVideo1.mp4')}
                 overlayOpacity={0.88}
@@ -694,6 +779,31 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                             contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 }]}
                         >
                         {!route?.params?.initialType && renderTypeSelector()}
+
+                        {/* TARGET TEAM HEADER BANNER (WHEN NAVIGATING FROM TEAM) */}
+                        {targetTeamId && (
+                            <View style={[styles.card, { backgroundColor: isDark ? 'rgba(20,20,20,0.92)' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.1)' : homeColors.border, marginBottom: 14 }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                                    <SmartImage
+                                        uri={targetTeamData?.logo_url || targetTeamData?.logo || formData.selectedOrgLogo}
+                                        style={{ width: 52, height: 52, borderRadius: 16 }}
+                                        contentFit="cover"
+                                        fallbackIcon="shield-outline"
+                                    />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 16, fontWeight: '800', color: isDark ? '#FFFFFF' : homeColors.textPrimary, letterSpacing: -0.2 }}>
+                                            {targetTeamData?.name || formData.teamName || t('teams.my_team', 'Mening jamoam')}
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                                            <Text style={{ fontSize: 12.5, fontWeight: '600', color: homeColors.accent }}>
+                                                {t('teams.add_player_to_squad', 'Jamoa tarkibiga yangi o\'yinchi qo\'shish')}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
 
                         {/* STEP 1: TASHKILOT TANLASH (EXPANDABLE SELECT WITH LOGO & NAME) */}
                         {!targetTeamId && organizations.length > 0 && (
@@ -1046,27 +1156,20 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.inputLabel}>TELEFON RAQAM *</Text>
-                                        <View style={styles.phoneRow}>
-                                            <View style={styles.phonePrefixBox}>
-                                                <Text style={styles.phonePrefixText}>+998</Text>
-                                            </View>
-                                            <TextInput
-                                                style={styles.phoneInputField}
-                                                value={formData.phone}
-                                                onChangeText={(t) => {
-                                                    const cleaned = t.replace(/\D/g, '');
-                                                    if (cleaned.length <= 9) {
-                                                        const newPhone = cleaned;
-                                                        setFormData({ ...formData, phone: newPhone });
-                                                        triggerValidation('player', formData.teamName, newPhone);
-                                                    }
-                                                }}
-                                                placeholder="90 123 45 67"
-                                                keyboardType="phone-pad"
-                                                maxLength={9}
-                                                placeholderTextColor="rgba(255,255,255,0.3)"
-                                            />
-                                        </View>
+                                        <TextInput
+                                            style={styles.inputField}
+                                            value={formatUzPhone(formData.phone)}
+                                            onChangeText={(t) => {
+                                                const formatted = formatUzPhone(t);
+                                                const clean = cleanPhoneForDb(formatted).replace('+998', '');
+                                                setFormData({ ...formData, phone: clean });
+                                                triggerValidation('player', formData.teamName, clean);
+                                            }}
+                                            placeholder="+998 90 123 45 67"
+                                            keyboardType="phone-pad"
+                                            maxLength={17}
+                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                        />
                                     </View>
 
                                     {renderValidationBadge()}
@@ -1294,27 +1397,20 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
 
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.inputLabel}>SARDOR (KAPITAN) TELEFONI *</Text>
-                                        <View style={styles.phoneRow}>
-                                            <View style={styles.phonePrefixBox}>
-                                                <Text style={styles.phonePrefixText}>+998</Text>
-                                            </View>
-                                            <TextInput
-                                                style={styles.phoneInputField}
-                                                value={formData.phone}
-                                                onChangeText={(t) => {
-                                                    const cleaned = t.replace(/\D/g, '');
-                                                    if (cleaned.length <= 9) {
-                                                        const newPhone = cleaned;
-                                                        setFormData({ ...formData, phone: newPhone });
-                                                        triggerValidation('team', formData.teamName, newPhone);
-                                                    }
-                                                }}
-                                                placeholder="90 123 45 67"
-                                                keyboardType="phone-pad"
-                                                maxLength={9}
-                                                placeholderTextColor="rgba(255,255,255,0.3)"
-                                            />
-                                        </View>
+                                        <TextInput
+                                            style={styles.inputField}
+                                            value={formatUzPhone(formData.phone)}
+                                            onChangeText={(t) => {
+                                                const formatted = formatUzPhone(t);
+                                                const clean = cleanPhoneForDb(formatted).replace('+998', '');
+                                                setFormData({ ...formData, phone: clean });
+                                                triggerValidation('team', formData.teamName, clean);
+                                            }}
+                                            placeholder="+998 90 123 45 67"
+                                            keyboardType="phone-pad"
+                                            maxLength={17}
+                                            placeholderTextColor="rgba(255,255,255,0.3)"
+                                        />
                                     </View>
 
                                     {renderValidationBadge()}
@@ -1651,7 +1747,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </Animated.View>
     );
 }
 
