@@ -41,7 +41,6 @@ import SystemSettingsScreen from './screens/SystemSettingsScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
 import { notificationService } from './services/notificationService';
-import VideoBackground from './components/VideoBackground';
 
 import * as SplashScreenExpo from 'expo-splash-screen';
 import SplashScreen from './screens/SplashScreen';
@@ -163,37 +162,32 @@ function App() {
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider style={{ backgroundColor: '#000' }}>
                 <SocketProvider>
-                    <VideoBackground
-                        source={require('./assets/images/welcomeScreenVideo1.mp4')}
-                        overlayOpacity={0.78}
-                        style={StyleSheet.absoluteFill}
-                    >
-                        <NavigationContainer 
-                            ref={navigationRef}
-                            key={isAuthenticated ? `auth_user_${(user as any)?._id || (user as any)?.id}` : (isGuest ? 'guest' : 'unauth')}
-                            theme={{
-                            ...DarkTheme,
-                            colors: {
-                                ...DarkTheme.colors,
-                                primary: Colors.primary,
-                                background: 'transparent',
-                                card: 'transparent',
-                                text: Colors.text,
-                                border: Colors.border,
-                                notification: Colors.danger,
-                            }
-                        }}>
-                            {isAuthenticated || isGuest ? (
-                                <Stack.Navigator 
-                                    screenOptions={{ 
-                                        headerShown: false,
-                                        cardStyle: { backgroundColor: 'transparent' },
-                                        cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                        gestureEnabled: true,
-                                        gestureDirection: 'horizontal',
-                                    }}
-                                >
-                                    <Stack.Screen name="MainTabs" component={AppNavigator} />
+                    <NavigationContainer 
+                        ref={navigationRef}
+                        key={isAuthenticated ? `auth_user_${(user as any)?._id || (user as any)?.id}` : (isGuest ? 'guest' : 'unauth')}
+                        theme={{
+                        ...DarkTheme,
+                        colors: {
+                            ...DarkTheme.colors,
+                            primary: Colors.primary,
+                            background: '#000000',
+                            card: '#000000',
+                            text: Colors.text,
+                            border: Colors.border,
+                            notification: Colors.danger,
+                        }
+                    }}>
+                        {isAuthenticated || isGuest ? (
+                            <Stack.Navigator 
+                                screenOptions={{ 
+                                    headerShown: false,
+                                    cardStyle: { backgroundColor: '#000000' },
+                                    cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                    gestureEnabled: true,
+                                    gestureDirection: 'horizontal',
+                                }}
+                            >
+                                <Stack.Screen name="MainTabs" component={AppNavigator} />
                                     <Stack.Screen name="Welcome" component={WelcomeScreen} />
                                     <Stack.Screen name="JoinApplication" component={JoinApplicationScreen} />
                                     <Stack.Screen name="MyStats" component={MyStatsScreen} />
@@ -330,7 +324,6 @@ function App() {
                             )}
                             <StatusBar style="light" />
                         </NavigationContainer>
-                    </VideoBackground>
                 </SocketProvider>
             </SafeAreaProvider>
         </GestureHandlerRootView>
