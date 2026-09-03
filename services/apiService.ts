@@ -1161,6 +1161,22 @@ export const apiService = {
                 };
             });
 
+            const parseFormationObject = (data: any) => {
+                if (!data) return null;
+                if (typeof data === 'object' && Array.isArray(data.players) && data.players.length > 0) {
+                    return data;
+                }
+                if (typeof data === 'string') {
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed && Array.isArray(parsed.players) && parsed.players.length > 0) {
+                            return parsed;
+                        }
+                    } catch (e) {}
+                }
+                return null;
+            };
+
             const parseTeamFormation = (teamObj: any) => {
                 if (!teamObj) return { players: [] };
 
@@ -1188,6 +1204,14 @@ export const apiService = {
                 return form || { players: [] };
             };
 
+            const homeMatchSnapshot = parseFormationObject(m.home_formation || m.homeFormation);
+            const awayMatchSnapshot = parseFormationObject(m.away_formation || m.awayFormation);
+            const homeLiveFormation = parseTeamFormation(homeTeam);
+            const awayLiveFormation = parseTeamFormation(awayTeam);
+
+            const finalHomeFormation = homeMatchSnapshot || homeLiveFormation;
+            const finalAwayFormation = awayMatchSnapshot || awayLiveFormation;
+
             return {
                 ...m,
                 _id: m.id,
@@ -1199,8 +1223,10 @@ export const apiService = {
                 homeTeamLogo: homeTeam?.logo_url || homeTeam?.logo || m.home_team_logo || '',
                 awayTeamName: awayTeam?.name || m.away_team_name || 'Mehmon jamoa',
                 awayTeamLogo: awayTeam?.logo_url || awayTeam?.logo || m.away_team_logo || '',
-                homeTeam: homeTeam ? { ...homeTeam, name: homeTeam.name, logo: homeTeam.logo_url || homeTeam.logo, formation: parseTeamFormation(homeTeam) } : { name: m.home_team_name, logo: m.home_team_logo, formation: { players: [] } },
-                awayTeam: awayTeam ? { ...awayTeam, name: awayTeam.name, logo: awayTeam.logo_url || awayTeam.logo, formation: parseTeamFormation(awayTeam) } : { name: m.away_team_name, logo: m.away_team_logo, formation: { players: [] } },
+                home_formation: finalHomeFormation,
+                away_formation: finalAwayFormation,
+                homeTeam: homeTeam ? { ...homeTeam, name: homeTeam.name, logo: homeTeam.logo_url || homeTeam.logo, formation: finalHomeFormation } : { name: m.home_team_name, logo: m.home_team_logo, formation: finalHomeFormation },
+                awayTeam: awayTeam ? { ...awayTeam, name: awayTeam.name, logo: awayTeam.logo_url || awayTeam.logo, formation: finalAwayFormation } : { name: m.away_team_name, logo: m.away_team_logo, formation: finalAwayFormation },
                 score: { home: m.home_score ?? 0, away: m.away_score ?? 0 },
                 home_score: m.home_score ?? 0,
                 away_score: m.away_score ?? 0,
@@ -1214,6 +1240,30 @@ export const apiService = {
         } catch (err) {
             console.error('getMatchById error:', err);
             return null;
+        }
+    },
+
+    // O'yin tarkiblarini qotirib saqlash (Lineup Snapshot)
+    updateMatchFormation: async (matchId: string | number, payload: { home_formation?: any; away_formation?: any }) => {
+        try {
+            if (!matchId) return { success: false, error: 'Match ID topilmadi' };
+            const { error: rpcErr } = await supabase.rpc('update_match_formations', {
+                p_match_id: matchId,
+                p_home_formation: payload.home_formation || null,
+                p_away_formation: payload.away_formation || null,
+            });
+
+            if (rpcErr) {
+                const updateObj: any = {};
+                if (payload.home_formation) updateObj.home_formation = payload.home_formation;
+                if (payload.away_formation) updateObj.away_formation = payload.away_formation;
+                const { error: directErr } = await supabase.from('matches').update(updateObj).eq('id', matchId);
+                if (directErr) throw directErr;
+            }
+            return { success: true };
+        } catch (e: any) {
+            console.warn('updateMatchFormation error:', e);
+            return { success: false, error: e.message || 'Xatolik yuz berdi' };
         }
     },
 

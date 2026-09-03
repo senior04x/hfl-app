@@ -1027,8 +1027,13 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             return renderLineupsSkeleton();
         }
 
+        const matchSnapshotFormation = isHome 
+            ? (match?.home_formation || match?.homeFormation) 
+            : (match?.away_formation || match?.awayFormation);
         const targetTeamObject = isHome ? match?.homeTeam : match?.awayTeam;
-        const rawFormationPlayers = targetTeamObject?.formation?.players || targetTeamObject?.players || [];
+        const rawFormationPlayers = (matchSnapshotFormation?.players && matchSnapshotFormation.players.length > 0)
+            ? matchSnapshotFormation.players
+            : (targetTeamObject?.formation?.players || targetTeamObject?.players || []);
 
         let tacticsPlayers: any[] = [];
 
