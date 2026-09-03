@@ -1390,9 +1390,9 @@ export default function MyStatsScreen({ route, navigation }: any) {
                         style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
                         keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
                     >
-                        <View style={[styles.editModalCard, cardSurface, { maxHeight: '90%', padding: 0, overflow: 'hidden' }]}>
-                            {/* Fixed Modal Header */}
-                            <View style={[styles.editModalHeader, { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, marginBottom: 0 }]}>
+                        <View style={[styles.editModalCard, cardSurface, { maxHeight: '92%', padding: 16 }]}>
+                            {/* Modal Header */}
+                            <View style={[styles.editModalHeader, { marginBottom: 12 }]}>
                                 <Text style={[styles.editModalTitle, { color: homeColors.textPrimary }]}>{t('profile.edit_profile', 'PROFILNI TAHRIRLASH')}</Text>
                                 <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                     <Ionicons name="close" size={22} color={homeColors.textPrimary} />
@@ -1401,8 +1401,8 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                             {/* Scrollable Form Body */}
                             <ScrollView
-                                style={{ maxHeight: 370, paddingHorizontal: 16 }}
-                                contentContainerStyle={{ paddingVertical: 10 }}
+                                style={{ maxHeight: 460 }}
+                                contentContainerStyle={{ paddingBottom: 12 }}
                                 showsVerticalScrollIndicator={false}
                                 keyboardShouldPersistTaps="handled"
                             >
@@ -1717,22 +1717,22 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         />
                                     </View>
                                 </View>
-                            </ScrollView>
 
-                            {/* Sticky Fixed Footer for SlideButton */}
-                            <View style={[styles.editModalStickyFooter, { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderTopColor: homeColors.border }]}>
-                                <SlideButton
-                                    title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
-                                    loadingTitle={t('common.loading', 'Yuborilmoqda...')}
-                                    successTitle={t('common.success', 'Muvaffaqiyatli!')}
-                                    onSwipeSuccess={handleSubmitProfileUpdate}
-                                    loading={submittingUpdate}
-                                    status={updateSubmitStatus}
-                                    disabled={submittingUpdate}
-                                    compact={true}
-                                    showHelperText={false}
-                                />
-                            </View>
+                                {/* Slide To Send Button inside Scrollable Form */}
+                                <View style={{ marginTop: 16, marginBottom: 4, alignItems: 'center', width: '100%' }}>
+                                    <SlideButton
+                                        title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
+                                        loadingTitle={t('common.loading', 'Yuborilmoqda...')}
+                                        successTitle={t('common.success', 'Muvaffaqiyatli!')}
+                                        onSwipeSuccess={handleSubmitProfileUpdate}
+                                        loading={submittingUpdate}
+                                        status={updateSubmitStatus}
+                                        disabled={submittingUpdate}
+                                        compact={true}
+                                        showHelperText={false}
+                                    />
+                                </View>
+                            </ScrollView>
                         </View>
                     </KeyboardAvoidingView>
 
