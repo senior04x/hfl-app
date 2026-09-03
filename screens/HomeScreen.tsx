@@ -214,10 +214,26 @@ export default function HomeScreen({ navigation }: any) {
         const targetUserId = user.id || user._id;
         const targetTeamId = user.teamId || user.team_id || targetUserId;
         try {
+            let res = null;
             if (user.role === 'player' && targetUserId) {
-                return await apiService.getPlayerById(targetUserId);
+                res = await apiService.getPlayerById(targetUserId, true);
             } else if (user.role === 'manager' && targetTeamId) {
-                return await apiService.getTeamById(targetTeamId);
+                res = await apiService.getTeamById(targetTeamId);
+            }
+            if (res) {
+                const freshPhoto = res.photo || res.photo_url || res.avatar || res.logo || res.logo_url;
+                const freshFirstName = res.firstName || res.first_name;
+                const freshLastName = res.lastName || res.last_name;
+                useAuthStore.getState().updateUser({
+                    photo: freshPhoto,
+                    photo_url: freshPhoto,
+                    avatar: freshPhoto,
+                    firstName: freshFirstName,
+                    first_name: freshFirstName,
+                    lastName: freshLastName,
+                    last_name: freshLastName,
+                });
+                return res;
             }
         } catch (e) {
             console.error('Error fetching profile in HomeScreen:', e);
@@ -819,7 +835,7 @@ export default function HomeScreen({ navigation }: any) {
                     ) : (
                         <>
                             {(() => {
-                                const avatarUri = user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url || userProfile?.photo || userProfile?.photo_url || userProfile?.avatar || userProfile?.logo || userProfile?.logo_url;
+                                const avatarUri = userProfile?.photo || userProfile?.photo_url || userProfile?.avatar || userProfile?.logo || userProfile?.logo_url || user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url;
                                 const rawName = user?.firstName || user?.name || user?.team_name || userProfile?.firstName || userProfile?.name || userProfile?.team_name || 'AMATORA';
                                 const displayName = rawName.replace(/\(sardor\)/gi, '').replace(/\(menejer\)/gi, '').trim().split(' ')[0] || 'AMATORA';
 

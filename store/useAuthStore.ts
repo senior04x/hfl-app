@@ -5,13 +5,14 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 interface AuthState {
     isGuest: boolean;
     isAuthenticated: boolean;
-    user: any | null; // Note: Ensure backend session.token is correctly stored here
+    user: any | null;
     userAccounts: any[];
     unreadCount: number;
     isChatMuted: boolean;
     setGuest: (isGuest: boolean) => void;
     setAuth: (user: any, accounts?: any[]) => void;
     setUserAccounts: (accounts: any[]) => void;
+    updateUser: (partialUser: any) => void;
     logout: () => void;
     incrementUnreadCount: () => void;
     resetUnreadCount: () => void;
@@ -41,6 +42,22 @@ export const useAuthStore = create<AuthState>()(
                 };
             }),
             setUserAccounts: (accounts) => set({ userAccounts: accounts }),
+            updateUser: (partialUser) => set((state) => {
+                if (!state.user) return state;
+                const updatedUser = { ...state.user, ...partialUser };
+                const updatedAccounts = (state.userAccounts || []).map(acc => {
+                    const accId = String(acc.id || acc._id || acc.teamId || acc.team_id || '');
+                    const targetId = String(updatedUser.id || updatedUser._id || updatedUser.teamId || updatedUser.team_id || '');
+                    if (accId && targetId && accId === targetId) {
+                        return { ...acc, ...partialUser };
+                    }
+                    return acc;
+                });
+                return {
+                    user: updatedUser,
+                    userAccounts: updatedAccounts,
+                };
+            }),
             logout: () => set({ user: null, userAccounts: [], isAuthenticated: false, isGuest: false, unreadCount: 0, isChatMuted: false }),
             incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
             resetUnreadCount: () => set({ unreadCount: 0 }),

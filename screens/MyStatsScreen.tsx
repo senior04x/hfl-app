@@ -786,6 +786,20 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 parsed.aiStats = evaluatedAi;
                 setAiStats(evaluatedAi);
                 setPlayer(parsed);
+
+                // Sync latest photo & name to useAuthStore so HomeScreen and Navbar update immediately
+                const freshPhoto = parsed.photo || parsed.photo_url || parsed.avatar;
+                const freshFirstName = parsed.firstName || parsed.first_name;
+                const freshLastName = parsed.lastName || parsed.last_name;
+                useAuthStore.getState().updateUser({
+                    photo: freshPhoto,
+                    photo_url: freshPhoto,
+                    avatar: freshPhoto,
+                    firstName: freshFirstName,
+                    first_name: freshFirstName,
+                    lastName: freshLastName,
+                    last_name: freshLastName,
+                });
             }
             if (transfersData) {
                 setPlayerTransfers(transfersData);
