@@ -503,24 +503,11 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }
     };
 
-            // Open Profile Update Modal (Fetches fresh live data directly from DB)
-    const handleOpenUpdateModal = async () => {
+    // Open Profile Update Modal (Instantly opens with local cache + silent DB refresh)
+    const handleOpenUpdateModal = () => {
         try {
-            setLoading(true);
-            let freshPlayer = player;
-            if (targetPlayerId) {
-                const { data: dbData } = await supabase
-                    .from('applications')
-                    .select('*')
-                    .eq('id', targetPlayerId)
-                    .maybeSingle();
-                if (dbData) {
-                    freshPlayer = { ...player, ...dbData };
-                }
-            }
-
-            const pData = extractPlayerData(freshPlayer) || {};
-            const bDate = freshPlayer?.birth_date || freshPlayer?.birthDate || '15.05.1998';
+            const pData = extractPlayerData(player) || {};
+            const bDate = player?.birth_date || player?.birthDate || '15.05.1998';
             let formattedBDate = String(bDate);
 
             if (formattedBDate.includes('-')) {
@@ -530,30 +517,61 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 }
             }
 
-            setOriginalPlayerData(freshPlayer);
+            setOriginalPlayerData(player);
             setUpdateForm({
-                photoUrl: freshPlayer?.photo_url || freshPlayer?.photo || freshPlayer?.avatar || '',
-                phone: freshPlayer?.phone || '',
-                firstName: freshPlayer?.first_name || freshPlayer?.firstName || '',
-                lastName: freshPlayer?.last_name || freshPlayer?.lastName || '',
-                fatherName: freshPlayer?.father_name || freshPlayer?.fatherName || pData.fatherName || '',
-                position: freshPlayer?.position || 'Hujumchi',
-                playerNumber: String(freshPlayer?.player_number || freshPlayer?.number || freshPlayer?.shirt_number || ''),
-                passportSeries: freshPlayer?.passport_series || freshPlayer?.passportSeries || '',
-                passportNumber: freshPlayer?.passport_number || freshPlayer?.passportNumber || '',
-                citizenship: freshPlayer?.citizenship || pData.citizenship || "O'zbekiston",
-                height: String(freshPlayer?.height || pData.height || ''),
-                weight: String(freshPlayer?.weight || pData.weight || ''),
-                instagramUsername: freshPlayer?.instagram_username || pData.instagram_username || '',
+                photoUrl: player?.photo_url || player?.photo || player?.avatar || '',
+                phone: player?.phone || '',
+                firstName: player?.first_name || player?.firstName || '',
+                lastName: player?.last_name || player?.lastName || '',
+                fatherName: player?.father_name || player?.fatherName || pData.fatherName || '',
+                position: player?.position || 'Hujumchi',
+                playerNumber: String(player?.player_number || player?.number || player?.shirt_number || ''),
+                passportSeries: player?.passport_series || player?.passportSeries || '',
+                passportNumber: player?.passport_number || player?.passportNumber || '',
+                citizenship: player?.citizenship || pData.citizenship || "O'zbekiston",
+                height: String(player?.height || pData.height || ''),
+                weight: String(player?.weight || pData.weight || ''),
+                instagramUsername: player?.instagram_username || pData.instagram_username || '',
                 birthDate: formattedBDate
             });
             setUpdateSubmitStatus('idle');
             setShowProfileUpdateModal(true);
+
+            // Silent background refresh for freshest DB values
+            if (targetPlayerId) {
+                supabase
+                    .from('applications')
+                    .select('*')
+                    .eq('id', targetPlayerId)
+                    .maybeSingle()
+                    .then(({ data: dbData }) => {
+                        if (dbData) {
+                            const freshPlayer = { ...player, ...dbData };
+                            const freshPData = extractPlayerData(freshPlayer) || {};
+                            setOriginalPlayerData(freshPlayer);
+                            setUpdateForm(prev => ({
+                                ...prev,
+                                photoUrl: freshPlayer?.photo_url || freshPlayer?.photo || freshPlayer?.avatar || prev.photoUrl,
+                                phone: freshPlayer?.phone || prev.phone,
+                                firstName: freshPlayer?.first_name || freshPlayer?.firstName || prev.firstName,
+                                lastName: freshPlayer?.last_name || freshPlayer?.lastName || prev.lastName,
+                                fatherName: freshPlayer?.father_name || freshPlayer?.fatherName || freshPData.fatherName || prev.fatherName,
+                                position: freshPlayer?.position || prev.position,
+                                playerNumber: String(freshPlayer?.player_number || freshPlayer?.number || freshPlayer?.shirt_number || prev.playerNumber),
+                                passportSeries: freshPlayer?.passport_series || freshPlayer?.passportSeries || prev.passportSeries,
+                                passportNumber: freshPlayer?.passport_number || freshPlayer?.passportNumber || prev.passportNumber,
+                                citizenship: freshPlayer?.citizenship || freshPData.citizenship || prev.citizenship,
+                                height: String(freshPlayer?.height || freshPData.height || prev.height),
+                                weight: String(freshPlayer?.weight || freshPData.weight || prev.weight),
+                                instagramUsername: freshPlayer?.instagram_username || freshPData.instagram_username || prev.instagramUsername,
+                            }));
+                        }
+                    })
+                    .catch(() => {});
+            }
         } catch (e) {
-            console.error('Error fetching live player for edit:', e);
+            console.error('Error opening update modal:', e);
             setShowProfileUpdateModal(true);
-        } finally {
-            setLoading(false);
         }
     };
 
