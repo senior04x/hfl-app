@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,9 @@ import {
     Alert,
     ScrollView,
     Platform,
+    PanResponder,
+    StatusBar,
+    Animated as RNAnimated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -159,6 +162,56 @@ export default function FormationBoard({ route, navigation }: any) {
     const [selectedFormat, setSelectedFormat] = useState<MatchFormat>('8v8');
     const [selectedPresetId, setSelectedPresetId] = useState<string>('8v8_2-3-2');
     const { socket } = useSocket();
+
+    // Real-time Interactive Swipe-to-Back (Right Swipe)
+    const swipeBackAnim = useRef(new RNAnimated.Value(0)).current;
+
+    const swipeBackPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+                const isHorizontal = gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+                const isFromLeft = evt.nativeEvent.pageX < 75 || isHorizontal;
+                return isHorizontal && isFromLeft;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > SCREEN_WIDTH * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    RNAnimated.timing(swipeBackAnim, {
+                        toValue: SCREEN_WIDTH,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    RNAnimated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                RNAnimated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            },
+            onPanResponderTerminationRequest: () => true,
+        })
+    ).current;
+
 
     const currentPresets = useMemo(() => {
         return FORMATION_PRESETS[selectedFormat] || FORMATION_PRESETS['8v8'];
@@ -603,9 +656,43 @@ export default function FormationBoard({ route, navigation }: any) {
         );
     }
 
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, SCREEN_WIDTH * 0.8, SCREEN_WIDTH],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
+
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+
+            {/* Fading Backdrop Overlay */}
+            <RNAnimated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
+            />
+
+            <RNAnimated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
+                {...swipeBackPanResponder.panHandlers}
+            >
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                    <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
                 {/* HEADER */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, cardSurface]}>
@@ -883,8 +970,10 @@ export default function FormationBoard({ route, navigation }: any) {
                         </View>
                     </View>
                 </ScrollView>
-            </SafeAreaView>
-        </GestureHandlerRootView>
+                    </SafeAreaView>
+                </GestureHandlerRootView>
+            </RNAnimated.View>
+        </View>
     );
 }
 
