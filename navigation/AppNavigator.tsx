@@ -111,10 +111,10 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
     const TAB_INACTIVE_COLOR = isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.45)';
 
     // Liquid Glass fon ranglari:
-    const capsuleBg = isDark ? 'rgba(10, 12, 18, 0.88)' : 'rgba(255, 255, 255, 0.65)';
+    const capsuleBg = isDark ? 'rgba(16, 16, 16, 0.88)' : 'rgba(255, 255, 255, 0.65)';
     const capsuleBorderColor = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.08)';
     const activePillBg = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
-    const blurFallbackColor = isDark ? 'rgba(10, 12, 18, 0.92)' : 'rgba(255, 255, 255, 0.85)';
+    const blurFallbackColor = isDark ? 'rgba(16, 16, 16, 0.95)' : 'rgba(255, 255, 255, 0.85)';
 
     // Blur/qirralarning konteynerdagi bilan ANIQ bir xil radiusi — ba'zi RN/expo-blur
     // versiyalarida native blur qatlami ota-view'ning overflow:hidden'iga to'liq
@@ -762,7 +762,7 @@ const styles = StyleSheet.create({
         borderLeftWidth: 1,
         borderRightWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.14)',
-        backgroundColor: Platform.OS === 'android' ? 'rgba(15, 23, 42, 0.95)' : 'transparent',
+        backgroundColor: Platform.OS === 'android' ? '#141414' : 'transparent',
     },
     headerDragZone: {
         paddingTop: 12,

@@ -22,13 +22,13 @@ export interface ThemeColors {
 }
 
 export const darkThemeColors: ThemeColors = {
-    background: '#0B132B',       // ✅ Qop-qora emas, to'q ko'k!
-    surface: '#131F37',          // To'q ko'k karta foni
-    surfaceLight: '#1C2A4A',     // Yengil to'q ko'k
-    card: '#131F37',
+    background: '#000000',       // Sof qop-qora
+    surface: '#121212',          // Sof to'q kulrang/qora karta foni
+    surfaceLight: '#1E1E1E',     // Yengil to'q kulrang
+    card: '#141414',             // Sof to'q karta foni
     text: '#FFFFFF',
-    textMuted: '#94A3B8',
-    textSubtle: '#64748B',
+    textMuted: '#A3A3A3',
+    textSubtle: '#737373',
     border: 'rgba(255, 255, 255, 0.1)',
     primary: '#00DF82',
     primaryDark: '#00A862',
