@@ -1388,26 +1388,28 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                         style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
-                        keyboardVerticalOffset={Platform.OS === 'ios' ? 30 : 0}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
                     >
-                        <View style={[styles.editModalCard, cardSurface, { maxHeight: '92%' }]}>
-                            <View style={styles.editModalHeader}>
+                        <View style={[styles.editModalCard, cardSurface, { maxHeight: '90%', padding: 0, overflow: 'hidden' }]}>
+                            {/* Fixed Modal Header */}
+                            <View style={[styles.editModalHeader, { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, marginBottom: 0 }]}>
                                 <Text style={[styles.editModalTitle, { color: homeColors.textPrimary }]}>{t('profile.edit_profile', 'PROFILNI TAHRIRLASH')}</Text>
                                 <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                     <Ionicons name="close" size={22} color={homeColors.textPrimary} />
                                 </TouchableOpacity>
                             </View>
 
+                            {/* Scrollable Form Body */}
                             <ScrollView
-                                style={{ maxHeight: 480 }}
-                                contentContainerStyle={{ paddingBottom: 24 }}
+                                style={{ maxHeight: 370, paddingHorizontal: 16 }}
+                                contentContainerStyle={{ paddingVertical: 10 }}
                                 showsVerticalScrollIndicator={false}
                                 keyboardShouldPersistTaps="handled"
                             >
                                 {/* Photo upload row */}
-                                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                                <View style={{ alignItems: 'center', marginBottom: 14 }}>
                                     <TouchableOpacity onPress={handlePickImage} style={styles.editAvatarWrapper} activeOpacity={0.8}>
-                                        <SmartImage uri={updateForm.photoUrl || player.photo || player.avatar} style={{ width: 88, height: 88, borderRadius: 22 }} contentFit="cover" fallbackIcon="person" />
+                                        <SmartImage uri={updateForm.photoUrl || player.photo || player.avatar} style={{ width: 84, height: 84, borderRadius: 22 }} contentFit="cover" fallbackIcon="person" />
                                         <View style={[styles.cameraIconBadge, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}>
                                             <Ionicons name="camera" size={14} color={isDark ? '#000000' : '#FFFFFF'} />
                                         </View>
@@ -1466,23 +1468,23 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                             }
                                         ]}>
                                             <View style={{
-                                                paddingHorizontal: 10,
-                                                paddingVertical: 10,
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 9,
                                                 backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                                                 borderRightWidth: 1,
                                                 borderRightColor: homeColors.border,
                                                 justifyContent: 'center',
                                                 alignItems: 'center'
                                             }}>
-                                                <Text style={{ color: homeColors.textPrimary, fontWeight: '700', fontSize: 13.5 }}>+998</Text>
+                                                <Text style={{ color: homeColors.textPrimary, fontWeight: '700', fontSize: 13 }}>+998</Text>
                                             </View>
                                             <TextInput
                                                 style={{
                                                     flex: 1,
                                                     color: homeColors.textPrimary,
-                                                    paddingHorizontal: 10,
+                                                    paddingHorizontal: 8,
                                                     paddingVertical: 8,
-                                                    fontSize: 14,
+                                                    fontSize: 13.5,
                                                     fontWeight: '600'
                                                 }}
                                                 value={(updateForm.phone || '').replace(/^\+998/, '').replace(/^998/, '')}
@@ -1499,49 +1501,78 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                     </View>
                                 </View>
 
-                                {/* 4 Positions Select Pills */}
+                                {/* 4 Positions Select (2 explicit rows, zero overlap) */}
                                 <View style={styles.formGroup}>
                                     <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pozitsiya (Amplua)</Text>
-                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                                        {['Darvozabon', 'Himoyachi', 'Yarim himoyachi', 'Hujumchi'].map((pos) => {
-                                            const isSel = updateForm.position === pos;
-                                            return (
-                                                <TouchableOpacity
-                                                    key={pos}
-                                                    activeOpacity={0.7}
-                                                    onPress={() => {
-                                                        try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
-                                                        setUpdateForm(p => ({ ...p, position: pos }));
-                                                    }}
-                                                    style={[
-                                                        {
-                                                            flex: 1,
-                                                            minWidth: '45%',
-                                                            paddingVertical: 9,
-                                                            paddingHorizontal: 8,
-                                                            borderRadius: 10,
-                                                            borderWidth: 1,
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            borderColor: isSel ? (isDark ? '#FFFFFF' : '#000000') : homeColors.border,
-                                                            backgroundColor: isSel
-                                                                ? (isDark ? '#FFFFFF' : '#000000')
-                                                                : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
-                                                        }
-                                                    ]}
-                                                >
-                                                    <Text style={[
-                                                        {
-                                                            fontSize: 12.5,
-                                                            fontWeight: isSel ? '800' : '600',
-                                                            color: isSel ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textPrimary
-                                                        }
-                                                    ]}>
-                                                        {pos}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            );
-                                        })}
+                                    <View style={{ gap: 6, marginTop: 4 }}>
+                                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                                            {['Darvozabon', 'Himoyachi'].map((pos) => {
+                                                const isSel = updateForm.position === pos;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={pos}
+                                                        activeOpacity={0.7}
+                                                        onPress={() => {
+                                                            try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                                            setUpdateForm(p => ({ ...p, position: pos }));
+                                                        }}
+                                                        style={[
+                                                            styles.positionPillBtn,
+                                                            {
+                                                                borderColor: isSel ? (isDark ? '#FFFFFF' : '#000000') : homeColors.border,
+                                                                backgroundColor: isSel
+                                                                    ? (isDark ? '#FFFFFF' : '#000000')
+                                                                    : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
+                                                            }
+                                                        ]}
+                                                    >
+                                                        <Text style={[
+                                                            styles.positionPillBtnText,
+                                                            {
+                                                                color: isSel ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textPrimary,
+                                                                fontWeight: isSel ? '800' : '600'
+                                                            }
+                                                        ]}>
+                                                            {pos}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
+                                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                                            {['Yarim himoyachi', 'Hujumchi'].map((pos) => {
+                                                const isSel = updateForm.position === pos;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={pos}
+                                                        activeOpacity={0.7}
+                                                        onPress={() => {
+                                                            try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                                            setUpdateForm(p => ({ ...p, position: pos }));
+                                                        }}
+                                                        style={[
+                                                            styles.positionPillBtn,
+                                                            {
+                                                                borderColor: isSel ? (isDark ? '#FFFFFF' : '#000000') : homeColors.border,
+                                                                backgroundColor: isSel
+                                                                    ? (isDark ? '#FFFFFF' : '#000000')
+                                                                    : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
+                                                            }
+                                                        ]}
+                                                    >
+                                                        <Text style={[
+                                                            styles.positionPillBtnText,
+                                                            {
+                                                                color: isSel ? (isDark ? '#000000' : '#FFFFFF') : homeColors.textPrimary,
+                                                                fontWeight: isSel ? '800' : '600'
+                                                            }
+                                                        ]}>
+                                                            {pos}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
                                     </View>
                                 </View>
 
@@ -1558,7 +1589,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         />
                                     </View>
                                     <View style={[styles.formGroup, { flex: 1.2 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug\'ilgan sana</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug'ilgan sana</Text>
                                         <TouchableOpacity
                                             activeOpacity={0.7}
                                             onPress={() => setIsDatePickerVisible(true)}
@@ -1686,20 +1717,20 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         />
                                     </View>
                                 </View>
-
-                                {/* Interactive Slide To Send Button inside ScrollView */}
-                                <View style={{ marginTop: 20, marginBottom: 10, alignItems: 'center', width: '100%' }}>
-                                    <SlideButton
-                                        title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
-                                        loadingTitle={t('common.loading', 'Yuborilmoqda...')}
-                                        successTitle={t('common.success', 'Muvaffaqiyatli!')}
-                                        onSwipeSuccess={handleSubmitProfileUpdate}
-                                        loading={submittingUpdate}
-                                        status={updateSubmitStatus}
-                                        disabled={submittingUpdate}
-                                    />
-                                </View>
                             </ScrollView>
+
+                            {/* Sticky Fixed Footer for SlideButton */}
+                            <View style={[styles.editModalStickyFooter, { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderTopColor: homeColors.border }]}>
+                                <SlideButton
+                                    title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
+                                    loadingTitle={t('common.loading', 'Yuborilmoqda...')}
+                                    successTitle={t('common.success', 'Muvaffaqiyatli!')}
+                                    onSwipeSuccess={handleSubmitProfileUpdate}
+                                    loading={submittingUpdate}
+                                    status={updateSubmitStatus}
+                                    disabled={submittingUpdate}
+                                />
+                            </View>
                         </View>
                     </KeyboardAvoidingView>
 
@@ -2108,6 +2139,26 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
+    },
+    editModalStickyFooter: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    positionPillBtn: {
+        flex: 1,
+        height: 38,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 10,
+        borderWidth: 1,
+        paddingHorizontal: 6,
+    },
+    positionPillBtnText: {
+        fontSize: 12,
+        letterSpacing: 0.1,
     },
     editModalCard: {
         width: '100%',
