@@ -21,6 +21,7 @@ import SmartImage from './SmartImage';
 import { apiService, supabase } from '../services/apiService';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
+import { getLocalizedPosition } from '../utils/localizationUtils';
 import Colors from '../constants/Colors';
 
 const { width, height } = Dimensions.get('window');
@@ -102,7 +103,7 @@ export default function EditTeamModal({
                     lastName: p.last_name || '',
                     photo: p.photo_url || '',
                     photo_url: p.photo_url || '',
-                    position: p.position || 'O\'yinchi',
+                    position: p.position || 'PLAYER',
                     number: p.player_number || '',
                     phone: p.phone || '',
                 }));
@@ -110,7 +111,7 @@ export default function EditTeamModal({
             }
         } catch (error) {
             console.error('Error loading team data for edit:', error);
-            Alert.alert(t('common.error', 'Xatolik'), 'Jamoa ma\'lumotlarini yuklab bo\'lmadi.');
+            Alert.alert(t('common.error', 'Xatolik'), t('teams.load_error', 'Jamoa ma\'lumotlarini yuklab bo\'lmadi.'));
         } finally {
             setLoading(false);
         }
@@ -123,7 +124,7 @@ export default function EditTeamModal({
             if (!permission.granted) {
                 Alert.alert(
                     t('common.permission_denied', 'Ruxsat berilmadi'),
-                    'Galereyadan rasm tanlash uchun ruxsat berishingiz kerak.'
+                    t('teams.photo_permission_error', 'Galereyadan rasm tanlash uchun ruxsat berishingiz kerak.')
                 );
                 return;
             }
@@ -142,17 +143,16 @@ export default function EditTeamModal({
                     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 } catch (e) {}
 
-                // Upload directly to Supabase storage to get public URL
                 const uploadRes = await apiService.uploadPhoto(localUri);
                 if (uploadRes && uploadRes.url) {
                     setLogoUrl(uploadRes.url);
                 } else {
-                    Alert.alert(t('common.error', 'Xato'), 'Rasmni yuklashda xatolik yuz berdi.');
+                    Alert.alert(t('common.error', 'Xato'), t('teams.photo_upload_error', 'Rasmni yuklashda xatolik yuz berdi.'));
                 }
             }
         } catch (error) {
             console.error('Logo upload error:', error);
-            Alert.alert(t('common.error', 'Xato'), 'Rasm tanlashda xatolik.');
+            Alert.alert(t('common.error', 'Xato'), t('teams.photo_upload_error', 'Rasm tanlashda xatolik.'));
         } finally {
             setUploadingLogo(false);
         }
@@ -185,14 +185,14 @@ export default function EditTeamModal({
 
             Alert.alert(
                 t('common.success', 'Muvaffaqiyatli'),
-                'Jamoa ma\'lumotlari yangilandi.'
+                t('teams.team_updated_success', 'Jamoa ma\'lumotlari yangilandi.')
             );
 
             if (onSaved) onSaved();
             onClose();
         } catch (error: any) {
             console.error('Save team error:', error);
-            Alert.alert(t('common.error', 'Xato'), error?.message || 'Ma\'lumotlarni saqlashda xatolik.');
+            Alert.alert(t('common.error', 'Xato'), error?.message || t('teams.save_error', 'Ma\'lumotlarni saqlashda xatolik.'));
         } finally {
             setSaving(false);
         }
@@ -205,7 +205,7 @@ export default function EditTeamModal({
             if (!permission.granted) {
                 Alert.alert(
                     t('common.permission_denied', 'Ruxsat berilmadi'),
-                    'Galereyadan rasm tanlash uchun ruxsat kerak.'
+                    t('teams.photo_permission_error', 'Galereyadan rasm tanlash uchun ruxsat kerak.')
                 );
                 return;
             }
@@ -224,7 +224,6 @@ export default function EditTeamModal({
                     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 } catch (e) {}
 
-                // Upload to cloud storage
                 const uploadRes = await apiService.uploadPhoto(localUri);
                 if (uploadRes && uploadRes.url) {
                     const newPhotoUrl = uploadRes.url;
@@ -249,7 +248,7 @@ export default function EditTeamModal({
             }
         } catch (error) {
             console.error('Player photo upload error:', error);
-            Alert.alert(t('common.error', 'Xato'), 'O\'yinchi rasmini yuklashda xatolik.');
+            Alert.alert(t('common.error', 'Xato'), t('teams.photo_upload_error', 'O\'yinchi rasmini yuklashda xatolik.'));
         } finally {
             setUploadingPlayerId(null);
         }
@@ -282,7 +281,7 @@ export default function EditTeamModal({
             } catch (e) {}
         } catch (error: any) {
             console.error('Save player phone error:', error);
-            Alert.alert(t('common.error', 'Xato'), error?.message || 'Telefon raqamni saqlashda xatolik.');
+            Alert.alert(t('common.error', 'Xato'), error?.message || t('teams.phone_save_error', 'Telefon raqamni saqlashda xatolik.'));
         } finally {
             setSaving(false);
         }
@@ -324,7 +323,7 @@ export default function EditTeamModal({
                                 {t('profile.edit_team_info', 'Jamoa ma\'lumotlarini tahrirlash')}
                             </Text>
                             <Text style={[styles.headerSubtitle, { color: homeColors.textSecondary }]}>
-                                {teamName || 'Jamoa'}
+                                {teamName || t('teams.team', 'Jamoa')}
                             </Text>
                         </View>
                         <TouchableOpacity
@@ -427,11 +426,11 @@ export default function EditTeamModal({
                                                 >
                                                     <Ionicons name="camera-outline" size={16} color="#FFFFFF" />
                                                     <Text style={styles.uploadLogoText}>
-                                                        {uploadingLogo ? 'Yuklanmoqda...' : t('profile.change_photo', 'Logoni almashtirish')}
+                                                        {uploadingLogo ? t('common.loading', 'Yuklanmoqda...') : t('profile.change_photo', 'Logoni almashtirish')}
                                                     </Text>
                                                 </TouchableOpacity>
                                                 <Text style={[styles.hintText, { color: homeColors.textSecondary }]}>
-                                                    PNG, JPG yoki WEBP formatda
+                                                    {t('teams.image_format_hint', 'PNG, JPG yoki WEBP formatda')}
                                                 </Text>
                                             </View>
                                         </View>
@@ -444,7 +443,9 @@ export default function EditTeamModal({
                                             </Text>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                                 <Ionicons name="lock-closed" size={12} color={homeColors.textSecondary} />
-                                                <Text style={[styles.lockHint, { color: homeColors.textSecondary }]}>Himoyalangan</Text>
+                                                <Text style={[styles.lockHint, { color: homeColors.textSecondary }]}>
+                                                    {t('teams.protected_field', 'Himoyalangan')}
+                                                </Text>
                                             </View>
                                         </View>
                                         <TextInput
@@ -464,7 +465,7 @@ export default function EditTeamModal({
 
                                     <View style={[styles.sectionCard, cardSurface]}>
                                         <Text style={[styles.sectionLabel, { color: homeColors.textSecondary, marginBottom: 8 }]}>
-                                            {t('teams.leadership', 'Rahbariyat va aloqa')}
+                                            {t('teams.leadership_contacts', 'Rahbariyat va aloqa')}
                                         </Text>
 
                                         <View style={styles.fieldGroup}>
@@ -474,7 +475,7 @@ export default function EditTeamModal({
                                             <TextInput
                                                 value={captainName}
                                                 onChangeText={setCaptainName}
-                                                placeholder="Sardor F.I.SH."
+                                                placeholder={t('teams.captain_name_placeholder', 'Sardor F.I.SH.')}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border }]}
                                             />
@@ -495,7 +496,7 @@ export default function EditTeamModal({
                                             <TextInput
                                                 value={coachName}
                                                 onChangeText={setCoachName}
-                                                placeholder="Murabbiy F.I.SH."
+                                                placeholder={t('teams.coach_name_placeholder', 'Murabbiy F.I.SH.')}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border }]}
                                             />
@@ -516,7 +517,7 @@ export default function EditTeamModal({
                                             <TextInput
                                                 value={presidentName}
                                                 onChangeText={setPresidentName}
-                                                placeholder="Rahbar F.I.SH."
+                                                placeholder={t('teams.president_name_placeholder', 'Rahbar F.I.SH.')}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border }]}
                                             />
@@ -555,7 +556,7 @@ export default function EditTeamModal({
                                         <TextInput
                                             value={playerSearch}
                                             onChangeText={setPlayerSearch}
-                                            placeholder="O'yinchini qidirish..."
+                                            placeholder={t('teams.search_player_placeholder', 'O\'yinchini qidirish...')}
                                             placeholderTextColor={homeColors.textSecondary}
                                             style={[styles.searchInput, { color: homeColors.textPrimary }]}
                                         />
@@ -568,7 +569,9 @@ export default function EditTeamModal({
 
                                     {filteredPlayers.length === 0 ? (
                                         <View style={{ padding: 24, alignItems: 'center' }}>
-                                            <Text style={{ color: homeColors.textSecondary }}>O'yinchilar topilmadi</Text>
+                                            <Text style={{ color: homeColors.textSecondary }}>
+                                                {t('teams.no_players', 'O\'yinchilar topilmadi')}
+                                            </Text>
                                         </View>
                                     ) : (
                                         filteredPlayers.map((player) => {
@@ -584,6 +587,7 @@ export default function EditTeamModal({
                                                     isUploading={isUploadingThis}
                                                     homeColors={homeColors}
                                                     isDark={isDark}
+                                                    t={t}
                                                     onPickPhoto={() => handlePickPlayerPhoto(pId)}
                                                     onToggleEdit={() => setEditingPlayerId(isEditingThis ? null : pId)}
                                                     onSavePhone={(newPhone) => handleSavePlayerPhone(player, newPhone)}
@@ -607,6 +611,7 @@ function PlayerEditCard({
     isUploading,
     homeColors,
     isDark,
+    t,
     onPickPhoto,
     onToggleEdit,
     onSavePhone,
@@ -616,13 +621,15 @@ function PlayerEditCard({
     isUploading: boolean;
     homeColors: any;
     isDark: boolean;
+    t: any;
     onPickPhoto: () => void;
     onToggleEdit: () => void;
     onSavePhone: (phone: string) => void;
 }) {
     const [phoneText, setPhoneText] = useState(player.phone || player.phoneNumber || '');
 
-    const fullName = `${player.firstName || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim() || 'O\'yinchi';
+    const fullName = `${player.firstName || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim() || t('teams.player_fallback', 'O\'yinchi');
+    const localizedPos = getLocalizedPosition(player.position, t);
 
     return (
         <View style={[styles.playerCard, { backgroundColor: homeColors.surface, borderColor: homeColors.border, borderWidth: 1 }]}>
@@ -660,11 +667,11 @@ function PlayerEditCard({
                     </View>
 
                     <Text style={[styles.playerPositionText, { color: homeColors.textSecondary }]}>
-                        {player.position || 'O\'yinchi'}
+                        {localizedPos}
                     </Text>
 
                     <Text style={[styles.playerCurrentPhone, { color: homeColors.textSecondary }]}>
-                        📞 {player.phone || 'Telefon kiritilmagan'}
+                        📞 {player.phone || t('teams.no_phone_entered', 'Telefon kiritilmagan')}
                     </Text>
                 </View>
 
@@ -698,7 +705,7 @@ function PlayerEditCard({
                         style={[styles.savePhoneBtn, { backgroundColor: homeColors.accent }]}
                     >
                         <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                        <Text style={styles.savePhoneBtnText}>Saqlash</Text>
+                        <Text style={styles.savePhoneBtnText}>{t('common.save', 'Saqlash')}</Text>
                     </TouchableOpacity>
                 </View>
             )}
