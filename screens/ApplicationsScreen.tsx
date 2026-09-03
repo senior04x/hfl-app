@@ -131,7 +131,7 @@ export default function ApplicationsScreen({ navigation }: any) {
             // 2. Fetch applications directly from supabase with complete relations
             const { data: allApps, error: appErr } = await supabase
                 .from('applications')
-                .select('*, teams(id, name, logo_url, logo)')
+                .select('*, teams(id, name, logo_url)')
                 .order('created_at', { ascending: false })
                 .limit(100);
 
@@ -140,8 +140,12 @@ export default function ApplicationsScreen({ navigation }: any) {
                     const comment = String(app.comment || '');
                     const appPhoneClean = String(app.phone || '').replace(/\D/g, '');
 
-                    if (cleanPhone && appPhoneClean && (appPhoneClean.endsWith(cleanPhone) || cleanPhone.endsWith(appPhoneClean))) {
-                        return true;
+                    if (cleanPhone && appPhoneClean) {
+                        const last9User = cleanPhone.slice(-9);
+                        const last9App = appPhoneClean.slice(-9);
+                        if (last9User && last9App && (last9User === last9App || appPhoneClean.endsWith(cleanPhone) || cleanPhone.endsWith(appPhoneClean))) {
+                            return true;
+                        }
                     }
                     if (targetPlayerId && (comment.includes(`"playerId":"${targetPlayerId}"`) || comment.includes(`"playerId":${targetPlayerId}`))) {
                         return true;
