@@ -608,9 +608,8 @@ export default function FifaPlayerCard({
                             </View>
                         </View>
 
-                        {/* Bottom Container: Player Name Plaque + Real Football Stats + Amatora Seal */}
+                        {/* Middle: Player Name Plaque */}
                         <View style={[styles.bottomInfoSection, { marginTop: L.gapHeroToName }]}>
-                            {/* Player Name Plaque */}
                             <View style={styles.namePlateWrapper}>
                                 <LinearGradient
                                     colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
@@ -636,17 +635,27 @@ export default function FifaPlayerCard({
                                     </Text>
                                 </LinearGradient>
                             </View>
+                        </View>
 
-                            {/* Real Football Stats (GOL, ASIST, O'YIN) */}
+                        {/* Bottom Pinned Section: Separator + Stats Row (Gol, Asist, O'yin) + 5px gap + Micro Amatora Seal */}
+                        <View
+                            style={{
+                                position: 'absolute',
+                                bottom: Math.max(3, Math.round(5 * scaleFactor)),
+                                left: 0,
+                                right: 0,
+                                alignItems: 'center',
+                            }}
+                        >
                             {showAttributes && (
-                                <View style={{ width: '100%' }}>
-                                    <View style={[styles.separatorContainer, { height: L.sepH, marginTop: L.gapNameToSep }]}>
+                                <View style={{ width: '100%', alignItems: 'center' }}>
+                                    <View style={[styles.separatorContainer, { height: L.sepH, marginBottom: 4 }]}>
                                         <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow, height: Math.max(1, scaleFactor) }]} />
                                         <View style={[styles.separatorDiamond, { backgroundColor: theme.textGold, width: L.sepH * 0.55, height: L.sepH * 0.55, marginHorizontal: 6 * scaleFactor }]} />
                                         <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow, height: Math.max(1, scaleFactor) }]} />
                                     </View>
 
-                                    <View style={[styles.statsRowThree, { paddingHorizontal: L.bodyPadH, marginTop: L.gapSepToStats }]}>
+                                    <View style={[styles.statsRowThree, { paddingHorizontal: L.bodyPadH }]}>
                                         <View style={[styles.statColItem, { gap: L.gapStatNumToLabel }]}>
                                             <Text style={[styles.statNumBig, { fontSize: L.statNumFont, lineHeight: L.statNumLineH, color: theme.textGold }]}>
                                                 {goalsCount}
@@ -678,45 +687,45 @@ export default function FifaPlayerCard({
                                             </Text>
                                         </View>
                                     </View>
-
-                                    {/* Micro Amatora Seal placed exactly 5px below stats row */}
-                                    <View
-                                        style={[
-                                            styles.cardFooterBrand,
-                                            {
-                                                marginTop: 5,
-                                                height: L.footerH,
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                            }
-                                        ]}
-                                    >
-                                        <Image
-                                            source={require('../assets/logo.png')}
-                                            style={{
-                                                width: L.footerLogo,
-                                                height: L.footerLogo,
-                                                opacity: 0.45,
-                                                marginRight: 2.5 * scaleFactor
-                                            }}
-                                            resizeMode="contain"
-                                        />
-                                        <Text
-                                            style={[
-                                                styles.footerBrandText,
-                                                {
-                                                    fontSize: L.footerFont,
-                                                    lineHeight: L.footerH,
-                                                    color: theme.textGold,
-                                                    opacity: 0.65,
-                                                }
-                                            ]}
-                                        >
-                                            AMATORA
-                                        </Text>
-                                    </View>
                                 </View>
                             )}
+
+                            {/* Micro Amatora Seal Glued exactly 5px below stats row at the absolute bottom */}
+                            <View
+                                style={[
+                                    styles.cardFooterBrand,
+                                    {
+                                        marginTop: 5,
+                                        height: L.footerH,
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                    }
+                                ]}
+                            >
+                                <Image
+                                    source={require('../assets/logo.png')}
+                                    style={{
+                                        width: L.footerLogo,
+                                        height: L.footerLogo,
+                                        opacity: 0.45,
+                                        marginRight: 2.5 * scaleFactor
+                                    }}
+                                    resizeMode="contain"
+                                />
+                                <Text
+                                    style={[
+                                        styles.footerBrandText,
+                                        {
+                                            fontSize: L.footerFont,
+                                            lineHeight: L.footerH,
+                                            color: theme.textGold,
+                                            opacity: 0.65,
+                                        }
+                                    ]}
+                                >
+                                    AMATORA
+                                </Text>
+                            </View>
                         </View>
                     </LinearGradient>
                 </LinearGradient>
