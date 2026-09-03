@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     Animated,
+    Easing,
     PanResponder,
     Dimensions,
     TouchableOpacity,
@@ -47,6 +48,39 @@ const RARITY_BADGE_ICON: Record<number, string> = {
     5: 'sparkles',        // holographic
     6: 'diamond',         // icon
 };
+
+// =============================================================================
+// DARAJAGA XOS "SHIDDATLI" FON UslUBLARI (referens rasm asosida)
+// -----------------------------------------------------------------------------
+// Bronza/Kumush/Tilla -> teatrdagidek YUQORIDAN TUSHUVCHI SPOTLIGHT nuri.
+// Amatora Elite       -> OLMOS QIRRALARI (faceted crystal) yorug'lik chiziqlari.
+// Holographic         -> harakatlanuvchi PRIZMA (radug'a) chizig'i.
+// Icon (Mythic)        -> chuqur KOSMIK fon + yulduzli osmon + afsonaviy nur.
+// Yulduzlar foizli (%) koordinatada — karta o'lchami qanday bo'lmasin avtomatik
+// moslashadi, BASE matematik maketiga hech qanday ta'sir qilmaydi.
+// =============================================================================
+const STAR_POSITIONS: { left: string; top: string; size: number; opacity: number }[] = [
+    { left: '10%', top: '8%', size: 2.2, opacity: 0.9 },
+    { left: '24%', top: '18%', size: 1.3, opacity: 0.55 },
+    { left: '36%', top: '6%', size: 1.8, opacity: 0.75 },
+    { left: '50%', top: '14%', size: 1.1, opacity: 0.45 },
+    { left: '7%', top: '28%', size: 1.6, opacity: 0.65 },
+    { left: '19%', top: '40%', size: 1.0, opacity: 0.4 },
+    { left: '31%', top: '50%', size: 2.0, opacity: 0.8 },
+    { left: '6%', top: '58%', size: 1.2, opacity: 0.5 },
+    { left: '42%', top: '63%', size: 1.4, opacity: 0.55 },
+    { left: '16%', top: '74%', size: 1.1, opacity: 0.45 },
+    { left: '29%', top: '84%', size: 1.7, opacity: 0.7 },
+    { left: '4%', top: '90%', size: 1.2, opacity: 0.45 },
+    { left: '38%', top: '92%', size: 1.5, opacity: 0.55 },
+    { left: '47%', top: '35%', size: 1.0, opacity: 0.35 },
+];
+
+const CRYSTAL_FACETS: { rotate: string; top: string; left: string; weight: number }[] = [
+    { rotate: '22deg', top: '4%', left: '-10%', weight: 1.4 },
+    { rotate: '-16deg', top: '46%', left: '58%', weight: 1.1 },
+    { rotate: '34deg', top: '72%', left: '-6%', weight: 1.2 },
+];
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -485,11 +519,49 @@ export default function FifaPlayerCard({
     const cardHeight = L.cardHeight;
     const scaleFactor = L.sf;
 
+    // Daraja (rarity) asosida qaysi "shiddatli" fon uslubi ishlatilishi
+    const backdropStyle: 'spotlight' | 'crystal' | 'prism' | 'cosmic' =
+        rarity === 'icon' ? 'cosmic'
+        : rarity === 'holographic' ? 'prism'
+        : rarity === 'amatora_elite' ? 'crystal'
+        : 'spotlight';
+    const hasDramaShimmer = backdropStyle === 'prism' || backdropStyle === 'cosmic';
+
     // 3D Parallax & Tilt animations
     const tiltX = useRef(new Animated.Value(0)).current;
     const tiltY = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const isTouchingRef = useRef(false);
+
+    // Prizma/Kosmik daraja uchun harakatlanuvchi nur chizig'i (faqat eng
+    // yuqori 2 daraja — "shiddatli" taassurotni kuchaytiradi).
+    const dramaShimmerAnim = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        if (!hasDramaShimmer) return;
+        dramaShimmerAnim.setValue(0);
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(dramaShimmerAnim, {
+                    toValue: 1,
+                    duration: 2200,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.delay(1400),
+                Animated.timing(dramaShimmerAnim, {
+                    toValue: 0,
+                    duration: 0,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+        loop.start();
+        return () => {
+            try {
+                loop.stop();
+            } catch (e) {}
+        };
+    }, [hasDramaShimmer]);
 
     // Accelerometer Subscription for Real Device Tilt Motion (Gyroscope Parallax)
     useEffect(() => {
@@ -625,6 +697,19 @@ export default function FifaPlayerCard({
         : (player?.stats?.rating ? Number(player.stats.rating) : 0);
     const displayRating = attrs.ovr === 0 ? "0" : (rawRating > 0 ? rawRating.toFixed(1) : (attrs.ovr >= 50 ? (attrs.ovr / 10).toFixed(1) : (attrs.ovr || 0).toFixed(1)));
 
+    // Minimalist "glow mesh" foni uchun ikkinchi (aksent bilan bir juft
+    // ishlaydigan) rang — borderGradient'ning o'rta bo'g'inidan olinadi,
+    // shu bilan har bir tier o'zining ikki rangli, mos aurora fonini oladi.
+    const secondaryGlow = (theme.borderGradient && theme.borderGradient.length > 2
+        ? theme.borderGradient[Math.floor(theme.borderGradient.length / 2)]
+        : theme.accentGlow) as string;
+    const glassBorderColor = theme.isLightCard ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.10)';
+
+    const dramaShimmerTranslate = dramaShimmerAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-cardWidth * 1.1, cardWidth * 1.6],
+    });
+
     return (
         <Animated.View
             {...(interactive3D ? panResponder.panHandlers : {})}
@@ -685,15 +770,190 @@ export default function FifaPlayerCard({
                                 paddingHorizontal: L.bodyPadH,
                                 paddingTop: L.bodyPadTop,
                                 paddingBottom: L.bodyPadBottom,
+                                borderWidth: Math.max(0.5, scaleFactor * 0.7),
+                                borderColor: glassBorderColor,
                             },
                         ]}
                     >
-                        {/* Background Geometric Facets */}
-                        <View style={styles.geometricPattern}>
-                            <View style={[styles.geoLine, { borderColor: theme.accentGlow, width: 200 * scaleFactor, height: 200 * scaleFactor, top: -30 * scaleFactor, right: -30 * scaleFactor }]} />
-                            <View style={[styles.geoLine2, { borderColor: theme.accentGlow, width: 180 * scaleFactor, height: 180 * scaleFactor, bottom: 20 * scaleFactor, left: -40 * scaleFactor }]} />
-                            <View style={[styles.geoCircle, { borderColor: theme.accentGlow, width: 140 * scaleFactor, height: 140 * scaleFactor, borderRadius: 70 * scaleFactor, top: 60 * scaleFactor, left: 40 * scaleFactor }]} />
-                        </View>
+                        {/* SHIDDATLI, DARAJAGA XOS FON — referens rasmdan (Bronza→Kumush→
+                            Tilla→Olmos→Brilliant→Mythic) ilhomlanib qurilgan. Har biri
+                            FAQAT dekorativ, absolute-positioned qatlam — BASE matematik
+                            maketiga hech qanday ta'sir qilmaydi. PAC/SHO/PAS/DRI/DEF/PHY
+                            kabi 6ta atribut bo'limi ATAYLAB qo'shilmadi. */}
+
+                        {backdropStyle === 'spotlight' && (
+                            <View pointerEvents="none" style={styles.meshGlowLayer}>
+                                {/* Ikkita keskin, o'tkir NUR TIG'I (light blade) — burchaklardan
+                                    kesib o'tadi, dumaloq emas, keskin qirrali va "shiddatli". */}
+                                <View
+                                    style={[
+                                        styles.spotlightBeam,
+                                        {
+                                            backgroundColor: theme.accentGlow,
+                                            width: cardWidth * 0.42,
+                                            height: cardHeight * 1.5,
+                                            left: cardWidth * 0.06,
+                                            top: -cardHeight * 0.62,
+                                            opacity: theme.isLightCard ? 0.18 : 0.24,
+                                            transform: [{ rotate: '-14deg' }],
+                                        },
+                                    ]}
+                                />
+                                <View
+                                    style={[
+                                        styles.spotlightBeam,
+                                        {
+                                            backgroundColor: theme.accentGlow,
+                                            width: cardWidth * 0.34,
+                                            height: cardHeight * 1.5,
+                                            right: cardWidth * 0.02,
+                                            top: -cardHeight * 0.62,
+                                            opacity: theme.isLightCard ? 0.14 : 0.18,
+                                            transform: [{ rotate: '16deg' }],
+                                        },
+                                    ]}
+                                />
+                                {/* O'tkir olmos-nishon — burchakda, dumaloq emas */}
+                                <View
+                                    style={[
+                                        styles.diamondGlow,
+                                        {
+                                            backgroundColor: theme.accentGlow,
+                                            width: L.heroRowH * 0.85,
+                                            height: L.heroRowH * 0.85,
+                                            top: -L.heroRowH * 0.5,
+                                            left: (cardWidth - L.heroRowH * 0.85) / 2,
+                                            opacity: theme.isLightCard ? 0.16 : 0.20,
+                                        },
+                                    ]}
+                                />
+                                {/* Pastki vinyetka — sahna kabi chuqurlik va drama beradi */}
+                                <LinearGradient
+                                    colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.34)']}
+                                    start={{ x: 0.5, y: 0.42 }}
+                                    end={{ x: 0.5, y: 1 }}
+                                    style={StyleSheet.absoluteFillObject}
+                                />
+                                <View
+                                    style={[
+                                        styles.diamondGlow,
+                                        {
+                                            backgroundColor: secondaryGlow,
+                                            width: L.heroRowH * 0.9,
+                                            height: L.heroRowH * 0.9,
+                                            bottom: -L.heroRowH * 0.55,
+                                            left: -L.heroRowH * 0.35,
+                                            opacity: 0.12,
+                                        },
+                                    ]}
+                                />
+                            </View>
+                        )}
+
+                        {backdropStyle === 'crystal' && (
+                            <View pointerEvents="none" style={styles.meshGlowLayer}>
+                                <View style={[styles.diamondGlow, { backgroundColor: theme.accentGlow, width: L.heroRowH * 1.15, height: L.heroRowH * 1.15, top: -L.heroRowH * 0.55, right: -L.heroRowH * 0.4, opacity: 0.26 }]} />
+                                <View style={[styles.diamondGlow, { backgroundColor: '#FFFFFF', width: L.heroRowH * 0.55, height: L.heroRowH * 0.55, top: -L.heroRowH * 0.06, right: L.heroRowH * 0.12, opacity: 0.20 }]} />
+                                {/* Olmos qirralari — nozik, keskin yorug'lik chiziqlari */}
+                                {CRYSTAL_FACETS.map((shard, idx) => (
+                                    <View
+                                        key={idx}
+                                        style={[
+                                            styles.facetShard,
+                                            { top: shard.top as any, left: shard.left as any, width: cardWidth * 0.9, transform: [{ rotate: shard.rotate }] },
+                                        ]}
+                                    >
+                                        <LinearGradient
+                                            colors={['rgba(255,255,255,0)', `rgba(255,255,255,${shard.weight * 0.22})`, 'rgba(255,255,255,0)']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={{ width: '100%', height: Math.max(1, scaleFactor * shard.weight) }}
+                                        />
+                                    </View>
+                                ))}
+                                <View style={[styles.diamondGlow, { backgroundColor: secondaryGlow, width: L.heroRowH * 0.9, height: L.heroRowH * 0.9, bottom: -L.heroRowH * 0.45, left: -L.heroRowH * 0.35, opacity: 0.16 }]} />
+                            </View>
+                        )}
+
+                        {backdropStyle === 'prism' && (
+                            <View pointerEvents="none" style={styles.meshGlowLayer}>
+                                <View style={[styles.diamondGlow, { backgroundColor: theme.accentGlow, width: L.heroRowH * 1.15, height: L.heroRowH * 1.15, top: -L.heroRowH * 0.55, right: -L.heroRowH * 0.4, opacity: 0.20 }]} />
+                                <View style={[styles.diamondGlow, { backgroundColor: secondaryGlow, width: L.heroRowH, height: L.heroRowH, bottom: -L.heroRowH * 0.5, left: -L.heroRowH * 0.38, opacity: 0.17 }]} />
+                                {/* Harakatlanuvchi PRIZMA (radug'a) chizig'i — bir qarashda "vauv" */}
+                                <Animated.View
+                                    style={[
+                                        styles.prismBand,
+                                        {
+                                            width: cardWidth * 0.5,
+                                            height: cardHeight * 2.2,
+                                            top: -cardHeight * 0.6,
+                                            transform: [{ translateX: dramaShimmerTranslate }, { rotate: '22deg' }],
+                                        },
+                                    ]}
+                                >
+                                    <LinearGradient
+                                        colors={['rgba(255,255,255,0)', 'rgba(240,171,252,0.5)', 'rgba(125,211,252,0.5)', 'rgba(253,224,71,0.4)', 'rgba(255,255,255,0)']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={StyleSheet.absoluteFillObject}
+                                    />
+                                </Animated.View>
+                            </View>
+                        )}
+
+                        {backdropStyle === 'cosmic' && (
+                            <View pointerEvents="none" style={styles.meshGlowLayer}>
+                                <View style={[styles.diamondGlow, { backgroundColor: theme.accentGlow, width: L.heroRowH * 1.1, height: L.heroRowH * 1.1, top: -L.heroRowH * 0.5, right: -L.heroRowH * 0.35, opacity: 0.24 }]} />
+                                <View style={[styles.diamondGlow, { backgroundColor: theme.textGold, width: L.heroRowH * 0.85, height: L.heroRowH * 0.85, bottom: -L.heroRowH * 0.4, left: -L.heroRowH * 0.3, opacity: 0.16 }]} />
+                                {/* Yulduzli osmon — o'tkir sparkle (romb) shakllar, dumaloq nuqta EMAS */}
+                                {STAR_POSITIONS.map((star, idx) => (
+                                    <View
+                                        key={idx}
+                                        style={{
+                                            position: 'absolute',
+                                            left: star.left as any,
+                                            top: star.top as any,
+                                            width: Math.max(1.5, star.size * scaleFactor * 1.6),
+                                            height: Math.max(1.5, star.size * scaleFactor * 1.6),
+                                            backgroundColor: '#FFFFFF',
+                                            opacity: star.opacity,
+                                            transform: [{ rotate: '45deg' }],
+                                        }}
+                                    />
+                                ))}
+                                {/* Harakatlanuvchi afsonaviy (mythic) oltin nur chizig'i */}
+                                <Animated.View
+                                    style={[
+                                        styles.prismBand,
+                                        {
+                                            width: cardWidth * 0.42,
+                                            height: cardHeight * 2.2,
+                                            top: -cardHeight * 0.6,
+                                            transform: [{ translateX: dramaShimmerTranslate }, { rotate: '22deg' }],
+                                        },
+                                    ]}
+                                >
+                                    <LinearGradient
+                                        colors={['rgba(255,255,255,0)', 'rgba(253,224,71,0.45)', 'rgba(255,255,255,0)']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={StyleSheet.absoluteFillObject}
+                                    />
+                                </Animated.View>
+                            </View>
+                        )}
+
+                        {/* Yuqoridan pastga tushuvchi juda nozik shisha (glass) yorug'lik —
+                            barcha darajalarda mavjud, bazaviy "premium" tuyg'usini beradi. */}
+                        <LinearGradient
+                            pointerEvents="none"
+                            colors={theme.isLightCard
+                                ? ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0)']
+                                : ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0)']}
+                            start={{ x: 0.15, y: 0 }}
+                            end={{ x: 0.85, y: 0.55 }}
+                            style={StyleSheet.absoluteFillObject}
+                        />
 
                         {/* Top Hero Row (Left Stats Column + Right Photo Cutout) — ANIQ balandlik: L.heroRowH */}
                         <View style={[styles.topHeroRow, { height: L.heroRowH }]}>
@@ -926,23 +1186,28 @@ const styles = StyleSheet.create({
         position: 'relative',
         alignItems: 'center',
     },
-    geometricPattern: {
+    meshGlowLayer: {
         ...StyleSheet.absoluteFillObject,
-        opacity: 0.12,
+        overflow: 'hidden',
     },
-    geoLine: {
+    diamondGlow: {
+        // Yumaloq "orb" o'rniga O'TKIR ROMB (45deg burilgan kvadrat) —
+        // shiddatli, keskin qirrali fon effekti uchun. Kichik borderRadius
+        // faqat uchlarning pichoq kabi o'tkirligini biroz yumshatadi.
         position: 'absolute',
-        borderWidth: 1,
+        borderRadius: 6,
         transform: [{ rotate: '45deg' }],
     },
-    geoLine2: {
+    spotlightBeam: {
+        // O'tkir qirrali NUR TIG'I (light blade) — dumaloq pill emas.
         position: 'absolute',
-        borderWidth: 1,
-        transform: [{ rotate: '30deg' }],
     },
-    geoCircle: {
+    facetShard: {
         position: 'absolute',
-        borderWidth: 0.8,
+    },
+    prismBand: {
+        position: 'absolute',
+        overflow: 'hidden',
     },
     topHeroRow: {
         width: '100%',
