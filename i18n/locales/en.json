@@ -48,7 +48,8 @@
     "details": "Details",
     "clear": "Clear",
     "copy": "Copy",
-    "version": "VERSION"
+    "version": "VERSION",
+    "understood": "Understood"
   },
   "nav": {
     "home": "Home",

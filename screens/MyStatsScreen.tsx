@@ -307,6 +307,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const [openingInstagram, setOpeningInstagram] = useState(false);
     const [checkingPendingUpdate, setCheckingPendingUpdate] = useState(false);
+    const [showPendingAppModal, setShowPendingAppModal] = useState(false);
 
     // Profile Update & Modals
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
@@ -562,11 +563,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
             if (hasPendingApp) {
                 setCheckingPendingUpdate(false);
                 try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
-                Alert.alert(
-                    t('profile.pending_application_title', 'Arizangiz mavjud'),
-                    t('profile.pending_application_msg', 'Sizda ko\'rib chiqilayotgan faol ariza mavjud. Administrator tasdiqlashini kuting.'),
-                    [{ text: t('common.close', 'Yopish'), style: 'cancel' }]
-                );
+                setShowPendingAppModal(true);
                 return;
             }
 
@@ -1960,6 +1957,129 @@ export default function MyStatsScreen({ route, navigation }: any) {
                         }}
                     />
                 </View>
+            </Modal>
+
+            {/* PENDING APPLICATION WARNING MODAL */}
+            <Modal
+                visible={showPendingAppModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowPendingAppModal(false)}
+            >
+                <TouchableOpacity
+                    style={[styles.editModalOverlay, { backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 24 }]}
+                    activeOpacity={1}
+                    onPress={() => setShowPendingAppModal(false)}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={[
+                            cardSurface,
+                            {
+                                width: '100%',
+                                maxWidth: 360,
+                                borderRadius: 24,
+                                padding: 22,
+                                alignItems: 'center',
+                                backgroundColor: homeColors.background,
+                                borderColor: homeColors.border,
+                                borderWidth: 1,
+                            }
+                        ]}
+                    >
+                        {/* Glowing Hourglass Icon Badge */}
+                        <View
+                            style={{
+                                width: 68,
+                                height: 68,
+                                borderRadius: 34,
+                                backgroundColor: isDark ? 'rgba(234, 179, 8, 0.15)' : 'rgba(234, 179, 8, 0.12)',
+                                borderWidth: 1.5,
+                                borderColor: 'rgba(234, 179, 8, 0.35)',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: 16,
+                            }}
+                        >
+                            <Ionicons name="hourglass-outline" size={32} color="#EAB308" />
+                        </View>
+
+                        {/* Title */}
+                        <Text
+                            style={{
+                                fontSize: 18,
+                                fontWeight: '800',
+                                color: homeColors.textPrimary,
+                                textAlign: 'center',
+                                marginBottom: 8,
+                                letterSpacing: 0.3,
+                            }}
+                        >
+                            {t('profile.pending_application_title', 'Arizangiz mavjud')}
+                        </Text>
+
+                        {/* Status Badge */}
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: isDark ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 179, 8, 0.15)',
+                                paddingHorizontal: 12,
+                                paddingVertical: 5,
+                                borderRadius: 12,
+                                marginBottom: 14,
+                            }}
+                        >
+                            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#EAB308' }} />
+                            <Text style={{ color: '#EAB308', fontSize: 11.5, fontWeight: '800', letterSpacing: 0.5 }}>
+                                {t('common.pending', 'KUTILMOQDA').toUpperCase()}
+                            </Text>
+                        </View>
+
+                        {/* Description */}
+                        <Text
+                            style={{
+                                fontSize: 13.5,
+                                lineHeight: 20,
+                                color: homeColors.textSecondary,
+                                textAlign: 'center',
+                                marginBottom: 22,
+                                fontWeight: '500',
+                            }}
+                        >
+                            {t('profile.pending_application_msg', "Sizda ko'rib chiqilayotgan faol ariza mavjud. Administrator tasdiqlashini kuting.")}
+                        </Text>
+
+                        {/* Close / Understood Button */}
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
+                                setShowPendingAppModal(false);
+                            }}
+                            style={{
+                                width: '100%',
+                                paddingVertical: 13,
+                                borderRadius: 14,
+                                backgroundColor: isDark ? '#FFFFFF' : '#000000',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 14.5,
+                                    fontWeight: '800',
+                                    color: isDark ? '#000000' : '#FFFFFF',
+                                    letterSpacing: 0.4,
+                                }}
+                            >
+                                {t('common.understood', 'Tushundim')}
+                            </Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
             </Modal>
 
 
