@@ -4,7 +4,6 @@ import {
     Text,
     StyleSheet,
     Animated,
-    Easing,
     PanResponder,
     Dimensions,
     TouchableOpacity,
@@ -23,7 +22,6 @@ import {
     getLocalizedStatLabel,
     getCardPosition,
     getRarityTierLevel,
-    getLocalizedRarityLabel,
     CARD_THEMES,
     CardRarity,
     FifaAttributes,
@@ -230,10 +228,6 @@ export default function FifaPlayerCard({
 
     // Reyting balandligiga qarab "qimmatbaho" darajasi (0 = past, 6 = eng yuqori)
     const tierLevel = getRarityTierLevel(rarity);
-    const rarityLabel = getLocalizedRarityLabel(rarity, currentLang);
-    const showRarityBadge = tierLevel >= 1;
-    const showFoilSheen = tierLevel >= 3; // Gold va undan yuqori
-    const showAnimatedShimmer = tierLevel >= 5; // Holographic va Icon
 
     const goalsCount = player?.stats?.goals ?? player?.goals ?? 0;
     const assistsCount = player?.stats?.assists ?? player?.assists ?? 0;
@@ -252,41 +246,6 @@ export default function FifaPlayerCard({
     const tiltY = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const isTouchingRef = useRef(false);
-
-    // Eng yuqori 2 daraja (Holographic, Icon) uchun harakatlanuvchi
-    // yaltiroq chiziq (shimmer sweep) — faqat dekorativ, layoutga ta'sir qilmaydi.
-    const shimmerAnim = useRef(new Animated.Value(0)).current;
-    useEffect(() => {
-        if (!showAnimatedShimmer) return;
-        shimmerAnim.setValue(0);
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(shimmerAnim, {
-                    toValue: 1,
-                    duration: 2400,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.delay(1100),
-                Animated.timing(shimmerAnim, {
-                    toValue: 0,
-                    duration: 0,
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-        loop.start();
-        return () => {
-            try {
-                loop.stop();
-            } catch (e) {}
-        };
-    }, [showAnimatedShimmer]);
-
-    const shimmerTranslateX = shimmerAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [-cardWidth * 0.9, cardWidth * 1.3],
-    });
 
     // Accelerometer Subscription for Real Device Tilt Motion (Gyroscope Parallax)
     useEffect(() => {
@@ -662,100 +621,8 @@ export default function FifaPlayerCard({
                                 </View>
                             )}
                         </View>
-
-                        {/* Foliya charaqlashi (foil sheen) — faqat Gold va undan yuqori
-                            darajalarda, kuchi tierLevel bilan birga oshib boradi. Sof
-                            dekorativ qatlam, hech qanday layout o'lchamiga ta'sir qilmaydi. */}
-                        {showFoilSheen && (
-                            <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, styles.foilLayer]}>
-                                <LinearGradient
-                                    colors={[
-                                        'rgba(255,255,255,0)',
-                                        theme.foilOverlay,
-                                        'rgba(255,255,255,0)',
-                                    ]}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={[
-                                        StyleSheet.absoluteFillObject,
-                                        { opacity: [0, 0, 0, 0.6, 0.75, 0.88, 1][tierLevel] ?? 0.6 },
-                                    ]}
-                                />
-                            </View>
-                        )}
-
-                        {/* Eng yuqori 2 daraja (Holographic, Icon) uchun harakatlanuvchi
-                            yaltiroq chiziq — bodyLayer overflow:hidden bo'lgani uchun
-                            aylanish/siljishidan qat'i nazar doim burchaklar ichida qoladi. */}
-                        {showAnimatedShimmer && (
-                            <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, styles.shimmerClip]}>
-                                <Animated.View
-                                    style={[
-                                        styles.shimmerBand,
-                                        {
-                                            width: Math.max(24, cardWidth * 0.34),
-                                            height: cardHeight * 2.4,
-                                            top: -cardHeight * 0.7,
-                                            transform: [
-                                                { translateX: shimmerTranslateX },
-                                                { rotate: '18deg' },
-                                            ],
-                                        },
-                                    ]}
-                                >
-                                    <LinearGradient
-                                        colors={[
-                                            'rgba(255,255,255,0)',
-                                            'rgba(255,255,255,0.55)',
-                                            'rgba(255,255,255,0)',
-                                        ]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                        style={StyleSheet.absoluteFillObject}
-                                    />
-                                </Animated.View>
-                            </View>
-                        )}
                     </LinearGradient>
                 </LinearGradient>
-
-                {/* Daraja nishoni (Rarity Badge) — reyting darajasi qancha yuqori
-                    bo'lsa, nishon shuncha "qimmatbaho" ko'rinadi. Tashqi burchakka
-                    qo'yilgan, BASE maketiga hech qanday ta'sir qilmaydi. */}
-                {showRarityBadge && (
-                    <View
-                        pointerEvents="none"
-                        style={[
-                            styles.rarityBadge,
-                            {
-                                top: 6 * scaleFactor,
-                                right: -3 * scaleFactor,
-                                paddingHorizontal: 7 * scaleFactor,
-                                paddingVertical: 3 * scaleFactor,
-                                borderRadius: 8 * scaleFactor,
-                                backgroundColor: theme.badgeBg,
-                                borderColor: theme.accentGlow,
-                                borderWidth: Math.max(0.6, scaleFactor),
-                            },
-                        ]}
-                    >
-                        <Ionicons
-                            name={(RARITY_BADGE_ICON[tierLevel] || 'medal-outline') as any}
-                            size={10 * scaleFactor}
-                            color={theme.textGold}
-                            style={{ marginRight: 3 * scaleFactor }}
-                        />
-                        <Text
-                            numberOfLines={1}
-                            style={[
-                                styles.rarityBadgeText,
-                                { fontSize: 7.5 * scaleFactor, lineHeight: 9.5 * scaleFactor, color: theme.textGold },
-                            ]}
-                        >
-                            {rarityLabel}
-                        </Text>
-                    </View>
-                )}
             </TouchableOpacity>
         </Animated.View>
     );
@@ -930,35 +797,6 @@ const styles = StyleSheet.create({
     footerBrandText: {
         fontWeight: '900',
         letterSpacing: 1.5,
-        includeFontPadding: false,
-    },
-    foilLayer: {
-        zIndex: 20,
-    },
-    shimmerClip: {
-        zIndex: 21,
-        overflow: 'hidden',
-    },
-    shimmerBand: {
-        position: 'absolute',
-        left: 0,
-    },
-    rarityBadge: {
-        position: 'absolute',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 30,
-        transform: [{ rotate: '10deg' }],
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 6,
-    },
-    rarityBadgeText: {
-        fontWeight: '900',
-        letterSpacing: 0.6,
         includeFontPadding: false,
     },
 });
