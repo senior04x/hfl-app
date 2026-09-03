@@ -54,43 +54,43 @@ function computeCardLayout(cardW: number, showAttrs: boolean) {
     const innerRadiusBottom = Math.max(0, outerRadiusBottom - borderPad);
 
     const bodyPadH = Math.round(10 * sf);
-    const bodyPadTop = Math.round(8 * sf);
-    const bodyPadBottom = Math.round(6 * sf);
+    const bodyPadTop = Math.round(14 * sf);
+    const bodyPadBottom = Math.round(14 * sf);
 
-    const heroRowH = Math.round(122 * sf);
+    const heroRowH = Math.round(142 * sf);
     const leftColW = Math.round(62 * sf);
-    const leftColGap = Math.round(2 * sf);
+    const leftColGap = Math.round(4 * sf);
     const photoW = cardW - (borderPad * 2) - (bodyPadH * 2) - leftColW;
 
     const ovrFont = Math.round(30 * sf);
     const ovrLineH = Math.round(32 * sf);
-    const posFont = Math.round(8 * sf);
-    const posLineH = Math.round(10 * sf);
+    const posFont = Math.round(8.5 * sf);
+    const posLineH = Math.round(11 * sf);
     const posBorder = Math.max(1, Math.round(1 * sf));
-    const posPadV = Math.max(1, Math.round(1 * sf));
-    const dividerH = Math.max(1, Math.round(1 * sf));
-    const clubBadgeD = Math.round(32 * sf);
+    const posPadV = Math.max(1, Math.round(2 * sf));
+    const dividerH = Math.max(1, Math.round(1.5 * sf));
+    const clubBadgeD = Math.round(36 * sf);
 
-    const gapHeroToName = Math.round(2 * sf);
-    const namePadV = Math.max(1, Math.round(2 * sf));
+    const gapHeroToName = Math.round(6 * sf);
+    const namePadV = Math.max(2, Math.round(4 * sf));
     const nameFont = Math.round(13 * sf);
     const nameLineH = Math.round(15 * sf);
 
-    const gapNameToSep = Math.round(2 * sf);
-    const sepH = Math.round(5 * sf);
-    const gapSepToStats = Math.round(2 * sf);
+    const gapNameToSep = Math.round(5 * sf);
+    const sepH = Math.round(6 * sf);
+    const gapSepToStats = Math.round(5 * sf);
 
     const statNumFont = Math.round(15 * sf);
     const statNumLineH = Math.round(17 * sf);
     const statLabelFont = Math.round(8.5 * sf);
     const statLabelLineH = Math.round(10 * sf);
-    const gapStatNumToLabel = Math.max(1, Math.round(1 * sf));
+    const gapStatNumToLabel = Math.max(1, Math.round(2 * sf));
     const statColItemH = statNumLineH + gapStatNumToLabel + statLabelLineH;
 
-    const gapStatsToFooter = Math.round(2 * sf);
-    const footerH = Math.round(10 * sf);
-    const footerLogo = Math.round(8 * sf);
-    const footerFont = Math.round(7.5 * sf);
+    const gapStatsToFooter = Math.round(6 * sf);
+    const footerH = Math.round(13 * sf);
+    const footerLogo = Math.round(10 * sf);
+    const footerFont = Math.round(8 * sf);
 
     const namePlateH = nameLineH + (namePadV * 2);
 
