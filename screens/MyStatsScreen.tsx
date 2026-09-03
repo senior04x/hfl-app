@@ -38,6 +38,7 @@ import { getLocalizedPosition } from '../utils/localizationUtils';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { SlideButton } from '../components/SlideButton';
+import CustomDatePickerModal from '../components/CustomDatePickerModal';
 
 const { width } = Dimensions.get('window');
 
@@ -290,6 +291,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
     // Profile Update & Modals
     const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
+    const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
         const [showComparisonModal, setShowComparisonModal] = useState(false);
@@ -498,7 +500,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }
     };
 
-        // Open Profile Update Modal (Fetches fresh live data directly from DB)
+            // Open Profile Update Modal (Fetches fresh live data directly from DB)
     const handleOpenUpdateModal = async () => {
         try {
             setLoading(true);
@@ -515,23 +517,14 @@ export default function MyStatsScreen({ route, navigation }: any) {
             }
 
             const pData = extractPlayerData(freshPlayer) || {};
-            const bDate = freshPlayer?.birth_date || freshPlayer?.birthDate || '1998-05-15';
-            let day = '15', month = '05', year = '1998';
+            const bDate = freshPlayer?.birth_date || freshPlayer?.birthDate || '15.05.1998';
+            let formattedBDate = String(bDate);
 
-            if (String(bDate).includes('.')) {
-                const p = String(bDate).split('.');
-                day = p[0] || '15';
-                month = p[1] || '05';
-                year = p[2] || '1998';
-            } else if (String(bDate).includes('-')) {
-                const p = String(bDate).split('-');
-                year = p[0] || '1998';
-                month = p[1] || '05';
-                day = p[2] || '15';
-            } else if (/^\d{8}$/.test(String(bDate))) {
-                day = String(bDate).substring(0, 2);
-                month = String(bDate).substring(2, 4);
-                year = String(bDate).substring(4, 8);
+            if (formattedBDate.includes('-')) {
+                const parts = formattedBDate.split('-');
+                if (parts[0].length === 4) {
+                    formattedBDate = `${parts[2].padStart(2, '0')}.${parts[1].padStart(2, '0')}.${parts[0]}`;
+                }
             }
 
             setUpdateForm({
@@ -548,9 +541,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 height: String(freshPlayer?.height || pData.height || ''),
                 weight: String(freshPlayer?.weight || pData.weight || ''),
                 instagramUsername: freshPlayer?.instagram_username || pData.instagram_username || '',
-                birthDay: day.padStart(2, '0'),
-                birthMonth: month.padStart(2, '0'),
-                birthYear: year
+                birthDate: formattedBDate
             });
             setUpdateSubmitStatus('idle');
             setShowProfileUpdateModal(true);
@@ -609,7 +600,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
         setSubmittingUpdate(true);
         setUpdateSubmitStatus('loading');
         try {
-            const formattedBirthDate = `${updateForm.birthDay}.${updateForm.birthMonth}.${updateForm.birthYear}`;
+            const formattedBirthDate = updateForm.birthDate || '15.05.1998';
             const targetOrgId = player?.organization_id || player?.org_id || player?.teams?.organization_id || 1;
             const targetLeague = player?.league || player?.teams?.league || '';
 
@@ -1483,38 +1474,29 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                 </View>
                             </View>
 
-                            {/* Birth date row: Day / Month / Year */}
+                            {/* Tug'ilgan sana (JoinApplication date picker modal) */}
                             <View style={styles.formGroup}>
-                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug\'ilgan sana (Kun / Oy / Yil)</Text>
-                                <View style={{ flexDirection: 'row', gap: 8 }}>
-                                    <TextInput
-                                        style={[styles.modalInput, { flex: 1, textAlign: 'center', color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.birthDay}
-                                        maxLength={2}
-                                        keyboardType="numeric"
-                                        placeholder="15"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, birthDay: v }))}
-                                    />
-                                    <TextInput
-                                        style={[styles.modalInput, { flex: 1, textAlign: 'center', color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.birthMonth}
-                                        maxLength={2}
-                                        keyboardType="numeric"
-                                        placeholder="05"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, birthMonth: v }))}
-                                    />
-                                    <TextInput
-                                        style={[styles.modalInput, { flex: 1.5, textAlign: 'center', color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
-                                        value={updateForm.birthYear}
-                                        maxLength={4}
-                                        keyboardType="numeric"
-                                        placeholder="1998"
-                                        placeholderTextColor={homeColors.textSecondary}
-                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, birthYear: v }))}
-                                    />
-                                </View>
+                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Tug'ilgan sana</Text>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={() => setIsDatePickerVisible(true)}
+                                    style={[
+                                        styles.modalInput,
+                                        {
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            borderColor: homeColors.border,
+                                            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                            paddingVertical: 12,
+                                        }
+                                    ]}
+                                >
+                                    <Text style={{ color: updateForm.birthDate ? homeColors.textPrimary : homeColors.textSecondary, fontSize: 14, fontWeight: '600' }}>
+                                        {updateForm.birthDate || "Sanani tanlang"}
+                                    </Text>
+                                    <Ionicons name="calendar-outline" size={18} color={homeColors.textPrimary} />
+                                </TouchableOpacity>
                             </View>
 
                             <View style={styles.formRow}>
@@ -1609,6 +1591,17 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     </View>
                 </View>
             </Modal>
+
+            {/* CUSTOM DATE PICKER MODAL */}
+            <CustomDatePickerModal
+                visible={isDatePickerVisible}
+                initialDate={updateForm.birthDate}
+                onClose={() => setIsDatePickerVisible(false)}
+                onSelectDate={(dateStr) => {
+                    setUpdateForm(p => ({ ...p, birthDate: dateStr }));
+                    setIsDatePickerVisible(false);
+                }}
+            />
 
             {/* SUCCESS MODAL */}
             <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => setShowSuccessModal(false)}>
