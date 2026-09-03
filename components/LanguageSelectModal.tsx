@@ -6,12 +6,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
-import Colors from '../constants/Colors';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 import { useLanguageStore, SUPPORTED_LANGUAGES } from '../store/useLanguageStore';
 import { AppLanguage } from '../i18n';
+
+const BRAND_ORANGE = '#FF6B00';
 
 interface LanguageSelectModalProps {
   visible: boolean;
@@ -24,10 +29,28 @@ export const LanguageSelectModal: React.FC<LanguageSelectModalProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const { setLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const homeColors = getHomeScreenColors(isDark);
 
   const handleSelectLanguage = async (langCode: AppLanguage) => {
+    try {
+      Haptics.selectionAsync().catch(() => {});
+    } catch (e) {}
     await setLanguage(langCode);
     onClose();
+  };
+
+  const getLanguageSub = (code: string) => {
+    switch (code) {
+      case 'uz':
+        return "O'zbek tili (Lotin)";
+      case 'ru':
+        return 'Русский язык';
+      case 'en':
+        return 'English language';
+      default:
+        return '';
+    }
   };
 
   return (
@@ -38,14 +61,39 @@ export const LanguageSelectModal: React.FC<LanguageSelectModalProps> = ({
       onRequestClose={onClose}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.container} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.header}>
-            <Text style={styles.title}>{t('settings.select_language')}</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={24} color={Colors.textMuted} />
+        <Pressable
+          style={[
+            styles.container,
+            {
+              backgroundColor: isDark ? '#141414' : '#FFFFFF',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+            },
+          ]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="globe-outline" size={18} color={BRAND_ORANGE} style={{ marginRight: 8 }} />
+              <Text style={[styles.title, { color: homeColors.textPrimary }]}>
+                {t('settings.select_language', 'Ilova tilini tanlang')}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={[
+                styles.closeButton,
+                {
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+                },
+              ]}
+            >
+              <Ionicons name="close" size={18} color={homeColors.textSecondary} />
             </TouchableOpacity>
           </View>
 
+          {/* Language List */}
           <View style={styles.languageList}>
             {SUPPORTED_LANGUAGES.map((lang) => {
               const isSelected = i18n.language === lang.code;
@@ -55,25 +103,61 @@ export const LanguageSelectModal: React.FC<LanguageSelectModalProps> = ({
                   key={lang.code}
                   style={[
                     styles.languageItem,
-                    isSelected && styles.languageItemSelected,
+                    {
+                      backgroundColor: isSelected
+                        ? (isDark ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 107, 0, 0.08)')
+                        : (isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)'),
+                      borderColor: isSelected
+                        ? BRAND_ORANGE
+                        : (isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.06)'),
+                    },
                   ]}
                   onPress={() => handleSelectLanguage(lang.code)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.flagLabelContainer}>
                     <Text style={styles.flag}>{lang.flag}</Text>
-                    <Text
-                      style={[
-                        styles.languageLabel,
-                        isSelected && styles.languageLabelSelected,
-                      ]}
-                    >
-                      {lang.label}
-                    </Text>
+                    <View style={{ marginLeft: 12 }}>
+                      <Text
+                        style={[
+                          styles.languageLabel,
+                          {
+                            color: isSelected ? BRAND_ORANGE : homeColors.textPrimary,
+                            fontWeight: isSelected ? '800' : '600',
+                          },
+                        ]}
+                      >
+                        {lang.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.languageSub,
+                          {
+                            color: homeColors.textSecondary,
+                          },
+                        ]}
+                      >
+                        {getLanguageSub(lang.code)}
+                      </Text>
+                    </View>
                   </View>
 
-                  <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                    {isSelected && <View style={styles.radioInnerCircle} />}
+                  <View
+                    style={[
+                      styles.radioCircle,
+                      {
+                        borderColor: isSelected
+                          ? BRAND_ORANGE
+                          : (isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.2)'),
+                        backgroundColor: isSelected
+                          ? BRAND_ORANGE
+                          : 'transparent',
+                      },
+                    ]}
+                  >
+                    {isSelected && (
+                      <Ionicons name="checkmark-sharp" size={14} color="#FFFFFF" />
+                    )}
                   </View>
                 </TouchableOpacity>
               );
@@ -96,28 +180,40 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#121722',
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.35,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    marginBottom: 14,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
+    fontSize: 16,
+    fontWeight: '800',
     letterSpacing: 0.3,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   languageList: {
     gap: 10,
@@ -126,51 +222,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(29, 35, 51, 0.6)',
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderRadius: 16,
+    paddingVertical: 13,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  languageItemSelected: {
-    backgroundColor: 'rgba(0, 223, 130, 0.12)',
-    borderColor: Colors.primary,
   },
   flagLabelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flex: 1,
   },
   flag: {
-    fontSize: 22,
+    fontSize: 24,
   },
   languageLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.textMuted,
+    fontSize: 15,
   },
-  languageLabelSelected: {
-    color: Colors.primary,
-    fontWeight: '700',
+  languageSub: {
+    fontSize: 12,
+    marginTop: 2,
   },
   radioCircle: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  radioCircleSelected: {
-    borderColor: Colors.primary,
-  },
-  radioInnerCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.primary,
   },
 });
 
