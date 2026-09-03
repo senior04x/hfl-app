@@ -615,8 +615,8 @@ export default function FifaPlayerCard({
                             </View>
                         </View>
 
-                        {/* Middle: Player Name Plaque (2 Lines: First Name & Last Name) */}
-                        <View style={[styles.bottomInfoSection, { marginTop: L.gapHeroToName }]}>
+                        {/* Middle: Player Name Plaque (2 Lines: First Name & Last Name) with 20px top margin */}
+                        <View style={[styles.bottomInfoSection, { marginTop: 20 }]}>
                             <View style={styles.namePlateWrapper}>
                                 <LinearGradient
                                     colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
