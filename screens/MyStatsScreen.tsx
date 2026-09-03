@@ -1047,43 +1047,32 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                 <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setShowComparisonModal(true);
-                    }}
-                    style={[styles.compareBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
-                >
-                    <Ionicons name="git-compare-outline" size={16} color={isDark ? '#000000' : '#FFFFFF'} />
-                    <Text style={[styles.compareBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
-                        {t('stats.compare_vs', 'BOSHQASI BILAN TAQQOSLASH (VS)').toUpperCase()}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* FIFA CARD SHARE SECTION */}
-            <View style={{ marginTop: 14, width: '100%' }}>
-                <TouchableOpacity
-                    activeOpacity={0.8}
                     onPress={handleExportPress}
                     disabled={exportState !== 'idle'}
-                    style={[styles.exportBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: homeColors.border }]}
+                    style={[styles.compareBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000', marginTop: 16 }]}
                 >
                     {exportState === 'idle' && (
                         <>
-                            <Ionicons name="share-social-outline" size={18} color={homeColors.textPrimary} />
-                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.share_fifa_card', 'FIFA KARTASINI ULASHISH')}</Text>
+                            <Ionicons name="share-social-outline" size={16} color={isDark ? '#000000' : '#FFFFFF'} />
+                            <Text style={[styles.compareBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                                {t('stats.share_fifa_card', 'KARTANI ULASHISH').toUpperCase()}
+                            </Text>
                         </>
                     )}
                     {exportState === 'loading' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <ActivityIndicator size="small" color={homeColors.textPrimary} />
-                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.preparing_card', 'KARTA TAYYORLANMOQDA...')} {exportProgress}%</Text>
+                            <ActivityIndicator size="small" color={isDark ? '#000000' : '#FFFFFF'} />
+                            <Text style={[styles.compareBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                                {t('stats.preparing_card', 'KARTA TAYYORLANMOQDA...').toUpperCase()} {exportProgress}%
+                            </Text>
                         </View>
                     )}
                     {exportState === 'complete' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.card_ready', 'KARTA TAYYOR!')}</Text>
+                            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                            <Text style={[styles.compareBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                                {t('stats.card_ready', 'KARTA TAYYOR!').toUpperCase()}
+                            </Text>
                         </View>
                     )}
                 </TouchableOpacity>
