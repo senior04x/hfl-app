@@ -189,7 +189,17 @@ function App() {
                             >
                                 <Stack.Screen name="MainTabs" component={AppNavigator} />
                                     <Stack.Screen name="Welcome" component={WelcomeScreen} />
-                                    <Stack.Screen name="JoinApplication" component={JoinApplicationScreen} />
+                                    <Stack.Screen 
+                                        name="JoinApplication" 
+                                        component={JoinApplicationScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
                                     <Stack.Screen name="MyStats" component={MyStatsScreen} />
                                     <Stack.Screen name="TransferRequest" component={TransferRequestScreen} />
                                     <Stack.Screen name="Applications" component={ApplicationsScreen} />

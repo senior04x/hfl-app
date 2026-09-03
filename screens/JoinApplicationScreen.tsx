@@ -835,19 +835,43 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
         return null;
     };
 
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, width * 0.8, width],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
+
     return (
-        <Animated.View
-            style={[
-                styles.container,
-                {
-                    backgroundColor: homeColors.background,
-                    transform: [{ translateX: swipeBackAnim }],
-                }
-            ]}
-            {...exitPanResponder.panHandlers}
-        >
+        <View style={{ flex: 1, backgroundColor: 'transparent' }} {...exitPanResponder.panHandlers}>
             <StatusBar barStyle={isDark ? "light-content" : "dark-content"} translucent backgroundColor="transparent" />
-            <SafeAreaView style={{ flex: 1, backgroundColor: homeColors.background }}>
+
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
+            />
+
+            <Animated.View
+                style={[
+                    styles.container,
+                    {
+                        backgroundColor: homeColors.background,
+                        transform: [{ translateX: swipeBackAnim }],
+                        shadowColor: '#000000',
+                        shadowOffset: { width: -4, height: 0 },
+                        shadowOpacity: isDark ? 0.5 : 0.2,
+                        shadowRadius: 10,
+                        elevation: 10,
+                    }
+                ]}
+            >
+                <SafeAreaView style={{ flex: 1, backgroundColor: homeColors.background }}>
                 {renderHeader()}
 
                 <KeyboardAvoidingView
@@ -1879,7 +1903,8 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                     </View>
                 </View>
             </Modal>
-        </Animated.View>
+            </Animated.View>
+        </View>
     );
 }
 
