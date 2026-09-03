@@ -679,48 +679,44 @@ export default function FifaPlayerCard({
                                         </View>
                                     </View>
 
+                                    {/* Micro Amatora Seal placed exactly 5px below stats row */}
+                                    <View
+                                        style={[
+                                            styles.cardFooterBrand,
+                                            {
+                                                marginTop: 5,
+                                                height: L.footerH,
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                            }
+                                        ]}
+                                    >
+                                        <Image
+                                            source={require('../assets/logo.png')}
+                                            style={{
+                                                width: L.footerLogo,
+                                                height: L.footerLogo,
+                                                opacity: 0.45,
+                                                marginRight: 2.5 * scaleFactor
+                                            }}
+                                            resizeMode="contain"
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.footerBrandText,
+                                                {
+                                                    fontSize: L.footerFont,
+                                                    lineHeight: L.footerH,
+                                                    color: theme.textGold,
+                                                    opacity: 0.65,
+                                                }
+                                            ]}
+                                        >
+                                            AMATORA
+                                        </Text>
+                                    </View>
                                 </View>
                             )}
-                        </View>
-
-                        {/* Micro Amatora Seal Glued Directly to Absolute Bottom */}
-                        <View
-                            style={[
-                                styles.cardFooterBrand,
-                                {
-                                    position: 'absolute',
-                                    bottom: Math.max(2, Math.round(3.5 * scaleFactor)),
-                                    left: 0,
-                                    right: 0,
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    height: L.footerH,
-                                }
-                            ]}
-                        >
-                            <Image
-                                source={require('../assets/logo.png')}
-                                style={{
-                                    width: L.footerLogo,
-                                    height: L.footerLogo,
-                                    opacity: 0.45,
-                                    marginRight: 2.5 * scaleFactor
-                                }}
-                                resizeMode="contain"
-                            />
-                            <Text
-                                style={[
-                                    styles.footerBrandText,
-                                    {
-                                        fontSize: L.footerFont,
-                                        lineHeight: L.footerH,
-                                        color: theme.textGold,
-                                        opacity: 0.65,
-                                    }
-                                ]}
-                            >
-                                AMATORA
-                            </Text>
                         </View>
                     </LinearGradient>
                 </LinearGradient>
