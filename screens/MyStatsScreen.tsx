@@ -37,6 +37,7 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
+import { SlideButton } from '../components/SlideButton';
 
 const { width } = Dimensions.get('window');
 
