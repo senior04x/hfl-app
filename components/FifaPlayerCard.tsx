@@ -55,9 +55,13 @@ export default function FifaPlayerCard({
     const attrs: FifaAttributes = calculateFifaAttributes(player);
     const cardPosition = getCardPosition(player?.position || player?.positionUz, currentLang);
 
+    const goalsCount = player?.stats?.goals ?? player?.goals ?? 0;
+    const assistsCount = player?.stats?.assists ?? player?.assists ?? 0;
+    const matchesCount = player?.stats?.matchesPlayed ?? player?.stats?.matches ?? player?.matchesPlayed ?? 0;
+
     // Optimized Card Aspect Ratio
     const cardWidth = size === 'sm' ? 175 : size === 'lg' ? Math.min(SCREEN_WIDTH - 48, 330) : 260;
-    const cardHeight = showAttributes ? cardWidth * 1.46 : cardWidth * 1.06;
+    const cardHeight = showAttributes ? cardWidth * 1.32 : cardWidth * 1.06;
     const scaleFactor = cardWidth / 260;
 
     // 3D Parallax & Tilt animations
@@ -362,105 +366,46 @@ export default function FifaPlayerCard({
                             </LinearGradient>
                         </View>
 
-                        {/* Decorative Gold Separator & 6 Core Attributes Grid */}
+                        {/* Real Football Stats (GOL, ASIST, O'YIN) */}
                         {showAttributes && (
                             <>
-                                <View style={[styles.separatorContainer, { marginVertical: 3 * scaleFactor }]}>
+                                <View style={[styles.separatorContainer, { marginVertical: 3.5 * scaleFactor }]}>
                                     <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
                                     <View style={[styles.separatorDiamond, { backgroundColor: theme.textGold }]} />
                                     <View style={[styles.separatorLine, { backgroundColor: theme.accentGlow }]} />
                                 </View>
 
-                                <View style={[styles.statsGrid, { paddingHorizontal: 10 * scaleFactor, marginVertical: 2 * scaleFactor }]}>
-                                    <View style={styles.statsColumn}>
-                                        <View style={[styles.statRow, { marginVertical: 2.5 * scaleFactor }]}>
-                                            <Text numberOfLines={1} style={styles.statLine}>
-                                                <Text style={[styles.statNum, { fontSize: 13.5 * scaleFactor, color: theme.textGold }]}>
-                                                    {attrs.pac}
-                                                </Text>
-                                                <Text style={{ fontSize: 11 * scaleFactor }}>{' '}</Text>
-                                                <Text style={[styles.statLabel, { fontSize: 11 * scaleFactor }]}>
-                                                    {getLocalizedStatLabel('pac', currentLang)}
-                                                </Text>
-                                            </Text>
-                                        </View>
-                                        <View style={[styles.statRow, { marginVertical: 2.5 * scaleFactor }]}>
-                                            <Text numberOfLines={1} style={styles.statLine}>
-                                                <Text style={[styles.statNum, { fontSize: 13.5 * scaleFactor, color: theme.textGold }]}>
-                                                    {attrs.sho}
-                                                </Text>
-                                                <Text style={{ fontSize: 11 * scaleFactor }}>{' '}</Text>
-                                                <Text style={[styles.statLabel, { fontSize: 11 * scaleFactor }]}>
-                                                    {getLocalizedStatLabel('sho', currentLang)}
-                                                </Text>
-                                            </Text>
-                                        </View>
-                                        <View style={[styles.statRow, { marginVertical: 2.5 * scaleFactor }]}>
-                                            <Text numberOfLines={1} style={styles.statLine}>
-                                                <Text style={[styles.statNum, { fontSize: 13.5 * scaleFactor, color: theme.textGold }]}>
-                                                    {attrs.pas}
-                                                </Text>
-                                                <Text style={{ fontSize: 11 * scaleFactor }}>{' '}</Text>
-                                                <Text style={[styles.statLabel, { fontSize: 11 * scaleFactor }]}>
-                                                    {getLocalizedStatLabel('pas', currentLang)}
-                                                </Text>
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={[styles.statsVerticalDivider, { height: 50 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.18)' }]} />
-
-                                    <View style={styles.statsColumn}>
-                                        <View style={[styles.statRow, { marginVertical: 2.5 * scaleFactor }]}>
-                                            <Text numberOfLines={1} style={styles.statLine}>
-                                                <Text style={[styles.statNum, { fontSize: 13.5 * scaleFactor, color: theme.textGold }]}>
-                                                    {attrs.dri}
-                                                </Text>
-                                                <Text style={{ fontSize: 11 * scaleFactor }}>{' '}</Text>
-                                                <Text style={[styles.statLabel, { fontSize: 11 * scaleFactor }]}>
-                                                    {getLocalizedStatLabel('dri', currentLang)}
-                                                </Text>
-                                            </Text>
-                                        </View>
-                                        <View style={[styles.statRow, { marginVertical: 2.5 * scaleFactor }]}>
-                                            <Text numberOfLines={1} style={styles.statLine}>
-                                                <Text style={[styles.statNum, { fontSize: 13.5 * scaleFactor, color: theme.textGold }]}>
-                                                    {attrs.def}
-                                                </Text>
-                                                <Text style={{ fontSize: 11 * scaleFactor }}>{' '}</Text>
-                                                <Text style={[styles.statLabel, { fontSize: 11 * scaleFactor }]}>
-                                                    {getLocalizedStatLabel('def', currentLang)}
-                                                </Text>
-                                            </Text>
-                                        </View>
-                                        <View style={[styles.statRow, { marginVertical: 2.5 * scaleFactor }]}>
-                                            <Text numberOfLines={1} style={styles.statLine}>
-                                                <Text style={[styles.statNum, { fontSize: 13.5 * scaleFactor, color: theme.textGold }]}>
-                                                    {attrs.phy}
-                                                </Text>
-                                                <Text style={{ fontSize: 11 * scaleFactor }}>{' '}</Text>
-                                                <Text style={[styles.statLabel, { fontSize: 11 * scaleFactor }]}>
-                                                    {getLocalizedStatLabel('phy', currentLang)}
-                                                </Text>
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                <View style={[styles.sealContainer, { flexDirection: 'row', gap: 6 * scaleFactor }]}>
-                                    <View style={[styles.sealBadge, { borderColor: theme.accentGlow, paddingHorizontal: 8 * scaleFactor, paddingVertical: 1.5 * scaleFactor }]}>
-                                        <Text style={[styles.sealText, { fontSize: 8.5 * scaleFactor, color: theme.textGold }]}>
-                                            AMATORA
+                                <View style={[styles.statsRowThree, { paddingHorizontal: 12 * scaleFactor, marginVertical: 2 * scaleFactor }]}>
+                                    <View style={styles.statColItem}>
+                                        <Text style={[styles.statNumBig, { fontSize: 16 * scaleFactor, color: theme.textGold }]}>
+                                            {goalsCount}
+                                        </Text>
+                                        <Text style={[styles.statLabelSmall, { fontSize: 9 * scaleFactor, color: theme.textPrimary }]}>
+                                            GOL
                                         </Text>
                                     </View>
-                                    {attrs.hasScoutedVideo && (
-                                        <View style={[styles.sealBadge, { borderColor: '#00DF82', backgroundColor: 'rgba(0, 223, 130, 0.15)', paddingHorizontal: 6 * scaleFactor, paddingVertical: 1.5 * scaleFactor, flexDirection: 'row', alignItems: 'center' }]}>
-                                            <Ionicons name="sparkles" size={8 * scaleFactor} color="#00DF82" style={{ marginRight: 3 }} />
-                                            <Text style={[styles.sealText, { fontSize: 8 * scaleFactor, color: '#00DF82', fontWeight: '900' }]}>
-                                                AI SCOUT
-                                            </Text>
-                                        </View>
-                                    )}
+
+                                    <View style={[styles.statsVerticalDivider, { height: 26 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.18)' }]} />
+
+                                    <View style={styles.statColItem}>
+                                        <Text style={[styles.statNumBig, { fontSize: 16 * scaleFactor, color: theme.textGold }]}>
+                                            {assistsCount}
+                                        </Text>
+                                        <Text style={[styles.statLabelSmall, { fontSize: 9 * scaleFactor, color: theme.textPrimary }]}>
+                                            ASIST
+                                        </Text>
+                                    </View>
+
+                                    <View style={[styles.statsVerticalDivider, { height: 26 * scaleFactor, backgroundColor: 'rgba(255,255,255,0.18)' }]} />
+
+                                    <View style={styles.statColItem}>
+                                        <Text style={[styles.statNumBig, { fontSize: 16 * scaleFactor, color: theme.textGold }]}>
+                                            {matchesCount}
+                                        </Text>
+                                        <Text style={[styles.statLabelSmall, { fontSize: 9 * scaleFactor, color: theme.textPrimary }]}>
+                                            O'YIN
+                                        </Text>
+                                    </View>
                                 </View>
                             </>
                         )}
@@ -637,17 +582,21 @@ const styles = StyleSheet.create({
         transform: [{ rotate: '45deg' }],
         marginHorizontal: 6,
     },
-    statsGrid: {
+    statsRowThree: {
         width: '100%',
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-around',
         zIndex: 10,
     },
-    statsColumn: {
-        flex: 1,
+    statColItem: {
         alignItems: 'center',
         justifyContent: 'center',
+        minWidth: 44,
+    },
+    statNumBig: {
+        fontWeight: '900',
+        includeFontPadding: false,
     },
     statsVerticalDivider: {
         width: 1,

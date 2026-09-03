@@ -798,7 +798,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     size="lg"
                     interactive3D={false}
                     showPlayStyles={false}
-                    showAttributes={false}
+                    showAttributes={true}
                 />
 
                 <TouchableOpacity
@@ -816,7 +816,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 </TouchableOpacity>
             </View>
 
-            {/* MATCHDAY POSTER EXPORT SECTION */}
+            {/* FIFA CARD SHARE SECTION */}
             <View style={{ marginTop: 14, width: '100%' }}>
                 <TouchableOpacity
                     activeOpacity={0.8}
@@ -826,20 +826,20 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 >
                     {exportState === 'idle' && (
                         <>
-                            <Ionicons name="image-outline" size={18} color={homeColors.textPrimary} />
-                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.create_matchday_poster', 'MATCHDAY POSTER YARATISH')}</Text>
+                            <Ionicons name="share-social-outline" size={18} color={homeColors.textPrimary} />
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.share_fifa_card', 'FIFA KARTASINI ULASHISH')}</Text>
                         </>
                     )}
                     {exportState === 'loading' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                             <ActivityIndicator size="small" color={homeColors.textPrimary} />
-                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.generating_poster', 'POSTER YARATILMOQDA...')} {exportProgress}%</Text>
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.preparing_card', 'KARTA TAYYORLANMOQDA...')} {exportProgress}%</Text>
                         </View>
                     )}
                     {exportState === 'complete' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                             <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.poster_ready', 'POSTER TAYYOR!')}</Text>
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.card_ready', 'KARTA TAYYOR!')}</Text>
                         </View>
                     )}
                 </TouchableOpacity>
@@ -1313,32 +1313,27 @@ export default function MyStatsScreen({ route, navigation }: any) {
             {/* POSTER VIEWSHOT MODAL */}
             <Modal visible={showExportModal} transparent animationType="fade" onRequestClose={() => setShowExportModal(false)}>
                 <View style={[styles.exportModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
-                    <View style={[styles.exportModalCard, cardSurface]}>
-                        <View style={styles.exportModalHeader}>
-                            <Text style={[styles.exportModalTitle, { color: homeColors.textPrimary }]}>{t('stats.matchday_poster_preview', 'POSTER PREVIEW')}</Text>
+                    <View style={[styles.exportModalCard, cardSurface, { maxWidth: 360, alignItems: 'center' }]}>
+                        <View style={[styles.exportModalHeader, { width: '100%' }]}>
+                            <Text style={[styles.exportModalTitle, { color: homeColors.textPrimary }]}>{t('stats.share_fifa_card_title', 'FIFA KARTASINI ULASHISH')}</Text>
                             <TouchableOpacity onPress={() => setShowExportModal(false)}>
                                 <Ionicons name="close" size={22} color={homeColors.textPrimary} />
                             </TouchableOpacity>
                         </View>
 
-                        <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={styles.posterCaptureContainer}>
-                            <View style={[styles.posterInner, { backgroundColor: '#0A0A0C' }]}>
-                                <SmartImage uri={player.photo || player.avatar} style={styles.posterPhoto} contentFit="cover" fallbackIcon="person" />
-                                <View style={styles.posterOverlayBottom}>
-                                    <Text style={styles.posterNameText}>{playerNameFull.toUpperCase()}</Text>
-                                    <Text style={styles.posterSubText}>{getLocalizedPosition(player.position, t).toUpperCase()} • {currentTeamName || 'AMATORA'}</Text>
-                                    <View style={styles.posterStatsRow}>
-                                        <Text style={styles.posterStatItem}>⚽ {stats.goals} GOL</Text>
-                                        <Text style={styles.posterStatItem}>👟 {stats.assists} ASIST</Text>
-                                        <Text style={styles.posterStatItem}>⭐ {stats.rating || 0} OVR</Text>
-                                    </View>
-                                </View>
-                            </View>
+                        <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={{ padding: 6, borderRadius: 20, overflow: 'hidden', alignItems: 'center', backgroundColor: 'transparent' }}>
+                            <FifaPlayerCard
+                                player={player}
+                                size="lg"
+                                interactive3D={false}
+                                showPlayStyles={false}
+                                showAttributes={true}
+                            />
                         </ViewShot>
 
-                        <TouchableOpacity style={[styles.sharePosterBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} onPress={handleSharePoster}>
+                        <TouchableOpacity style={[styles.sharePosterBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000', width: '100%', marginTop: 16 }]} onPress={handleSharePoster}>
                             <Ionicons name="share-social" size={18} color={isDark ? '#000000' : '#FFFFFF'} />
-                            <Text style={[styles.sharePosterBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>{t('stats.share_poster', 'ULASHISH / SAQLASH')}</Text>
+                            <Text style={[styles.sharePosterBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>{t('stats.share_card_btn', 'ULASHISH / SAQLASH')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
