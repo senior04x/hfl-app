@@ -61,12 +61,17 @@ export default function TeamProfileScreen({ route, navigation }: any) {
     const userTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
     const activeTeamId = teamId || route?.params?.id || route?.params?.teamId || initialTeam?.id || initialTeam?._id || userTeamId;
 
-    const [team, setTeam] = useState<any | null>(initialTeam || null);
-    const [players, setPlayers] = useState<Player[]>([]);
-    const [matches, setMatches] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(!initialTeam);
-    const [isPlayersLoading, setIsPlayersLoading] = useState(true);
-    const [isMatchesLoading, setIsMatchesLoading] = useState(true);
+    const initialMem = activeTeamId ? globalTeamProfileMemoryCache[String(activeTeamId)] : null;
+    const initialTeamData = initialTeam || route?.params?.team || initialMem?.team || null;
+    const initialPlayersData = (initialMem?.players && initialMem.players.length > 0) ? initialMem.players : (initialTeamData?.players || []);
+    const initialMatchesData = initialMem?.matches || [];
+
+    const [team, setTeam] = useState<any | null>(initialTeamData);
+    const [players, setPlayers] = useState<Player[]>(initialPlayersData);
+    const [matches, setMatches] = useState<any[]>(initialMatchesData);
+    const [isLoading, setIsLoading] = useState(!initialTeamData);
+    const [isPlayersLoading, setIsPlayersLoading] = useState(initialPlayersData.length === 0);
+    const [isMatchesLoading, setIsMatchesLoading] = useState(initialMatchesData.length === 0);
     const [refreshing, setRefreshing] = useState(false);
 
     const [selectedPlayerForPhone, setSelectedPlayerForPhone] = useState<any | null>(null);
@@ -212,8 +217,10 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             console.log('TeamProfile cache read error:', e);
         }
 
-        // 1-BOSQICH (HERO QISMI): Jamoa ma'lumotlarini birinchi tezkor yuklash
-        if (!team && !forceRefresh) setIsLoading(true);
+        // 1-BOSQICH (HERO QISMI): Jamoa ma'lumotlarini fonda sokin yuklash
+        if (!team && !globalTeamProfileMemoryCache[String(currentId)]?.team && !forceRefresh) {
+            setIsLoading(true);
+        }
         apiService.getTeamById(currentId)
             .then((teamData) => {
                 if (teamData) {
@@ -235,8 +242,11 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             });
 
         // 2-BOSQICH (TABLAR): Tarkib va o'yinlar ma'lumotlarini fonda parallel yuklash
-        if (players.length === 0 || forceRefresh) setIsPlayersLoading(true);
-        if (matches.length === 0 || forceRefresh) setIsMatchesLoading(true);
+        const hasPlayers = (players && players.length > 0) || (globalTeamProfileMemoryCache[String(currentId)]?.players?.length > 0);
+        const hasMatches = (matches && matches.length > 0) || (globalTeamProfileMemoryCache[String(currentId)]?.matches?.length > 0);
+
+        if (!hasPlayers || forceRefresh) setIsPlayersLoading(true);
+        if (!hasMatches || forceRefresh) setIsMatchesLoading(true);
 
         apiService.getPlayersByTeam(currentId)
             .then((playersData) => {

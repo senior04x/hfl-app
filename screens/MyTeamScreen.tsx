@@ -220,8 +220,10 @@ export default function MyTeamScreen({ route, navigation }: any) {
             console.log('Team cache read error:', e);
         }
 
-        // 1-BOSQICH (HERO QISMI): Jamoa ma'lumotlarini birinchi tezkor yuklash
-        if (!team && !forceRefresh) setIsLoading(true);
+        // 1-BOSQICH (HERO QISMI): Jamoa ma'lumotlarini fonda sokin yuklash
+        if (!team && !globalTeamMemoryCache[String(currentId)]?.team && !forceRefresh) {
+            setIsLoading(true);
+        }
         apiService.getTeamById(currentId)
             .then((teamData) => {
                 if (teamData) {
@@ -244,8 +246,11 @@ export default function MyTeamScreen({ route, navigation }: any) {
             });
 
         // 2-BOSQICH (TABLAR): Tarkib va o'yinlar ma'lumotlarini fonda parallel yuklash
-        if (players.length === 0 || forceRefresh) setIsPlayersLoading(true);
-        if (matches.length === 0 || forceRefresh) setIsMatchesLoading(true);
+        const hasPlayers = (players && players.length > 0) || (globalTeamMemoryCache[String(currentId)]?.players?.length > 0);
+        const hasMatches = (matches && matches.length > 0) || (globalTeamMemoryCache[String(currentId)]?.matches?.length > 0);
+
+        if (!hasPlayers || forceRefresh) setIsPlayersLoading(true);
+        if (!hasMatches || forceRefresh) setIsMatchesLoading(true);
 
         apiService.getPlayersByTeam(currentId)
             .then((playersData) => {
