@@ -200,7 +200,17 @@ function App() {
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
-                                    <Stack.Screen name="MyStats" component={MyStatsScreen} />
+                                    <Stack.Screen 
+                                        name="MyStats" 
+                                        component={MyStatsScreen} 
+                                        options={{ 
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }} 
+                                    />
                                     <Stack.Screen name="TransferRequest" component={TransferRequestScreen} />
                                     <Stack.Screen name="Applications" component={ApplicationsScreen} />
                                     <Stack.Screen 

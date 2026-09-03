@@ -10,14 +10,14 @@ import {
     Dimensions,
     Image,
     Animated,
-    PanResponder,
-    SafeAreaView,
     StatusBar,
     Modal,
     TextInput,
     Alert,
-    Platform
+    Platform,
+    PanResponder,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
@@ -25,15 +25,11 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 import { Picker } from '@react-native-picker/picker';
 import { apiService, clearApiCache } from '../services/apiService';
 import { supabase } from '../services/supabase';
-import { BlurView } from 'expo-blur';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
-import VideoBackground from '../components/VideoBackground';
 import { useAuthStore } from '../store/useAuthStore';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
-import { SlideButton } from '../components/SlideButton';
-import ReplayVideoCard from '../components/ReplayVideoCard';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
 import FifaPlayerCard from '../components/FifaPlayerCard';
 import PlayerCardZoomModal from '../components/PlayerCardZoomModal';
@@ -41,31 +37,12 @@ import PlayerComparisonModal from '../components/PlayerComparisonModal';
 import { aiScoutService, PlayerAiStats } from '../services/aiScoutService';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 const { width } = Dimensions.get('window');
 
-const getPositionFullUz = (pos: string) => {
-    const map: any = {
-        'GK': 'Darvozabon',
-        'LB': 'Chap qanot himoyachisi',
-        'CB': 'Markaziy himoyachi',
-        'RB': "O'ng qanot himoyachisi",
-        'CDM': 'Tayanch yarim himoyachisi',
-        'CM': 'Markaziy yarim himoyachisi',
-        'CAM': 'Hujumkor yarim himoyachisi',
-        'LW': 'Chap qanot hujumchisi',
-        'RW': "O'ng qanot hujumchisi",
-        'ST': 'Markaziy hujumchi',
-        'CF': 'Ikkinchi hujumchi',
-        'LM': 'Chap qanot yarim himoyachisi',
-        'RM': "O'ng qanot yarim himoyachisi",
-        'LWB': 'Chap qanot qanot himoyachisi',
-        'RWB': "O'ng qanot qanot himoyachisi",
-    };
-    return map[pos?.toUpperCase()] || pos || 'O\'YINCHI';
-};
-
-// Universal Player Metadata Extractor
+// Universal Metadata Extractor
 const extractPlayerData = (data: any) => {
     if (!data) return null;
     let citizenship = data.citizenship || '';
@@ -155,24 +132,180 @@ const calculateAgeFromBirthDate = (birthStr?: string, defaultAge?: any) => {
     return age > 0 ? `${age}` : (defaultAge ? `${defaultAge}` : '—');
 };
 
-const MyStatsScreen = ({ navigation }: any) => {
+export default function MyStatsScreen({ route, navigation }: any) {
     const { t } = useTranslation();
-    const user = useAuthStore((state) => state.user);
+    const { user } = useAuthStore();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+
+    const cardSurface = {
+        backgroundColor: homeColors.background,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                borderColor: homeColors.border,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 2,
+                shadowColor: isDark ? '#FFFFFF' : '#000000',
+            },
+        }),
+    };
+
+    const targetPlayerId = route?.params?.playerId || user?.id || user?._id;
     const [loading, setLoading] = useState(true);
     const [player, setPlayer] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState('profil');
-    const [scrollEnabled, setScrollEnabled] = useState(true);
+    const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
-    const [playerReplays, setPlayerReplays] = useState<any[]>([]);
-    const [replaysLoading, setReplaysLoading] = useState(false);
-    
-    // Instagram state
-    const [showInstagramModal, setShowInstagramModal] = useState(false);
-    const [instagramInput, setInstagramInput] = useState('');
-    const [savingInstagram, setSavingInstagram] = useState(false);
-    const [instagramUsername, setInstagramUsername] = useState('');
     const [openingInstagram, setOpeningInstagram] = useState(false);
+
+    // Profile Update & Modals
+    const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [showCardZoomModal, setShowCardZoomModal] = useState(false);
+    const [showComparisonModal, setShowComparisonModal] = useState(false);
+    const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
+
+    // Export State & ViewShot Ref
+    const [exportState, setExportState] = useState<'idle' | 'loading' | 'complete'>('idle');
+    const [exportProgress, setExportProgress] = useState(0);
+    const posterShotRef = useRef<any>(null);
+
+    // Profile update form state
+    const [updateForm, setUpdateForm] = useState({
+        photoUrl: '',
+        phone: '',
+        firstName: '',
+        lastName: '',
+        fatherName: '',
+        position: '',
+        playerNumber: '',
+        passportSeries: '',
+        passportNumber: '',
+        citizenship: '',
+        height: '',
+        weight: '',
+        instagramUsername: '',
+        birthDay: '15',
+        birthMonth: '05',
+        birthYear: '1998'
+    });
+    const [submittingUpdate, setSubmittingUpdate] = useState(false);
+    const [pickerLoading, setPickerLoading] = useState(false);
+    const [updateSubmitStatus, setUpdateSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+    // Real-time 1:1 linked pager (MatchDetail & MyTeam architecture)
+    const tabs: ('profil' | 'karyerasi' | 'oyinlari')[] = ['profil', 'karyerasi', 'oyinlari'];
+    const TAB_LABELS: Record<string, string> = {
+        profil: t('stats.tab_profile', 'PROFIL').toUpperCase(),
+        karyerasi: t('stats.tab_career', 'KARYERASI').toUpperCase(),
+        oyinlari: t('stats.tab_matches', "O'YINLARI").toUpperCase()
+    };
+    const [currentTabIndex, setCurrentTabIndex] = useState(0);
+    const currentTabIndexRef = useRef(0);
+    const scrollXPager = useRef(new Animated.Value(0)).current;
+    const isPagerScrolling = useRef(false);
+    const pagerScrollRef = useRef<ScrollView>(null);
+    const [tabLabelWidths, setTabLabelWidths] = useState<number[]>([]);
+
+    const TAB_BAR_WIDTH = width - 32;
+    const TAB_WIDTH = TAB_BAR_WIDTH / tabs.length;
+    const DEFAULT_INDICATOR_WIDTH = TAB_WIDTH * 0.72;
+    const tabIndicatorInputRange = tabs.map((_, i) => i * width);
+    const indicatorWidths = tabs.map((_, i) => tabLabelWidths[i] ?? DEFAULT_INDICATOR_WIDTH);
+    const indicatorLefts = tabs.map((_, i) => i * TAB_WIDTH + (TAB_WIDTH - indicatorWidths[i]) / 2);
+    const indicatorTranslateX = scrollXPager.interpolate({
+        inputRange: tabIndicatorInputRange,
+        outputRange: indicatorLefts,
+        extrapolate: 'clamp',
+    });
+    const indicatorWidthAnim = scrollXPager.interpolate({
+        inputRange: tabIndicatorInputRange,
+        outputRange: indicatorWidths,
+        extrapolate: 'clamp',
+    });
+
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
+
+    // Tab 0 interactive real-time swipe to back
+    const swipeBackPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                if (currentTabIndexRef.current !== 0) return false;
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: width,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
+                } else {
+                    Animated.spring(swipeBackAnim, {
+                        toValue: 0,
+                        friction: 8,
+                        tension: 45,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                Animated.spring(swipeBackAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 45,
+                    useNativeDriver: true,
+                }).start();
+            },
+            onPanResponderTerminationRequest: () => true,
+        })
+    ).current;
+
+    const handleTabPress = async (index: number) => {
+        if (index === currentTabIndexRef.current) return;
+        try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+        isPagerScrolling.current = true;
+        currentTabIndexRef.current = index;
+        setCurrentTabIndex(index);
+        pagerScrollRef.current?.scrollTo({
+            x: index * width,
+            animated: false,
+        });
+        requestAnimationFrame(() => {
+            isPagerScrolling.current = false;
+        });
+    };
+
+    const handlePagerMomentumScrollEnd = (e: any) => {
+        const offsetX = e.nativeEvent.contentOffset.x;
+        const newIdx = Math.max(0, Math.min(tabs.length - 1, Math.round(offsetX / width)));
+        if (newIdx !== currentTabIndexRef.current) {
+            currentTabIndexRef.current = newIdx;
+            setCurrentTabIndex(newIdx);
+            if (tabs[newIdx] === 'oyinlari' && matches.length === 0) {
+                fetchPlayerMatches();
+            }
+        }
+        isPagerScrolling.current = false;
+    };
 
     const handleOpenInstagram = async (url: string) => {
         if (!url || openingInstagram) return;
@@ -183,7 +316,7 @@ const MyStatsScreen = ({ navigation }: any) => {
             if (canOpen) {
                 await Linking.openURL(url);
             } else {
-                Alert.alert('Xatolik', 'Instagram havolasini ochib bo\'lmadi');
+                Alert.alert(t('common.notice', 'Eslatma'), 'Instagram havolasini ochib bo\'lmadi');
             }
         } catch (error) {
             console.error('Error opening instagram URL:', error);
@@ -191,21 +324,6 @@ const MyStatsScreen = ({ navigation }: any) => {
             setTimeout(() => setOpeningInstagram(false), 1200);
         }
     };
-
-    // Profile Update Request state
-    const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [submittingUpdate, setSubmittingUpdate] = useState(false);
-    const [updateSubmitStatus, setUpdateSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-    const [pickerLoading, setPickerLoading] = useState(false);
-
-    // Export State & ViewShot Ref
-    const [exportState, setExportState] = useState<'idle' | 'loading' | 'complete'>('idle');
-    const [exportProgress, setExportProgress] = useState(0);
-    const [showExportModal, setShowExportModal] = useState(false);
-    const [showCardZoomModal, setShowCardZoomModal] = useState(false);
-    const [showComparisonModal, setShowComparisonModal] = useState(false);
-    const posterShotRef = useRef<any>(null);
 
     const handleExportPress = () => {
         if (exportState !== 'idle') return;
@@ -244,289 +362,14 @@ const MyStatsScreen = ({ navigation }: any) => {
                         UTI: 'public.png'
                     });
                 } else {
-                    Alert.alert('Tayyor!', `Posteringiz saqlandi: ${uri}`);
+                    Alert.alert(t('common.ready', 'Tayyor!'), `Posteringiz saqlandi: ${uri}`);
                 }
             } else {
-                Alert.alert('Eslatma', 'Posterni rasmga olib bo\'lmadi. Qayta urinib ko\'ring.');
+                Alert.alert(t('common.notice', 'Eslatma'), 'Posterni rasmga olib bo\'lmadi. Qayta urinib ko\'ring.');
             }
-        } catch (err: any) {
-            console.error('Poster capture error:', err);
-            Alert.alert('Xatolik', 'Posterni saqlashda xatolik yuz berdi');
-        }
-    };
-
-    const passportNumberRef = useRef<TextInput>(null);
-
-    const [updateForm, setUpdateForm] = useState({
-        photoUrl: '',
-        phone: '',
-        firstName: '',
-        lastName: '',
-        fatherName: '',
-        position: '',
-        playerNumber: '',
-        passportSeries: '',
-        passportNumber: '',
-        citizenship: '',
-        height: '',
-        weight: '',
-        instagramUsername: '',
-        birthDay: '15',
-        birthMonth: '05',
-        birthYear: '1998'
-    });
-
-    const slideAnim = useRef(new Animated.Value(0)).current;
-
-    const tabs = ['profil', 'karyerasi', 'oyinlari'];
-    const tabLabels: any = {
-        profil: t('stats.tab_profile', 'PROFIL'),
-        karyerasi: t('stats.tab_my_career', 'KARYERAM'),
-        oyinlari: t('stats.tab_matches', 'O\'YINLARI')
-    };
-
-    const activeTabRef = useRef(activeTab);
-    useEffect(() => {
-        activeTabRef.current = activeTab;
-    }, [activeTab]);
-
-    const nextTab = () => {
-        try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        } catch (e) {}
-
-        const currentIndex = tabs.indexOf(activeTabRef.current);
-        const nextIndex = (currentIndex + 1) % tabs.length;
-        const nextTabName = tabs[nextIndex];
-        
-        Animated.timing(slideAnim, {
-            toValue: -80,
-            duration: 100,
-            useNativeDriver: true,
-        }).start(() => {
-            setActiveTab(nextTabName);
-            slideAnim.setValue(80);
-            Animated.spring(slideAnim, {
-                toValue: 0,
-                friction: 7,
-                tension: 45,
-                useNativeDriver: true,
-            }).start();
-        });
-    };
-
-    const prevTab = () => {
-        try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        } catch (e) {}
-
-        const currentIndex = tabs.indexOf(activeTabRef.current);
-        const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-        const prevTabName = tabs[prevIndex];
-        
-        Animated.timing(slideAnim, {
-            toValue: 80,
-            duration: 100,
-            useNativeDriver: true,
-        }).start(() => {
-            setActiveTab(prevTabName);
-            slideAnim.setValue(-80);
-            Animated.spring(slideAnim, {
-                toValue: 0,
-                friction: 7,
-                tension: 45,
-                useNativeDriver: true,
-            }).start();
-        });
-    };
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onMoveShouldSetPanResponder: (evt, gestureState) => {
-                const isStrictHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2.2 && Math.abs(gestureState.dx) > 12;
-                return isStrictHorizontal;
-            },
-            onPanResponderGrant: () => {
-                setScrollEnabled(false);
-            },
-            onPanResponderMove: (evt, gestureState) => {
-                slideAnim.setValue(gestureState.dx / 2.2);
-            },
-            onPanResponderRelease: (evt, gestureState) => {
-                setScrollEnabled(true);
-                if (gestureState.dx < -45) {
-                    nextTab();
-                } else if (gestureState.dx > 45) {
-                    prevTab();
-                } else {
-                    Animated.spring(slideAnim, {
-                        toValue: 0,
-                        friction: 7,
-                        tension: 50,
-                        useNativeDriver: true,
-                    }).start();
-                }
-            },
-            onPanResponderTerminate: () => {
-                setScrollEnabled(true);
-                Animated.spring(slideAnim, {
-                    toValue: 0,
-                    friction: 7,
-                    tension: 50,
-                    useNativeDriver: true,
-                }).start();
-            }
-        })
-    ).current;
-
-    useEffect(() => {
-        if (user && user.id && user.role === 'player') {
-            fetchPlayer();
-        } else {
-            setLoading(false);
-        }
-    }, [user]);
-
-    // Player Transfers History state
-    const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
-    const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
-
-    const fetchPlayer = async () => {
-        try {
-            setLoading(true);
-            const [data, transfersData] = await Promise.all([
-                apiService.getPlayerById(user.id),
-                apiService.getPlayerTransfers(user.id).catch(() => [])
-            ]);
-            if (data) {
-                const parsed = extractPlayerData(data);
-                
-                // AI Scout evaluation for FIFA Card & Radar
-                const evaluatedAi = await aiScoutService.evaluatePlayer(parsed);
-                parsed.aiStats = evaluatedAi;
-                setAiStats(evaluatedAi);
-                setPlayer(parsed);
-                if (parsed.instagram_username) {
-                    setInstagramUsername(parsed.instagram_username);
-                    setInstagramInput(parsed.instagram_username);
-                }
-                if (activeTab === 'oyinlari') fetchPlayerMatches();
-            }
-            if (transfersData) {
-                setPlayerTransfers(transfersData);
-            }
-        } catch (error) {
-            console.error('Error fetching my stats:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchPlayerMatches = async () => {
-        if (!user?.id) return;
-        try {
-            setMatchesLoading(true);
-            const data = await apiService.getPlayerMatches(user.id);
-            setMatches(data || []);
-        } catch (error) {
-            console.error('Error fetching player matches:', error);
-        } finally {
-            setMatchesLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        const fetchPlayerReplays = async () => {
-            const pId = player?.id || player?._id || user?.id;
-            if (!pId) return;
-            setReplaysLoading(true);
-            try {
-                // Find all application IDs associated with this player
-                const playerPhone = player?.phone || user?.phone;
-                let targetPlayerIds = [pId];
-                if (playerPhone) {
-                    const cleanPhone = String(playerPhone).replace(/\D/g, '').slice(-9);
-                    const { data: siblings } = await supabase
-                        .from('applications')
-                        .select('id')
-                        .ilike('phone', `%${cleanPhone}%`);
-                    if (siblings && siblings.length > 0) {
-                        targetPlayerIds = [...new Set([pId, ...siblings.map(s => s.id)])];
-                    }
-                }
-
-                const { data: events, error } = await supabase
-                    .from('match_events')
-                    .select('*, match:match_id(*)')
-                    .in('player_id', targetPlayerIds)
-                    .order('created_at', { ascending: false });
-
-                if (error) {
-                    console.warn('Error fetching player replays (query):', error.message || error);
-                }
-
-                if (events && events.length > 0) {
-                    const validReplays = events.filter((e: any) =>
-                        Boolean(e.replay_video_url || e.video_url || e.replay_url || e.video)
-                    );
-                    setPlayerReplays(validReplays);
-                } else {
-                    setPlayerReplays([]);
-                }
-            } catch (e) {
-                console.warn('Error fetching player replays:', e);
-            } finally {
-                setReplaysLoading(false);
-            }
-        };
-
-        fetchPlayerReplays();
-    }, [player?.id, player?._id, user?.id, player?.phone]);
-
-    // Save Instagram Username & URL Permanently in DB
-    const handleSaveInstagram = async () => {
-        if (!instagramInput.trim()) return;
-        setSavingInstagram(true);
-        try {
-            const username = instagramInput.trim().replace(/^@/, '').replace(/[^a-zA-Z0-9._]/g, '');
-            const fullUrl = `https://www.instagram.com/${username}/`;
-
-            const currentComment = player?.comment || '';
-            const cleanComment = currentComment.replace(/\[INSTAGRAM:[^\]]+\]/g, '').trim();
-            const updatedComment = `${cleanComment} [INSTAGRAM:${fullUrl}]`.trim();
-
-            const targetId = player?.id || player?._id || user?.id;
-
-            if (targetId) {
-                await supabase
-                    .from('applications')
-                    .update({ comment: updatedComment })
-                    .eq('id', targetId);
-            }
-            
-            if (user?.phone) {
-                await supabase
-                    .from('applications')
-                    .update({ comment: updatedComment })
-                    .eq('phone', user.phone);
-            }
-
-            clearApiCache();
-
-            setInstagramUsername(username);
-            setPlayer((prev: any) => ({
-                ...prev,
-                instagram_username: username,
-                instagram_url: fullUrl,
-                comment: updatedComment
-            }));
-            setShowInstagramModal(false);
-            Alert.alert('Muvaffaqiyatli', 'Instagram profili saqlandi');
-        } catch (err: any) {
-            console.error('Error saving instagram:', err);
-            Alert.alert('Xatolik', 'Instagram profili saqlashda xatolik yuz berdi');
-        } finally {
-            setSavingInstagram(false);
+        } catch (e) {
+            console.error('Error exporting poster:', e);
+            Alert.alert(t('common.notice', 'Xatolik'), 'Posterni eksport qilishda xatolik bo\'ldi');
         }
     };
 
@@ -564,7 +407,7 @@ const MyStatsScreen = ({ navigation }: any) => {
             citizenship: player?.citizenship || '',
             height: String(player?.height || ''),
             weight: String(player?.weight || ''),
-            instagramUsername: player?.instagram_username || instagramUsername || '',
+            instagramUsername: player?.instagram_username || '',
             birthDay: day.padStart(2, '0'),
             birthMonth: month.padStart(2, '0'),
             birthYear: year
@@ -590,8 +433,6 @@ const MyStatsScreen = ({ navigation }: any) => {
 
             if (!result.canceled && result.assets && result.assets[0]?.uri) {
                 const localUri = result.assets[0].uri;
-                
-                // 1. Immediately set localUri preview so user sees chosen photo right away!
                 setUpdateForm(prev => ({ ...prev, photoUrl: localUri }));
 
                 try {
@@ -605,31 +446,26 @@ const MyStatsScreen = ({ navigation }: any) => {
             }
         } catch (err: any) {
             console.error('Error picking image:', err);
-            Alert.alert('Xatolik', 'Rasmni tanlashda xatolik yuz berdi');
+            Alert.alert(t('common.notice', 'Xatolik'), 'Rasmni tanlashda xatolik yuz berdi');
         } finally {
             setPickerLoading(false);
         }
     };
 
-    // Submit Profile Update Ticket to Admin
     const handleSubmitProfileUpdate = async () => {
         setSubmittingUpdate(true);
         setUpdateSubmitStatus('loading');
         try {
             const formattedBirthDate = `${updateForm.birthDay}.${updateForm.birthMonth}.${updateForm.birthYear}`;
             const targetOrgId = player?.organization_id || player?.org_id || player?.teams?.organization_id || 1;
-            const targetTeamId = player?.team_id || player?.teams?.id || null;
             const targetLeague = player?.league || player?.teams?.league || '';
-            const targetPlayerId = player?.id || user?.id;
 
-            // Ensure photo is uploaded to Supabase Storage if it is a local file URI
             let finalPhotoUrl = updateForm.photoUrl || player?.photo || player?.avatar || null;
             if (finalPhotoUrl && (finalPhotoUrl.startsWith('file:') || finalPhotoUrl.startsWith('content:') || finalPhotoUrl.startsWith('ph:') || finalPhotoUrl.startsWith('blob:'))) {
                 const uRes: any = await apiService.uploadPhoto(finalPhotoUrl);
                 if (uRes && uRes.url && uRes.url.startsWith('http')) {
                     finalPhotoUrl = uRes.url;
                 } else {
-                    // Fallback to existing valid HTTP photo if upload failed
                     const existingPhoto = player?.photo || player?.avatar || '';
                     finalPhotoUrl = existingPhoto.startsWith('http') ? existingPhoto : null;
                 }
@@ -656,7 +492,7 @@ const MyStatsScreen = ({ navigation }: any) => {
                     citizenship: pData.citizenship || player?.citizenship || '',
                     height: String(pData.height || player?.height || ''),
                     weight: String(pData.weight || player?.weight || ''),
-                    instagramUsername: pData.instagram_username || player?.instagram_username || instagramUsername || '',
+                    instagramUsername: pData.instagram_username || player?.instagram_username || '',
                     birthDate: player?.birth_date || player?.birthDate || ''
                 },
                 newData: {
@@ -722,25 +558,9 @@ const MyStatsScreen = ({ navigation }: any) => {
             if (error) {
                 setUpdateSubmitStatus('error');
                 console.error('Supabase profile update insert error:', error);
-                Alert.alert('Xatolik yuz berdi', error.message);
+                Alert.alert(t('common.notice', 'Xatolik'), error.message);
                 return;
             }
-
-            // Trigger Admin Push Notification
-            try {
-                const { API_BASE_URL } = require('../constants/ApiConfig');
-                const fullName = `${updateForm.firstName || player?.first_name || ''} ${updateForm.lastName || player?.last_name || ''}`.trim() || 'Futbolchi';
-                fetch(`${API_BASE_URL}/api/notifications/notify-admin-profile-update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        playerName: fullName,
-                        playerId: targetPlayerId,
-                        phone: updateForm.phone || player?.phone,
-                        organizationId: targetOrgId || 1,
-                    }),
-                }).catch(() => {});
-            } catch (e) {}
 
             setUpdateSubmitStatus('success');
             setShowProfileUpdateModal(false);
@@ -748,173 +568,139 @@ const MyStatsScreen = ({ navigation }: any) => {
         } catch (err: any) {
             setUpdateSubmitStatus('error');
             console.error('Error submitting profile update:', err);
-            Alert.alert('Xatolik', err.message || 'Arizani yuborib bo\'lmadi');
+            Alert.alert(t('common.notice', 'Xatolik'), 'Arizani yuborishda xatolik yuz berdi');
         } finally {
             setSubmittingUpdate(false);
         }
     };
 
-    if (loading) {
+    const fetchPlayer = async () => {
+        try {
+            setLoading(true);
+            const [playerData, statsData, transfersData] = await Promise.all([
+                apiService.getPlayerById(targetPlayerId),
+                apiService.getPlayerStats(targetPlayerId).catch(() => null),
+                apiService.getPlayerTransfers(targetPlayerId).catch(() => [])
+            ]);
+
+            if (playerData) {
+                const parsed = extractPlayerData({
+                    ...playerData,
+                    stats: statsData || playerData.stats
+                });
+
+                const evaluatedAi = await aiScoutService.evaluatePlayer(parsed);
+                parsed.aiStats = evaluatedAi;
+                setAiStats(evaluatedAi);
+                setPlayer(parsed);
+            }
+            if (transfersData) {
+                setPlayerTransfers(transfersData);
+            }
+        } catch (error) {
+            console.error('Error fetching my player stats:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchPlayerMatches = async () => {
+        try {
+            setMatchesLoading(true);
+            const data = await apiService.getPlayerMatches(targetPlayerId);
+            setMatches(data || []);
+        } catch (error) {
+            console.error('Error fetching player matches:', error);
+        } finally {
+            setMatchesLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (targetPlayerId) {
+            fetchPlayer();
+        } else {
+            setLoading(false);
+        }
+    }, [targetPlayerId]);
+
+    const [playerReplays, setPlayerReplays] = useState<any[]>([]);
+    const [replaysLoading, setReplaysLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchPlayerReplays = async () => {
+            const pId = player?.id || player?._id || targetPlayerId;
+            if (!pId) return;
+            setReplaysLoading(true);
+            try {
+                const playerPhone = player?.phone;
+                let targetPlayerIds = [pId];
+                if (playerPhone) {
+                    const cleanPhone = String(playerPhone).replace(/\D/g, '').slice(-9);
+                    const { data: siblings } = await supabase
+                        .from('applications')
+                        .select('id')
+                        .ilike('phone', `%${cleanPhone}%`);
+                    if (siblings && siblings.length > 0) {
+                        targetPlayerIds = [...new Set([pId, ...siblings.map(s => s.id)])];
+                    }
+                }
+
+                const { data: events, error } = await supabase
+                    .from('match_events')
+                    .select('*, match:match_id(*)')
+                    .in('player_id', targetPlayerIds)
+                    .order('created_at', { ascending: false });
+
+                if (!error && events && events.length > 0) {
+                    const validReplays = events.filter((e: any) =>
+                        Boolean(e.replay_video_url || e.video_url || e.replay_url || e.video)
+                    );
+                    setPlayerReplays(validReplays);
+                } else {
+                    setPlayerReplays([]);
+                }
+            } catch (e) {
+                console.warn('Error fetching player replays:', e);
+            } finally {
+                setReplaysLoading(false);
+            }
+        };
+
+        fetchPlayerReplays();
+    }, [player?.id, player?._id, targetPlayerId, player?.phone]);
+
+    if (loading && !player) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#050811' }}>
-                <VideoBackground
-                    source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                    overlayOpacity={0.85}
-                    style={StyleSheet.absoluteFill}
-                />
+            <View style={{ flex: 1, backgroundColor: homeColors.background }}>
                 <PlayerProfileSkeleton />
             </View>
         );
     }
 
-    if (!user || user.role !== 'player' || !player) {
+    if (!player) {
         return (
-            <SafeAreaView style={styles.emptyContainer}>
-                <StatusBar barStyle="light-content" />
+            <SafeAreaView style={[styles.emptyContainer, { backgroundColor: homeColors.background }]}>
+                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
                 <View style={styles.emptyContent}>
-                    <Ionicons name="person-circle-outline" size={80} color="rgba(255,255,255,0.2)" />
-                    <Text style={styles.emptyTitle}>{t('stats.no_profile')}</Text>
-                    <Text style={styles.emptySub}>
-                        {t('stats.no_profile')}
-                    </Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Welcome')} style={styles.loginBtn}>
-                        <Text style={styles.loginBtnText}>{t('auth.login')}</Text>
+                    <Ionicons name="person-outline" size={64} color={homeColors.textSecondary} />
+                    <Text style={[styles.emptyTitle, { color: homeColors.textPrimary }]}>{t('teams.player_fallback', 'O\'yinchi topilmadi')}</Text>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtnAction, { backgroundColor: homeColors.accent }]}>
+                        <Text style={[styles.backBtnActionText, { color: isDark ? '#000000' : '#FFFFFF' }]}>{t('common.back', 'Orqaga')}</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
         );
     }
 
-    const stats = player.stats || {
-        goals: player.goals || 0,
-        assists: player.assists || 0,
-        matchesPlayed: player.matchesPlayed || 0,
-        yellowCards: player.yellowCards || 0,
-        redCards: player.redCards || 0,
-        rating: player.rating || 0
-    };
-
-    const instagramUrl = instagramUsername ? `https://www.instagram.com/${instagramUsername}/` : null;
+    const stats = player.stats || { goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0, rating: 0 };
     const computedAge = calculateAgeFromBirthDate(player.birth_date || player.birthDate, player.age);
+    const instagramUsername = player.instagram_username || '';
+    const instagramUrl = instagramUsername ? `https://www.instagram.com/${instagramUsername}/` : null;
 
-    const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
-    const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
-    const years = Array.from({ length: 65 }, (_, i) => String(2025 - i));
-
-    const renderProfil = () => (
-        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.statsGrid}>
-                <StatBox label={t('stats.goals').toUpperCase()} value={stats.goals} icon="football" color={Colors.primary} />
-                <StatBox label={t('stats.assists').toUpperCase()} value={stats.assists} icon="shoe-prints" color="#3b82f6" />
-                <StatBox label={t('stats.matches_played').toUpperCase()} value={stats.matchesPlayed} icon="calendar" color="#FFF" />
-                <StatBox label={t('stats.rating').toUpperCase()} value={stats.rating || player.rating || 0} icon="trending-up" color="#FACC15" />
-            </View>
-
-            <View style={styles.physicalInfoBox}>
-                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                <View style={styles.cardContent}>
-                    <View style={styles.statItem}>
-                        <View style={styles.statIconBox}><Ionicons name="calendar-outline" size={18} color={Colors.primary} /></View>
-                        <View>
-                            <Text style={styles.statLabelSmall}>{t('stats.age')}</Text>
-                            <Text style={styles.statValueSmall}>{computedAge !== '—' ? `${computedAge} ${t('stats.years_old')}` : '—'}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.statItem}>
-                        <View style={styles.statIconBox}><Ionicons name="resize-outline" size={18} color={Colors.primary} /></View>
-                        <View>
-                            <Text style={styles.statLabelSmall}>{t('stats.height')}</Text>
-                            <Text style={styles.statValueSmall}>{player?.height ? `${player.height} ${t('stats.cm').toUpperCase()}` : '—'}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.statItem}>
-                        <View style={styles.statIconBox}><Ionicons name="fitness-outline" size={18} color={Colors.primary} /></View>
-                        <View>
-                            <Text style={styles.statLabelSmall}>{t('stats.weight')}</Text>
-                            <Text style={styles.statValueSmall}>{player?.weight ? `${player.weight} ${t('stats.kg').toUpperCase()}` : '—'}</Text>
-                        </View>
-                    </View>
-                </View>
-            </View>
-
-            <View style={styles.infoSection}>
-                <View style={styles.sectionHeader}>
-                    <Ionicons name="person-circle" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>{t('stats.personal_info')}</Text>
-                </View>
-                <View style={styles.infoList}>
-                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <InfoRow label={t('stats.father_name')} value={player.fatherName || player.father_name || '---'} icon="person" />
-                    <InfoRow label={t('stats.citizenship')} value={player.citizenship || '---'} icon="planet" />
-                    <InfoRow label={t('stats.position')} value={getLocalizedPosition(player.position, t)} icon="shield" />
-                    <InfoRow label={t('stats.phone')} value={player.phone || '---'} icon="call" />
-                </View>
-            </View>
-
-            {/* 3D FIFA / EA FC PLAYER CARD */}
-            <View style={{ marginTop: 24, marginBottom: 16, alignItems: 'center', width: '100%' }}>
-                <View style={[styles.sectionHeader, { width: '100%', marginBottom: 10 }]}>
-                    <Ionicons name="sparkles" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>{t('stats.player_card_title', 'O\'YINCHI KARTASI')}</Text>
-                </View>
-
-                <View style={{ marginBottom: 12, alignItems: 'center' }}>
-                    <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
-                        {t('stats.card_tap_hint', 'Kattalashtirish va 3D ko\'rish uchun kartaga bosing')}
-                    </Text>
-                </View>
-
-                <FifaPlayerCard
-                    player={player}
-                    size="lg"
-                    interactive3D={true}
-                    showPlayStyles={true}
-                    onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setShowCardZoomModal(true);
-                    }}
-                />
-
-                {aiStats?.aiScoutSummary ? (
-                    <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 223, 130, 0.08)', borderWidth: 1, borderColor: 'rgba(0, 223, 130, 0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, gap: 8, maxWidth: width - 48 }}>
-                        <Ionicons name={aiStats.hasVideoScouted ? "sparkles" : "analytics-outline"} size={16} color={Colors.primary} />
-                        <Text style={{ color: '#E2E8F0', fontSize: 11, fontWeight: '700', flex: 1, lineHeight: 15 }}>
-                            {aiStats.aiScoutSummary}
-                        </Text>
-                    </View>
-                ) : null}
-
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setShowComparisonModal(true);
-                    }}
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 8,
-                        backgroundColor: 'rgba(0, 223, 130, 0.15)',
-                        borderWidth: 1.2,
-                        borderColor: Colors.primary,
-                        borderRadius: 14,
-                        paddingVertical: 13,
-                        paddingHorizontal: 20,
-                        marginTop: 22,
-                        width: '100%'
-                    }}
-                >
-                    <Ionicons name="git-compare" size={18} color={Colors.primary} />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>
-                        {t('stats.compare_h2h', 'O\'YINCHILARNI TAQQOSLASH (H2H)')}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={{ marginBottom: 35 }} />
-        </ScrollView>
-    );
+    const approvedTransfers = playerTransfers.filter((t: any) => t.status === 'approved');
+    const currentTeamName = player?.teams?.name || (approvedTransfers[0]?.new_team_name) || player?.team_name || player?.teamName || '';
+    const currentTeamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || (approvedTransfers[0]?.new_team_logo) || '';
 
     const formatTransferDate = (dateStr: string) => {
         if (!dateStr) return '';
@@ -931,1495 +717,1170 @@ const MyStatsScreen = ({ navigation }: any) => {
         }
     };
 
-    const renderCareer = () => {
-        const approvedTransfers = playerTransfers.filter((t: any) => t.status === 'approved');
-        const currentTeamName = player?.teams?.name || (approvedTransfers[0]?.new_team_name) || player?.team_name || 'Jamoa';
-        const currentTeamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || (approvedTransfers[0]?.new_team_logo);
+    // Group player replays by match
+    const matchGroups: { [key: string]: { match: any, replays: any[] } } = {};
+    playerReplays.forEach((ev: any) => {
+        const mId = ev.match_id || ev.match?.id || 'unknown';
+        if (!matchGroups[mId]) {
+            matchGroups[mId] = {
+                match: ev.match || {},
+                replays: []
+            };
+        }
+        if (!matchGroups[mId].replays.some(r => r.id === ev.id)) {
+            matchGroups[mId].replays.push(ev);
+        }
+    });
+    const groupedMatches = Object.values(matchGroups);
 
-        // Group player replays by match
-        const matchGroups: { [key: string]: { match: any, replays: any[] } } = {};
-        playerReplays.forEach((ev: any) => {
-            const mId = ev.match_id || ev.match?.id || 'unknown';
-            if (!matchGroups[mId]) {
-                matchGroups[mId] = {
-                    match: ev.match || {},
-                    replays: []
-                };
-            }
-            if (!matchGroups[mId].replays.some(r => r.id === ev.id)) {
-                matchGroups[mId].replays.push(ev);
-            }
-        });
-        const groupedMatches = Object.values(matchGroups);
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, width * 0.8, width],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
 
-        return (
-            <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-                <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-                    <Ionicons name="time-outline" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>{t('stats.career_history').toUpperCase()}</Text>
+    const playerNameFull = `${player.firstName || player.name || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim() || t('teams.player_fallback', 'O\'YINCHI');
+
+    const renderProfil = () => (
+        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+            {/* PHYSICAL STATS CARD */}
+            <View style={[styles.infoSectionCard, cardSurface]}>
+                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                    <Ionicons name="finger-print-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.personal_info', 'MA\'LUMOTLAR').toUpperCase()}</Text>
+                    <TouchableOpacity onPress={handleOpenUpdateModal} hitSlop={10} style={{ marginLeft: 'auto' }}>
+                        <Ionicons name="create-outline" size={18} color={homeColors.textPrimary} />
+                    </TouchableOpacity>
                 </View>
 
-                <View style={styles.careerTimelineContainer}>
-                    {/* 1. HOZIRGI JAMOASI (CURRENT ACTIVE TEAM) */}
-                    <View style={[styles.teamCareerWrapper, styles.teamCareerCurrent]}>
-                        <View style={styles.teamMainRow}>
-                            <View style={[styles.teamIconBox, { borderColor: '#00FF66', borderWidth: 1.5, width: 36, height: 36, borderRadius: 10 }]}>
-                                {currentTeamLogo ? (
-                                    <Image source={{ uri: currentTeamLogo }} style={{ width: 26, height: 26 }} resizeMode="contain" />
+                <View style={styles.physicalGrid}>
+                    <View style={styles.physicalItem}>
+                        <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.age', 'YOSHI')}</Text>
+                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{computedAge !== '—' ? `${computedAge}` : '—'}</Text>
+                    </View>
+                    <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
+                    <View style={styles.physicalItem}>
+                        <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.height', 'BO\'YI')}</Text>
+                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{player?.height ? `${player.height} CM` : '—'}</Text>
+                    </View>
+                    <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
+                    <View style={styles.physicalItem}>
+                        <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.weight', 'VAZNI')}</Text>
+                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{player?.weight ? `${player.weight} KG` : '—'}</Text>
+                    </View>
+                    <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
+                    <View style={styles.physicalItem}>
+                        <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.citizenship', 'DAVLAT')}</Text>
+                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]} numberOfLines={1}>{player?.citizenship || 'UZB'}</Text>
+                    </View>
+                </View>
+
+                {instagramUrl && (
+                    <TouchableOpacity
+                        style={[styles.instagramBtn, { borderTopColor: homeColors.border }]}
+                        activeOpacity={0.75}
+                        onPress={() => handleOpenInstagram(instagramUrl)}
+                    >
+                        <Ionicons name="logo-instagram" size={18} color="#E1306C" />
+                        <Text style={[styles.instagramBtnText, { color: homeColors.textPrimary }]}>@{instagramUsername}</Text>
+                        <Ionicons name="open-outline" size={14} color={homeColors.textSecondary} style={{ marginLeft: 'auto' }} />
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {/* 3D FIFA / EA FC PLAYER CARD */}
+            <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14, alignItems: 'center', paddingVertical: 18 }]}>
+                <View style={[styles.sectionCardHeader, { width: '100%', borderBottomColor: homeColors.border, marginBottom: 14 }]}>
+                    <Ionicons name="sparkles-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.player_card_title', 'O\'YINCHI KARTASI')}</Text>
+                </View>
+
+                <FifaPlayerCard
+                    player={player}
+                    size="lg"
+                    interactive3D={true}
+                    showPlayStyles={true}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowCardZoomModal(true);
+                    }}
+                />
+
+                <Text style={{ color: homeColors.textSecondary, fontSize: 11, fontWeight: '600', marginTop: 12, textAlign: 'center' }}>
+                    {t('stats.card_tap_hint', 'Kattalashtirish va 3D ko\'rish uchun kartaga bosing')}
+                </Text>
+
+                {aiStats?.aiScoutSummary ? (
+                    <View style={[styles.aiScoutPill, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)', borderColor: homeColors.border }]}>
+                        <Ionicons name="sparkles" size={15} color={homeColors.textPrimary} />
+                        <Text style={[styles.aiScoutText, { color: homeColors.textPrimary }]}>
+                            {aiStats.aiScoutSummary}
+                        </Text>
+                    </View>
+                ) : null}
+            </View>
+
+            {/* 3D SPIDER / RADAR POLYGON CHART */}
+            <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14, alignItems: 'center', paddingVertical: 18 }]}>
+                <View style={[styles.sectionCardHeader, { width: '100%', borderBottomColor: homeColors.border, marginBottom: 12 }]}>
+                    <Ionicons name="pie-chart-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>3D ATRIBUTLAR RADARI</Text>
+                </View>
+
+                <PlayerRadarChart
+                    player1={player}
+                    player1Name={playerNameFull}
+                    size={Math.min(width - 64, 310)}
+                />
+
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowComparisonModal(true);
+                    }}
+                    style={[styles.compareBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
+                >
+                    <Ionicons name="git-compare-outline" size={16} color={isDark ? '#000000' : '#FFFFFF'} />
+                    <Text style={[styles.compareBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                        BOSHQASI BILAN TAQQOSLASH (VS)
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* MATCHDAY POSTER EXPORT SECTION */}
+            <View style={{ marginTop: 14, width: '100%' }}>
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handleExportPress}
+                    disabled={exportState !== 'idle'}
+                    style={[styles.exportBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: homeColors.border }]}
+                >
+                    {exportState === 'idle' && (
+                        <>
+                            <Ionicons name="image-outline" size={18} color={homeColors.textPrimary} />
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.create_matchday_poster', 'MATCHDAY POSTER YARATISH')}</Text>
+                        </>
+                    )}
+                    {exportState === 'loading' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <ActivityIndicator size="small" color={homeColors.textPrimary} />
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.generating_poster', 'POSTER YARATILMOQDA...')} {exportProgress}%</Text>
+                        </View>
+                    )}
+                    {exportState === 'complete' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.poster_ready', 'POSTER TAYYOR!')}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+        </ScrollView>
+    );
+
+    const renderKaryera = () => (
+        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+            {/* CURRENT TEAM */}
+            <View style={[styles.infoSectionCard, cardSurface]}>
+                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                    <Ionicons name="trophy-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.career_history', 'KARYERA TARIXI').toUpperCase()}</Text>
+                </View>
+
+                <View style={styles.careerTeamItem}>
+                    <View style={[styles.teamLogoBoxMini, { borderColor: homeColors.border }]}>
+                        {currentTeamLogo ? (
+                            <SmartImage uri={currentTeamLogo} style={{ width: 28, height: 28 }} contentFit="contain" fallbackIcon="shield-outline" />
+                        ) : (
+                            <Ionicons name="shield-outline" size={20} color={homeColors.textPrimary} />
+                        )}
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={[styles.careerTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                {(currentTeamName || 'ERKIN AGENT').toUpperCase()}
+                            </Text>
+                            <View style={[styles.currentTeamBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                <View style={[styles.pulsingDot, { backgroundColor: '#10B981' }]} />
+                                <Text style={[styles.currentTeamBadgeText, { color: homeColors.textPrimary }]}>{t('stats.current_team', 'HOZIRGI').toUpperCase()}</Text>
+                            </View>
+                        </View>
+                        <Text style={[styles.careerDateSub, { color: homeColors.textSecondary }]}>{t('stats.current_team_sub', 'Amaldagi jamoasi')}</Text>
+                    </View>
+                </View>
+
+                {/* PAST TRANSFERS */}
+                {approvedTransfers.map((tr: any, idx: number) => {
+                    const trDate = formatTransferDate(tr.created_at);
+                    const oldLogo = tr.old_team_logo;
+                    const oldName = tr.old_team_name || 'Eski jamoasi';
+
+                    return (
+                        <View key={tr.id || idx} style={[styles.careerTeamItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: homeColors.border }]}>
+                            <View style={[styles.teamLogoBoxMini, { borderColor: homeColors.border }]}>
+                                {oldLogo ? (
+                                    <SmartImage uri={oldLogo} style={{ width: 24, height: 24 }} contentFit="contain" fallbackIcon="shield-outline" />
                                 ) : (
-                                    <Ionicons name="shield" size={18} color="#00FF66" />
+                                    <Ionicons name="shield-outline" size={18} color={homeColors.textSecondary} />
                                 )}
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Text style={[styles.teamNameCareer, { color: '#00FF66', fontSize: 14 }]} numberOfLines={1}>
-                                        {(currentTeamName || 'AMALDAGI JAMOA').toUpperCase()}
+                                    <Text style={[styles.careerTeamName, { color: homeColors.textSecondary }]} numberOfLines={1}>
+                                        {oldName.toUpperCase()}
                                     </Text>
-                                    <View style={styles.currentTeamBadge}>
-                                        <View style={styles.pulsingDot} />
-                                        <Text style={styles.currentTeamBadgeText}>{t('stats.current_team').toUpperCase()}</Text>
-                                    </View>
+                                    <Text style={[styles.pastTeamBadgeText, { color: homeColors.textSecondary }]}>{t('stats.past_team', 'AVVALGI').toUpperCase()}</Text>
                                 </View>
-                                <Text style={styles.careerDateSub}>{t('stats.current_team_sub')}</Text>
+                                <Text style={[styles.careerDateSub, { color: homeColors.textSecondary }]}>
+                                    🗓️ {t('stats.transfer_date', 'Transfer')}: {trDate}
+                                </Text>
                             </View>
                         </View>
-                    </View>
-
-                    {/* 2. TRANSFER BO'LGAN AVVALGI JAMOALARI (PAST TEAMS WITH EXACT TRANSFER DATE) */}
-                    {approvedTransfers.map((tr: any, idx: number) => {
-                        const trDate = formatTransferDate(tr.created_at);
-                        const oldLogo = tr.old_team_logo;
-                        const oldName = tr.old_team_name || 'Eski jamoasi';
-
-                        return (
-                            <View key={tr.id || idx} style={[styles.teamCareerWrapper, { borderLeftWidth: 3, borderLeftColor: 'rgba(255,255,255,0.25)', marginTop: 8 }]}>
-                                <View style={styles.teamMainRow}>
-                                    <View style={[styles.teamIconBox, { width: 34, height: 34, borderRadius: 10 }]}>
-                                        {oldLogo ? (
-                                            <Image source={{ uri: oldLogo }} style={{ width: 24, height: 24 }} resizeMode="contain" />
-                                        ) : (
-                                            <Ionicons name="shield-outline" size={16} color="rgba(255,255,255,0.6)" />
-                                        )}
-                                    </View>
-                                    <View style={{ flex: 1, marginLeft: 12 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <Text style={styles.teamNameCareer} numberOfLines={1}>
-                                                {oldName.toUpperCase()}
-                                            </Text>
-                                            <View style={styles.transferredBadge}>
-                                                <Ionicons name="arrow-forward" size={10} color="#94A3B8" />
-                                                <Text style={styles.transferredBadgeText}>{t('stats.past_team').toUpperCase()}</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={styles.careerDateSub}>
-                                            🗓️ {t('stats.transfer_date')}: {trDate}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        );
-                    })}
-                </View>
-
-                {/* Player's Personal 20s Goal Replay Clips Feed (Grouped by Match) */}
-                <View style={{ marginTop: 24, marginBottom: 20 }}>
-                    <View style={[styles.sectionHeader, { marginBottom: 12 }]}>
-                        <Ionicons name="videocam" size={20} color={Colors.primary} />
-                        <Text style={styles.sectionTitle}>{t('stats.personal_replays')}</Text>
-                    </View>
-
-                    {replaysLoading ? (
-                        <ActivityIndicator color={Colors.primary} style={{ marginVertical: 15 }} />
-                    ) : groupedMatches.length > 0 ? (
-                        groupedMatches.map((group: any, idx: number) => (
-                            <PlayerMatchReplayCard
-                                key={group.match?.id || idx}
-                                match={group.match}
-                                replays={group.replays}
-                                playerName={`${player?.first_name || ''} ${player?.last_name || ''}`.trim()}
-                            />
-                        ))
-                    ) : (
-                        <View style={styles.emptyCareer}>
-                            <Ionicons name="videocam-outline" size={32} color="rgba(255,255,255,0.2)" />
-                            <Text style={[styles.emptyCareerText, { marginTop: 6 }]}>{t('stats.no_replays')}</Text>
-                        </View>
-                    )}
-                </View>
-            </ScrollView>
-        );
-    };
-
-    const renderMatches = () => (
-        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-            <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-                <Ionicons name="football-outline" size={20} color={Colors.primary} />
-                <Text style={styles.sectionTitle}>{t('stats.past_matches').toUpperCase()}</Text>
+                    );
+                })}
             </View>
 
-            {matchesLoading ? (
-                <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
-            ) : matches.length > 0 ? (
-                matches.map((match: any) => (
-                    <MatchCard key={match.id || match._id} match={match} />
-                ))
-            ) : (
-                <View style={styles.emptyCareer}>
-                    <Text style={styles.emptyCareerText}>{t('matches.no_matches')}</Text>
+            {/* PLAYER'S REPLAY HIGHLIGHTS FEED */}
+            <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14 }]}>
+                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                    <Ionicons name="videocam-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.personal_replays', 'GOLLAR & REPLAYLAR').toUpperCase()}</Text>
                 </View>
-            )}
+
+                {replaysLoading ? (
+                    <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 20 }} />
+                ) : groupedMatches.length > 0 ? (
+                    groupedMatches.map((group: any, idx: number) => (
+                        <PlayerMatchReplayCard
+                            key={group.match?.id || idx}
+                            match={group.match}
+                            replays={group.replays}
+                            playerName={playerNameFull}
+                        />
+                    ))
+                ) : (
+                    <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="videocam-outline" size={32} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
+                        <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 8, fontWeight: '600' }}>{t('stats.no_replays', 'Replaylar mavjud emas')}</Text>
+                    </View>
+                )}
+            </View>
+        </ScrollView>
+    );
+
+    const renderMatches = () => (
+        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+            <View style={[styles.infoSectionCard, cardSurface]}>
+                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                    <Ionicons name="football-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.past_matches', 'O\'YINLAR TARIXI').toUpperCase()}</Text>
+                </View>
+
+                {matchesLoading ? (
+                    <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 24 }} />
+                ) : matches.length > 0 ? (
+                    matches.map((match: any, idx: number) => (
+                        <View key={match.id || match._id || idx} style={[styles.matchRowItem, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: homeColors.border }]}>
+                            <View style={styles.matchRowTop}>
+                                <Text style={[styles.matchRowLeague, { color: homeColors.textSecondary }]}>{match.leagueName || 'AMATORA LIGA'}</Text>
+                                <Text style={[styles.matchRowDate, { color: homeColors.textSecondary }]}>{new Date(match.date || match.match_date || Date.now()).toLocaleDateString('uz-UZ')}</Text>
+                            </View>
+                            <View style={styles.matchTeamsRow}>
+                                <View style={styles.teamCol}>
+                                    <SmartImage uri={match.homeTeam?.logo || match.homeTeamLogo} style={styles.teamMiniLogo} contentFit="contain" fallbackIcon="shield-outline" />
+                                    <Text style={[styles.teamNameMatch, { color: homeColors.textPrimary }]} numberOfLines={1}>{match.homeTeam?.name || match.homeTeamName || 'Jamoa A'}</Text>
+                                </View>
+                                <View style={[styles.scoreBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                    <Text style={[styles.scoreText, { color: homeColors.textPrimary }]}>{match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}</Text>
+                                </View>
+                                <View style={styles.teamCol}>
+                                    <SmartImage uri={match.awayTeam?.logo || match.awayTeamLogo} style={styles.teamMiniLogo} contentFit="contain" fallbackIcon="shield-outline" />
+                                    <Text style={[styles.teamNameMatch, { color: homeColors.textPrimary }]} numberOfLines={1}>{match.awayTeam?.name || match.awayTeamName || 'Jamoa B'}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    ))
+                ) : (
+                    <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="football-outline" size={32} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
+                        <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 8, fontWeight: '600' }}>O'yinlar tarixi mavjud emas</Text>
+                    </View>
+                )}
+            </View>
         </ScrollView>
     );
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.8}
-                style={StyleSheet.absoluteFill}
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
             />
 
-            <ScrollView 
-                scrollEnabled={scrollEnabled}
-                contentContainerStyle={styles.scrollContent} 
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
+            <Animated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
             >
-                <View style={styles.heroSection}>
-                    {/* AMATORA BRAND HEADER (SIDE-BY-SIDE WITH LOGO) */}
-                    <View style={styles.brandHeaderWrapper}>
-                        <Image
-                            source={require('../assets/logo.png')}
-                            style={{ width: 18, height: 18, marginRight: 6 }}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.brandText}>AMATORA</Text>
-                    </View>
+                <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                    {/* STICKY HEADER: TOP ACTIONS + PLAYER IDENTITY + STATS + TABS */}
+                    <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
+                        {/* TOP ROW: BACK BUTTON & ACTIONS */}
+                        <View style={styles.topRow}>
+                            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, cardSurface]}>
+                                <Ionicons name="arrow-back" size={20} color={homeColors.textPrimary} />
+                            </TouchableOpacity>
 
-                    {/* ⚽ PARALLEL TOP ROW: BACK BUTTON ALIGNED TO TOP EDGE PARALLEL WITH PLAYER PHOTO */}
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: 30, marginBottom: 20 }}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonBtn}>
-                            <Ionicons name="arrow-back" size={22} color="#FFF" />
-                        </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TouchableOpacity
+                                    style={[styles.iconBtn, cardSurface]}
+                                    onPress={handleOpenUpdateModal}
+                                >
+                                    <Ionicons name="create-outline" size={18} color={homeColors.textPrimary} />
+                                </TouchableOpacity>
 
-                        {/* PLAYER PHOTO CREST (BIGGER 1X1 SQUARE CARD) */}
-                        <View style={{ position: 'relative' }}>
-                            <View style={{
-                                width: 118,
-                                height: 118,
-                                borderRadius: 22,
-                                borderWidth: 1.5,
-                                borderColor: 'rgba(0, 255, 135, 0.7)',
-                                padding: 2,
-                                backgroundColor: '#0A1224',
-                                overflow: 'hidden',
-                                shadowColor: '#00FF87',
-                                shadowRadius: 16,
-                                shadowOpacity: 0.35,
-                                elevation: 8
-                            }}>
-                                <SmartImage
-                                    uri={player.photo || player.avatar}
-                                    style={{ width: '100%', height: '100%', borderRadius: 18 }}
-                                    contentFit="cover"
-                                    fallbackIcon="person"
-                                />
-                            </View>
+                                <TouchableOpacity
+                                    style={[styles.iconBtn, cardSurface]}
+                                    onPress={() => {
+                                        Haptics.selectionAsync().catch(() => {});
+                                        setShowComparisonModal(true);
+                                    }}
+                                >
+                                    <Ionicons name="git-compare-outline" size={18} color={homeColors.textPrimary} />
+                                </TouchableOpacity>
 
-                            {/* UNIQUE TILTED FOOTBALL CREST SHIRT NUMBER BADGE */}
-                            <View style={{
-                                position: 'absolute',
-                                bottom: -4,
-                                right: -4,
-                                backgroundColor: '#00FF87',
-                                borderWidth: 2,
-                                borderColor: '#050A14',
-                                paddingHorizontal: 9,
-                                paddingVertical: 2.5,
-                                borderRadius: 10,
-                                transform: [{ rotate: '-8deg' }],
-                                shadowColor: '#00FF87',
-                                shadowRadius: 10,
-                                shadowOpacity: 0.6,
-                                elevation: 6
-                            }}>
-                                <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 11, fontStyle: 'italic', letterSpacing: 0.5 }}>
-                                    #{player.number || player.player_number || '0'}
-                                </Text>
+                                <TouchableOpacity
+                                    style={[styles.iconBtn, cardSurface]}
+                                    onPress={() => {
+                                        Haptics.selectionAsync().catch(() => {});
+                                        setShowCardZoomModal(true);
+                                    }}
+                                >
+                                    <Ionicons name="sparkles-outline" size={18} color={homeColors.textPrimary} />
+                                </TouchableOpacity>
                             </View>
                         </View>
 
-                        {/* PENCIL EDIT BUTTON PARALLEL TO BACK BUTTON & PLAYER PHOTO */}
-                        <TouchableOpacity onPress={handleOpenUpdateModal} style={styles.backButtonBtn}>
-                            <Ionicons name="create-outline" size={20} color="#00FF87" />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* PLAYER DETAILS CENTERED BELOW */}
-                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
-
-                        {/* PLAYER FULL NAME (FIRST NAME NEON GREEN, LAST NAME WHITE) */}
-                        <Text style={{
-                            fontWeight: '900',
-                            fontSize: 22,
-                            letterSpacing: 0.5,
-                            textAlign: 'center',
-                            textTransform: 'uppercase'
-                        }}>
-                            <Text style={{ color: '#00FF87' }}>{(player.firstName || player.first_name || '').toUpperCase()}</Text>{' '}
-                            <Text style={{ color: '#FFFFFF' }}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
-                        </Text>
-
-                        {/* CENTERED BADGES ROW: TEAM LOGO + POSITION & RATING */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                            {/* POSITION BADGE WITH TEAM LOGO */}
-                            <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                                backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                                borderWidth: 1,
-                                borderColor: 'rgba(255, 255, 255, 0.14)',
-                                paddingHorizontal: 12,
-                                paddingVertical: 5,
-                                borderRadius: 20
-                            }}>
-                                {(player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo) ? (
-                                    <Image
-                                        source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }}
-                                        style={{ width: 16, height: 16, borderRadius: 8 }}
-                                        resizeMode="contain"
+                        {/* PLAYER IDENTITY — 1x1 Square photo on left, info on right */}
+                        <View style={styles.identityRowSticky}>
+                            <View style={{ position: 'relative' }}>
+                                <View style={[styles.photoBoxSm, cardSurface]}>
+                                    <SmartImage
+                                        uri={player.photo || player.avatar || player.photo_url}
+                                        style={{ width: '100%', height: '100%', borderRadius: 16 }}
+                                        contentFit="cover"
+                                        fallbackIcon="person"
                                     />
-                                ) : (
-                                    <Ionicons name="shield-sharp" size={14} color="#00FF87" />
-                                )}
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: '800', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
-                                    {getLocalizedPosition(player?.position, t)}
-                                </Text>
-                            </View>
-
-                            {/* RATING BADGE (GOLD WITH TRENDING-UP ICON) */}
-                            <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                                backgroundColor: 'rgba(255, 215, 0, 0.15)',
-                                borderWidth: 1,
-                                borderColor: 'rgba(255, 215, 0, 0.4)',
-                                paddingHorizontal: 10,
-                                paddingVertical: 5,
-                                borderRadius: 20
-                            }}>
-                                <Ionicons name="trending-up" size={13} color="#FFD700" />
-                                <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 12, letterSpacing: 0.5 }}>
-                                    {player?.rating !== undefined && player?.rating !== null && player?.rating !== 0 ? player.rating : (stats?.rating || 0)}
-                                </Text>
-                            </View>
-                        </View>
-
-                        {/* INSTAGRAM LINK BADGE */}
-                        {instagramUrl ? (
-                            <TouchableOpacity
-                                onPress={() => handleOpenInstagram(instagramUrl)}
-                                disabled={openingInstagram}
-                                activeOpacity={0.7}
-                                style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 6,
-                                    backgroundColor: 'rgba(225, 48, 108, 0.14)',
-                                    borderColor: 'rgba(225, 48, 108, 0.4)',
-                                    borderWidth: 1,
-                                    paddingHorizontal: 12,
-                                    height: 26,
-                                    borderRadius: 13,
-                                    marginTop: 10
-                                }}
-                            >
-                                {openingInstagram ? (
-                                    <ActivityIndicator size="small" color="#E1306C" style={{ transform: [{ scale: 0.65 }], width: 14, height: 14 }} />
-                                ) : (
-                                    <FontAwesome5 name="instagram" size={12} color="#E1306C" />
-                                )}
-                                <Text style={{ color: '#E1306C', fontSize: 11, fontWeight: '800', lineHeight: 14 }}>
-                                    {openingInstagram ? t('common.loading') : `@${instagramUsername}`}
-                                </Text>
-                            </TouchableOpacity>
-                        ) : null}
-                    </View>
-                </View>
-
-                {/* Slider-Style Tab Switcher */}
-                <View style={styles.switcherWrapper}>
-                    <View style={styles.carouselContainer}>
-                        <View style={styles.animatedCardWrapper}>
-                            <Animated.View style={[styles.miniTabCard, { transform: [{ translateX: slideAnim }] }]}>
-                                <View style={styles.miniTabInner}>
-                                    <View style={styles.miniTabIconBox}>
-                                        <Ionicons 
-                                            name={
-                                                activeTab === 'profil' ? 'person' : 
-                                                activeTab === 'karyerasi' ? 'trophy' : 'football'
-                                            } 
-                                            size={20} 
-                                            color={Colors.primary} 
-                                        />
-                                    </View>
-                                    <View style={{ flex: 1, marginLeft: 12 }}>
-                                        <Text style={styles.miniTabType}>{t('stats.section')}</Text>
-                                        <Text style={styles.miniTabName}>{tabLabels[activeTab]}</Text>
-                                    </View>
                                 </View>
-                            </Animated.View>
-                        </View>
-                    </View>
-
-                    <TouchableOpacity onPress={nextTab} style={styles.navArrowBtnLarge}>
-                        <Ionicons name="chevron-forward" size={32} color={Colors.primary} />
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.mainContent} {...panResponder.panHandlers}>
-                    <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-                        {activeTab === 'profil' && renderProfil()}
-                        {activeTab === 'karyerasi' && renderCareer()}
-                        {activeTab === 'oyinlari' && renderMatches()}
-                    </Animated.View>
-                </View>
-            </ScrollView>
-
-            {/* ⚽ MINIMALIST ULTIMATE FOOTBALL PLAYER POSTER MODAL */}
-            <Modal
-                visible={showExportModal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowExportModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={{ width: '90%', maxHeight: '85%', backgroundColor: '#050A14', borderRadius: 32, borderWidth: 1.5, borderColor: 'rgba(0, 255, 135, 0.3)', overflow: 'hidden', shadowColor: '#00FF87', shadowRadius: 30, shadowOpacity: 0.3, elevation: 20 }}>
-                        <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
-                        
-                        <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={{ flex: 1, backgroundColor: '#050A14' }}>
-                            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 28, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
-                                {/* Minimalist Top Header with Original Logo */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.08)', paddingBottom: 16, marginBottom: 24 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <Image
-                                            source={require('../assets/logo.png')}
-                                            style={{ width: 24, height: 24 }}
-                                            resizeMode="contain"
-                                        />
-                                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 15, letterSpacing: 2 }}>AMATORA</Text>
-                                    </View>
-                                    <View style={{ backgroundColor: 'rgba(0, 255, 135, 0.12)', borderWidth: 1, borderColor: 'rgba(0, 255, 135, 0.3)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 }}>
-                                        <Text style={{ color: '#00FF87', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>SEASON 2026</Text>
-                                    </View>
-                                </View>
-
-                                {/* Minimalist Player Photo Crest & Rating */}
-                                <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                                    <View style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: '#00FF87', padding: 4, backgroundColor: '#0A1224', shadowColor: '#00FF87', shadowRadius: 20, shadowOpacity: 0.4 }}>
-                                        <Image
-                                            source={{ uri: player?.photo || player?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80' }}
-                                            style={{ width: '100%', height: '100%', borderRadius: 54 }}
-                                            resizeMode="cover"
-                                        />
-                                    </View>
-                                    
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFD700', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20, marginTop: -14, shadowColor: '#FFD700', shadowRadius: 10, shadowOpacity: 0.6 }}>
-                                        <Ionicons name="trending-up" size={14} color="#050A14" />
-                                        <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>
-                                            {player?.rating !== undefined && player?.rating !== null && player?.rating !== 0 ? player.rating : (stats?.rating || 0)} RATING
-                                        </Text>
-                                    </View>
-
-                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 22, marginTop: 14, letterSpacing: 0.5, textAlign: 'center' }}>
-                                        {(player?.firstName || player?.first_name || 'FUTBOLCHI').toUpperCase()} {(player?.lastName || player?.last_name || '').toUpperCase()}
+                                {/* Tilted Shirt Number Badge */}
+                                <View style={[styles.numberBadgeSticky, { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: homeColors.background }]}>
+                                    <Text style={[styles.numberBadgeText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                                        #{player.number || player.player_number || '0'}
                                     </Text>
+                                </View>
+                            </View>
 
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255, 255, 255, 0.06)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, marginTop: 8 }}>
-                                        {(player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo) ? (
-                                            <Image
-                                                source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }}
-                                                style={{ width: 16, height: 16, borderRadius: 8 }}
-                                                resizeMode="contain"
-                                            />
-                                        ) : (
-                                            <Ionicons name="shield-outline" size={14} color="#00FF87" />
-                                        )}
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontWeight: '700', fontSize: 11, letterSpacing: 1 }}>
-                                            {getLocalizedPosition(player?.position, t)}
+                            <View style={{ flex: 1, paddingLeft: 12 }}>
+                                <Text style={[styles.playerNameSm, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                    {playerNameFull.toUpperCase()}
+                                </Text>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
+                                    {currentTeamLogo ? (
+                                        <SmartImage uri={currentTeamLogo} style={{ width: 14, height: 14 }} contentFit="contain" fallbackIcon="shield-outline" />
+                                    ) : null}
+                                    <Text style={[styles.playerTeamName, { color: homeColors.textSecondary }]} numberOfLines={1}>
+                                        {(currentTeamName || 'ERKIN AGENT').toUpperCase()}
+                                    </Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6 }}>
+                                    <View style={[styles.positionPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                        <Text style={[styles.positionPillText, { color: homeColors.textPrimary }]}>
+                                            {getLocalizedPosition(player.position, t).toUpperCase()}
                                         </Text>
                                     </View>
+                                    {stats.rating > 0 && (
+                                        <View style={[styles.ratingPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                            <Ionicons name="star" size={10} color="#FACC15" style={{ marginRight: 3 }} />
+                                            <Text style={[styles.ratingPillText, { color: homeColors.textPrimary }]}>{stats.rating}</Text>
+                                        </View>
+                                    )}
                                 </View>
-
-                                {/* Minimalist Grid Stats */}
-                                <View style={{ width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 10 }}>
-                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>GOLLAR</Text>
-                                        <Text style={{ color: '#00FF87', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.goals}</Text>
-                                    </View>
-
-                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>ASSISTLAR</Text>
-                                        <Text style={{ color: '#3B82F6', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.assists}</Text>
-                                    </View>
-
-                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>O'YINLAR</Text>
-                                        <Text style={{ color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.matchesPlayed}</Text>
-                                    </View>
-
-                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>SARIQ / QIZIL</Text>
-                                        <Text style={{ color: '#FACC15', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.yellowCards} / {stats.redCards}</Text>
-                                    </View>
-                                </View>
-
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: 10, fontWeight: '600', marginTop: 14, letterSpacing: 1 }}>
-                                    AMATORA LEAGUE • OFFICIAL MATCHDAY CARD
-                                </Text>
-                            </ScrollView>
-                        </ViewShot>
-
-                        {/* Minimalist Action Buttons */}
-                        <View style={{ flexDirection: 'row', gap: 12, padding: 20, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.08)' }}>
-                            <TouchableOpacity
-                                onPress={() => setShowExportModal(false)}
-                                style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', paddingVertical: 15, borderRadius: 18, alignItems: 'center' }}
-                            >
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: '800', fontSize: 13 }}>YOPISH</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={handleSharePoster}
-                                style={{ flex: 1.5, backgroundColor: '#00FF87', paddingVertical: 15, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                            >
-                                <Ionicons name="share-social" size={18} color="#050A14" />
-                                <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>STORY'GA ULASHISH</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-
-            {/* INSTAGRAM MODAL */}
-            <Modal
-                visible={showInstagramModal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowInstagramModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContentSmall}>
-                        <View style={{ alignItems: 'center', marginBottom: 15 }}>
-                            <View style={{ width: 50, height: 50, borderRadius: 15, backgroundColor: 'rgba(225, 48, 108, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                                <FontAwesome5 name="instagram" size={26} color="#E1306C" />
                             </View>
-                            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '900' }}>Instagram Username</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
-                                Instagram akkauntingiz username'ini kiriting. (Masalan: omankulofff)
-                            </Text>
                         </View>
 
-                        <TextInput
-                            style={styles.modalInput}
-                            placeholder="omankulofff"
-                            placeholderTextColor="rgba(255,255,255,0.3)"
-                            value={instagramInput}
-                            onChangeText={setInstagramInput}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
+                        {/* INFO STATS CARD */}
+                        <View style={[styles.infoStatsCard, cardSurface, { marginBottom: 8 }]}>
+                            <View style={styles.infoTopRow}>
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.goals || 0}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.goals', 'GOL').toUpperCase()}</Text>
+                                </View>
+                                <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.assists || 0}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.assists', 'ASIST').toUpperCase()}</Text>
+                                </View>
+                                <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.matchesPlayed || stats.matches || 0}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.matches_played', 'O\'YIN').toUpperCase()}</Text>
+                                </View>
+                                <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: '#EF4444' }]}>{stats.yellowCards || 0} / {stats.redCards || 0}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>KARTA</Text>
+                                </View>
+                            </View>
+                        </View>
 
-                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
-                            <TouchableOpacity
-                                onPress={() => setShowInstagramModal(false)}
-                                style={[styles.modalBtn, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
-                            >
-                                <Text style={{ color: '#FFF', fontWeight: '800' }}>BEKOR QILISH</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={handleSaveInstagram}
-                                disabled={savingInstagram}
-                                style={[styles.modalBtn, { backgroundColor: Colors.primary }]}
-                            >
-                                <Text style={{ color: '#000', fontWeight: '900' }}>
-                                    {savingInstagram ? 'SAQLANMOQDA...' : 'SAQLASH'}
-                                </Text>
-                            </TouchableOpacity>
+                        {/* TAB SWITCHER */}
+                        <View style={styles.tabsContainer}>
+                            <Animated.View
+                                style={[
+                                    styles.tabActiveLine,
+                                    {
+                                        width: indicatorWidthAnim,
+                                        backgroundColor: isDark ? '#FFFFFF' : '#000000',
+                                        transform: [{ translateX: indicatorTranslateX }],
+                                    },
+                                ]}
+                            />
+                            {tabs.map((tabKey, idx) => {
+                                const isCurrent = currentTabIndex === idx;
+                                return (
+                                    <TouchableOpacity
+                                        key={tabKey}
+                                        style={styles.tabBtn}
+                                        onPress={() => handleTabPress(idx)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text
+                                            onLayout={(e) => {
+                                                const w = e.nativeEvent.layout.width;
+                                                setTabLabelWidths((prev) => {
+                                                    if (prev[idx] === w) return prev;
+                                                    const next = [...prev];
+                                                    next[idx] = w;
+                                                    return next;
+                                                });
+                                            }}
+                                            style={[
+                                                styles.tabBtnText,
+                                                { color: isCurrent ? homeColors.textPrimary : homeColors.textSecondary },
+                                                isCurrent && { fontWeight: '900' },
+                                            ]}
+                                        >
+                                            {TAB_LABELS[tabKey]}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     </View>
-                </View>
-            </Modal>
+
+                    {/* 1:1 REAL-TIME LINKED HORIZONTAL PAGER */}
+                    <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                        <Animated.ScrollView
+                            ref={pagerScrollRef as any}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            bounces={false}
+                            scrollEventThrottle={16}
+                            decelerationRate="fast"
+                            onScroll={Animated.event(
+                                [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
+                                { useNativeDriver: false }
+                            )}
+                            onMomentumScrollEnd={handlePagerMomentumScrollEnd}
+                            style={{ flex: 1 }}
+                        >
+                            <View style={{ width, flex: 1 }}>{renderProfil()}</View>
+                            <View style={{ width, flex: 1 }}>{renderKaryera()}</View>
+                            <View style={{ width, flex: 1 }}>{renderMatches()}</View>
+                        </Animated.ScrollView>
+                    </View>
+                </SafeAreaView>
+            </Animated.View>
 
             {/* PROFILE UPDATE MODAL */}
             <Modal
                 visible={showProfileUpdateModal}
-                transparent
                 animationType="slide"
+                transparent={true}
                 onRequestClose={() => setShowProfileUpdateModal(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <ScrollView contentContainerStyle={{ paddingVertical: 40 }} showsVerticalScrollIndicator={false}>
-                        <View style={styles.modalContentLarge}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                                <Text style={styles.modalTitleLarge}>MA'LUMOTLARNI TAHRIRLASH</Text>
-                                <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)} style={{ padding: 4 }}>
-                                    <Ionicons name="close-circle" size={28} color="rgba(255,255,255,0.6)" />
-                                </TouchableOpacity>
-                            </View>
-                            <Text style={styles.modalSubLarge}>
-                                O'zgartirmoqchi bo'lgan ma'lumotlaringizni kiriting va tashkilotchiga yuboring.
-                            </Text>
+                <View style={[styles.editModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+                    <View style={[styles.editModalCard, cardSurface]}>
+                        <View style={styles.editModalHeader}>
+                            <Text style={[styles.editModalTitle, { color: homeColors.textPrimary }]}>{t('profile.edit_profile', 'PROFILNI TAHRIRLASH')}</Text>
+                            <TouchableOpacity onPress={() => setShowProfileUpdateModal(false)}>
+                                <Ionicons name="close" size={22} color={homeColors.textPrimary} />
+                            </TouchableOpacity>
+                        </View>
 
-                            <View style={{ alignItems: 'center', marginVertical: 15 }}>
-                                <TouchableOpacity onPress={handlePickImage} disabled={pickerLoading} style={{ position: 'relative', width: 100, height: 100, borderRadius: 20 }}>
-                                    <SmartImage
-                                        uri={updateForm.photoUrl || player?.photo}
-                                        style={{ width: 100, height: 100, borderRadius: 20, borderWidth: 2, borderColor: Colors.primary }}
-                                        contentFit="cover"
-                                    />
-                                    <View style={{ position: 'absolute', bottom: -4, right: -4, backgroundColor: Colors.primary, padding: 6, borderRadius: 10, zIndex: 5 }}>
-                                        <Ionicons name="camera" size={16} color="#000" />
+                        <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                            {/* Photo upload row */}
+                            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                                <TouchableOpacity onPress={handlePickImage} style={styles.editAvatarWrapper}>
+                                    <SmartImage uri={updateForm.photoUrl || player.photo || player.avatar} style={{ width: 80, height: 80, borderRadius: 20 }} contentFit="cover" fallbackIcon="person" />
+                                    <View style={styles.cameraIconBadge}>
+                                        <Ionicons name="camera" size={14} color="#FFF" />
                                     </View>
-                                    {pickerLoading && (
-                                        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center', borderRadius: 20, zIndex: 10 }}>
-                                            <ActivityIndicator size="small" color={Colors.primary} />
-                                        </View>
-                                    )}
                                 </TouchableOpacity>
                             </View>
 
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>ISM</Text>
+                            <View style={styles.formGroup}>
+                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Ism</Text>
                                 <TextInput
-                                    style={styles.modalInput}
+                                    style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                     value={updateForm.firstName}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, firstName: text }))}
+                                    onChangeText={(v) => setUpdateForm(p => ({ ...p, firstName: v }))}
                                 />
                             </View>
 
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>FAMILIYA</Text>
+                            <View style={styles.formGroup}>
+                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Familiya</Text>
                                 <TextInput
-                                    style={styles.modalInput}
+                                    style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                     value={updateForm.lastName}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, lastName: text }))}
+                                    onChangeText={(v) => setUpdateForm(p => ({ ...p, lastName: v }))}
                                 />
                             </View>
 
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>OTASINING ISMI</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    value={updateForm.fatherName}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, fatherName: text }))}
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>TELEFON RAQAM</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    value={updateForm.phone}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, phone: text }))}
-                                    keyboardType="phone-pad"
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>PASPORT SERIYA VA RAQAM</Text>
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <View style={styles.formRow}>
+                                <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Raqam (#)</Text>
                                     <TextInput
-                                        style={[styles.modalInput, { width: 70, textAlign: 'center', textTransform: 'uppercase' }]}
-                                        value={updateForm.passportSeries}
-                                        maxLength={2}
-                                        onChangeText={(text) => {
-                                            const cleaned = text.toUpperCase();
-                                            setUpdateForm(prev => ({ ...prev, passportSeries: cleaned }));
-                                            if (cleaned.length === 2) {
-                                                passportNumberRef.current?.focus();
-                                            }
-                                        }}
-                                        placeholder="AA"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
-                                    />
-                                    <TextInput
-                                        ref={passportNumberRef}
-                                        style={[styles.modalInput, { flex: 1 }]}
-                                        value={updateForm.passportNumber}
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.playerNumber}
                                         keyboardType="numeric"
-                                        maxLength={7}
-                                        onChangeText={(text) => setUpdateForm(prev => ({ ...prev, passportNumber: text }))}
-                                        placeholder="1234567"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, playerNumber: v }))}
                                     />
                                 </View>
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>TUG'ILGAN SANA (KUN / OY / YIL)</Text>
-                                <View style={{ flexDirection: 'row', gap: 6 }}>
-                                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden', height: 114, justifyContent: 'center' }}>
-                                        <Picker
-                                            selectedValue={updateForm.birthDay}
-                                            onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthDay: val }))}
-                                            style={{ color: '#FFF', height: 114 }}
-                                            itemStyle={{ height: 114, color: '#FFF' }}
-                                            dropdownIconColor="#FFF"
-                                        >
-                                            {days.map(d => <Picker.Item key={d} label={d} value={d} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}
-                                        </Picker>
-                                    </View>
-
-                                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden', height: 114, justifyContent: 'center' }}>
-                                        <Picker
-                                            selectedValue={updateForm.birthMonth}
-                                            onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthMonth: val }))}
-                                            style={{ color: '#FFF', height: 114 }}
-                                            itemStyle={{ height: 114, color: '#FFF' }}
-                                            dropdownIconColor="#FFF"
-                                        >
-                                            {months.map(m => <Picker.Item key={m} label={m} value={m} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}
-                                        </Picker>
-                                    </View>
-
-                                    <View style={{ flex: 1.2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, overflow: 'hidden', height: 114, justifyContent: 'center' }}>
-                                        <Picker
-                                            selectedValue={updateForm.birthYear}
-                                            onValueChange={(val) => setUpdateForm(prev => ({ ...prev, birthYear: val }))}
-                                            style={{ color: '#FFF', height: 114 }}
-                                            itemStyle={{ height: 114, color: '#FFF' }}
-                                            dropdownIconColor="#FFF"
-                                        >
-                                            {years.map(y => <Picker.Item key={y} label={y} value={y} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />)}
-                                        </Picker>
-                                    </View>
-                                </View>
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>POZITSIYA</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    value={updateForm.position}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, position: text }))}
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>RAQAM</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    value={updateForm.playerNumber}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, playerNumber: text }))}
-                                    keyboardType="numeric"
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>MILLATI</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    value={updateForm.citizenship}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, citizenship: text }))}
-                                    placeholder="O'zbekiston"
-                                    placeholderTextColor="rgba(255,255,255,0.3)"
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>BO'YI (SM)</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    value={updateForm.height}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, height: text }))}
-                                    keyboardType="numeric"
-                                    placeholder="178"
-                                    placeholderTextColor="rgba(255,255,255,0.3)"
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>VAZNI (KG)</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    value={updateForm.weight}
-                                    onChangeText={(text) => setUpdateForm(prev => ({ ...prev, weight: text }))}
-                                    keyboardType="numeric"
-                                    placeholder="72"
-                                    placeholderTextColor="rgba(255,255,255,0.3)"
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>INSTAGRAM USERNAME</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: 'rgba(225, 48, 108, 0.4)' }}>
-                                    <FontAwesome5 name="instagram" size={18} color="#E1306C" style={{ marginRight: 8 }} />
+                                <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Bo'yi (sm)</Text>
                                     <TextInput
-                                        style={[styles.modalInput, { flex: 1, backgroundColor: 'transparent', borderWidth: 0 }]}
-                                        value={updateForm.instagramUsername}
-                                        onChangeText={(text) => setUpdateForm(prev => ({ ...prev, instagramUsername: text.replace(/^@/, '') }))}
-                                        placeholder="username (masalan: ronaldo)"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
-                                        autoCapitalize="none"
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.height}
+                                        keyboardType="numeric"
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, height: v }))}
+                                    />
+                                </View>
+                                <View style={[styles.formGroup, { flex: 1 }]}>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Vazni (kg)</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                        value={updateForm.weight}
+                                        keyboardType="numeric"
+                                        onChangeText={(v) => setUpdateForm(p => ({ ...p, weight: v }))}
                                     />
                                 </View>
                             </View>
 
-                            {/* ONE-DIRECTION SLIDE BUTTON */}
-                            <SlideButton
-                                loading={submittingUpdate}
-                                status={updateSubmitStatus}
-                                title="Yuborish uchun suring"
-                                helperText="Arizani yuborish uchun o'ngga suring yoki bosing"
-                                onSwipeSuccess={handleSubmitProfileUpdate}
-                                onReset={() => setUpdateSubmitStatus('idle')}
-                            />
-                        </View>
-                    </ScrollView>
-                </View>
-            </Modal>
-
-            {/* SUCCESS CONFIRMATION MODAL */}
-            <Modal
-                visible={showSuccessModal}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setShowSuccessModal(false)}
-            >
-                <View style={styles.successModalOverlay}>
-                    <View style={styles.successModalCard}>
-                        <View style={styles.successIconBadge}>
-                            <Ionicons name="checkmark-circle" size={42} color="#00FF66" />
-                        </View>
-
-                        <View style={styles.successTitleRow}>
-                            <Text style={styles.successModalTitle}>Ariza Yuborildi</Text>
-                        </View>
-
-                        <Text style={styles.successModalSub}>
-                            Ma'lumotlaringizni tahrirlash so'rovi tashkilotchiga yuborildi. Tekshiruvdan so'ng profilingiz yangilanadi.
-                        </Text>
+                            <View style={styles.formGroup}>
+                                <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Instagram Username</Text>
+                                <TextInput
+                                    style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                    value={updateForm.instagramUsername}
+                                    placeholder="username"
+                                    placeholderTextColor={homeColors.textSecondary}
+                                    onChangeText={(v) => setUpdateForm(p => ({ ...p, instagramUsername: v }))}
+                                />
+                            </View>
+                        </ScrollView>
 
                         <TouchableOpacity
-                            style={styles.successModalBtn}
-                            onPress={() => setShowSuccessModal(false)}
-                            activeOpacity={0.8}
+                            style={[styles.submitUpdateBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
+                            onPress={handleSubmitProfileUpdate}
+                            disabled={submittingUpdate}
                         >
-                            <Text style={styles.successModalBtnText}>RAHMAT</Text>
+                            {submittingUpdate ? (
+                                <ActivityIndicator size="small" color={isDark ? '#000000' : '#FFFFFF'} />
+                            ) : (
+                                <Text style={[styles.submitUpdateBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>ARIZANI YUBORISH</Text>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
 
+            {/* SUCCESS MODAL */}
+            <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => setShowSuccessModal(false)}>
+                <View style={[styles.exportModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+                    <View style={[styles.exportModalCard, cardSurface, { alignItems: 'center', paddingVertical: 24 }]}>
+                        <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(16, 185, 129, 0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 14 }}>
+                            <Ionicons name="checkmark-circle" size={36} color="#10B981" />
+                        </View>
+                        <Text style={[styles.exportModalTitle, { color: homeColors.textPrimary, fontSize: 16, textAlign: 'center' }]}>Arizangiz qabul qilindi!</Text>
+                        <Text style={{ color: homeColors.textSecondary, fontSize: 12.5, textAlign: 'center', marginTop: 6, lineHeight: 18, paddingHorizontal: 12 }}>
+                            O'zgarishlar admin tomonidan tasdiqlangandan so'ng profilingizda aks etadi.
+                        </Text>
+                        <TouchableOpacity
+                            style={[styles.sharePosterBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000', width: '100%', marginTop: 20 }]}
+                            onPress={() => setShowSuccessModal(false)}
+                        >
+                            <Text style={[styles.sharePosterBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>Tushunarli</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* COMPARISON MODAL */}
             <PlayerComparisonModal
                 visible={showComparisonModal}
                 onClose={() => setShowComparisonModal(false)}
-                player1={player}
+                currentPlayer={player}
             />
 
+            {/* ZOOM MODAL */}
             <PlayerCardZoomModal
                 visible={showCardZoomModal}
                 onClose={() => setShowCardZoomModal(false)}
                 player={player}
             />
+
+            {/* POSTER VIEWSHOT MODAL */}
+            <Modal visible={showExportModal} transparent animationType="fade" onRequestClose={() => setShowExportModal(false)}>
+                <View style={[styles.exportModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+                    <View style={[styles.exportModalCard, cardSurface]}>
+                        <View style={styles.exportModalHeader}>
+                            <Text style={[styles.exportModalTitle, { color: homeColors.textPrimary }]}>{t('stats.matchday_poster_preview', 'POSTER PREVIEW')}</Text>
+                            <TouchableOpacity onPress={() => setShowExportModal(false)}>
+                                <Ionicons name="close" size={22} color={homeColors.textPrimary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={styles.posterCaptureContainer}>
+                            <View style={[styles.posterInner, { backgroundColor: '#0A0A0C' }]}>
+                                <SmartImage uri={player.photo || player.avatar} style={styles.posterPhoto} contentFit="cover" fallbackIcon="person" />
+                                <View style={styles.posterOverlayBottom}>
+                                    <Text style={styles.posterNameText}>{playerNameFull.toUpperCase()}</Text>
+                                    <Text style={styles.posterSubText}>{getLocalizedPosition(player.position, t).toUpperCase()} • {currentTeamName || 'AMATORA'}</Text>
+                                    <View style={styles.posterStatsRow}>
+                                        <Text style={styles.posterStatItem}>⚽ {stats.goals} GOL</Text>
+                                        <Text style={styles.posterStatItem}>👟 {stats.assists} ASIST</Text>
+                                        <Text style={styles.posterStatItem}>⭐ {stats.rating || 0} OVR</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </ViewShot>
+
+                        <TouchableOpacity style={[styles.sharePosterBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} onPress={handleSharePoster}>
+                            <Ionicons name="share-social" size={18} color={isDark ? '#000000' : '#FFFFFF'} />
+                            <Text style={[styles.sharePosterBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>{t('stats.share_poster', 'ULASHISH / SAQLASH')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
-};
-
-const StatBox = ({ label, value, icon, color }: any) => (
-    <View style={styles.statBox}>
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
-            {icon === 'shoe-prints' ? (
-                <FontAwesome5 name="shoe-prints" size={16} color={color} />
-            ) : (
-                <Ionicons name={icon} size={20} color={color} />
-            )}
-        </View>
-        <Text style={styles.statLabelSmall}>{label}</Text>
-        <Text style={styles.statValue}>{value}</Text>
-    </View>
-);
-
-const InfoRow = ({ label, value, icon }: any) => (
-    <View style={styles.infoRow}>
-        <View style={styles.infoIconBox}>
-            <Ionicons name={icon} size={16} color={Colors.primary} />
-        </View>
-        <View style={{ flex: 1 }}>
-            <Text style={styles.infoLabel}>{label}</Text>
-            <Text style={styles.infoValue}>{value}</Text>
-        </View>
-    </View>
-);
-
-const MatchCard = ({ match }: any) => (
-    <View style={styles.matchCard}>
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={styles.matchTop}>
-            <Text style={styles.matchLeague}>{match.leagueName || 'Amatora Turniri'}</Text>
-            <Text style={styles.matchDate}>{new Date(match.date || match.match_date || Date.now()).toLocaleDateString('uz-UZ')}</Text>
-        </View>
-        <View style={styles.matchTeams}>
-            <View style={styles.teamInfo}>
-                <SmartImage uri={match.homeTeam?.logo || match.homeTeamLogo} style={styles.matchTeamLogo} contentFit="contain" />
-                <Text style={styles.matchTeamName} numberOfLines={1}>{match.homeTeam?.name || match.homeTeamName}</Text>
-            </View>
-            <View style={styles.matchScore}>
-                <Text style={styles.scoreText}>{match.score?.home ?? match.home_score ?? 0}:{match.score?.away ?? match.away_score ?? 0}</Text>
-            </View>
-            <View style={styles.teamInfo}>
-                <SmartImage uri={match.awayTeam?.logo || match.awayTeamLogo} style={styles.matchTeamLogo} contentFit="contain" />
-                <Text style={styles.matchTeamName} numberOfLines={1}>{match.awayTeam?.name || match.awayTeamName}</Text>
-            </View>
-        </View>
-    </View>
-);
+}
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#050811',
+    container: { flex: 1 },
+    headerStickySection: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    scrollContent: {
-        paddingBottom: 40,
-    },
-    emptyContainer: {
-        flex: 1,
-        backgroundColor: '#050811',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    emptyContent: {
-        padding: 30,
-        alignItems: 'center',
-    },
-    emptyTitle: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: '#FFF',
-        marginTop: 15,
-    },
-    emptySub: {
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.5)',
-        textAlign: 'center',
-        marginTop: 8,
-        lineHeight: 18,
-    },
-    loginBtn: {
-        marginTop: 20,
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 12,
-    },
-    loginBtnText: {
-        color: '#000',
-        fontWeight: '900',
-        fontSize: 13,
-    },
-    heroSection: {
-        paddingTop: Platform.OS === 'ios' ? 12 : (StatusBar.currentHeight ? StatusBar.currentHeight + 5 : 20),
-        paddingHorizontal: 20,
-        paddingBottom: 15,
-    },
-    brandHeaderWrapper: {
+    topRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 2,
-        marginBottom: 8,
+        justifyContent: 'space-between',
+        marginBottom: 10,
     },
-    brandText: {
-        fontSize: 13,
-        fontWeight: '900',
-        color: '#FFF',
-        letterSpacing: 2,
-        fontStyle: 'italic',
-        textAlign: 'center',
-    },
-    navHeaderRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    backButtonBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.12)',
-        zIndex: 10,
-    },
-    profileHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 18,
-    },
-    photoContainer: {
-        position: 'relative',
-    },
-    mainPhotoWrapper: {
-        width: 115,
-        height: 115,
-        borderRadius: 22,
-        overflow: 'hidden',
-        borderWidth: 2,
-        borderColor: Colors.primary,
-    },
-    profilePhoto: {
-        width: '100%',
-        height: '100%',
-    },
-    numberOverlay: {
-        position: 'absolute',
-        bottom: -4,
-        right: -4,
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 10,
-        transform: [{ rotate: '12deg' }],
-    },
-    numberText: {
-        color: '#000',
-        fontWeight: '900',
-        fontSize: 13,
-    },
-    nameContainer: {
-        flex: 1,
-    },
-    badgeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 6,
-    },
-    statusBadge: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        borderColor: 'rgba(0, 255, 102, 0.2)',
-        borderWidth: 1,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 8,
-    },
-    statusText: {
-        color: Colors.primary,
-        fontSize: 10,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    ratingBadge: {
-        backgroundColor: 'rgba(250, 204, 21, 0.15)',
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 8,
-    },
-    ratingText: {
-        color: '#FACC15',
-        fontSize: 11,
-        fontWeight: '900',
-    },
-    firstName: {
-        fontSize: 24,
-        fontWeight: '900',
-        color: '#FFF',
-        lineHeight: 26,
-    },
-    lastName: {
-        fontSize: 24,
-        fontWeight: '900',
-        color: Colors.primary,
-        lineHeight: 26,
-    },
-    switcherWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginVertical: 10,
-    },
-    carouselContainer: {
-        flex: 1,
-    },
-    animatedCardWrapper: {
-        overflow: 'hidden',
-    },
-    miniTabCard: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 14,
-        padding: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-    },
-    miniTabInner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    miniTabIconBox: {
+    iconBtn: {
         width: 36,
         height: 36,
         borderRadius: 10,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    miniTabType: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: 'rgba(255,255,255,0.4)',
-        letterSpacing: 1,
+    identityRowSticky: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
     },
-    miniTabName: {
-        fontSize: 13,
+    photoBoxSm: {
+        width: 68,
+        height: 68,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    numberBadgeSticky: {
+        position: 'absolute',
+        bottom: -3,
+        right: -3,
+        borderWidth: 1.5,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 8,
+        transform: [{ rotate: '-6deg' }],
+    },
+    numberBadgeText: {
+        fontSize: 10,
         fontWeight: '900',
-        color: '#FFF',
-        letterSpacing: 0.5,
     },
-    navArrowBtnLarge: {
-        width: 44,
-        height: 44,
+    playerNameSm: {
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
+    playerTeamName: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    positionPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 2.5,
+        borderRadius: 6,
+    },
+    positionPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
+    },
+    ratingPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 7,
+        paddingVertical: 2.5,
+        borderRadius: 6,
+    },
+    ratingPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+    },
+
+    infoStatsCard: {
         borderRadius: 14,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    },
+    infoTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+    },
+    infoStat: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginLeft: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.2)',
+        minWidth: 44,
     },
-    mainContent: {
-        paddingHorizontal: 20,
+    infoStatValue: {
+        fontSize: 14,
+        fontWeight: '900',
     },
+    infoStatLabel: {
+        fontSize: 9,
+        fontWeight: '700',
+        marginTop: 2,
+        letterSpacing: 0.3,
+    },
+    infoDivider: {
+        width: 1,
+        height: 20,
+    },
+
+    tabsContainer: {
+        flexDirection: 'row',
+        position: 'relative',
+        height: 38,
+        alignItems: 'center',
+    },
+    tabBtn: {
+        flex: 1,
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabBtnText: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    tabActiveLine: {
+        position: 'absolute',
+        bottom: 0,
+        height: 2.5,
+        borderRadius: 1.5,
+    },
+
     tabContent: {
         flex: 1,
     },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-        marginBottom: 15,
-    },
-    statBox: {
-        width: (width - 50) / 2,
-        backgroundColor: 'rgba(255,255,255,0.04)',
+
+    infoSectionCard: {
         borderRadius: 16,
         padding: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
     },
-    statIconContainer: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 8,
-    },
-    statLabelSmall: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: 'rgba(255,255,255,0.5)',
-        letterSpacing: 0.5,
-        textAlign: 'center',
-    },
-    statValue: {
-        fontSize: 22,
-        fontWeight: '900',
-        color: '#FFF',
-        marginTop: 2,
-        textAlign: 'center',
-    },
-    physicalInfoBox: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
-        marginBottom: 15,
-    },
-    cardContent: {
+    sectionCardHeader: {
         flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingBottom: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    sectionCardTitle: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+
+    physicalGrid: {
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-around',
-        paddingVertical: 14,
+        paddingTop: 12,
+        paddingBottom: 4,
     },
-    statItem: {
+    physicalItem: {
+        alignItems: 'center',
+    },
+    physicalLabel: {
+        fontSize: 9.5,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    physicalValue: {
+        fontSize: 13,
+        fontWeight: '900',
+        marginTop: 3,
+    },
+    physicalDivider: {
+        width: 1,
+        height: 22,
+    },
+
+    instagramBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+        paddingTop: 10,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        gap: 8,
+    },
+    instagramBtnText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+
+    aiScoutPill: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-    },
-    statIconBox: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: 'rgba(0,255,102,0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    statValueSmall: {
-        fontSize: 13,
-        fontWeight: '900',
-        color: '#FFF',
-    },
-    infoSection: {
-        marginTop: 5,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 10,
-    },
-    sectionTitle: {
-        fontSize: 13,
-        fontWeight: '900',
-        color: '#FFF',
-        letterSpacing: 0.5,
-    },
-    sectionTitleHighlight: {
-        color: Colors.primary,
-    },
-    infoList: {
-        borderRadius: 16,
-        overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
-        padding: 12,
-        gap: 10,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    infoIconBox: {
-        width: 30,
-        height: 30,
-        borderRadius: 8,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    infoLabel: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: 'rgba(255,255,255,0.4)',
-        letterSpacing: 0.5,
-    },
-    infoValue: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#FFF',
-    },
-    yearBlock: {
-        marginBottom: 15,
-    },
-    yearHeaderBadge: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        borderRadius: 12,
         paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 10,
-        marginBottom: 8,
+        paddingVertical: 8,
+        marginTop: 12,
+        width: '100%',
     },
-    yearHeaderText: {
-        color: Colors.primary,
-        fontWeight: '900',
+    aiScoutText: {
+        fontSize: 11,
+        fontWeight: '600',
+        flex: 1,
+        lineHeight: 15,
+    },
+
+    compareBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        marginTop: 14,
+        width: '100%',
+    },
+    compareBtnText: {
         fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 0.3,
     },
-    teamCareerWrapper: {
-        backgroundColor: 'rgba(255,255,255,0.03)',
-        borderRadius: 14,
-        padding: 12,
-        marginBottom: 8,
+
+    exportBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
     },
-    teamCareerCurrent: {
-        backgroundColor: 'rgba(0, 255, 102, 0.05)',
-        borderColor: 'rgba(0, 255, 102, 0.35)',
-        borderLeftWidth: 4,
-        borderLeftColor: '#00FF66',
+    exportBtnText: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
+    },
+
+    careerTeamItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    teamLogoBoxMini: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    careerTeamName: {
+        fontSize: 13,
+        fontWeight: '800',
     },
     currentTeamBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 255, 102, 0.15)',
-        borderColor: 'rgba(0, 255, 102, 0.4)',
-        borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-        gap: 5,
-    },
-    currentTeamBadgeText: {
-        color: '#00FF66',
-        fontSize: 9.5,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    pulsingDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#00FF66',
-    },
-    transferredBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
         borderRadius: 6,
         gap: 4,
     },
-    transferredBadgeText: {
-        color: '#94A3B8',
-        fontSize: 9.5,
+    pulsingDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+    },
+    currentTeamBadgeText: {
+        fontSize: 9,
         fontWeight: '800',
-        letterSpacing: 0.5,
+    },
+    pastTeamBadgeText: {
+        fontSize: 9,
+        fontWeight: '700',
     },
     careerDateSub: {
-        color: '#94A3B8',
-        fontSize: 11.5,
+        fontSize: 10.5,
         fontWeight: '600',
-        marginTop: 4,
+        marginTop: 2,
     },
-    teamMainRow: {
+
+    matchRowItem: {
+        paddingVertical: 12,
+    },
+    matchRowTop: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    teamIconBox: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    teamNameCareer: {
-        color: '#FFF',
-        fontWeight: '800',
-        fontSize: 13,
-    },
-    emptyCareer: {
-        padding: 20,
-        alignItems: 'center',
-    },
-    emptyCareerText: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 12,
-    },
-    careerTimelineContainer: {
-        marginVertical: 10,
-    },
-    teamMiniLogo: {
-        width: 18,
-        height: 18,
-        borderRadius: 4,
-    },
-    matchCard: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
-        padding: 12,
-        marginBottom: 10,
-    },
-    matchTop: {
-        flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 8,
     },
-    matchLeague: {
+    matchRowLeague: {
         fontSize: 10,
-        fontWeight: '800',
-        color: Colors.primary,
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
-    matchDate: {
+    matchRowDate: {
         fontSize: 10,
-        color: 'rgba(255,255,255,0.4)',
+        fontWeight: '600',
     },
-    matchTeams: {
+    matchTeamsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
     },
-    teamInfo: {
+    teamCol: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        flex: 1,
+        gap: 8,
     },
-    matchTeamLogo: {
-        width: 20,
-        height: 20,
+    teamMiniLogo: {
+        width: 22,
+        height: 22,
     },
-    matchTeamName: {
-        color: '#FFF',
+    teamNameMatch: {
         fontSize: 12,
         fontWeight: '700',
         flex: 1,
     },
-    matchScore: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+    scoreBadge: {
         paddingHorizontal: 10,
-        paddingVertical: 3,
+        paddingVertical: 4,
         borderRadius: 8,
-        marginHorizontal: 10,
+        marginHorizontal: 8,
     },
     scoreText: {
-        color: Colors.primary,
+        fontSize: 12.5,
         fontWeight: '900',
-        fontSize: 13,
     },
-    modalOverlay: {
+
+    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyContent: { alignItems: 'center', padding: 24 },
+    emptyTitle: { fontSize: 16, fontWeight: '800', marginTop: 16, marginBottom: 16 },
+    backBtnAction: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+    backBtnActionText: { fontSize: 13, fontWeight: '800' },
+
+    editModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.85)',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        padding: 20,
     },
-    modalContentSmall: {
+    editModalCard: {
         width: '100%',
-        backgroundColor: '#0c101c',
-        borderRadius: 24,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        maxWidth: 360,
+        borderRadius: 20,
+        padding: 16,
     },
-    modalContentLarge: {
-        width: width - 40,
-        backgroundColor: '#0c101c',
-        borderRadius: 24,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    modalTitleLarge: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: '#FFF',
-        textAlign: 'center',
-    },
-    modalSubLarge: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.5)',
-        textAlign: 'center',
-        marginTop: 4,
-        marginBottom: 15,
-    },
-    modalInput: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        color: '#FFF',
-        fontSize: 14,
-        fontWeight: '700',
-    },
-    inputGroup: {
+    editModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         marginBottom: 12,
     },
-    inputLabel: {
-        fontSize: 10,
+    editModalTitle: {
+        fontSize: 13,
         fontWeight: '800',
-        color: 'rgba(255,255,255,0.5)',
-        marginBottom: 6,
-        letterSpacing: 0.5,
     },
-    modalBtn: {
-        flex: 1,
-        paddingVertical: 14,
+    editAvatarWrapper: {
+        position: 'relative',
+        borderRadius: 20,
+    },
+    cameraIconBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        backgroundColor: '#000',
+        width: 24,
+        height: 24,
         borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#FFF',
+    },
+    formGroup: {
+        marginBottom: 10,
+    },
+    formRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    inputLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        fontSize: 13,
+    },
+    submitUpdateBtn: {
+        borderRadius: 12,
+        paddingVertical: 11,
         alignItems: 'center',
         justifyContent: 'center',
+        marginTop: 12,
     },
-    successModalOverlay: {
+    submitUpdateBtnText: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
+    },
+
+    exportModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
+        alignItems: 'center',
+        padding: 20,
     },
-    successModalCard: {
+    exportModalCard: {
         width: '100%',
         maxWidth: 340,
-        backgroundColor: '#0d1117',
-        borderRadius: 24,
-        padding: 28,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
-        shadowColor: '#00FF66',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
-        elevation: 12,
+        borderRadius: 20,
+        padding: 16,
     },
-    successIconBadge: {
-        width: 76,
-        height: 76,
-        borderRadius: 38,
-        backgroundColor: 'rgba(0, 255, 102, 0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
+    exportModalHeader: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
+        justifyContent: 'space-between',
+        marginBottom: 12,
     },
-    successTitleRow: {
+    exportModalTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    posterCaptureContainer: {
+        borderRadius: 16,
+        overflow: 'hidden',
+        alignItems: 'center',
+    },
+    posterInner: {
+        width: 300,
+        height: 400,
+        position: 'relative',
+        justifyContent: 'flex-end',
+    },
+    posterPhoto: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+    },
+    posterOverlayBottom: {
+        padding: 14,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+    },
+    posterNameText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '900',
+    },
+    posterSubText: {
+        color: '#94A3B8',
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    posterStatsRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 8,
+    },
+    posterStatItem: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    sharePosterBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 10,
+        gap: 8,
+        borderRadius: 12,
+        paddingVertical: 11,
+        marginTop: 14,
     },
-    successModalTitle: {
-        color: '#FFFFFF',
-        fontSize: 22,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    successModalSub: {
-        color: 'rgba(255, 255, 255, 0.65)',
-        fontSize: 14,
-        textAlign: 'center',
-        lineHeight: 21,
-        marginBottom: 24,
-    },
-    successModalBtn: {
-        width: '100%',
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: '#00FF66',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#00FF66',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    successModalBtnText: {
-        color: '#0b0e17',
-        fontSize: 15,
-        fontWeight: '900',
-        letterSpacing: 0.5,
+    sharePosterBtnText: {
+        fontSize: 13,
+        fontWeight: '800',
     },
 });
-
-export default MyStatsScreen;

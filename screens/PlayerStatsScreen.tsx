@@ -14,19 +14,17 @@ import {
     Platform,
     Alert,
     Modal,
-    PanResponder
+    PanResponder,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { apiService } from '../services/apiService';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import VideoBackground from '../components/VideoBackground';
 import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
 import { supabase } from '../services/supabase';
-import ReplayVideoCard from '../components/ReplayVideoCard';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
 import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import PlayerRadarChart from '../components/PlayerRadarChart';
@@ -34,32 +32,12 @@ import FifaPlayerCard from '../components/FifaPlayerCard';
 import PlayerComparisonModal from '../components/PlayerComparisonModal';
 import PlayerCardZoomModal from '../components/PlayerCardZoomModal';
 import { aiScoutService, PlayerAiStats } from '../services/aiScoutService';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 const { width } = Dimensions.get('window');
-
-const getPositionFullUz = (pos: string) => {
-    const map: any = {
-        'GK': 'Darvozabon',
-        'LB': 'Chap qanot himoyachisi',
-        'CB': 'Markaziy himoyachi',
-        'RB': "O'ng qanot himoyachisi",
-        'CDM': 'Tayanch yarim himoyachisi',
-        'CM': 'Markaziy yarim himoyachisi',
-        'CAM': 'Hujumkor yarim himoyachisi',
-        'LW': 'Chap qanot hujumchisi',
-        'RW': "O'ng qanot hujumchisi",
-        'ST': 'Markaziy hujumchi',
-        'CF': 'Ikkinchi hujumchi',
-        'LM': 'Chap qanot yarim himoyachisi',
-        'RM': "O'ng qanot yarim himoyachisi",
-        'LWB': 'Chap qanot qanot himoyachisi',
-        'RWB': "O'ng qanot qanot himoyachisi",
-    };
-    return map[pos?.toUpperCase()] || pos || 'O\'YINCHI';
-};
 
 // Universal Metadata Extractor
 const extractPlayerData = (data: any) => {
@@ -153,16 +131,41 @@ const calculateAgeFromBirthDate = (birthStr?: string, defaultAge?: any) => {
 
 const PlayerStatsScreen = ({ route, navigation }: any) => {
     const { t } = useTranslation();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
+
+    const cardSurface = {
+        backgroundColor: homeColors.background,
+        ...Platform.select({
+            ios: {
+                borderWidth: 1,
+                borderColor: homeColors.border,
+                shadowOpacity: 0,
+            },
+            android: {
+                borderWidth: 0,
+                elevation: 2,
+                shadowColor: isDark ? '#FFFFFF' : '#000000',
+            },
+        }),
+    };
+
     const { playerId, player: initialPlayer } = route.params || {};
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!initialPlayer);
     const [player, setPlayer] = useState<any>(initialPlayer ? extractPlayerData(initialPlayer) : null);
     const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState('profil');
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
     const [openingInstagram, setOpeningInstagram] = useState(false);
     const [showComparisonModal, setShowComparisonModal] = useState(false);
     const [showCardZoomModal, setShowCardZoomModal] = useState(false);
+    const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
+
+    // Export State & ViewShot Ref
+    const [exportState, setExportState] = useState<'idle' | 'loading' | 'complete'>('idle');
+    const [exportProgress, setExportProgress] = useState(0);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const posterShotRef = useRef<any>(null);
 
     const handleOpenInstagram = async (url: string) => {
         if (!url || openingInstagram) return;
@@ -173,7 +176,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             if (canOpen) {
                 await Linking.openURL(url);
             } else {
-                Alert.alert('Xatolik', 'Instagram havolasini ochib bo\'lmadi');
+                Alert.alert(t('common.notice', 'Eslatma'), 'Instagram havolasini ochib bo\'lmadi');
             }
         } catch (error) {
             console.error('Error opening instagram URL:', error);
@@ -181,13 +184,6 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             setTimeout(() => setOpeningInstagram(false), 1200);
         }
     };
-    
-    // Export State & ViewShot Ref
-    const [exportState, setExportState] = useState<'idle' | 'loading' | 'complete'>('idle');
-    const [exportProgress, setExportProgress] = useState(0);
-    const [showExportModal, setShowExportModal] = useState(false);
-    const posterShotRef = useRef<any>(null);
-    const [scrollEnabled, setScrollEnabled] = useState(true);
 
     const handleExportPress = () => {
         if (exportState !== 'idle') return;
@@ -226,127 +222,125 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                         UTI: 'public.png'
                     });
                 } else {
-                    Alert.alert('Tayyor!', `Posteringiz saqlandi: ${uri}`);
+                    Alert.alert(t('common.ready', 'Tayyor!'), `Posteringiz saqlandi: ${uri}`);
                 }
             } else {
-                Alert.alert('Eslatma', 'Posterni rasmga olib bo\'lmadi. Qayta urinib ko\'ring.');
+                Alert.alert(t('common.notice', 'Eslatma'), 'Posterni rasmga olib bo\'lmadi. Qayta urinib ko\'ring.');
             }
         } catch (e) {
             console.error('Error exporting poster:', e);
-            Alert.alert('Xatolik', 'Posterni eksport qilishda xatolik bo\'ldi');
+            Alert.alert(t('common.notice', 'Xatolik'), 'Posterni eksport qilishda xatolik bo\'ldi');
         }
     };
-    
-    const slideAnim = useRef(new Animated.Value(0)).current;
 
-    const tabs = ['profil', 'karyerasi', 'oyinlari'];
-    const activeTabRef = useRef(activeTab);
-    activeTabRef.current = activeTab;
-
-    const tabLabels: any = {
-        profil: t('stats.tab_profile', 'PROFIL'),
-        karyerasi: t('stats.tab_career', 'KARYERASI'),
-        oyinlari: t('stats.tab_matches', 'O\'YINLARI')
+    // Real-time 1:1 linked pager (MatchDetail & MyTeam architecture)
+    const tabs: ('profil' | 'karyerasi' | 'oyinlari')[] = ['profil', 'karyerasi', 'oyinlari'];
+    const TAB_LABELS: Record<string, string> = {
+        profil: t('stats.tab_profile', 'PROFIL').toUpperCase(),
+        karyerasi: t('stats.tab_career', 'KARYERASI').toUpperCase(),
+        oyinlari: t('stats.tab_matches', "O'YINLARI").toUpperCase()
     };
+    const [currentTabIndex, setCurrentTabIndex] = useState(0);
+    const currentTabIndexRef = useRef(0);
+    const scrollXPager = useRef(new Animated.Value(0)).current;
+    const isPagerScrolling = useRef(false);
+    const pagerScrollRef = useRef<ScrollView>(null);
+    const [tabLabelWidths, setTabLabelWidths] = useState<number[]>([]);
 
-    const nextTab = () => {
-        try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        } catch (e) {}
+    const TAB_BAR_WIDTH = width - 32;
+    const TAB_WIDTH = TAB_BAR_WIDTH / tabs.length;
+    const DEFAULT_INDICATOR_WIDTH = TAB_WIDTH * 0.72;
+    const tabIndicatorInputRange = tabs.map((_, i) => i * width);
+    const indicatorWidths = tabs.map((_, i) => tabLabelWidths[i] ?? DEFAULT_INDICATOR_WIDTH);
+    const indicatorLefts = tabs.map((_, i) => i * TAB_WIDTH + (TAB_WIDTH - indicatorWidths[i]) / 2);
+    const indicatorTranslateX = scrollXPager.interpolate({
+        inputRange: tabIndicatorInputRange,
+        outputRange: indicatorLefts,
+        extrapolate: 'clamp',
+    });
+    const indicatorWidthAnim = scrollXPager.interpolate({
+        inputRange: tabIndicatorInputRange,
+        outputRange: indicatorWidths,
+        extrapolate: 'clamp',
+    });
 
-        const currentIndex = tabs.indexOf(activeTabRef.current);
-        const nextIndex = (currentIndex + 1) % tabs.length;
-        const nextTabName = tabs[nextIndex];
-        
-        Animated.timing(slideAnim, {
-            toValue: -80,
-            duration: 100,
-            useNativeDriver: true,
-        }).start(() => {
-            setActiveTab(nextTabName);
-            slideAnim.setValue(80);
-            Animated.spring(slideAnim, {
-                toValue: 0,
-                friction: 7,
-                tension: 45,
-                useNativeDriver: true,
-            }).start();
-        });
-    };
+    const swipeBackAnim = useRef(new Animated.Value(0)).current;
 
-    const prevTab = () => {
-        try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        } catch (e) {}
-
-        const currentIndex = tabs.indexOf(activeTabRef.current);
-        const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-        const prevTabName = tabs[prevIndex];
-        
-        Animated.timing(slideAnim, {
-            toValue: 80,
-            duration: 100,
-            useNativeDriver: true,
-        }).start(() => {
-            setActiveTab(prevTabName);
-            slideAnim.setValue(-80);
-            Animated.spring(slideAnim, {
-                toValue: 0,
-                friction: 7,
-                tension: 45,
-                useNativeDriver: true,
-            }).start();
-        });
-    };
-
-    const panResponder = useRef(
+    // Tab 0 interactive real-time swipe to back
+    const swipeBackPanResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => false,
-            onMoveShouldSetPanResponder: (_, gestureState) => {
-                return Math.abs(gestureState.dx) > 25 && Math.abs(gestureState.dy) < 15;
-            },
-            onPanResponderGrant: () => {
-                setScrollEnabled(false);
+            onStartShouldSetPanResponderCapture: () => false,
+            onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+                if (currentTabIndexRef.current !== 0) return false;
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
             },
             onPanResponderMove: (_, gestureState) => {
-                slideAnim.setValue(gestureState.dx * 0.4);
+                if (gestureState.dx > 0) {
+                    swipeBackAnim.setValue(gestureState.dx);
+                } else {
+                    swipeBackAnim.setValue(0);
+                }
             },
             onPanResponderRelease: (_, gestureState) => {
-                setScrollEnabled(true);
-                if (gestureState.dx < -50) {
-                    nextTab();
-                } else if (gestureState.dx > 50) {
-                    prevTab();
+                const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
+                if (shouldExit) {
+                    Animated.timing(swipeBackAnim, {
+                        toValue: width,
+                        duration: 180,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        navigation.goBack();
+                    });
                 } else {
-                    Animated.spring(slideAnim, {
+                    Animated.spring(swipeBackAnim, {
                         toValue: 0,
-                        friction: 7,
-                        tension: 50,
+                        friction: 8,
+                        tension: 45,
                         useNativeDriver: true,
                     }).start();
                 }
             },
             onPanResponderTerminate: () => {
-                setScrollEnabled(true);
-                Animated.spring(slideAnim, {
+                Animated.spring(swipeBackAnim, {
                     toValue: 0,
-                    friction: 7,
-                    tension: 50,
+                    friction: 8,
+                    tension: 45,
                     useNativeDriver: true,
                 }).start();
-            }
+            },
+            onPanResponderTerminationRequest: () => true,
         })
     ).current;
 
-    useEffect(() => {
-        if (playerId) {
-            fetchPlayer();
-        } else {
-            setLoading(false);
-        }
-    }, [playerId]);
+    const handleTabPress = async (index: number) => {
+        if (index === currentTabIndexRef.current) return;
+        try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (e) {}
+        isPagerScrolling.current = true;
+        currentTabIndexRef.current = index;
+        setCurrentTabIndex(index);
+        pagerScrollRef.current?.scrollTo({
+            x: index * width,
+            animated: false,
+        });
+        requestAnimationFrame(() => {
+            isPagerScrolling.current = false;
+        });
+    };
 
-    const [aiStats, setAiStats] = useState<PlayerAiStats | null>(null);
+    const handlePagerMomentumScrollEnd = (e: any) => {
+        const offsetX = e.nativeEvent.contentOffset.x;
+        const newIdx = Math.max(0, Math.min(tabs.length - 1, Math.round(offsetX / width)));
+        if (newIdx !== currentTabIndexRef.current) {
+            currentTabIndexRef.current = newIdx;
+            setCurrentTabIndex(newIdx);
+            if (tabs[newIdx] === 'oyinlari' && matches.length === 0) {
+                fetchPlayerMatches();
+            }
+        }
+        isPagerScrolling.current = false;
+    };
 
     const fetchPlayer = async () => {
         try {
@@ -368,7 +362,6 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 parsed.aiStats = evaluatedAi;
                 setAiStats(evaluatedAi);
                 setPlayer(parsed);
-                if (activeTab === 'oyinlari') fetchPlayerMatches();
             }
             if (transfersData) {
                 setPlayerTransfers(transfersData);
@@ -393,181 +386,12 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     };
 
     useEffect(() => {
-        if (activeTab === 'oyinlari' && matches.length === 0) fetchPlayerMatches();
-    }, [activeTab]);
-
-    if (loading && !player) return (
-        <View style={{ flex: 1, backgroundColor: '#050811' }}>
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.85}
-                style={StyleSheet.absoluteFill}
-            />
-            <PlayerProfileSkeleton />
-        </View>
-    );
-
-    if (!player) return null;
-
-    const stats = player.stats || { goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0, rating: 0 };
-    const computedAge = calculateAgeFromBirthDate(player.birth_date || player.birthDate, player.age);
-    const instagramUsername = player.instagram_username || '';
-    const instagramUrl = instagramUsername ? `https://www.instagram.com/${instagramUsername}/` : null;
-
-    const renderProfil = () => (
-        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.statsGrid}>
-                <StatBox label={t('stats.goals').toUpperCase()} value={stats.goals} icon="football" color={Colors.primary} />
-                <StatBox label={t('stats.assists').toUpperCase()} value={stats.assists} icon="shoe-prints" color="#3b82f6" />
-                <StatBox label={t('stats.matches_played').toUpperCase()} value={stats.matchesPlayed} icon="calendar" color="#FFF" />
-                <StatBox label={t('stats.rating').toUpperCase()} value={stats.rating || player.rating || 0} icon="trending-up" color="#FACC15" />
-            </View>
-
-            <View style={styles.physicalInfoBox}>
-                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                <View style={styles.cardContent}>
-                    <View style={styles.statItem}>
-                        <View style={styles.statIconBox}><Ionicons name="calendar-outline" size={18} color={Colors.primary} /></View>
-                        <View>
-                            <Text style={styles.statLabelSmall}>{t('stats.age')}</Text>
-                            <Text style={styles.statValueSmall}>{computedAge !== '—' ? `${computedAge} ${t('stats.years_old')}` : '—'}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.statItem}>
-                        <View style={styles.statIconBox}><Ionicons name="resize-outline" size={18} color={Colors.primary} /></View>
-                        <View>
-                            <Text style={styles.statLabelSmall}>{t('stats.height')}</Text>
-                            <Text style={styles.statValueSmall}>{player?.height ? `${player.height} ${t('stats.cm').toUpperCase()}` : '—'}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.statItem}>
-                        <View style={styles.statIconBox}><Ionicons name="fitness-outline" size={18} color={Colors.primary} /></View>
-                        <View>
-                            <Text style={styles.statLabelSmall}>{t('stats.weight')}</Text>
-                            <Text style={styles.statValueSmall}>{player?.weight ? `${player.weight} ${t('stats.kg').toUpperCase()}` : '—'}</Text>
-                        </View>
-                    </View>
-                </View>
-            </View>
-
-            <View style={styles.infoSection}>
-                <View style={styles.sectionHeader}>
-                    <Ionicons name="person-circle" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>{t('stats.personal_info')}</Text>
-                </View>
-                <View style={styles.infoList}>
-                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <InfoRow label={t('stats.father_name')} value={player.fatherName || player.father_name || '---'} icon="person" />
-                    <InfoRow label={t('stats.citizenship')} value={player.citizenship || '---'} icon="planet" />
-                    <InfoRow label={t('stats.position')} value={getLocalizedPosition(player.position, t)} icon="shield" />
-                </View>
-            </View>
-
-            {/* 3D FIFA / EA FC PLAYER CARD */}
-            <View style={{ marginTop: 24, marginBottom: 16, alignItems: 'center', width: '100%' }}>
-                <View style={[styles.sectionHeader, { width: '100%', marginBottom: 10 }]}>
-                    <Ionicons name="sparkles" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>{t('stats.player_card_title', 'O\'YINCHI KARTASI')}</Text>
-                </View>
-
-                <View style={{ marginBottom: 12, alignItems: 'center' }}>
-                    <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
-                        {t('stats.card_tap_hint', 'Kattalashtirish va 3D ko\'rish uchun kartaga bosing')}
-                    </Text>
-                </View>
-
-                <FifaPlayerCard
-                    player={player}
-                    size="lg"
-                    interactive3D={true}
-                    showPlayStyles={true}
-                    onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setShowCardZoomModal(true);
-                    }}
-                />
-
-                {aiStats?.aiScoutSummary ? (
-                    <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 223, 130, 0.08)', borderWidth: 1, borderColor: 'rgba(0, 223, 130, 0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, gap: 8, maxWidth: width - 48 }}>
-                        <Ionicons name={aiStats.hasVideoScouted ? "sparkles" : "analytics-outline"} size={16} color={Colors.primary} />
-                        <Text style={{ color: '#E2E8F0', fontSize: 11, fontWeight: '700', flex: 1, lineHeight: 15 }}>
-                            {aiStats.aiScoutSummary}
-                        </Text>
-                    </View>
-                ) : null}
-            </View>
-
-            {/* 3D SPIDER / RADAR POLYGON CHART SECTION */}
-            <View style={{ marginTop: 16, marginBottom: 24, alignItems: 'center', width: '100%' }}>
-                <View style={[styles.sectionHeader, { width: '100%', marginBottom: 6 }]}>
-                    <Ionicons name="pie-chart" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>3D ATRIBUTLAR RADARI</Text>
-                </View>
-                <PlayerRadarChart
-                    player1={player}
-                    player1Name={`${player.firstName || ''} ${player.lastName || ''}`.trim() || 'O\'yinchi'}
-                    size={Math.min(width - 40, 330)}
-                />
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => {
-                        Haptics.selectionAsync().catch(() => {});
-                        setShowComparisonModal(true);
-                    }}
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 8,
-                        backgroundColor: 'rgba(0, 223, 130, 0.15)',
-                        borderWidth: 1.2,
-                        borderColor: Colors.primary,
-                        borderRadius: 14,
-                        paddingVertical: 12,
-                        paddingHorizontal: 20,
-                        marginTop: 12,
-                        width: '100%'
-                    }}
-                >
-                    <Ionicons name="git-compare" size={18} color={Colors.primary} />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>
-                        BOSHQASI BILAN TAQQOSLASH (VS)
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* MATCHDAY POSTER EXPORT SECTION */}
-            <View style={{ marginTop: 10, marginBottom: 25, width: '100%' }}>
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={handleExportPress}
-                    disabled={exportState !== 'idle'}
-                    style={styles.exportBtn}
-                >
-                    {exportState === 'idle' && (
-                        <>
-                            <Ionicons name="sparkles" size={18} color="#000" />
-                            <Text style={styles.exportBtnText}>{t('stats.create_matchday_poster', 'MATCHDAY POSTER YARATISH')}</Text>
-                        </>
-                    )}
-                    {exportState === 'loading' && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <ActivityIndicator size="small" color="#000" />
-                            <Text style={styles.exportBtnText}>{t('stats.generating_poster', 'POSTER YARATILMOQDA...')} {exportProgress}%</Text>
-                        </View>
-                    )}
-                    {exportState === 'complete' && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Ionicons name="checkmark-circle" size={20} color="#000" />
-                            <Text style={styles.exportBtnText}>{t('stats.poster_ready', 'POSTER TAYYOR!')}</Text>
-                        </View>
-                    )}
-                </TouchableOpacity>
-            </View>
-
-            <View style={{ marginBottom: 35 }} />
-        </ScrollView>
-    );
+        if (playerId) {
+            fetchPlayer();
+        } else {
+            setLoading(false);
+        }
+    }, [playerId]);
 
     const [playerReplays, setPlayerReplays] = useState<any[]>([]);
     const [replaysLoading, setReplaysLoading] = useState(false);
@@ -578,7 +402,6 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             if (!pId) return;
             setReplaysLoading(true);
             try {
-                // Find all application IDs associated with this player
                 const playerPhone = player?.phone;
                 let targetPlayerIds = [pId];
                 if (playerPhone) {
@@ -598,11 +421,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     .in('player_id', targetPlayerIds)
                     .order('created_at', { ascending: false });
 
-                if (error) {
-                    console.warn('Error fetching player replays (query):', error.message || error);
-                }
-
-                if (events && events.length > 0) {
+                if (!error && events && events.length > 0) {
                     const validReplays = events.filter((e: any) =>
                         Boolean(e.replay_video_url || e.video_url || e.replay_url || e.video)
                     );
@@ -620,6 +439,38 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         fetchPlayerReplays();
     }, [player?.id, player?._id, playerId, player?.phone]);
 
+    if (loading && !player) {
+        return (
+            <View style={{ flex: 1, backgroundColor: homeColors.background }}>
+                <PlayerProfileSkeleton />
+            </View>
+        );
+    }
+
+    if (!player) {
+        return (
+            <SafeAreaView style={[styles.emptyContainer, { backgroundColor: homeColors.background }]}>
+                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+                <View style={styles.emptyContent}>
+                    <Ionicons name="person-outline" size={64} color={homeColors.textSecondary} />
+                    <Text style={[styles.emptyTitle, { color: homeColors.textPrimary }]}>{t('teams.player_fallback', 'O\'yinchi topilmadi')}</Text>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtnAction, { backgroundColor: homeColors.accent }]}>
+                        <Text style={[styles.backBtnActionText, { color: isDark ? '#000000' : '#FFFFFF' }]}>{t('common.back', 'Orqaga')}</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    const stats = player.stats || { goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0, rating: 0 };
+    const computedAge = calculateAgeFromBirthDate(player.birth_date || player.birthDate, player.age);
+    const instagramUsername = player.instagram_username || '';
+    const instagramUrl = instagramUsername ? `https://www.instagram.com/${instagramUsername}/` : null;
+
+    const approvedTransfers = playerTransfers.filter((t: any) => t.status === 'approved');
+    const currentTeamName = player?.teams?.name || (approvedTransfers[0]?.new_team_name) || player?.team_name || player?.teamName || '';
+    const currentTeamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || (approvedTransfers[0]?.new_team_logo) || '';
+
     const formatTransferDate = (dateStr: string) => {
         if (!dateStr) return '';
         try {
@@ -635,1040 +486,967 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         }
     };
 
-    const renderKaryera = () => {
-        const approvedTransfers = playerTransfers.filter((t: any) => t.status === 'approved');
-        const currentTeamName = player?.teams?.name || (approvedTransfers[0]?.new_team_name) || player?.team_name || player?.teamName || 'Jamoa';
-        const currentTeamLogo = player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || (approvedTransfers[0]?.new_team_logo) || '';
+    // Group player replays by match
+    const matchGroups: { [key: string]: { match: any, replays: any[] } } = {};
+    playerReplays.forEach((ev: any) => {
+        const mId = ev.match_id || ev.match?.id || 'unknown';
+        if (!matchGroups[mId]) {
+            matchGroups[mId] = {
+                match: ev.match || {},
+                replays: []
+            };
+        }
+        if (!matchGroups[mId].replays.some(r => r.id === ev.id)) {
+            matchGroups[mId].replays.push(ev);
+        }
+    });
+    const groupedMatches = Object.values(matchGroups);
 
-        // Group player replays by match
-        const matchGroups: { [key: string]: { match: any, replays: any[] } } = {};
-        playerReplays.forEach((ev: any) => {
-            const mId = ev.match_id || ev.match?.id || 'unknown';
-            if (!matchGroups[mId]) {
-                matchGroups[mId] = {
-                    match: ev.match || {},
-                    replays: []
-                };
-            }
-            if (!matchGroups[mId].replays.some(r => r.id === ev.id)) {
-                matchGroups[mId].replays.push(ev);
-            }
-        });
-        const groupedMatches = Object.values(matchGroups);
+    const backdropOpacity = swipeBackAnim.interpolate({
+        inputRange: [0, width * 0.8, width],
+        outputRange: [isDark ? 0.6 : 0.25, 0.05, 0],
+        extrapolate: 'clamp',
+    });
 
-        return (
-            <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-                <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-                    <Ionicons name="trophy-outline" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>{t('stats.career_history').toUpperCase()}</Text>
+    const playerNameFull = `${player.firstName || player.name || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim() || t('teams.player_fallback', 'O\'YINCHI');
+
+    const renderProfil = () => (
+        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+            {/* PHYSICAL STATS CARD */}
+            <View style={[styles.infoSectionCard, cardSurface]}>
+                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                    <Ionicons name="finger-print-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.personal_info', 'MA\'LUMOTLAR').toUpperCase()}</Text>
                 </View>
 
-                <View style={styles.careerTimelineContainer}>
-                    {/* 1. HOZIRGI JAMOASI (CURRENT ACTIVE TEAM) */}
-                    <View style={[styles.teamCareerWrapper, styles.teamCareerCurrent]}>
-                        <View style={styles.teamMainRow}>
-                            <View style={[styles.teamIconBox, { borderColor: '#00FF66', borderWidth: 1.5, width: 36, height: 36, borderRadius: 10 }]}>
-                                {currentTeamLogo ? (
-                                    <Image source={{ uri: currentTeamLogo }} style={{ width: 26, height: 26 }} resizeMode="contain" />
+                <View style={styles.physicalGrid}>
+                    <View style={styles.physicalItem}>
+                        <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.age', 'YOSHI')}</Text>
+                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{computedAge !== '—' ? `${computedAge}` : '—'}</Text>
+                    </View>
+                    <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
+                    <View style={styles.physicalItem}>
+                        <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.height', 'BO\'YI')}</Text>
+                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{player?.height ? `${player.height} CM` : '—'}</Text>
+                    </View>
+                    <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
+                    <View style={styles.physicalItem}>
+                        <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.weight', 'VAZNI')}</Text>
+                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]}>{player?.weight ? `${player.weight} KG` : '—'}</Text>
+                    </View>
+                    <View style={[styles.physicalDivider, { backgroundColor: homeColors.border }]} />
+                    <View style={styles.physicalItem}>
+                        <Text style={[styles.physicalLabel, { color: homeColors.textSecondary }]}>{t('stats.citizenship', 'DAVLAT')}</Text>
+                        <Text style={[styles.physicalValue, { color: homeColors.textPrimary }]} numberOfLines={1}>{player?.citizenship || 'UZB'}</Text>
+                    </View>
+                </View>
+
+                {instagramUrl && (
+                    <TouchableOpacity
+                        style={[styles.instagramBtn, { borderTopColor: homeColors.border }]}
+                        activeOpacity={0.75}
+                        onPress={() => handleOpenInstagram(instagramUrl)}
+                    >
+                        <Ionicons name="logo-instagram" size={18} color="#E1306C" />
+                        <Text style={[styles.instagramBtnText, { color: homeColors.textPrimary }]}>@{instagramUsername}</Text>
+                        <Ionicons name="open-outline" size={14} color={homeColors.textSecondary} style={{ marginLeft: 'auto' }} />
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {/* 3D FIFA / EA FC PLAYER CARD */}
+            <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14, alignItems: 'center', paddingVertical: 18 }]}>
+                <View style={[styles.sectionCardHeader, { width: '100%', borderBottomColor: homeColors.border, marginBottom: 14 }]}>
+                    <Ionicons name="sparkles-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.player_card_title', 'O\'YINCHI KARTASI')}</Text>
+                </View>
+
+                <FifaPlayerCard
+                    player={player}
+                    size="lg"
+                    interactive3D={true}
+                    showPlayStyles={true}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowCardZoomModal(true);
+                    }}
+                />
+
+                <Text style={{ color: homeColors.textSecondary, fontSize: 11, fontWeight: '600', marginTop: 12, textAlign: 'center' }}>
+                    {t('stats.card_tap_hint', 'Kattalashtirish va 3D ko\'rish uchun kartaga bosing')}
+                </Text>
+
+                {aiStats?.aiScoutSummary ? (
+                    <View style={[styles.aiScoutPill, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)', borderColor: homeColors.border }]}>
+                        <Ionicons name="sparkles" size={15} color={homeColors.textPrimary} />
+                        <Text style={[styles.aiScoutText, { color: homeColors.textPrimary }]}>
+                            {aiStats.aiScoutSummary}
+                        </Text>
+                    </View>
+                ) : null}
+            </View>
+
+            {/* 3D SPIDER / RADAR POLYGON CHART */}
+            <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14, alignItems: 'center', paddingVertical: 18 }]}>
+                <View style={[styles.sectionCardHeader, { width: '100%', borderBottomColor: homeColors.border, marginBottom: 12 }]}>
+                    <Ionicons name="pie-chart-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>3D ATRIBUTLAR RADARI</Text>
+                </View>
+
+                <PlayerRadarChart
+                    player1={player}
+                    player1Name={playerNameFull}
+                    size={Math.min(width - 64, 310)}
+                />
+
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowComparisonModal(true);
+                    }}
+                    style={[styles.compareBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]}
+                >
+                    <Ionicons name="git-compare-outline" size={16} color={isDark ? '#000000' : '#FFFFFF'} />
+                    <Text style={[styles.compareBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                        BOSHQASI BILAN TAQQOSLASH (VS)
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* MATCHDAY POSTER EXPORT SECTION */}
+            <View style={{ marginTop: 14, width: '100%' }}>
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handleExportPress}
+                    disabled={exportState !== 'idle'}
+                    style={[styles.exportBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: homeColors.border }]}
+                >
+                    {exportState === 'idle' && (
+                        <>
+                            <Ionicons name="image-outline" size={18} color={homeColors.textPrimary} />
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.create_matchday_poster', 'MATCHDAY POSTER YARATISH')}</Text>
+                        </>
+                    )}
+                    {exportState === 'loading' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <ActivityIndicator size="small" color={homeColors.textPrimary} />
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.generating_poster', 'POSTER YARATILMOQDA...')} {exportProgress}%</Text>
+                        </View>
+                    )}
+                    {exportState === 'complete' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                            <Text style={[styles.exportBtnText, { color: homeColors.textPrimary }]}>{t('stats.poster_ready', 'POSTER TAYYOR!')}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+        </ScrollView>
+    );
+
+    const renderKaryera = () => (
+        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+            {/* CURRENT TEAM */}
+            <View style={[styles.infoSectionCard, cardSurface]}>
+                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                    <Ionicons name="trophy-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.career_history', 'KARYERA TARIXI').toUpperCase()}</Text>
+                </View>
+
+                <View style={styles.careerTeamItem}>
+                    <View style={[styles.teamLogoBoxMini, { borderColor: homeColors.border }]}>
+                        {currentTeamLogo ? (
+                            <SmartImage uri={currentTeamLogo} style={{ width: 28, height: 28 }} contentFit="contain" fallbackIcon="shield-outline" />
+                        ) : (
+                            <Ionicons name="shield-outline" size={20} color={homeColors.textPrimary} />
+                        )}
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={[styles.careerTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                {(currentTeamName || 'ERKIN AGENT').toUpperCase()}
+                            </Text>
+                            <View style={[styles.currentTeamBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                <View style={[styles.pulsingDot, { backgroundColor: '#10B981' }]} />
+                                <Text style={[styles.currentTeamBadgeText, { color: homeColors.textPrimary }]}>{t('stats.current_team', 'HOZIRGI').toUpperCase()}</Text>
+                            </View>
+                        </View>
+                        <Text style={[styles.careerDateSub, { color: homeColors.textSecondary }]}>{t('stats.current_team_sub', 'Amaldagi jamoasi')}</Text>
+                    </View>
+                </View>
+
+                {/* PAST TRANSFERS */}
+                {approvedTransfers.map((tr: any, idx: number) => {
+                    const trDate = formatTransferDate(tr.created_at);
+                    const oldLogo = tr.old_team_logo;
+                    const oldName = tr.old_team_name || 'Eski jamoasi';
+
+                    return (
+                        <View key={tr.id || idx} style={[styles.careerTeamItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: homeColors.border }]}>
+                            <View style={[styles.teamLogoBoxMini, { borderColor: homeColors.border }]}>
+                                {oldLogo ? (
+                                    <SmartImage uri={oldLogo} style={{ width: 24, height: 24 }} contentFit="contain" fallbackIcon="shield-outline" />
                                 ) : (
-                                    <Ionicons name="shield" size={18} color="#00FF66" />
+                                    <Ionicons name="shield-outline" size={18} color={homeColors.textSecondary} />
                                 )}
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Text style={[styles.teamNameCareer, { color: '#00FF66', fontSize: 14 }]} numberOfLines={1}>
-                                        {(currentTeamName || 'AMALDAGI JAMOA').toUpperCase()}
+                                    <Text style={[styles.careerTeamName, { color: homeColors.textSecondary }]} numberOfLines={1}>
+                                        {oldName.toUpperCase()}
                                     </Text>
-                                    <View style={styles.currentTeamBadge}>
-                                        <View style={styles.pulsingDot} />
-                                        <Text style={styles.currentTeamBadgeText}>{t('stats.current_team').toUpperCase()}</Text>
-                                    </View>
+                                    <Text style={[styles.pastTeamBadgeText, { color: homeColors.textSecondary }]}>{t('stats.past_team', 'AVVALGI').toUpperCase()}</Text>
                                 </View>
-                                <Text style={styles.careerDateSub}>{t('stats.current_team_sub')}</Text>
+                                <Text style={[styles.careerDateSub, { color: homeColors.textSecondary }]}>
+                                    🗓️ {t('stats.transfer_date', 'Transfer')}: {trDate}
+                                </Text>
                             </View>
                         </View>
-                    </View>
-
-                    {/* 2. TRANSFER BO'LGAN AVVALGI JAMOALARI (PAST TEAMS WITH EXACT TRANSFER DATE) */}
-                    {approvedTransfers.map((tr: any, idx: number) => {
-                        const trDate = formatTransferDate(tr.created_at);
-                        const oldLogo = tr.old_team_logo;
-                        const oldName = tr.old_team_name || 'Eski jamoasi';
-
-                        return (
-                            <View key={tr.id || idx} style={[styles.teamCareerWrapper, { borderLeftWidth: 3, borderLeftColor: 'rgba(255,255,255,0.25)', marginTop: 8 }]}>
-                                <View style={styles.teamMainRow}>
-                                    <View style={[styles.teamIconBox, { width: 34, height: 34, borderRadius: 10 }]}>
-                                        {oldLogo ? (
-                                            <Image source={{ uri: oldLogo }} style={{ width: 24, height: 24 }} resizeMode="contain" />
-                                        ) : (
-                                            <Ionicons name="shield-outline" size={16} color="rgba(255,255,255,0.6)" />
-                                        )}
-                                    </View>
-                                    <View style={{ flex: 1, marginLeft: 12 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <Text style={styles.teamNameCareer} numberOfLines={1}>
-                                                {oldName.toUpperCase()}
-                                            </Text>
-                                            <View style={styles.transferredBadge}>
-                                                <Ionicons name="arrow-forward" size={10} color="#94A3B8" />
-                                                <Text style={styles.transferredBadgeText}>{t('stats.past_team').toUpperCase()}</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={styles.careerDateSub}>
-                                            🗓️ {t('stats.transfer_date')}: {trDate}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        );
-                    })}
-                </View>
-
-                {/* Player's Personal 20s Goal Replay Clips Feed (Grouped by Match) */}
-                <View style={{ marginTop: 24, marginBottom: 20 }}>
-                    <View style={[styles.sectionHeader, { marginBottom: 12 }]}>
-                        <Ionicons name="videocam" size={20} color={Colors.primary || '#00FF87'} />
-                        <Text style={styles.sectionTitle}>{t('stats.personal_replays')}</Text>
-                    </View>
-
-                    {replaysLoading ? (
-                        <ActivityIndicator color={Colors.primary || '#00FF87'} style={{ marginVertical: 15 }} />
-                    ) : groupedMatches.length > 0 ? (
-                        groupedMatches.map((group: any, idx: number) => (
-                            <PlayerMatchReplayCard
-                                key={group.match?.id || idx}
-                                match={group.match}
-                                replays={group.replays}
-                                playerName={`${player?.first_name || ''} ${player?.last_name || ''}`.trim()}
-                            />
-                        ))
-                    ) : (
-                        <View style={styles.teamCareerWrapper}>
-                            <View style={{ padding: 15, alignItems: 'center', justifyContent: 'center' }}>
-                                <Ionicons name="videocam-outline" size={30} color="rgba(255,255,255,0.2)" />
-                                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 }}>{t('stats.no_replays')}</Text>
-                            </View>
-                        </View>
-                    )}
-                </View>
-            </ScrollView>
-        );
-    };
-
-    const renderMatches = () => (
-        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-            <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-                <Ionicons name="football-outline" size={20} color={Colors.primary} />
-                <Text style={styles.sectionTitle}>{t('stats.past_matches').toUpperCase()}</Text>
+                    );
+                })}
             </View>
 
-            {matchesLoading ? (
-                <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
-            ) : matches.length > 0 ? (
-                matches.map((match: any) => (
-                    <MatchCard key={match.id || match._id} match={match} />
-                ))
-            ) : (
-                <View style={styles.emptyCareer}>
-                    <Text style={styles.emptyCareerText}>O'yinlar tarixi mavjud emas</Text>
+            {/* PLAYER'S REPLAY HIGHLIGHTS FEED */}
+            <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14 }]}>
+                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                    <Ionicons name="videocam-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.personal_replays', 'GOLLAR & REPLAYLAR').toUpperCase()}</Text>
                 </View>
-            )}
+
+                {replaysLoading ? (
+                    <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 20 }} />
+                ) : groupedMatches.length > 0 ? (
+                    groupedMatches.map((group: any, idx: number) => (
+                        <PlayerMatchReplayCard
+                            key={group.match?.id || idx}
+                            match={group.match}
+                            replays={group.replays}
+                            playerName={playerNameFull}
+                        />
+                    ))
+                ) : (
+                    <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="videocam-outline" size={32} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
+                        <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 8, fontWeight: '600' }}>{t('stats.no_replays', 'Replaylar mavjud emas')}</Text>
+                    </View>
+                )}
+            </View>
+        </ScrollView>
+    );
+
+    const renderMatches = () => (
+        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+            <View style={[styles.infoSectionCard, cardSurface]}>
+                <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
+                    <Ionicons name="football-outline" size={17} color={homeColors.textPrimary} />
+                    <Text style={[styles.sectionCardTitle, { color: homeColors.textPrimary }]}>{t('stats.past_matches', 'O\'YINLAR TARIXI').toUpperCase()}</Text>
+                </View>
+
+                {matchesLoading ? (
+                    <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 24 }} />
+                ) : matches.length > 0 ? (
+                    matches.map((match: any, idx: number) => (
+                        <View key={match.id || match._id || idx} style={[styles.matchRowItem, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: homeColors.border }]}>
+                            <View style={styles.matchRowTop}>
+                                <Text style={[styles.matchRowLeague, { color: homeColors.textSecondary }]}>{match.leagueName || 'AMATORA LIGA'}</Text>
+                                <Text style={[styles.matchRowDate, { color: homeColors.textSecondary }]}>{new Date(match.date || match.match_date || Date.now()).toLocaleDateString('uz-UZ')}</Text>
+                            </View>
+                            <View style={styles.matchTeamsRow}>
+                                <View style={styles.teamCol}>
+                                    <SmartImage uri={match.homeTeam?.logo || match.homeTeamLogo} style={styles.teamMiniLogo} contentFit="contain" fallbackIcon="shield-outline" />
+                                    <Text style={[styles.teamNameMatch, { color: homeColors.textPrimary }]} numberOfLines={1}>{match.homeTeam?.name || match.homeTeamName || 'Jamoa A'}</Text>
+                                </View>
+                                <View style={[styles.scoreBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                    <Text style={[styles.scoreText, { color: homeColors.textPrimary }]}>{match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}</Text>
+                                </View>
+                                <View style={styles.teamCol}>
+                                    <SmartImage uri={match.awayTeam?.logo || match.awayTeamLogo} style={styles.teamMiniLogo} contentFit="contain" fallbackIcon="shield-outline" />
+                                    <Text style={[styles.teamNameMatch, { color: homeColors.textPrimary }]} numberOfLines={1}>{match.awayTeam?.name || match.awayTeamName || 'Jamoa B'}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    ))
+                ) : (
+                    <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="football-outline" size={32} color={homeColors.textSecondary} style={{ opacity: 0.5 }} />
+                        <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 8, fontWeight: '600' }}>O'yinlar tarixi mavjud emas</Text>
+                    </View>
+                )}
+            </View>
         </ScrollView>
     );
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-            <VideoBackground
-                source={require('../assets/images/welcomeScreenVideo1.mp4')}
-                overlayOpacity={0.8}
-                style={StyleSheet.absoluteFill}
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+
+            {/* Fading Backdrop Overlay */}
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        backgroundColor: '#000000',
+                        opacity: backdropOpacity,
+                    },
+                ]}
             />
 
-            <ScrollView 
-                contentContainerStyle={styles.scrollContent} 
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
+            <Animated.View
+                style={{
+                    flex: 1,
+                    backgroundColor: homeColors.background,
+                    transform: [{ translateX: swipeBackAnim }],
+                    shadowColor: '#000000',
+                    shadowOffset: { width: -4, height: 0 },
+                    shadowOpacity: isDark ? 0.5 : 0.2,
+                    shadowRadius: 10,
+                    elevation: 10,
+                }}
             >
-                <View style={styles.heroSection}>
-                    {/* AMATORA BRAND HEADER (SIDE-BY-SIDE WITH LOGO) */}
-                    <View style={styles.brandHeaderWrapper}>
-                        <Image
-                            source={require('../assets/logo.png')}
-                            style={{ width: 18, height: 18, marginRight: 6 }}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.brandText}>AMATORA</Text>
-                    </View>
+                <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                    {/* STICKY HEADER: TOP ACTIONS + PLAYER IDENTITY + STATS + TABS */}
+                    <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
+                        {/* TOP ROW: BACK BUTTON & ACTIONS */}
+                        <View style={styles.topRow}>
+                            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, cardSurface]}>
+                                <Ionicons name="arrow-back" size={20} color={homeColors.textPrimary} />
+                            </TouchableOpacity>
 
-                    {/* ⚽ PARALLEL TOP ROW: BACK BUTTON ALIGNED TO TOP EDGE PARALLEL WITH PLAYER PHOTO */}
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: 30, marginBottom: 20 }}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonBtn}>
-                            <Ionicons name="arrow-back" size={24} color="#FFF" />
-                        </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TouchableOpacity
+                                    style={[styles.iconBtn, cardSurface]}
+                                    onPress={() => {
+                                        Haptics.selectionAsync().catch(() => {});
+                                        setShowComparisonModal(true);
+                                    }}
+                                >
+                                    <Ionicons name="git-compare-outline" size={18} color={homeColors.textPrimary} />
+                                </TouchableOpacity>
 
-                        {/* PLAYER PHOTO CREST (BIGGER 1X1 SQUARE CARD) */}
-                        <View style={{ position: 'relative' }}>
-                            <View style={{
-                                width: 118,
-                                height: 118,
-                                borderRadius: 22,
-                                borderWidth: 1.5,
-                                borderColor: 'rgba(0, 255, 135, 0.7)',
-                                padding: 2,
-                                backgroundColor: '#0A1224',
-                                overflow: 'hidden',
-                                shadowColor: '#00FF87',
-                                shadowRadius: 16,
-                                shadowOpacity: 0.35,
-                                elevation: 8
-                            }}>
-                                <SmartImage
-                                    uri={player.photo || player.avatar || player.photo_url}
-                                    style={{ width: '100%', height: '100%', borderRadius: 18 }}
-                                    contentFit="cover"
-                                    fallbackIcon="person"
-                                />
-                            </View>
-
-                            {/* UNIQUE TILTED FOOTBALL CREST SHIRT NUMBER BADGE */}
-                            <View style={{
-                                position: 'absolute',
-                                bottom: -4,
-                                right: -4,
-                                backgroundColor: '#00FF87',
-                                borderWidth: 2,
-                                borderColor: '#050A14',
-                                paddingHorizontal: 9,
-                                paddingVertical: 2.5,
-                                borderRadius: 10,
-                                transform: [{ rotate: '-8deg' }],
-                                shadowColor: '#00FF87',
-                                shadowRadius: 10,
-                                shadowOpacity: 0.6,
-                                elevation: 6
-                            }}>
-                                <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 11, fontStyle: 'italic', letterSpacing: 0.5 }}>
-                                    #{player.number || player.player_number || '0'}
-                                </Text>
+                                <TouchableOpacity
+                                    style={[styles.iconBtn, cardSurface]}
+                                    onPress={() => {
+                                        Haptics.selectionAsync().catch(() => {});
+                                        setShowCardZoomModal(true);
+                                    }}
+                                >
+                                    <Ionicons name="sparkles-outline" size={18} color={homeColors.textPrimary} />
+                                </TouchableOpacity>
                             </View>
                         </View>
 
-                        {/* SPACER FOR BALANCED CENTERING */}
-                        <View style={{ width: 40, height: 40 }} />
-                    </View>
-
-                    {/* PLAYER DETAILS CENTERED BELOW */}
-                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
-
-                        {/* PLAYER FULL NAME (FIRST NAME NEON GREEN, LAST NAME WHITE) */}
-                        <Text style={{
-                            fontWeight: '900',
-                            fontSize: 22,
-                            letterSpacing: 0.5,
-                            textAlign: 'center',
-                            textTransform: 'uppercase'
-                        }}>
-                            <Text style={{ color: '#00FF87' }}>{(player.firstName || player.first_name || '').toUpperCase()}</Text>{' '}
-                            <Text style={{ color: '#FFFFFF' }}>{(player.lastName || player.last_name || '').toUpperCase()}</Text>
-                        </Text>
-
-                        {/* CENTERED BADGES ROW: TEAM LOGO + POSITION & RATING */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                            {/* POSITION BADGE WITH TEAM LOGO */}
-                            <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                                backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                                borderWidth: 1,
-                                borderColor: 'rgba(255, 255, 255, 0.14)',
-                                paddingHorizontal: 12,
-                                paddingVertical: 5,
-                                borderRadius: 20
-                            }}>
-                                {(player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo) ? (
-                                    <Image
-                                        source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }}
-                                        style={{ width: 16, height: 16, borderRadius: 8 }}
-                                        resizeMode="contain"
+                        {/* PLAYER IDENTITY — 1x1 Square photo on left, info on right */}
+                        <View style={styles.identityRowSticky}>
+                            <View style={{ position: 'relative' }}>
+                                <View style={[styles.photoBoxSm, cardSurface]}>
+                                    <SmartImage
+                                        uri={player.photo || player.avatar || player.photo_url}
+                                        style={{ width: '100%', height: '100%', borderRadius: 16 }}
+                                        contentFit="cover"
+                                        fallbackIcon="person"
                                     />
-                                ) : (
-                                    <Ionicons name="shield-sharp" size={14} color="#00FF87" />
-                                )}
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: '800', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
-                                    {getLocalizedPosition(player?.position, t)}
-                                </Text>
-                            </View>
-
-                            {/* RATING BADGE (GOLD WITH TRENDING-UP ICON) */}
-                            <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                                backgroundColor: 'rgba(255, 215, 0, 0.15)',
-                                borderWidth: 1,
-                                borderColor: 'rgba(255, 215, 0, 0.4)',
-                                paddingHorizontal: 10,
-                                paddingVertical: 5,
-                                borderRadius: 20
-                            }}>
-                                <Ionicons name="trending-up" size={13} color="#FFD700" />
-                                <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 12, letterSpacing: 0.5 }}>
-                                    {player?.rating !== undefined && player?.rating !== null && player?.rating !== 0 ? player.rating : (stats?.rating || 0)}
-                                </Text>
-                            </View>
-                        </View>
-
-                        {/* INSTAGRAM LINK BADGE */}
-                        {instagramUrl ? (
-                            <TouchableOpacity
-                                onPress={() => handleOpenInstagram(instagramUrl)}
-                                disabled={openingInstagram}
-                                activeOpacity={0.7}
-                                style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 6,
-                                    backgroundColor: 'rgba(225, 48, 108, 0.14)',
-                                    borderColor: 'rgba(225, 48, 108, 0.4)',
-                                    borderWidth: 1,
-                                    paddingHorizontal: 12,
-                                    height: 26,
-                                    borderRadius: 13,
-                                    marginTop: 10
-                                }}
-                            >
-                                {openingInstagram ? (
-                                    <ActivityIndicator size="small" color="#E1306C" style={{ transform: [{ scale: 0.65 }], width: 14, height: 14 }} />
-                                ) : (
-                                    <FontAwesome5 name="instagram" size={12} color="#E1306C" />
-                                )}
-                                <Text style={{ color: '#E1306C', fontSize: 11, fontWeight: '800', lineHeight: 14 }}>
-                                    {openingInstagram ? t('common.loading') : `@${instagramUsername}`}
-                                </Text>
-                            </TouchableOpacity>
-                        ) : null}
-                    </View>
-                </View>
-
-                {/* Slider-Style Tab Switcher */}
-                <View style={styles.switcherWrapper}>
-                    <View style={styles.carouselContainer}>
-                        <View style={styles.animatedCardWrapper}>
-                            <Animated.View style={[styles.miniTabCard, { transform: [{ translateX: slideAnim }] }]}>
-                                <View style={styles.miniTabInner}>
-                                    <View style={styles.miniTabIconBox}>
-                                        <Ionicons 
-                                            name={
-                                                activeTab === 'profil' ? 'person' : 
-                                                activeTab === 'fifa_card' ? 'sparkles' :
-                                                activeTab === 'karyerasi' ? 'trophy' : 'football'
-                                            } 
-                                            size={20} 
-                                            color={Colors.primary} 
-                                        />
-                                    </View>
-                                    <View style={{ flex: 1, marginLeft: 12 }}>
-                                        <Text style={styles.miniTabType}>{t('stats.section')}</Text>
-                                        <Text style={styles.miniTabName}>{tabLabels[activeTab]}</Text>
-                                    </View>
                                 </View>
-                            </Animated.View>
-                        </View>
-                    </View>
-
-                    <TouchableOpacity onPress={nextTab} style={styles.navArrowBtnLarge}>
-                        <Ionicons name="chevron-forward" size={32} color={Colors.primary} />
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.mainContent} {...panResponder.panHandlers}>
-                    <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-                        {activeTab === 'profil' && renderProfil()}
-                        {activeTab === 'karyerasi' && renderKaryera()}
-                        {activeTab === 'oyinlari' && renderMatches()}
-                    </Animated.View>
-                </View>
-            </ScrollView>
-
-            {/* ⚽ MINIMALIST ULTIMATE FOOTBALL PLAYER POSTER MODAL */}
-            <Modal
-                visible={showExportModal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowExportModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={{ width: '90%', maxHeight: '85%', backgroundColor: '#050A14', borderRadius: 32, borderWidth: 1.5, borderColor: 'rgba(0, 255, 135, 0.3)', overflow: 'hidden', shadowColor: '#00FF87', shadowRadius: 30, shadowOpacity: 0.3, elevation: 20 }}>
-                        <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
-                        
-                        <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={{ flex: 1, backgroundColor: '#050A14' }}>
-                            <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 28, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
-                                {/* Minimalist Top Header with Original Logo */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.08)', paddingBottom: 16, marginBottom: 24 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <Image
-                                            source={require('../assets/logo.png')}
-                                            style={{ width: 24, height: 24 }}
-                                            resizeMode="contain"
-                                        />
-                                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 15, letterSpacing: 2 }}>AMATORA</Text>
-                                    </View>
-                                    <View style={{ backgroundColor: 'rgba(0, 255, 135, 0.12)', borderWidth: 1, borderColor: 'rgba(0, 255, 135, 0.3)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 }}>
-                                        <Text style={{ color: '#00FF87', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>SEASON 2026</Text>
-                                    </View>
-                                </View>
-
-                                {/* Minimalist Player Photo Crest & Rating */}
-                                <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                                    <View style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: '#00FF87', padding: 4, backgroundColor: '#0A1224', shadowColor: '#00FF87', shadowRadius: 20, shadowOpacity: 0.4 }}>
-                                        <Image
-                                            source={{ uri: player?.photo || player?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80' }}
-                                            style={{ width: '100%', height: '100%', borderRadius: 54 }}
-                                            resizeMode="cover"
-                                        />
-                                    </View>
-                                    
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFD700', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20, marginTop: -14, shadowColor: '#FFD700', shadowRadius: 10, shadowOpacity: 0.6 }}>
-                                        <Ionicons name="trending-up" size={14} color="#050A14" />
-                                        <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>
-                                            {player?.rating !== undefined && player?.rating !== null && player?.rating !== 0 ? player.rating : (stats?.rating || 0)} RATING
-                                        </Text>
-                                    </View>
-
-                                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 22, marginTop: 14, letterSpacing: 0.5, textAlign: 'center' }}>
-                                        {(player?.firstName || player?.first_name || 'FUTBOLCHI').toUpperCase()} {(player?.lastName || player?.last_name || '').toUpperCase()}
+                                {/* Tilted Shirt Number Badge */}
+                                <View style={[styles.numberBadgeSticky, { backgroundColor: isDark ? '#FFFFFF' : '#000000', borderColor: homeColors.background }]}>
+                                    <Text style={[styles.numberBadgeText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                                        #{player.number || player.player_number || '0'}
                                     </Text>
+                                </View>
+                            </View>
 
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255, 255, 255, 0.06)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, marginTop: 8 }}>
-                                        {(player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo) ? (
-                                            <Image
-                                                source={{ uri: player?.teams?.logo_url || player?.teams?.logo || player?.team_logo || player?.teamLogo }}
-                                                style={{ width: 16, height: 16, borderRadius: 8 }}
-                                                resizeMode="contain"
-                                            />
-                                        ) : (
-                                            <Ionicons name="shield-outline" size={14} color="#00FF87" />
-                                        )}
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontWeight: '700', fontSize: 11, letterSpacing: 1 }}>
-                                            {getLocalizedPosition(player?.position, t)}
+                            <View style={{ flex: 1, paddingLeft: 12 }}>
+                                <Text style={[styles.playerNameSm, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                    {playerNameFull.toUpperCase()}
+                                </Text>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
+                                    {currentTeamLogo ? (
+                                        <SmartImage uri={currentTeamLogo} style={{ width: 14, height: 14 }} contentFit="contain" fallbackIcon="shield-outline" />
+                                    ) : null}
+                                    <Text style={[styles.playerTeamName, { color: homeColors.textSecondary }]} numberOfLines={1}>
+                                        {(currentTeamName || 'ERKIN AGENT').toUpperCase()}
+                                    </Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6 }}>
+                                    <View style={[styles.positionPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                        <Text style={[styles.positionPillText, { color: homeColors.textPrimary }]}>
+                                            {getLocalizedPosition(player.position, t).toUpperCase()}
                                         </Text>
                                     </View>
+                                    {stats.rating > 0 && (
+                                        <View style={[styles.ratingPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                            <Ionicons name="star" size={10} color="#FACC15" style={{ marginRight: 3 }} />
+                                            <Text style={[styles.ratingPillText, { color: homeColors.textPrimary }]}>{stats.rating}</Text>
+                                        </View>
+                                    )}
                                 </View>
+                            </View>
+                        </View>
 
-                                {/* Minimalist Grid Stats */}
-                                <View style={{ width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 10 }}>
-                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>GOLLAR</Text>
-                                        <Text style={{ color: '#00FF87', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.goals}</Text>
-                                    </View>
-
-                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>ASSISTLAR</Text>
-                                        <Text style={{ color: '#3B82F6', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.assists}</Text>
-                                    </View>
-
-                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>O'YINLAR</Text>
-                                        <Text style={{ color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.matchesPlayed}</Text>
-                                    </View>
-
-                                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', padding: 16, borderRadius: 20 }}>
-                                        <Text style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>SARIQ / QIZIL</Text>
-                                        <Text style={{ color: '#FACC15', fontSize: 28, fontWeight: '900', marginTop: 4 }}>{stats.yellowCards} / {stats.redCards}</Text>
-                                    </View>
+                        {/* INFO STATS CARD */}
+                        <View style={[styles.infoStatsCard, cardSurface, { marginBottom: 8 }]}>
+                            <View style={styles.infoTopRow}>
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.goals || 0}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.goals', 'GOL').toUpperCase()}</Text>
                                 </View>
+                                <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.assists || 0}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.assists', 'ASIST').toUpperCase()}</Text>
+                                </View>
+                                <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: homeColors.textPrimary }]}>{stats.matchesPlayed || stats.matches || 0}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>{t('stats.matches_played', 'O\'YIN').toUpperCase()}</Text>
+                                </View>
+                                <View style={[styles.infoDivider, { backgroundColor: homeColors.border }]} />
+                                <View style={styles.infoStat}>
+                                    <Text style={[styles.infoStatValue, { color: '#EF4444' }]}>{stats.yellowCards || 0} / {stats.redCards || 0}</Text>
+                                    <Text style={[styles.infoStatLabel, { color: homeColors.textSecondary }]}>KARTA</Text>
+                                </View>
+                            </View>
+                        </View>
 
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: 10, fontWeight: '600', marginTop: 14, letterSpacing: 1 }}>
-                                    AMATORA LEAGUE • OFFICIAL MATCHDAY CARD
-                                </Text>
-                            </ScrollView>
-                        </ViewShot>
-
-                        {/* Minimalist Action Buttons */}
-                        <View style={{ flexDirection: 'row', gap: 12, padding: 20, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.08)' }}>
-                            <TouchableOpacity
-                                onPress={() => setShowExportModal(false)}
-                                style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', paddingVertical: 15, borderRadius: 18, alignItems: 'center' }}
-                            >
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: '800', fontSize: 13 }}>YOPISH</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={handleSharePoster}
-                                style={{ flex: 1.5, backgroundColor: '#00FF87', paddingVertical: 15, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                            >
-                                <Ionicons name="share-social" size={18} color="#050A14" />
-                                <Text style={{ color: '#050A14', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>STORY'GA ULASHISH</Text>
-                            </TouchableOpacity>
+                        {/* TAB SWITCHER */}
+                        <View style={styles.tabsContainer}>
+                            <Animated.View
+                                style={[
+                                    styles.tabActiveLine,
+                                    {
+                                        width: indicatorWidthAnim,
+                                        backgroundColor: isDark ? '#FFFFFF' : '#000000',
+                                        transform: [{ translateX: indicatorTranslateX }],
+                                    },
+                                ]}
+                            />
+                            {tabs.map((tabKey, idx) => {
+                                const isCurrent = currentTabIndex === idx;
+                                return (
+                                    <TouchableOpacity
+                                        key={tabKey}
+                                        style={styles.tabBtn}
+                                        onPress={() => handleTabPress(idx)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text
+                                            onLayout={(e) => {
+                                                const w = e.nativeEvent.layout.width;
+                                                setTabLabelWidths((prev) => {
+                                                    if (prev[idx] === w) return prev;
+                                                    const next = [...prev];
+                                                    next[idx] = w;
+                                                    return next;
+                                                });
+                                            }}
+                                            style={[
+                                                styles.tabBtnText,
+                                                { color: isCurrent ? homeColors.textPrimary : homeColors.textSecondary },
+                                                isCurrent && { fontWeight: '900' },
+                                            ]}
+                                        >
+                                            {TAB_LABELS[tabKey]}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     </View>
-                </View>
-            </Modal>
 
+                    {/* 1:1 REAL-TIME LINKED HORIZONTAL PAGER */}
+                    <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                        <Animated.ScrollView
+                            ref={pagerScrollRef as any}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            bounces={false}
+                            scrollEventThrottle={16}
+                            decelerationRate="fast"
+                            onScroll={Animated.event(
+                                [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
+                                { useNativeDriver: false }
+                            )}
+                            onMomentumScrollEnd={handlePagerMomentumScrollEnd}
+                            style={{ flex: 1 }}
+                        >
+                            <View style={{ width, flex: 1 }}>{renderProfil()}</View>
+                            <View style={{ width, flex: 1 }}>{renderKaryera()}</View>
+                            <View style={{ width, flex: 1 }}>{renderMatches()}</View>
+                        </Animated.ScrollView>
+                    </View>
+                </SafeAreaView>
+            </Animated.View>
+
+            {/* COMPARISON MODAL */}
             <PlayerComparisonModal
                 visible={showComparisonModal}
                 onClose={() => setShowComparisonModal(false)}
-                player1={player}
+                currentPlayer={player}
             />
 
+            {/* ZOOM MODAL */}
             <PlayerCardZoomModal
                 visible={showCardZoomModal}
                 onClose={() => setShowCardZoomModal(false)}
                 player={player}
             />
+
+            {/* POSTER VIEWSHOT MODAL */}
+            <Modal visible={showExportModal} transparent animationType="fade" onRequestClose={() => setShowExportModal(false)}>
+                <View style={[styles.exportModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+                    <View style={[styles.exportModalCard, cardSurface]}>
+                        <View style={styles.exportModalHeader}>
+                            <Text style={[styles.exportModalTitle, { color: homeColors.textPrimary }]}>{t('stats.matchday_poster_preview', 'POSTER PREVIEW')}</Text>
+                            <TouchableOpacity onPress={() => setShowExportModal(false)}>
+                                <Ionicons name="close" size={22} color={homeColors.textPrimary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ViewShot ref={posterShotRef} options={{ format: 'png', quality: 1.0 }} style={styles.posterCaptureContainer}>
+                            <View style={[styles.posterInner, { backgroundColor: '#0A0A0C' }]}>
+                                <SmartImage uri={player.photo || player.avatar} style={styles.posterPhoto} contentFit="cover" fallbackIcon="person" />
+                                <View style={styles.posterOverlayBottom}>
+                                    <Text style={styles.posterNameText}>{playerNameFull.toUpperCase()}</Text>
+                                    <Text style={styles.posterSubText}>{getLocalizedPosition(player.position, t).toUpperCase()} • {currentTeamName || 'AMATORA'}</Text>
+                                    <View style={styles.posterStatsRow}>
+                                        <Text style={styles.posterStatItem}>⚽ {stats.goals} GOL</Text>
+                                        <Text style={styles.posterStatItem}>👟 {stats.assists} ASIST</Text>
+                                        <Text style={styles.posterStatItem}>⭐ {stats.rating || 0} OVR</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </ViewShot>
+
+                        <TouchableOpacity style={[styles.sharePosterBtn, { backgroundColor: isDark ? '#FFFFFF' : '#000000' }]} onPress={handleSharePoster}>
+                            <Ionicons name="share-social" size={18} color={isDark ? '#000000' : '#FFFFFF'} />
+                            <Text style={[styles.sharePosterBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>{t('stats.share_poster', 'ULASHISH / SAQLASH')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
 
-const StatBox = ({ label, value, icon, color }: any) => (
-    <View style={styles.statBox}>
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
-            {icon === 'shoe-prints' ? (
-                <FontAwesome5 name="shoe-prints" size={16} color={color} />
-            ) : (
-                <Ionicons name={icon} size={20} color={color} />
-            )}
-        </View>
-        <Text style={styles.statLabelSmall}>{label}</Text>
-        <Text style={styles.statValue}>{value}</Text>
-    </View>
-);
-
-const InfoRow = ({ label, value, icon }: any) => (
-    <View style={styles.infoRow}>
-        <View style={styles.infoIconBox}>
-            <Ionicons name={icon} size={16} color={Colors.primary} />
-        </View>
-        <View style={{ flex: 1 }}>
-            <Text style={styles.infoLabel}>{label}</Text>
-            <Text style={styles.infoValue}>{value}</Text>
-        </View>
-    </View>
-);
-
-const MatchCard = ({ match }: any) => (
-    <View style={styles.matchCard}>
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={styles.matchTop}>
-            <Text style={styles.matchLeague}>{match.leagueName || 'Amatora Turniri'}</Text>
-            <Text style={styles.matchDate}>{new Date(match.date || match.match_date || Date.now()).toLocaleDateString('uz-UZ')}</Text>
-        </View>
-        <View style={styles.matchTeams}>
-            <View style={styles.teamInfo}>
-                <SmartImage uri={match.homeTeam?.logo || match.homeTeamLogo} style={styles.matchTeamLogo} contentFit="contain" />
-                <Text style={styles.matchTeamName} numberOfLines={1}>{match.homeTeam?.name || match.homeTeamName}</Text>
-            </View>
-            <View style={styles.matchScore}>
-                <Text style={styles.scoreText}>{match.score?.home ?? match.home_score ?? 0}:{match.score?.away ?? match.away_score ?? 0}</Text>
-            </View>
-            <View style={styles.teamInfo}>
-                <SmartImage uri={match.awayTeam?.logo || match.awayTeamLogo} style={styles.matchTeamLogo} contentFit="contain" />
-                <Text style={styles.matchTeamName} numberOfLines={1}>{match.awayTeam?.name || match.awayTeamName}</Text>
-            </View>
-        </View>
-    </View>
-);
-
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#050811',
+    container: { flex: 1 },
+    headerStickySection: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    scrollContent: {
-        paddingBottom: 40,
-    },
-    heroSection: {
-        paddingTop: Platform.OS === 'ios' ? 12 : (StatusBar.currentHeight ? StatusBar.currentHeight + 5 : 20),
-        paddingHorizontal: 20,
-        paddingBottom: 15,
-    },
-    brandHeaderWrapper: {
+    topRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 2,
-        marginBottom: 8,
+        justifyContent: 'space-between',
+        marginBottom: 10,
     },
-    brandText: {
-        fontSize: 13,
-        fontWeight: '900',
-        color: '#FFF',
-        letterSpacing: 2,
-        fontStyle: 'italic',
-        textAlign: 'center',
-    },
-    navHeaderRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    backButtonBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.12)',
-        zIndex: 10,
-    },
-    profileHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 18,
-    },
-    photoContainer: {
-        position: 'relative',
-    },
-    mainPhotoWrapper: {
-        width: 115,
-        height: 115,
-        borderRadius: 22,
-        overflow: 'hidden',
-        borderWidth: 2,
-        borderColor: Colors.primary,
-    },
-    profilePhoto: {
-        width: '100%',
-        height: '100%',
-    },
-    numberOverlay: {
-        position: 'absolute',
-        bottom: -4,
-        right: -4,
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 10,
-        transform: [{ rotate: '12deg' }],
-    },
-    numberText: {
-        color: '#000',
-        fontWeight: '900',
-        fontSize: 13,
-    },
-    nameContainer: {
-        flex: 1,
-    },
-    badgeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 6,
-    },
-    statusBadge: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        borderColor: 'rgba(0, 255, 102, 0.2)',
-        borderWidth: 1,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 8,
-    },
-    statusText: {
-        color: Colors.primary,
-        fontSize: 10,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    ratingBadge: {
-        backgroundColor: 'rgba(250, 204, 21, 0.15)',
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 8,
-    },
-    ratingText: {
-        color: '#FACC15',
-        fontSize: 11,
-        fontWeight: '900',
-    },
-    firstName: {
-        fontSize: 24,
-        fontWeight: '900',
-        color: '#FFF',
-        lineHeight: 26,
-    },
-    lastName: {
-        fontSize: 24,
-        fontWeight: '900',
-        color: Colors.primary,
-        lineHeight: 26,
-    },
-    switcherWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginVertical: 10,
-    },
-    carouselContainer: {
-        flex: 1,
-    },
-    animatedCardWrapper: {
-        overflow: 'hidden',
-    },
-    miniTabCard: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 14,
-        padding: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-    },
-    miniTabInner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    miniTabIconBox: {
+    iconBtn: {
         width: 36,
         height: 36,
         borderRadius: 10,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    miniTabType: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: 'rgba(255,255,255,0.4)',
-        letterSpacing: 1,
+    identityRowSticky: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
     },
-    miniTabName: {
-        fontSize: 13,
+    photoBoxSm: {
+        width: 68,
+        height: 68,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    numberBadgeSticky: {
+        position: 'absolute',
+        bottom: -3,
+        right: -3,
+        borderWidth: 1.5,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 8,
+        transform: [{ rotate: '-6deg' }],
+    },
+    numberBadgeText: {
+        fontSize: 10,
         fontWeight: '900',
-        color: '#FFF',
-        letterSpacing: 0.5,
     },
-    navArrowBtnLarge: {
-        width: 44,
-        height: 44,
+    playerNameSm: {
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
+    playerTeamName: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    positionPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 2.5,
+        borderRadius: 6,
+    },
+    positionPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
+    },
+    ratingPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 7,
+        paddingVertical: 2.5,
+        borderRadius: 6,
+    },
+    ratingPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+    },
+
+    infoStatsCard: {
         borderRadius: 14,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    },
+    infoTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+    },
+    infoStat: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginLeft: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.2)',
+        minWidth: 44,
     },
-    mainContent: {
-        paddingHorizontal: 20,
+    infoStatValue: {
+        fontSize: 14,
+        fontWeight: '900',
     },
+    infoStatLabel: {
+        fontSize: 9,
+        fontWeight: '700',
+        marginTop: 2,
+        letterSpacing: 0.3,
+    },
+    infoDivider: {
+        width: 1,
+        height: 20,
+    },
+
+    tabsContainer: {
+        flexDirection: 'row',
+        position: 'relative',
+        height: 38,
+        alignItems: 'center',
+    },
+    tabBtn: {
+        flex: 1,
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabBtnText: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    tabActiveLine: {
+        position: 'absolute',
+        bottom: 0,
+        height: 2.5,
+        borderRadius: 1.5,
+    },
+
     tabContent: {
         flex: 1,
     },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-        marginBottom: 15,
-    },
-    statBox: {
-        width: (width - 50) / 2,
-        backgroundColor: 'rgba(255,255,255,0.04)',
+
+    infoSectionCard: {
         borderRadius: 16,
         padding: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
     },
-    statIconContainer: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 8,
-    },
-    statLabelSmall: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: 'rgba(255,255,255,0.5)',
-        letterSpacing: 0.5,
-        textAlign: 'center',
-    },
-    statValue: {
-        fontSize: 22,
-        fontWeight: '900',
-        color: '#FFF',
-        marginTop: 2,
-        textAlign: 'center',
-    },
-    physicalInfoBox: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
-        marginBottom: 15,
-    },
-    cardContent: {
+    sectionCardHeader: {
         flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingBottom: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    sectionCardTitle: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+
+    physicalGrid: {
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-around',
-        paddingVertical: 14,
+        paddingTop: 12,
+        paddingBottom: 4,
     },
-    statItem: {
+    physicalItem: {
+        alignItems: 'center',
+    },
+    physicalLabel: {
+        fontSize: 9.5,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    physicalValue: {
+        fontSize: 13,
+        fontWeight: '900',
+        marginTop: 3,
+    },
+    physicalDivider: {
+        width: 1,
+        height: 22,
+    },
+
+    instagramBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+        paddingTop: 10,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        gap: 8,
+    },
+    instagramBtnText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+
+    aiScoutPill: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-    },
-    statIconBox: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: 'rgba(0,255,102,0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    statValueSmall: {
-        fontSize: 13,
-        fontWeight: '900',
-        color: '#FFF',
-    },
-    infoSection: {
-        marginTop: 5,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 10,
-    },
-    sectionTitle: {
-        fontSize: 13,
-        fontWeight: '900',
-        color: '#FFF',
-        letterSpacing: 0.5,
-    },
-    sectionTitleHighlight: {
-        color: Colors.primary,
-    },
-    infoList: {
-        borderRadius: 16,
-        overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
-        padding: 12,
-        gap: 10,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    infoIconBox: {
-        width: 30,
-        height: 30,
-        borderRadius: 8,
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    infoLabel: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: 'rgba(255,255,255,0.4)',
-        letterSpacing: 0.5,
-    },
-    infoValue: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#FFF',
-    },
-    yearBlock: {
-        marginBottom: 15,
-    },
-    yearHeaderBadge: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        borderRadius: 12,
         paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 10,
-        marginBottom: 8,
+        paddingVertical: 8,
+        marginTop: 12,
+        width: '100%',
     },
-    yearHeaderText: {
-        color: Colors.primary,
-        fontWeight: '900',
+    aiScoutText: {
+        fontSize: 11,
+        fontWeight: '600',
+        flex: 1,
+        lineHeight: 15,
+    },
+
+    compareBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        marginTop: 14,
+        width: '100%',
+    },
+    compareBtnText: {
         fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 0.3,
     },
-    teamCareerWrapper: {
-        backgroundColor: 'rgba(255,255,255,0.03)',
-        borderRadius: 14,
-        padding: 12,
-        marginBottom: 8,
+
+    exportBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
     },
-    teamCareerCurrent: {
-        backgroundColor: 'rgba(0, 255, 102, 0.05)',
-        borderColor: 'rgba(0, 255, 102, 0.35)',
-        borderLeftWidth: 4,
-        borderLeftColor: '#00FF66',
+    exportBtnText: {
+        fontSize: 12.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
+    },
+
+    careerTeamItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    teamLogoBoxMini: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    careerTeamName: {
+        fontSize: 13,
+        fontWeight: '800',
     },
     currentTeamBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 255, 102, 0.15)',
-        borderColor: 'rgba(0, 255, 102, 0.4)',
-        borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-        gap: 5,
-    },
-    currentTeamBadgeText: {
-        color: '#00FF66',
-        fontSize: 9.5,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-    },
-    pulsingDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#00FF66',
-    },
-    transferredBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
         borderRadius: 6,
         gap: 4,
     },
-    transferredBadgeText: {
-        color: '#94A3B8',
-        fontSize: 9.5,
+    pulsingDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+    },
+    currentTeamBadgeText: {
+        fontSize: 9,
         fontWeight: '800',
-        letterSpacing: 0.5,
+    },
+    pastTeamBadgeText: {
+        fontSize: 9,
+        fontWeight: '700',
     },
     careerDateSub: {
-        color: '#94A3B8',
-        fontSize: 11.5,
+        fontSize: 10.5,
         fontWeight: '600',
-        marginTop: 4,
+        marginTop: 2,
     },
-    careerTimelineContainer: {
-        marginVertical: 10,
+
+    matchRowItem: {
+        paddingVertical: 12,
     },
-    teamMainRow: {
+    matchRowTop: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    teamIconBox: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    teamMiniLogo: {
-        width: 24,
-        height: 24,
-        resizeMode: 'contain',
-    },
-    teamNameCareer: {
-        flex: 1,
-        color: '#FFF',
-        fontWeight: '800',
-        fontSize: 12,
-    },
-    emptyCareer: {
-        padding: 20,
-        alignItems: 'center',
-    },
-    emptyCareerText: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 12,
-    },
-    matchCard: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
-        padding: 12,
-        marginBottom: 10,
-    },
-    matchTop: {
-        flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 8,
     },
-    matchLeague: {
+    matchRowLeague: {
         fontSize: 10,
-        fontWeight: '800',
-        color: Colors.primary,
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
-    matchDate: {
+    matchRowDate: {
         fontSize: 10,
-        color: 'rgba(255,255,255,0.4)',
+        fontWeight: '600',
     },
-    matchTeams: {
+    matchTeamsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
     },
-    teamInfo: {
+    teamCol: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        flex: 1,
+        gap: 8,
     },
-    matchTeamLogo: {
-        width: 20,
-        height: 20,
+    teamMiniLogo: {
+        width: 22,
+        height: 22,
     },
-    matchTeamName: {
-        color: '#FFF',
+    teamNameMatch: {
         fontSize: 12,
         fontWeight: '700',
         flex: 1,
     },
-    matchScore: {
-        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+    scoreBadge: {
         paddingHorizontal: 10,
-        paddingVertical: 3,
+        paddingVertical: 4,
         borderRadius: 8,
-        marginHorizontal: 10,
+        marginHorizontal: 8,
     },
     scoreText: {
-        color: Colors.primary,
+        fontSize: 12.5,
         fontWeight: '900',
-        fontSize: 13,
     },
-    exportBtn: {
-        backgroundColor: '#00FF87',
-        borderRadius: 14,
+
+    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyContent: { alignItems: 'center', padding: 24 },
+    emptyTitle: { fontSize: 16, fontWeight: '800', marginTop: 16, marginBottom: 16 },
+    backBtnAction: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+    backBtnActionText: { fontSize: 13, fontWeight: '800' },
+
+    exportModalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    exportModalCard: {
+        width: '100%',
+        maxWidth: 340,
+        borderRadius: 20,
+        padding: 16,
+    },
+    exportModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    exportModalTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    posterCaptureContainer: {
+        borderRadius: 16,
+        overflow: 'hidden',
+        alignItems: 'center',
+    },
+    posterInner: {
+        width: 300,
+        height: 400,
+        position: 'relative',
+        justifyContent: 'flex-end',
+    },
+    posterPhoto: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+    },
+    posterOverlayBottom: {
+        padding: 14,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+    },
+    posterNameText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '900',
+    },
+    posterSubText: {
+        color: '#94A3B8',
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    posterStatsRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 8,
+    },
+    posterStatItem: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    sharePosterBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 20,
         gap: 8,
-        shadowColor: '#00FF87',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 6,
+        borderRadius: 12,
+        paddingVertical: 11,
+        marginTop: 14,
     },
-    exportBtnText: {
-        color: '#000',
-        fontSize: 14,
+    sharePosterBtnText: {
+        fontSize: 13,
         fontWeight: '800',
-        letterSpacing: 0.5,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.85)',
-        justifyContent: 'center',
-        alignItems: 'center',
     },
 });
 
