@@ -118,3 +118,37 @@ export const formatLocalizedLeagueName = (leagueName: any, lang: string = 'uz'):
     return leagueName;
 };
 
+/**
+ * Formats raw phone digits into display mask: +998 93 123 45 67
+ */
+export const formatUzPhone = (raw: string | undefined | null): string => {
+    if (!raw) return '';
+    let digits = String(raw).replace(/\D/g, '');
+    if (digits.startsWith('998')) {
+        digits = digits.slice(3);
+    }
+    digits = digits.slice(0, 9);
+    if (digits.length === 0) return '';
+
+    let res = '+998';
+    if (digits.length > 0) res += ' ' + digits.slice(0, 2);
+    if (digits.length > 2) res += ' ' + digits.slice(2, 5);
+    if (digits.length > 5) res += ' ' + digits.slice(5, 7);
+    if (digits.length > 7) res += ' ' + digits.slice(7, 9);
+    return res;
+};
+
+/**
+ * Cleans formatted phone for database storage: +998931234567
+ */
+export const cleanPhoneForDb = (formatted: string | undefined | null): string => {
+    if (!formatted) return '';
+    let digits = String(formatted).replace(/\D/g, '');
+    if (digits.startsWith('998')) {
+        digits = digits.slice(3);
+    }
+    digits = digits.slice(0, 9);
+    if (digits.length === 0) return '';
+    return `+998${digits}`;
+};
+

@@ -23,6 +23,7 @@ import { apiService, supabase } from '../services/apiService';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { getLocalizedPosition } from '../utils/localizationUtils';
+import { formatUzPhone, cleanPhoneForDb } from '../utils/stringUtils';
 import Colors from '../constants/Colors';
 
 const { width, height } = Dimensions.get('window');
@@ -138,11 +139,11 @@ export default function EditTeamModal({
                 setTeamName(tData.name || '');
                 setLogoUrl(tData.logo_url || '');
                 setCaptainName(tData.captain_name || '');
-                setCaptainPhone(tData.captain_phone || '');
+                setCaptainPhone(formatUzPhone(tData.captain_phone));
                 setCoachName(tData.coach_name || '');
-                setCoachPhone(tData.coach_phone || '');
+                setCoachPhone(formatUzPhone(tData.coach_phone));
                 setPresidentName(tData.president_name || '');
-                setPresidentPhone(tData.president_phone || '');
+                setPresidentPhone(formatUzPhone(tData.president_phone));
             }
 
             if (pRes.data) {
@@ -159,7 +160,7 @@ export default function EditTeamModal({
                     photo_url: p.photo_url || '',
                     position: p.position || 'PLAYER',
                     number: p.player_number || '',
-                    phone: p.phone || '',
+                    phone: formatUzPhone(p.phone),
                 }));
                 setPlayers(activeTeamPlayers);
             }
@@ -216,9 +217,9 @@ export default function EditTeamModal({
             setSaving(true);
             const updates = {
                 logo_url: logoUrl,
-                captain_phone: captainPhone.trim(),
-                coach_phone: coachPhone.trim(),
-                president_phone: presidentPhone.trim(),
+                captain_phone: cleanPhoneForDb(captainPhone),
+                coach_phone: cleanPhoneForDb(coachPhone),
+                president_phone: cleanPhoneForDb(presidentPhone),
                 captain_name: captainName.trim(),
                 coach_name: coachName.trim(),
                 president_name: presidentName.trim(),
@@ -535,9 +536,10 @@ export default function EditTeamModal({
                                             />
                                             <TextInput
                                                 value={captainPhone}
-                                                onChangeText={setCaptainPhone}
+                                                onChangeText={(text) => setCaptainPhone(formatUzPhone(text))}
                                                 placeholder="+998 90 123 45 67"
                                                 keyboardType="phone-pad"
+                                                maxLength={17}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border, marginTop: 4 }]}
                                             />
@@ -556,9 +558,10 @@ export default function EditTeamModal({
                                             />
                                             <TextInput
                                                 value={coachPhone}
-                                                onChangeText={setCoachPhone}
+                                                onChangeText={(text) => setCoachPhone(formatUzPhone(text))}
                                                 placeholder="+998 90 123 45 67"
                                                 keyboardType="phone-pad"
+                                                maxLength={17}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border, marginTop: 4 }]}
                                             />
@@ -577,9 +580,10 @@ export default function EditTeamModal({
                                             />
                                             <TextInput
                                                 value={presidentPhone}
-                                                onChangeText={setPresidentPhone}
+                                                onChangeText={(text) => setPresidentPhone(formatUzPhone(text))}
                                                 placeholder="+998 90 123 45 67"
                                                 keyboardType="phone-pad"
+                                                maxLength={17}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border, marginTop: 4 }]}
                                             />
@@ -684,10 +688,15 @@ function PlayerEditCard({
     onToggleEdit: () => void;
     onSavePhone: (phone: string) => void;
 }) {
-    const [phoneText, setPhoneText] = useState(player.phone || player.phoneNumber || '');
+    const [phoneText, setPhoneText] = useState(formatUzPhone(player.phone || player.phoneNumber || ''));
+
+    useEffect(() => {
+        setPhoneText(formatUzPhone(player.phone || player.phoneNumber || ''));
+    }, [player.phone, player.phoneNumber]);
 
     const fullName = `${player.firstName || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim() || t('teams.player_fallback', 'O\'yinchi');
     const localizedPos = getLocalizedPosition(player.position, t);
+    const formattedDisplayPhone = formatUzPhone(player.phone || player.phoneNumber);
 
     return (
         <View style={[styles.playerCard, { backgroundColor: homeColors.surface, borderColor: homeColors.border, borderWidth: 1 }]}>
@@ -729,7 +738,7 @@ function PlayerEditCard({
                     </Text>
 
                     <Text style={[styles.playerCurrentPhone, { color: homeColors.textSecondary }]}>
-                        📞 {player.phone || t('teams.no_phone_entered', 'Telefon kiritilmagan')}
+                        📞 {formattedDisplayPhone || t('teams.no_phone_entered', 'Telefon kiritilmagan')}
                     </Text>
                 </View>
 
@@ -749,9 +758,10 @@ function PlayerEditCard({
                 <View style={[styles.phoneEditRow, { borderTopColor: homeColors.border }]}>
                     <TextInput
                         value={phoneText}
-                        onChangeText={setPhoneText}
+                        onChangeText={(text) => setPhoneText(formatUzPhone(text))}
                         placeholder="+998 90 123 45 67"
                         keyboardType="phone-pad"
+                        maxLength={17}
                         placeholderTextColor={homeColors.textSecondary}
                         style={[
                             styles.phoneInput,
@@ -759,7 +769,7 @@ function PlayerEditCard({
                         ]}
                     />
                     <TouchableOpacity
-                        onPress={() => onSavePhone(phoneText)}
+                        onPress={() => onSavePhone(cleanPhoneForDb(phoneText))}
                         disabled={isSavingPhone}
                         style={[
                             styles.savePhoneBtn,
