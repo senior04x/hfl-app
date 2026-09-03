@@ -568,60 +568,36 @@ const formatPhoneInput = (val: string) => {
                                     <Text style={styles.guestButtonText}>{t('auth.register')}</Text>
                                 </TouchableOpacity>
 
-                                {/* Bottom Row: Language + Guest */}
+                                {/* Bottom Row: Language + Guest (in register button style) */}
                                 <View style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    marginTop: 8,
-                                    gap: 10,
+                                    justifyContent: 'center',
+                                    marginTop: 4,
+                                    gap: 16,
                                 }}>
-                                    {/* Language Switcher */}
+                                    {/* Language Switcher with globe icon */}
                                     <TouchableOpacity
                                         onPress={() => setShowLanguageModal(true)}
                                         activeOpacity={0.7}
-                                        style={{
-                                            flex: 1,
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundColor: 'rgba(20, 25, 35, 0.82)',
-                                            borderWidth: 1,
-                                            borderColor: 'rgba(255, 255, 255, 0.15)',
-                                            paddingHorizontal: 14,
-                                            paddingVertical: 11,
-                                            borderRadius: 18,
-                                            gap: 6,
-                                        }}
+                                        style={[styles.guestButton, { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }]}
                                     >
-                                        <Text style={{ fontSize: 14 }}>{SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.flag || '🇺🇿'}</Text>
-                                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>
-                                            {SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label || "O'zbekcha"}
+                                        <Ionicons name="globe-outline" size={15} color="rgba(255, 255, 255, 0.6)" style={{ marginRight: 6 }} />
+                                        <Text style={styles.guestButtonText}>
+                                            {SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label || (i18n.language === 'ru' ? 'Русский' : "O'zbekcha")}
                                         </Text>
-                                        <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.6)" />
                                     </TouchableOpacity>
 
-                                    {/* Guest Mode Button */}
+                                    <Text style={{ color: 'rgba(255, 255, 255, 0.25)', fontSize: 12 }}>•</Text>
+
+                                    {/* Guest Mode Button (oddiy kulrang, iconsiz) */}
                                     <TouchableOpacity
                                         onPress={handleGuestLogin}
                                         activeOpacity={0.7}
-                                        style={{
-                                            flex: 1,
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundColor: 'rgba(255, 107, 0, 0.12)',
-                                            borderWidth: 1,
-                                            borderColor: 'rgba(255, 107, 0, 0.35)',
-                                            paddingHorizontal: 14,
-                                            paddingVertical: 11,
-                                            borderRadius: 18,
-                                            gap: 6,
-                                        }}
+                                        style={[styles.guestButton, { paddingVertical: 8 }]}
                                     >
-                                        <Ionicons name="person-outline" size={14} color="#FF6B00" />
-                                        <Text style={{ color: '#FF6B00', fontSize: 12, fontWeight: '800' }}>
-                                            {t('auth.guest_mode', "Mehmon")}
+                                        <Text style={styles.guestButtonText}>
+                                            {t('auth.guest_mode', "Mehmon bo'lib kirish")}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
