@@ -159,6 +159,50 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
     const checkTimerRef = useRef<any>(null);
     const passportNumberInputRef = useRef<TextInput>(null);
 
+    // Player Number check state
+    const [numberCheckResult, setNumberCheckResult] = useState<{ isChecked: boolean; isDuplicate: boolean; message: string }>({
+        isChecked: false,
+        isDuplicate: false,
+        message: ''
+    });
+    const [isCheckingNumber, setIsCheckingNumber] = useState(false);
+    const numberCheckTimerRef = useRef<any>(null);
+
+    const handleNumberChange = (num: string) => {
+        const cleanNum = num.replace(/\D/g, '').slice(0, 3);
+        setFormData(prev => ({ ...prev, number: cleanNum }));
+
+        if (numberCheckTimerRef.current) clearTimeout(numberCheckTimerRef.current);
+        if (!cleanNum) {
+            setNumberCheckResult({ isChecked: false, isDuplicate: false, message: '' });
+            return;
+        }
+
+        const currentTeamId = targetTeamId || formData.selectedTeam;
+        if (!currentTeamId) {
+            setNumberCheckResult({ isChecked: false, isDuplicate: false, message: '' });
+            return;
+        }
+
+        setIsCheckingNumber(true);
+        numberCheckTimerRef.current = setTimeout(async () => {
+            try {
+                const res = await apiService.checkPlayerNumberInTeam({
+                    teamId: currentTeamId,
+                    playerNumber: cleanNum
+                });
+                setIsCheckingNumber(false);
+                setNumberCheckResult({
+                    isChecked: true,
+                    isDuplicate: res.exists,
+                    message: res.message || ''
+                });
+            } catch (e) {
+                setIsCheckingNumber(false);
+            }
+        }, 300);
+    };
+
     const [organizations, setOrganizations] = useState<any[]>([]);
 
     // Main Form State
@@ -569,6 +613,10 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
         if (applicationType === 'player') {
             if (!formData.firstName.trim() || !formData.lastName.trim()) {
                 showNotice('error', 'XATO', 'Ism va familiyangizni to\'ldiring');
+                return;
+            }
+            if (formData.number && numberCheckResult.isDuplicate) {
+                showNotice('error', 'RAQAM BAND', numberCheckResult.message || 'Ushbu raqam allaqachon boshqa o\'yinchiga tegishli');
                 return;
             }
         } else {
@@ -1322,14 +1370,42 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
                                             <View style={styles.inputGroup}>
                                                 <Text style={styles.inputLabel}>O'YINCHI RAQAMI (IXTIYORIY)</Text>
                                                 <TextInput
-                                                    style={styles.inputField}
+                                                    style={[
+                                                        styles.inputField,
+                                                        numberCheckResult.isChecked && numberCheckResult.isDuplicate && { borderColor: '#FF3B30', borderWidth: 1.5 }
+                                                    ]}
                                                     value={formData.number}
-                                                    onChangeText={(t) => setFormData({ ...formData, number: t })}
+                                                    onChangeText={handleNumberChange}
                                                     placeholder="Masalan: 10"
                                                     keyboardType="number-pad"
-                                                    maxLength={2}
+                                                    maxLength={3}
                                                     placeholderTextColor="rgba(255,255,255,0.3)"
                                                 />
+                                                {isCheckingNumber && (
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6 }}>
+                                                        <ActivityIndicator size="small" color={Colors.primary} />
+                                                        <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Raqam tekshirilmoqda...</Text>
+                                                    </View>
+                                                )}
+                                                {!isCheckingNumber && numberCheckResult.isChecked && (
+                                                    <View style={[
+                                                        styles.numberBadgeBox,
+                                                        numberCheckResult.isDuplicate ? styles.numberBadgeError : styles.numberBadgeSuccess
+                                                    ]}>
+                                                        <Ionicons
+                                                            name={numberCheckResult.isDuplicate ? "alert-circle" : "checkmark-circle"}
+                                                            size={16}
+                                                            color={numberCheckResult.isDuplicate ? "#FF3B30" : "#00FF66"}
+                                                            style={{ marginRight: 6 }}
+                                                        />
+                                                        <Text style={[
+                                                            styles.numberBadgeText,
+                                                            numberCheckResult.isDuplicate ? { color: '#FF6B6B' } : { color: '#00FF66' }
+                                                        ]}>
+                                                            {numberCheckResult.message}
+                                                        </Text>
+                                                    </View>
+                                                )}
                                             </View>
                                         </View>
 
@@ -2057,6 +2133,28 @@ const styles = StyleSheet.create({
         color: Colors.primary,
         fontSize: 12,
         fontWeight: '800',
+        flex: 1,
+    },
+    numberBadgeBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 10,
+        marginTop: 6,
+        borderWidth: 1,
+    },
+    numberBadgeError: {
+        backgroundColor: 'rgba(255, 59, 48, 0.12)',
+        borderColor: 'rgba(255, 59, 48, 0.4)',
+    },
+    numberBadgeSuccess: {
+        backgroundColor: 'rgba(0, 255, 102, 0.1)',
+        borderColor: 'rgba(0, 255, 102, 0.3)',
+    },
+    numberBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
         flex: 1,
     },
 

@@ -2131,6 +2131,44 @@ export const apiService = {
         }
     },
 
+    checkPlayerNumberInTeam: async (params: { teamId?: string | number | null; playerNumber: string | number }) => {
+        try {
+            const numStr = String(params.playerNumber || '').trim();
+            if (!params.teamId || !numStr) {
+                return { exists: false, message: '' };
+            }
+
+            const { data: teamPlayers, error } = await supabase
+                .from('applications')
+                .select('id, first_name, last_name, player_number, status, is_archived')
+                .eq('team_id', params.teamId);
+
+            if (!error && teamPlayers && teamPlayers.length > 0) {
+                const match = teamPlayers.find((p: any) => {
+                    const st = String(p.status || '').toLowerCase();
+                    const isArchived = p.is_archived === true || st === 'archived';
+                    if (isArchived) return false;
+                    const pNum = String(p.player_number || '').trim();
+                    return pNum === numStr;
+                });
+
+                if (match) {
+                    const playerName = `${match.first_name || ''} ${match.last_name || ''}`.trim();
+                    return {
+                        exists: true,
+                        playerName: playerName || 'boshqa o\'yinchi',
+                        message: `Ushbu #${numStr} raqam allaqachon ${playerName || "boshqa o'yinchi"}ga berilgan!`
+                    };
+                }
+            }
+
+            return { exists: false, message: `#${numStr} raqami bo'sh!` };
+        } catch (err) {
+            console.error('Check player number error:', err);
+            return { exists: false, message: '' };
+        }
+    },
+
     checkTeamOrPhoneExists: async (params: { teamName?: string; phone?: string; type: 'player' | 'team' }) => {
         try {
             const cleanPhone = (params.phone || '').replace(/\D/g, '').slice(-9);
