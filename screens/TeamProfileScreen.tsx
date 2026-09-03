@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     ScrollView,
+    RefreshControl,
     TouchableOpacity,
     Pressable,
     Animated,
@@ -63,6 +64,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
     const [isLoading, setIsLoading] = useState(!initialTeam);
     const [isPlayersLoading, setIsPlayersLoading] = useState(true);
     const [isMatchesLoading, setIsMatchesLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const [selectedPlayerForPhone, setSelectedPlayerForPhone] = useState<any | null>(null);
     const [phoneInputText, setPhoneInputText] = useState('');
@@ -161,7 +163,18 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
     const getTeamCacheKey = (tId: string) => `@amatora_team_cache_${tId}`;
 
-    const fetchData = async () => {
+    const onRefresh = async () => {
+        setRefreshing(true);
+        try {
+            await fetchData(true);
+        } catch (e) {
+            console.log('TeamProfile refresh error:', e);
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
+    const fetchData = async (forceRefresh = false) => {
         const currentId = activeTeamId;
         if (!currentId) {
             setIsLoading(false);
@@ -193,7 +206,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
         }
 
         // 1-BOSQICH (HERO QISMI): Jamoa ma'lumotlarini birinchi tezkor yuklash
-        if (!team) setIsLoading(true);
+        if (!team && !forceRefresh) setIsLoading(true);
         apiService.getTeamById(currentId)
             .then((teamData) => {
                 if (teamData) {
@@ -211,8 +224,8 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             });
 
         // 2-BOSQICH (TABLAR): Tarkib va o'yinlar ma'lumotlarini fonda parallel yuklash
-        setIsPlayersLoading(true);
-        setIsMatchesLoading(true);
+        if (players.length === 0 || forceRefresh) setIsPlayersLoading(true);
+        if (matches.length === 0 || forceRefresh) setIsMatchesLoading(true);
 
         apiService.getPlayersByTeam(currentId)
             .then((playersData) => {
@@ -528,7 +541,18 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             >
                 {/* TAB 0: TARKIB */}
                 <View style={{ width, flex: 1 }}>
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}>
+                    <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={onRefresh}
+                                    tintColor={homeColors.textPrimary}
+                                    colors={[homeColors.accent || '#F59E0B']}
+                                />
+                            }
+                        >
                         {isPlayersLoading ? (
                             <View style={styles.squadGrid}>
                                 {[1, 2, 3, 4, 5, 6].map((key) => (

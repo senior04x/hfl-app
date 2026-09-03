@@ -8,6 +8,7 @@ import {
     ActivityIndicator,
     Alert,
     ScrollView,
+    RefreshControl,
     Platform,
     PanResponder,
     StatusBar,
@@ -157,6 +158,7 @@ export default function FormationBoard({ route, navigation }: any) {
     const [playersOnPitch, setPlayersOnPitch] = useState<PitchPlayer[]>([]);
     const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
     const [saving, setSaving] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
     // Format & Preset State
@@ -274,6 +276,17 @@ export default function FormationBoard({ route, navigation }: any) {
             return nameA.localeCompare(nameB);
         });
     }, [availablePlayers]);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        try {
+            await fetchData(true);
+        } catch (e) {
+            console.log('Refresh error:', e);
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     useEffect(() => {
         fetchData();
@@ -516,6 +529,23 @@ export default function FormationBoard({ route, navigation }: any) {
             });
 
             if (response.success) {
+                // Also sync team formation cache for MyTeamScreen instant load
+                AsyncStorage.getItem(`@amatora_team_cache_${targetId}`).then((cStr) => {
+                    const existing = cStr ? JSON.parse(cStr) : {};
+                    const existingTeam = existing.team || {};
+                    AsyncStorage.setItem(`@amatora_team_cache_${targetId}`, JSON.stringify({
+                        ...existing,
+                        team: {
+                            ...existingTeam,
+                            formation: {
+                                players: playersOnPitch,
+                                format: selectedFormat,
+                                preset: activePreset.name,
+                            }
+                        }
+                    })).catch(() => {});
+                }).catch(() => {});
+
                 AsyncStorage.setItem(getFormationCacheKey(targetId), JSON.stringify({
                     players: playersOnPitch,
                     availablePlayers,
@@ -667,7 +697,18 @@ export default function FormationBoard({ route, navigation }: any) {
                         )}
                     </View>
 
-                    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={homeColors.textPrimary}
+                            colors={[homeColors.accent || '#F59E0B']}
+                        />
+                    }
+                >
                         {/* FORMAT CONTROLS SKELETON */}
                         {!isReadOnly && (
                             <View style={styles.controlBarContainer}>
