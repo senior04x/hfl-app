@@ -46,7 +46,7 @@ interface FifaPlayerCardProps {
 // -----------------------------------------------------------------------------
 function computeCardLayout(cardW: number, showAttrs: boolean) {
     const sf = cardW / 260;
-    const cardHeight = Math.round(cardW * (4 / 3)); // Aniq 3x4 o'lcham nisbati
+    const cardHeight = Math.round(cardW * (4 / 3) * 0.93); // Balandlikdan 7% olib tashlangan ixcham proporsiya
 
     const outerRadiusTop = Math.round(18 * sf);
     const outerRadiusBottom = Math.round(18 * sf);
