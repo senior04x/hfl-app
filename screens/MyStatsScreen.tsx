@@ -30,9 +30,8 @@ import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
 import { useAuthStore } from '../store/useAuthStore';
 import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
-import FifaPlayerCard from '../components/FifaPlayerCard';
+import FifaPlayerCard, { FifaCardSkeleton } from '../components/FifaPlayerCard';
 import PlayerComparisonModal from '../components/PlayerComparisonModal';
-import PlayerProfileSkeleton from '../components/PlayerProfileSkeleton';
 import { aiScoutService, PlayerAiStats } from '../services/aiScoutService';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedPosition } from '../utils/localizationUtils';
@@ -154,9 +153,10 @@ export default function MyStatsScreen({ route, navigation }: any) {
         }),
     };
 
-    const targetPlayerId = route?.params?.playerId || user?.id || user?._id;
-    const [loading, setLoading] = useState(true);
-    const [player, setPlayer] = useState<any>(null);
+    const initialPlayer = route?.params?.player || user;
+    const targetPlayerId = route?.params?.playerId || initialPlayer?.id || initialPlayer?._id || user?.id || user?._id;
+    const [loading, setLoading] = useState(!initialPlayer);
+    const [player, setPlayer] = useState<any>(initialPlayer ? extractPlayerData(initialPlayer) : null);
     const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
@@ -670,11 +670,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
     }, [player?.id, player?._id, targetPlayerId, player?.phone]);
 
     if (loading && !player) {
-        return (
-            <View style={{ flex: 1, backgroundColor: homeColors.background }}>
-                <PlayerProfileSkeleton />
-            </View>
-        );
+        return <MyStatsScreenSkeleton />;
     }
 
     if (!player) {
