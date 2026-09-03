@@ -590,7 +590,7 @@ const formatPhoneInput = (val: string) => {
                                         }}
                                     >
                                         <Ionicons name="globe-outline" size={14} color="rgba(255, 255, 255, 0.6)" style={{ marginRight: 6 }} />
-                                        <Text style={styles.guestButtonText}>
+                                        <Text style={styles.bottomSecondaryText}>
                                             {SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label || (i18n.language === 'ru' ? 'Русский' : "O'zbekcha")}
                                         </Text>
                                     </TouchableOpacity>
@@ -611,7 +611,7 @@ const formatPhoneInput = (val: string) => {
                                             paddingLeft: 14,
                                         }}
                                     >
-                                        <Text style={styles.guestButtonText}>
+                                        <Text style={styles.bottomSecondaryText}>
                                             {t('auth.guest_mode', "Mehmon bo'lib kirish")}
                                         </Text>
                                     </TouchableOpacity>
@@ -1096,6 +1096,12 @@ const styles = StyleSheet.create({
     guestButton: {
         alignItems: 'center',
         paddingVertical: 12,
+    },
+    bottomSecondaryText: {
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: 13,
+        fontWeight: '600',
+        letterSpacing: 0.2,
     },
     guestButtonText: {
         color: 'rgba(255, 255, 255, 0.6)',

@@ -70,7 +70,7 @@
     "login": "LOGIN",
     "logout": "LOGOUT",
     "register": "REGISTER",
-    "guest_mode": "CONTINUE AS GUEST",
+    "guest_mode": "Guest Mode",
     "login_title": "SIGN IN",
     "login_subtitle": "Enter team captain or player phone number",
     "phone_label": "PHONE NUMBER",

@@ -70,7 +70,7 @@
     "login": "KIRISH",
     "logout": "CHIQISH",
     "register": "RO'YXATDAN O'TISH",
-    "guest_mode": "MEHMON SIFATIDA KIRISH",
+    "guest_mode": "Mehmon bo'lib kirish",
     "login_title": "TIZIMGA KIRISH",
     "login_subtitle": "Jamoa sardori yoki futbolchi telefon raqamingizni kiriting",
     "phone_label": "TEL RAQAMINGIZ",
