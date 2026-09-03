@@ -120,13 +120,28 @@ export const formatLocalizedLeagueName = (leagueName: any, lang: string = 'uz'):
 
 /**
  * Formats raw phone digits into display mask: +998 93 123 45 67
+ * Automatically handles paste with +998, 998, 8, spaces, hyphens, and duplicates.
  */
 export const formatUzPhone = (raw: string | undefined | null): string => {
     if (!raw) return '';
     let digits = String(raw).replace(/\D/g, '');
+    
+    // While digits starts with '998' and length > 9 (pasted when +998 was already in input), strip leading '998'
+    while (digits.startsWith('998') && digits.length > 9) {
+        digits = digits.slice(3);
+    }
+    
+    // If it starts with '998', strip it to get the local 9 digits
     if (digits.startsWith('998')) {
         digits = digits.slice(3);
     }
+
+    // If starts with '8' and has 10 digits (e.g. 8931234567), strip leading '8'
+    if (digits.startsWith('8') && digits.length === 10) {
+        digits = digits.slice(1);
+    }
+    
+    // Limit to 9 local digits
     digits = digits.slice(0, 9);
     if (digits.length === 0) return '';
 
@@ -144,8 +159,14 @@ export const formatUzPhone = (raw: string | undefined | null): string => {
 export const cleanPhoneForDb = (formatted: string | undefined | null): string => {
     if (!formatted) return '';
     let digits = String(formatted).replace(/\D/g, '');
+    while (digits.startsWith('998') && digits.length > 9) {
+        digits = digits.slice(3);
+    }
     if (digits.startsWith('998')) {
         digits = digits.slice(3);
+    }
+    if (digits.startsWith('8') && digits.length === 10) {
+        digits = digits.slice(1);
     }
     digits = digits.slice(0, 9);
     if (digits.length === 0) return '';
