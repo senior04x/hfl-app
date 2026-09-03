@@ -557,11 +557,65 @@ export const apiService = {
 
     updateTeam: async (id: string, data: any) => {
         try {
+            // 1. Try secure RPC function first
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('update_team_info', {
+                p_team_id: id,
+                p_logo_url: data.logo_url ?? data.logo ?? null,
+                p_captain_name: data.captain_name ?? null,
+                p_captain_phone: data.captain_phone ?? null,
+                p_coach_name: data.coach_name ?? null,
+                p_coach_phone: data.coach_phone ?? null,
+                p_president_name: data.president_name ?? null,
+                p_president_phone: data.president_phone ?? null,
+            });
+
+            if (!rpcErr && rpcData) {
+                clearApiCache();
+                return { success: true, data: rpcData };
+            }
+
+            // 2. Direct Supabase update fallback
             const { data: updated, error } = await supabase.from('teams').update(data).eq('id', id).select().single();
             if (error) throw error;
+            clearApiCache();
             return { success: true, data: updated };
         } catch (err) {
-            return api.put(`/teams/${id}`, data).then(res => res.data);
+            return api.put(`/teams/${id}`, data).then(res => {
+                clearApiCache();
+                return res.data;
+            });
+        }
+    },
+
+    updatePlayerInfo: async (playerId: string | number, updates: { photo_url?: string; phone?: string }) => {
+        try {
+            if (!playerId) return { success: false, error: "O'yinchi ID si topilmadi" };
+
+            // 1. Try secure RPC function
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('update_player_info', {
+                p_player_id: playerId,
+                p_photo_url: updates.photo_url ?? null,
+                p_phone: updates.phone ?? null,
+            });
+
+            if (!rpcErr && rpcData) {
+                clearApiCache();
+                return { success: true, data: rpcData };
+            }
+
+            // 2. Direct Supabase update fallback
+            const { data, error } = await supabase
+                .from('applications')
+                .update(updates)
+                .eq('id', playerId)
+                .select();
+
+            if (error) throw error;
+            clearApiCache();
+            return { success: true, data };
+        } catch (err: any) {
+            console.error('updatePlayerInfo error:', err);
+            return { success: false, error: err?.message || 'Xatolik' };
         }
     },
 

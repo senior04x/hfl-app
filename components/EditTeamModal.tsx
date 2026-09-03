@@ -223,12 +223,10 @@ export default function EditTeamModal({
                 president_name: presidentName.trim(),
             };
 
-            const { error } = await supabase
-                .from('teams')
-                .update(updates)
-                .eq('id', teamId);
-
-            if (error) throw error;
+            const result = await apiService.updateTeam(String(teamId), updates);
+            if (result && result.error) {
+                throw new Error(result.error);
+            }
 
             showToast(t('teams.team_updated_success', 'Jamoa ma\'lumotlari yangilandi.'), 'success');
 
@@ -274,16 +272,7 @@ export default function EditTeamModal({
                         prev.map(p => (String(p.id || p._id) === String(playerId) ? { ...p, photo: newPhotoUrl, photo_url: newPhotoUrl } : p))
                     );
 
-                    let queryId = playerId;
-                    if (typeof playerId === 'string' && !isNaN(Number(playerId))) {
-                        queryId = Number(playerId);
-                    }
-
-                    await supabase
-                        .from('applications')
-                        .update({ photo_url: newPhotoUrl, photo: newPhotoUrl })
-                        .eq('id', queryId);
-
+                    await apiService.updatePlayerInfo(playerId, { photo_url: newPhotoUrl });
                     showToast(t('teams.photo_updated_success', 'Rasm muvaffaqiyatli yuklandi.'), 'success');
                 }
             }
@@ -300,17 +289,10 @@ export default function EditTeamModal({
         const pId = player.id || player._id;
         try {
             setSaving(true);
-            let queryId = pId;
-            if (typeof pId === 'string' && !isNaN(Number(pId))) {
-                queryId = Number(pId);
+            const res = await apiService.updatePlayerInfo(pId, { phone: newPhone.trim() });
+            if (res && res.error) {
+                throw new Error(res.error);
             }
-
-            const { error } = await supabase
-                .from('applications')
-                .update({ phone: newPhone.trim() })
-                .eq('id', queryId);
-
-            if (error) throw error;
 
             setPlayers(prev =>
                 prev.map(p => (String(p.id || p._id) === String(pId) ? { ...p, phone: newPhone.trim() } : p))
