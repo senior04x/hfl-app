@@ -740,7 +740,7 @@ const formatPhoneInput = (val: string) => {
                 onClose={() => setShowLanguageModal(false)}
             />
 
-            {/* Organization Selection Modal */}
+            {/* Organization Selection / Registration Modal */}
             <Modal
                 visible={showOrgModal}
                 transparent
@@ -748,28 +748,66 @@ const formatPhoneInput = (val: string) => {
                 onRequestClose={() => setShowOrgModal(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.glassModalCard}>
-                        <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
-                        <View style={{ padding: 20 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <View style={[
+                        styles.glassModalCard,
+                        {
+                            backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                        }
+                    ]}>
+                        <View style={{ padding: 22 }}>
+                            {/* Header */}
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingBottom: 14,
+                                borderBottomWidth: 1,
+                                borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                marginBottom: 12,
+                            }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="business" size={24} color={Colors.primary} style={{ marginRight: 8 }} />
-                                    <Text style={styles.accountModalTitle}>{t('auth.select_org_title')}</Text>
+                                    <Ionicons name="business-outline" size={22} color={BRAND_ORANGE} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.accountModalTitle, { color: homeColors.textPrimary }]}>
+                                        {t('auth.select_org_title', 'TASHKILOTNI TANLANG')}
+                                    </Text>
                                 </View>
-                                <TouchableOpacity onPress={() => setShowOrgModal(false)} style={{ padding: 4 }}>
-                                    <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
+                                <TouchableOpacity
+                                    onPress={() => setShowOrgModal(false)}
+                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    style={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 16,
+                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Ionicons name="close" size={18} color={homeColors.textSecondary} />
                                 </TouchableOpacity>
                             </View>
-                            <Text style={styles.accountModalSubtitle}>
-                                {t('auth.select_org_sub')}
+
+                            <Text style={[styles.accountModalSubtitle, { color: homeColors.textSecondary, marginBottom: 14 }]}>
+                                {t('auth.select_org_sub', "Ligaga a'zo bo'lish yoki ro'yxatdan o'tish uchun tashkilotingizni tanlang")}
                             </Text>
 
-                            <ScrollView style={{ maxHeight: 320, marginVertical: 14 }} showsVerticalScrollIndicator={false}>
+                            {/* Organization List */}
+                            <ScrollView style={{ maxHeight: 320, marginBottom: 14 }} showsVerticalScrollIndicator={false}>
                                 {loadingOrgs && organizationsList.length === 0 ? (
                                     <>
                                         {[1, 2, 3].map((_, i) => (
-                                            <View key={i} style={styles.glassOrgCard}>
-                                                <Skeleton width={44} height={44} borderRadius={22} style={{ marginRight: 12 }} />
+                                            <View
+                                                key={i}
+                                                style={[
+                                                    styles.glassOrgCard,
+                                                    {
+                                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
+                                                        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                                    }
+                                                ]}
+                                            >
+                                                <Skeleton width={44} height={44} borderRadius={14} style={{ marginRight: 12 }} />
                                                 <View style={{ flex: 1, gap: 6 }}>
                                                     <Skeleton width="70%" height={16} borderRadius={6} />
                                                     <Skeleton width={110} height={12} borderRadius={4} />
@@ -780,9 +818,9 @@ const formatPhoneInput = (val: string) => {
                                     </>
                                 ) : organizationsList.length === 0 ? (
                                     <View style={{ paddingVertical: 30, alignItems: 'center' }}>
-                                        <Ionicons name="information-circle-outline" size={32} color="rgba(255,255,255,0.4)" />
-                                        <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8, fontSize: 13 }}>
-                                            {t('auth.no_orgs')}
+                                        <Ionicons name="information-circle-outline" size={32} color={homeColors.textSecondary} />
+                                        <Text style={{ color: homeColors.textSecondary, marginTop: 8, fontSize: 13 }}>
+                                            {t('auth.no_orgs', 'Tashkilotlar topilmadi')}
                                         </Text>
                                     </View>
                                 ) : (
@@ -794,38 +832,63 @@ const formatPhoneInput = (val: string) => {
                                         return (
                                             <TouchableOpacity
                                                 key={org.id || org._id || index}
-                                                style={styles.glassOrgCard}
+                                                style={[
+                                                    styles.glassOrgCard,
+                                                    {
+                                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
+                                                        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                                    }
+                                                ]}
                                                 activeOpacity={0.75}
                                                 onPress={() => handleSelectOrganization(org)}
                                             >
-                                                <View style={styles.accountOptionIcon}>
+                                                <View style={[
+                                                    styles.accountOptionIcon,
+                                                    {
+                                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
+                                                        borderRadius: 14,
+                                                    }
+                                                ]}>
                                                     {orgLogo ? (
                                                         <Image
                                                             source={{ uri: orgLogo }}
-                                                            style={{ width: 44, height: 44, borderRadius: 22 }}
+                                                            style={{ width: 44, height: 44, borderRadius: 14 }}
                                                             resizeMode="cover"
                                                         />
                                                     ) : (
-                                                        <Ionicons name="business" size={24} color={Colors.primary} />
+                                                        <Ionicons name="business" size={24} color={BRAND_ORANGE} />
                                                     )}
                                                 </View>
                                                 <View style={{ flex: 1, marginLeft: 12, justifyContent: 'center' }}>
-                                                    <Text style={styles.accountOptionName}>{orgName.toUpperCase()}</Text>
-                                                    <Text style={styles.accountOptionSubtitle}>amatora.uz/{orgSlug}</Text>
+                                                    <Text style={[styles.accountOptionName, { color: homeColors.textPrimary }]}>
+                                                        {orgName.toUpperCase()}
+                                                    </Text>
+                                                    <Text style={[styles.accountOptionSubtitle, { color: homeColors.textSecondary }]}>
+                                                        amatora.uz/{orgSlug}
+                                                    </Text>
                                                 </View>
-                                                <Ionicons name="globe-outline" size={20} color={Colors.primary} />
+                                                <Ionicons name="open-outline" size={18} color={BRAND_ORANGE} />
                                             </TouchableOpacity>
                                         );
                                     })
                                 )}
                             </ScrollView>
 
+                            {/* Close Button */}
                             <TouchableOpacity
-                                style={styles.glassCancelBtn}
+                                style={[
+                                    styles.glassCancelBtn,
+                                    {
+                                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+                                        borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                                    }
+                                ]}
                                 onPress={() => setShowOrgModal(false)}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.cancelModalBtnText}>{t('common.close').toUpperCase()}</Text>
+                                <Text style={[styles.cancelModalBtnText, { color: homeColors.textPrimary }]}>
+                                    {t('common.close', 'Yopish').toUpperCase()}
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -933,44 +996,75 @@ const formatPhoneInput = (val: string) => {
                 onRequestClose={() => setShowNotFoundModal(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.notFoundModalCard}>
-                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={[
+                        styles.notFoundModalCard,
+                        {
+                            backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                        }
+                    ]}>
                         <View style={{ padding: 24, alignItems: 'center' }}>
-                            <View style={styles.notFoundIconBadge}>
-                                <Ionicons name="alert-circle-outline" size={32} color="#FFD700" />
+                            {/* Brand Orange Warning Icon Badge */}
+                            <View style={[
+                                styles.notFoundIconBadge,
+                                {
+                                    backgroundColor: isDark ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 107, 0, 0.08)',
+                                    borderColor: isDark ? 'rgba(255, 107, 0, 0.3)' : 'rgba(255, 107, 0, 0.25)',
+                                }
+                            ]}>
+                                <Ionicons name="alert-circle-outline" size={32} color={BRAND_ORANGE} />
                             </View>
 
-                            <Text style={styles.notFoundModalTitle}>{t('auth.application_not_found')}</Text>
-
-                            <Text style={styles.notFoundModalSubtitle}>
-                                <Text style={{ color: BRAND_ORANGE, fontWeight: '900' }}>+998 {phone}</Text> {t('errors.PHONE_NOT_FOUND')}
+                            {/* Title */}
+                            <Text style={[styles.notFoundModalTitle, { color: homeColors.textPrimary }]}>
+                                {t('auth.application_not_found', 'ARIZA TOPILMADI')}
                             </Text>
 
-                            <View style={styles.notFoundNoticeBox}>
-                                <Ionicons name="information-circle-outline" size={18} color="#FFD700" style={{ marginRight: 8 }} />
-                                <Text style={styles.notFoundNoticeText}>
-                                    {t('auth.apply_first_notice')}
+                            {/* Subtitle */}
+                            <Text style={[styles.notFoundModalSubtitle, { color: homeColors.textSecondary }]}>
+                                <Text style={{ color: BRAND_ORANGE, fontWeight: '800' }}>+998 {phone}</Text>{' '}
+                                {t('auth.phone_not_found_desc', "raqami bo'yicha hech qanday profil yoki ariza topilmadi.")}
+                            </Text>
+
+                            {/* Notice Box */}
+                            <View style={[
+                                styles.notFoundNoticeBox,
+                                {
+                                    backgroundColor: isDark ? 'rgba(255, 107, 0, 0.08)' : 'rgba(255, 107, 0, 0.05)',
+                                    borderColor: isDark ? 'rgba(255, 107, 0, 0.2)' : 'rgba(255, 107, 0, 0.15)',
+                                }
+                            ]}>
+                                <Ionicons name="information-circle-outline" size={18} color={BRAND_ORANGE} style={{ marginRight: 8 }} />
+                                <Text style={[styles.notFoundNoticeText, { color: homeColors.textPrimary }]}>
+                                    {t('auth.apply_first_notice', "Ligada ishtirok etish uchun avval tashkilotingiz orqali ro'yxatdan o'tishingiz kerak.")}
                                 </Text>
                             </View>
 
+                            {/* Primary Button: Open Ro'yxatdan o'tish (Org Selection) Modal */}
                             <TouchableOpacity
-                                style={styles.notFoundPrimaryBtn}
-                                activeOpacity={0.8}
+                                style={[styles.notFoundPrimaryBtn, { backgroundColor: BRAND_ORANGE, shadowColor: BRAND_ORANGE }]}
+                                activeOpacity={0.85}
                                 onPress={() => {
                                     setShowNotFoundModal(false);
-                                    navigation.navigate('JoinApplication');
+                                    setShowOrgModal(true);
+                                    fetchOrganizations();
                                 }}
                             >
-                                <Ionicons name="document-text-outline" size={18} color="#050A14" style={{ marginRight: 8 }} />
-                                <Text style={styles.notFoundPrimaryBtnText}>{t('applications.submit_app')}</Text>
+                                <Ionicons name="person-add-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                <Text style={[styles.notFoundPrimaryBtnText, { color: '#FFFFFF' }]}>
+                                    {t('auth.register', "RO'YXATDAN O'TISH")}
+                                </Text>
                             </TouchableOpacity>
 
+                            {/* Secondary Button: Close */}
                             <TouchableOpacity
                                 style={styles.notFoundSecondaryBtn}
                                 activeOpacity={0.7}
                                 onPress={() => setShowNotFoundModal(false)}
                             >
-                                <Text style={styles.notFoundSecondaryBtnText}>{t('common.close')}</Text>
+                                <Text style={[styles.notFoundSecondaryBtnText, { color: homeColors.textSecondary }]}>
+                                    {t('common.close', 'Yopish')}
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </View>
