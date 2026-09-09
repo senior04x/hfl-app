@@ -208,18 +208,25 @@ const TournamentsHeader = ({
                                     resizeMode="contain"
                                 />
                             ) : (
-                                <Ionicons name="shield" size={60} color={homeColors.accent} />
+                                <Ionicons name={selectedLeague?.is_tournament ? "trophy" : "shield"} size={60} color={selectedLeague?.is_tournament ? "#38bdf8" : homeColors.accent} />
                             )
                         )}
                     </View>
 
                     {/* League / Organization Label & Switcher Cue */}
                     <View style={styles.selectorFooterRow}>
-                        <Text style={[styles.selectedLeagueHeading, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                            {isGuest 
-                                ? (activeOrg?.name || 'TASHKILOT').toUpperCase()
-                                : (selectedLeague?.name || 'LIGA').toUpperCase()}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 1 }}>
+                            <Text style={[styles.selectedLeagueHeading, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                {isGuest 
+                                    ? (activeOrg?.name || 'TASHKILOT').toUpperCase()
+                                    : (selectedLeague?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()}
+                            </Text>
+                            {!isGuest && selectedLeague?.is_tournament && (
+                                <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.4)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                    <Text style={{ color: '#38bdf8', fontSize: 9, fontWeight: '800' }}>TURNIR</Text>
+                                </View>
+                            )}
+                        </View>
                         <Ionicons
                             name={isLeagueSelectorOpen ? "chevron-up" : "chevron-down"}
                             size={16}
@@ -289,11 +296,12 @@ const TournamentsHeader = ({
                             </View>
                         ) : (
                             leagues.map((league: any) => {
-                                const isSelected = (selectedLeague?.id === league.id || selectedLeague?._id === league._id);
+                                const isSelected = (selectedLeague?.id === league.id && !!selectedLeague?.is_tournament === !!league.is_tournament);
                                 const itemLogo = getLeagueLogoSource(league);
+                                const isTourn = !!league.is_tournament;
                                 return (
                                     <TouchableOpacity
-                                        key={league.id || league._id}
+                                        key={`${isTourn ? 'tourn' : 'league'}-${league.id || league._id}`}
                                         style={[
                                             styles.accordionItem,
                                             { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
@@ -306,16 +314,23 @@ const TournamentsHeader = ({
                                             {itemLogo ? (
                                                 <Image source={itemLogo} style={styles.accordionLogo} resizeMode="contain" />
                                             ) : (
-                                                <Ionicons name="football" size={16} color={homeColors.accent} />
+                                                <Ionicons name={isTourn ? "trophy" : "football"} size={16} color={isTourn ? "#38bdf8" : homeColors.accent} />
                                             )}
                                         </View>
-                                        <Text style={[
-                                            styles.accordionItemName,
-                                            { color: isSelected ? homeColors.textPrimary : homeColors.textSecondary },
-                                            isSelected && { fontWeight: '800' }
-                                        ]} numberOfLines={1}>
-                                            {league.name?.toUpperCase()}
-                                        </Text>
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={[
+                                                styles.accordionItemName,
+                                                { color: isSelected ? homeColors.textPrimary : homeColors.textSecondary, flexShrink: 1 },
+                                                isSelected && { fontWeight: '800' }
+                                            ]} numberOfLines={1}>
+                                                {league.name?.toUpperCase()}
+                                            </Text>
+                                            {isTourn && (
+                                                <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.4)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                                    <Text style={{ color: '#38bdf8', fontSize: 9, fontWeight: '800' }}>TURNIR</Text>
+                                                </View>
+                                            )}
+                                        </View>
                                         {isSelected && (
                                             <Ionicons name="checkmark-circle" size={18} color={homeColors.accent} style={{ marginLeft: 8 }} />
                                         )}
@@ -340,7 +355,8 @@ const TournamentsHeader = ({
                     onPress={() => navigation.navigate('TournamentDetail', {
                         tournamentId: selectedLeague?.id,
                         tournamentName: selectedLeague?.name,
-                        tournament: selectedLeague
+                        tournament: selectedLeague,
+                        is_tournament: Boolean(selectedLeague?.is_tournament)
                     })}
                     activeOpacity={0.8}
                 >
@@ -348,7 +364,9 @@ const TournamentsHeader = ({
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Ionicons name="information-circle-outline" size={17} color={homeColors.textSecondary} style={{ marginRight: 8 }} />
                             <Text style={[styles.aboutLeagueButtonText, { color: homeColors.textPrimary }]}>
-                                {t('tournaments.about_league', currentLang === 'ru' ? 'О ЛИГЕ' : (currentLang === 'en' ? 'ABOUT LEAGUE' : 'LIGA HAQIDA')).toUpperCase()}
+                                {selectedLeague?.is_tournament 
+                                    ? t('tournaments.about_tournament', 'TURNIR HAQIDA').toUpperCase()
+                                    : t('tournaments.about_league', currentLang === 'ru' ? 'О ЛИГЕ' : (currentLang === 'en' ? 'ABOUT LEAGUE' : 'LIGA HAQIDA')).toUpperCase()}
                             </Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={homeColors.textSecondary} />
@@ -428,14 +446,14 @@ const TournamentsHeader = ({
             <View style={styles.listHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons 
-                        name={isGuest ? "trophy-outline" : "shield-checkmark-outline"} 
+                        name={isGuest ? "trophy-outline" : (selectedLeague?.is_tournament ? "trophy" : "shield-checkmark-outline")} 
                         size={15} 
                         color={homeColors.textSecondary} 
                     />
                     <Text style={[styles.listHeaderText, { color: homeColors.textPrimary }]}>
                         {isGuest 
-                            ? `${(activeOrg?.name || 'TASHKILOT').toUpperCase()} ${t('tournaments.title', 'LIGALARI').toUpperCase()} (${leagues?.length || 0})`
-                            : `${(selectedLeague?.name || 'LIGA').toUpperCase()} ${t('teams.title', 'JAMOALARI').toUpperCase()} (${teams?.length || 0})`}
+                            ? `${(activeOrg?.name || 'TASHKILOT').toUpperCase()} ${t('tournaments.title', 'LIGA VA TURNIRLARI').toUpperCase()} (${leagues?.length || 0})`
+                            : `${(selectedLeague?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()} ${t('teams.title', 'JAMOALARI').toUpperCase()} (${teams?.length || 0})`}
                     </Text>
                 </View>
             </View>
@@ -525,86 +543,156 @@ export default function TournamentsScreen({ navigation }: any) {
                 setIsLeaguesLoading(true);
             }
             
-            const [data, allTeamsData, matchesRes] = await Promise.all([
+            const [data, allTeamsData, matchesRes, ownTournamentsRes, collabRecvRes, collabSendRes] = await Promise.all([
                 apiService.getLeaguesByOrgId(targetOrgId),
                 apiService.getTeams(1, 500),
-                supabase.from('matches').select('id, league, round, tour, status, organization_id, league_id')
+                supabase.from('matches').select('id, league, round, tour, status, organization_id, league_id, tournament_id, stage, home_team_id, away_team_id'),
+                supabase.from('tournaments').select('*').eq('organization_id', targetOrgId).order('id', { ascending: true }),
+                supabase.from('tournament_cohosts').select('*, tournament:tournament_id (*)').eq('receiver_org_id', targetOrgId).eq('status', 'accepted'),
+                supabase.from('tournament_cohosts').select('*, tournament:tournament_id (*)').eq('sender_org_id', targetOrgId).eq('status', 'accepted'),
             ]);
 
             const matchesList = matchesRes?.data || [];
 
-            if (data && Array.isArray(data)) {
-                const orgLeagueNorms = new Set(data.map((l: any) => normalizeStr(l.name)));
+            // 1. Process Leagues
+            const orgLeagueNorms = new Set((data || []).map((l: any) => normalizeStr(l.name)));
 
-                const orgTeams = (allTeamsData || []).filter((t: any) => {
-                    const tOrg = Number(t.organization_id);
-                    if (tOrg && tOrg === targetOrgId) return true;
-                    if (t.league && orgLeagueNorms.has(normalizeStr(t.league))) return true;
-                    return false;
-                });
-                const orgTeamsTotal = orgTeams.length > 0 ? orgTeams.length : (allTeamsData?.length || 0);
-                setTotalTeamsCount(orgTeamsTotal);
+            const orgTeams = (allTeamsData || []).filter((t: any) => {
+                const tOrg = Number(t.organization_id);
+                if (tOrg && tOrg === targetOrgId) return true;
+                if (t.league && orgLeagueNorms.has(normalizeStr(t.league))) return true;
+                return false;
+            });
+            const orgTeamsTotal = orgTeams.length > 0 ? orgTeams.length : (allTeamsData?.length || 0);
+            setTotalTeamsCount(orgTeamsTotal);
 
-                const enrichedLeagues = data.map((l: any) => {
-                    const lNorm = normalizeStr(l.name);
-                    const leagueMatches = matchesList.filter((m: any) => {
-                        const mNorm = normalizeStr(m.league || m.tournament_name || '');
-                        const isIdMatch = m.league_id && Number(m.league_id) === Number(l.id);
-                        const isOrgMatch = (!m.organization_id || Number(m.organization_id) === targetOrgId);
-                        return isOrgMatch && (isIdMatch || (mNorm && lNorm && (mNorm === lNorm || mNorm.includes(lNorm) || lNorm.includes(mNorm))));
-                    });
-
-                    let maxRound = 0;
-                    let hasPlayedOrScheduled = false;
-
-                    leagueMatches.forEach((m: any) => {
-                        const r = Number(m.round || m.tour || 0);
-                        if (r > maxRound) maxRound = r;
-                        const st = String(m.status || '').toLowerCase();
-                        if (st === 'finished' || st === 'completed' || st === 'live' || st === 'first_half' || st === 'second_half' || st === 'halftime' || st === 'scheduled' || st === 'ongoing' || st === 'active') {
-                            hasPlayedOrScheduled = true;
-                        }
-                    });
-
-                    const fallbackRound = Number(l.current_round || l.round || 0);
-                    const latestRound = maxRound > 0 ? maxRound : fallbackRound;
-                    const hasPlayed = hasPlayedOrScheduled || latestRound > 0 || leagueMatches.length > 0;
-
-                    const isLeagueActive = (l.is_active !== undefined && l.is_active !== null) 
-                        ? (l.is_active === true || l.is_active === 'true') 
-                        : hasPlayed;
-
-                    return {
-                        ...l,
-                        is_active: isLeagueActive,
-                        latestRound: latestRound > 0 ? latestRound : 1,
-                        hasPlayedMatches: isLeagueActive && hasPlayed,
-                        matchesCount: leagueMatches.length
-                    };
+            const enrichedLeagues = (data || []).map((l: any) => {
+                const lNorm = normalizeStr(l.name);
+                const leagueMatches = matchesList.filter((m: any) => {
+                    const mNorm = normalizeStr(m.league || m.tournament_name || '');
+                    const isIdMatch = m.league_id && Number(m.league_id) === Number(l.id);
+                    const isOrgMatch = (!m.organization_id || Number(m.organization_id) === targetOrgId);
+                    return isOrgMatch && (isIdMatch || (mNorm && lNorm && (mNorm === lNorm || mNorm.includes(lNorm) || lNorm.includes(mNorm))));
                 });
 
-                setLeagues(enrichedLeagues);
+                let maxRound = 0;
+                let hasPlayedOrScheduled = false;
 
-                if (enrichedLeagues.length > 0) {
-                    const firstLeague = enrichedLeagues[0];
-                    setSelectedLeague(firstLeague);
-                    const fetchedTeams = await fetchLeagueTeams(firstLeague.name || firstLeague.id || '');
-                    
-                    await AsyncStorage.setItem(`@amatora_tournaments_cache_${targetOrgId}`, JSON.stringify({
-                        leagues: enrichedLeagues,
-                        selectedLeague: firstLeague,
-                        teams: fetchedTeams || [],
-                        totalTeamsCount: orgTeamsTotal,
-                        leaguePlayersCount: leaguePlayersCount,
-                        timestamp: Date.now()
-                    }));
-                } else {
-                    setSelectedLeague(null);
-                    setTeams([]);
+                leagueMatches.forEach((m: any) => {
+                    const r = Number(m.round || m.tour || 0);
+                    if (r > maxRound) maxRound = r;
+                    const st = String(m.status || '').toLowerCase();
+                    if (st === 'finished' || st === 'completed' || st === 'live' || st === 'first_half' || st === 'second_half' || st === 'halftime' || st === 'scheduled' || st === 'ongoing' || st === 'active') {
+                        hasPlayedOrScheduled = true;
+                    }
+                });
+
+                const fallbackRound = Number(l.current_round || l.round || 0);
+                const latestRound = maxRound > 0 ? maxRound : fallbackRound;
+                const hasPlayed = hasPlayedOrScheduled || latestRound > 0 || leagueMatches.length > 0;
+
+                const isLeagueActive = (l.is_active !== undefined && l.is_active !== null) 
+                    ? (l.is_active === true || l.is_active === 'true') 
+                    : hasPlayed;
+
+                return {
+                    ...l,
+                    is_tournament: false,
+                    is_active: isLeagueActive,
+                    latestRound: latestRound > 0 ? latestRound : 1,
+                    hasPlayedMatches: isLeagueActive && hasPlayed,
+                    matchesCount: leagueMatches.length
+                };
+            });
+
+            // 2. Process Tournaments (Own + Co-host)
+            const tournamentsList: any[] = [];
+            const tournIdMap = new Set<string>();
+
+            (ownTournamentsRes?.data || []).forEach((t: any) => {
+                if (t && t.id && !tournIdMap.has(String(t.id))) {
+                    tournIdMap.add(String(t.id));
+                    tournamentsList.push({
+                        ...t,
+                        is_tournament: true,
+                        isOwn: true,
+                    });
                 }
+            });
+
+            const processCollabTourn = (c: any) => {
+                if (c?.tournament && !tournIdMap.has(String(c.tournament.id))) {
+                    tournIdMap.add(String(c.tournament.id));
+                    tournamentsList.push({
+                        ...c.tournament,
+                        is_tournament: true,
+                        isCollab: true,
+                        isOwn: false,
+                    });
+                }
+            };
+
+            (collabRecvRes?.data || []).forEach(processCollabTourn);
+            (collabSendRes?.data || []).forEach(processCollabTourn);
+
+            const enrichedTournaments = tournamentsList.map((t: any) => {
+                const tournMatches = matchesList.filter((m: any) => {
+                    return m.tournament_id && String(m.tournament_id) === String(t.id);
+                });
+
+                let maxRound = 0;
+                let hasPlayedOrScheduled = false;
+
+                tournMatches.forEach((m: any) => {
+                    const r = Number(m.round || m.tour || 0);
+                    if (r > maxRound) maxRound = r;
+                    const st = String(m.status || '').toLowerCase();
+                    if (st === 'finished' || st === 'completed' || st === 'live' || st === 'first_half' || st === 'second_half' || st === 'halftime' || st === 'scheduled' || st === 'ongoing' || st === 'active') {
+                        hasPlayedOrScheduled = true;
+                    }
+                });
+
+                const isTournActive = (t.status === 'active' || t.status === 'ongoing' || !t.status)
+                    ? (tournMatches.length > 0 || hasPlayedOrScheduled || true)
+                    : hasPlayedOrScheduled;
+
+                return {
+                    ...t,
+                    is_tournament: true,
+                    is_active: isTournActive,
+                    latestRound: maxRound > 0 ? maxRound : 1,
+                    hasPlayedMatches: isTournActive && (hasPlayedOrScheduled || tournMatches.length > 0),
+                    matchesCount: tournMatches.length
+                };
+            });
+
+            // 3. Combine Leagues + Tournaments seamlessly
+            const combinedItems = [
+                ...enrichedLeagues,
+                ...enrichedTournaments
+            ];
+
+            setLeagues(combinedItems);
+
+            if (combinedItems.length > 0) {
+                const firstLeague = combinedItems[0];
+                setSelectedLeague(firstLeague);
+                const fetchedTeams = await fetchLeagueTeams(firstLeague.name || firstLeague.id || '', firstLeague);
+                
+                await AsyncStorage.setItem(`@amatora_tournaments_cache_${targetOrgId}`, JSON.stringify({
+                    leagues: combinedItems,
+                    selectedLeague: firstLeague,
+                    teams: fetchedTeams || [],
+                    totalTeamsCount: orgTeamsTotal,
+                    leaguePlayersCount: leaguePlayersCount,
+                    timestamp: Date.now()
+                }));
+            } else {
+                setSelectedLeague(null);
+                setTeams([]);
             }
         } catch (error) {
-            console.error('Error fetching leagues:', error);
+            console.error('Error fetching leagues and tournaments:', error);
         } finally {
             setIsLeaguesLoading(false);
         }
@@ -645,10 +733,144 @@ export default function TournamentsScreen({ navigation }: any) {
         });
     };
 
-    const fetchLeagueTeams = async (leagueName: string) => {
+    const fetchLeagueTeams = async (leagueName: string, itemObj?: any) => {
         try {
             setTeamsLoading(true);
-            const teamData = await apiService.getTeams(1, 100, leagueName);
+            const currentItem = itemObj || selectedLeague;
+            const isTourn = Boolean(currentItem?.is_tournament);
+            let teamData: any[] = [];
+
+            if (isTourn) {
+                const targetTournamentId = currentItem?.id;
+                // 1. Fetch linked leagues from tournament_leagues
+                const { data: tlData } = await supabase
+                    .from('tournament_leagues')
+                    .select('league_id')
+                    .eq('tournament_id', targetTournamentId);
+
+                let linkedLeagueNames: string[] = [];
+                if (tlData && tlData.length > 0) {
+                    const lIds = tlData.map((tl: any) => tl.league_id).filter(Boolean);
+                    if (lIds.length > 0) {
+                        const { data: lgs } = await supabase
+                            .from('leagues')
+                            .select('name')
+                            .in('id', lIds);
+                        if (lgs) {
+                            linkedLeagueNames = lgs.map((l: any) => l.name).filter(Boolean);
+                        }
+                    }
+                }
+
+                // 2. Fetch matches for this tournament
+                const { data: tournMatches } = await supabase
+                    .from('matches')
+                    .select('*')
+                    .eq('tournament_id', targetTournamentId);
+
+                // Collect team IDs from matches
+                const matchTeamIds = new Set<string | number>();
+                (tournMatches || []).forEach((m: any) => {
+                    if (m.home_team_id) matchTeamIds.add(m.home_team_id);
+                    if (m.away_team_id) matchTeamIds.add(m.away_team_id);
+                });
+
+                // 3. Fetch candidate teams: either by linkedLeagueNames, matchTeamIds, or org fallback
+                let candidateTeams: any[] = [];
+                if (linkedLeagueNames.length > 0) {
+                    const { data: lTeams } = await supabase
+                        .from('teams')
+                        .select('*')
+                        .in('league', linkedLeagueNames);
+                    if (lTeams && lTeams.length > 0) {
+                        candidateTeams = lTeams;
+                    }
+                }
+
+                if (candidateTeams.length === 0 && matchTeamIds.size > 0) {
+                    const { data: mTeams } = await supabase
+                        .from('teams')
+                        .select('*')
+                        .in('id', Array.from(matchTeamIds));
+                    if (mTeams && mTeams.length > 0) {
+                        candidateTeams = mTeams;
+                    }
+                }
+
+                if (candidateTeams.length === 0) {
+                    const orgId = currentItem?.organization_id || selectedOrganizationId;
+                    if (orgId) {
+                        const { data: orgTeams } = await supabase
+                            .from('teams')
+                            .select('*')
+                            .eq('organization_id', orgId);
+                        if (orgTeams && orgTeams.length > 0) {
+                            candidateTeams = orgTeams;
+                        }
+                    }
+                }
+
+                // Standings calculation from tournament matches
+                const statsMap: Record<string, { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number }> = {};
+                candidateTeams.forEach((tm: any) => {
+                    statsMap[String(tm.id)] = { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+                });
+
+                (tournMatches || []).forEach((m: any) => {
+                    const st = String(m.status || '').toLowerCase();
+                    const isFinished = st === 'finished' || st === 'completed';
+                    const homeId = String(m.home_team_id);
+                    const awayId = String(m.away_team_id);
+                    if (isFinished && m.home_score !== null && m.away_score !== null) {
+                        if (!statsMap[homeId]) statsMap[homeId] = { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+                        if (!statsMap[awayId]) statsMap[awayId] = { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+
+                        const hs = Number(m.home_score);
+                        const as = Number(m.away_score);
+
+                        statsMap[homeId].played += 1;
+                        statsMap[awayId].played += 1;
+                        statsMap[homeId].gf += hs;
+                        statsMap[homeId].ga += as;
+                        statsMap[awayId].gf += as;
+                        statsMap[awayId].ga += hs;
+
+                        if (hs > as) {
+                            statsMap[homeId].won += 1;
+                            statsMap[homeId].points += 3;
+                            statsMap[awayId].lost += 1;
+                        } else if (hs < as) {
+                            statsMap[awayId].won += 1;
+                            statsMap[awayId].points += 3;
+                            statsMap[homeId].lost += 1;
+                        } else {
+                            statsMap[homeId].drawn += 1;
+                            statsMap[homeId].points += 1;
+                            statsMap[awayId].drawn += 1;
+                            statsMap[awayId].points += 1;
+                        }
+                    }
+                });
+
+                teamData = candidateTeams.map((tm: any) => {
+                    const st = statsMap[String(tm.id)] || { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+                    return {
+                        ...tm,
+                        played: st.played,
+                        won: st.won,
+                        drawn: st.drawn,
+                        lost: st.lost,
+                        goalsFor: st.gf,
+                        goalsAgainst: st.ga,
+                        goalDifference: st.gf - st.ga,
+                        points: st.points,
+                        stats: st
+                    };
+                });
+            } else {
+                teamData = await apiService.getTeams(1, 100, leagueName);
+            }
+
             const sortedTeams = sortTeamsByStandingsRank(teamData || []);
             setTeams(sortedTeams);
 
@@ -671,7 +893,7 @@ export default function TournamentsScreen({ navigation }: any) {
 
             return sortedTeams;
         } catch (error) {
-            console.error('Error fetching league teams:', error);
+            console.error('Error fetching league/tournament teams:', error);
             setTeams([]);
             setLeaguePlayersCount(0);
             return [];
@@ -682,14 +904,14 @@ export default function TournamentsScreen({ navigation }: any) {
 
     useEffect(() => {
         if (selectedLeague && (leagues?.length || 0) > 0 && !isLeaguesLoading && !hasCachedLeaguesRef.current) {
-            fetchLeagueTeams(selectedLeague.name || selectedLeague.id || '');
+            fetchLeagueTeams(selectedLeague.name || selectedLeague.id || '', selectedLeague);
         }
-    }, [selectedLeague?.id, selectedLeague?.name]);
+    }, [selectedLeague?.id, selectedLeague?.name, selectedLeague?.is_tournament]);
 
     const handleLeagueSelect = useCallback((league: any) => {
         setIsLeagueSelectorOpen(false);
         setSelectedLeague(league);
-        fetchLeagueTeams(league.name || league.id || '');
+        fetchLeagueTeams(league.name || league.id || '', league);
     }, []);
 
     const filteredTeams = (teams || []).filter(t =>
@@ -726,14 +948,17 @@ export default function TournamentsScreen({ navigation }: any) {
 
         const leagueLogo = getLeagueLogoSource(league);
         const isActive = (league.is_active === true || league.is_active === 'true' || league.is_active !== false);
+        const isTourn = Boolean(league.is_tournament);
 
         return (
             <TouchableOpacity
-                key={league.id || league._id}
+                key={`${isTourn ? 'tourn' : 'league'}-${league.id || league._id}`}
                 style={[styles.teamItem, cardSurfaceStyle]}
                 onPress={() => navigation.navigate('TournamentDetail', { 
                     tournament: league, 
-                    tournamentId: league.id || league._id 
+                    tournamentId: league.id || league._id,
+                    tournamentName: league.name,
+                    is_tournament: isTourn
                 })}
                 activeOpacity={0.8}
             >
@@ -750,16 +975,23 @@ export default function TournamentsScreen({ navigation }: any) {
                         {leagueLogo ? (
                             <Image source={leagueLogo} style={styles.teamLogoImage} resizeMode="contain" />
                         ) : (
-                            <Ionicons name="trophy-outline" size={20} color="#FFFFFF" />
+                            <Ionicons name={isTourn ? "trophy" : "shield"} size={20} color={isTourn ? "#38bdf8" : "#FFFFFF"} />
                         )}
                     </View>
 
                     {/* Info */}
                     <View style={styles.teamMainInfo}>
                         <Text style={[styles.teamItemName, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                            {(league.name || 'LIGA').toUpperCase()}
+                            {(league.name || (isTourn ? 'TURNIR' : 'LIGA')).toUpperCase()}
                         </Text>
                         <View style={styles.teamBadgeRow}>
+                            {isTourn && (
+                                <View style={[styles.statusPill, { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.35)', marginRight: 6 }]}>
+                                    <Text style={[styles.statusPillText, { color: '#38bdf8', fontWeight: '800' }]}>
+                                        TURNIR
+                                    </Text>
+                                </View>
+                            )}
                             <View style={[
                                 styles.statusPill,
                                 {

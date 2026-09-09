@@ -245,42 +245,81 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 mergedTournament.name = navTournament.name;
             }
 
-            // 1. Resolve exact league from Supabase leagues table directly
+            // 1. Resolve exact league or tournament from Supabase
             let resolvedLeagueRecord: any = null;
             let resolvedLeagueId: number | null = null;
+            let resolvedTournamentRecord: any = null;
+            let isRealTournament = Boolean(route?.params?.is_tournament || navTournament?.is_tournament || route?.params?.isTournament);
 
             const potentialNumericId = currentTournamentId || navTournament?.id || navTournament?._id || t?.id || t?._id;
             if (potentialNumericId && !isNaN(Number(potentialNumericId))) {
-                const { data: lg } = await supabase.from('leagues').select('*').eq('id', Number(potentialNumericId)).maybeSingle();
-                if (lg) {
-                    resolvedLeagueRecord = lg;
-                    resolvedLeagueId = lg.id;
+                if (isRealTournament) {
+                    const { data: trn } = await supabase.from('tournaments').select('*').eq('id', Number(potentialNumericId)).maybeSingle();
+                    if (trn) {
+                        resolvedTournamentRecord = trn;
+                    }
+                } else {
+                    const { data: lg } = await supabase.from('leagues').select('*').eq('id', Number(potentialNumericId)).maybeSingle();
+                    if (lg) {
+                        resolvedLeagueRecord = lg;
+                        resolvedLeagueId = lg.id;
+                    } else {
+                        const { data: trn } = await supabase.from('tournaments').select('*').eq('id', Number(potentialNumericId)).maybeSingle();
+                        if (trn) {
+                            resolvedTournamentRecord = trn;
+                            isRealTournament = true;
+                        }
+                    }
                 }
             }
 
-            if (!resolvedLeagueRecord && (navTournament?.name || tournamentName || mergedTournament?.name || leagueSearchKey)) {
+            if (!resolvedLeagueRecord && !resolvedTournamentRecord && (navTournament?.name || tournamentName || mergedTournament?.name || leagueSearchKey)) {
                 const searchName = String(navTournament?.name || tournamentName || mergedTournament?.name || leagueSearchKey).trim();
-                const { data: lgList } = await supabase.from('leagues').select('*').ilike('name', `%${searchName}%`).limit(1);
-                if (lgList && lgList.length > 0) {
-                    resolvedLeagueRecord = lgList[0];
-                    resolvedLeagueId = lgList[0].id;
+                if (isRealTournament) {
+                    const { data: trnList } = await supabase.from('tournaments').select('*').ilike('name', `%${searchName}%`).limit(1);
+                    if (trnList && trnList.length > 0) {
+                        resolvedTournamentRecord = trnList[0];
+                    }
+                } else {
+                    const { data: lgList } = await supabase.from('leagues').select('*').ilike('name', `%${searchName}%`).limit(1);
+                    if (lgList && lgList.length > 0) {
+                        resolvedLeagueRecord = lgList[0];
+                        resolvedLeagueId = lgList[0].id;
+                    } else {
+                        const { data: trnList } = await supabase.from('tournaments').select('*').ilike('name', `%${searchName}%`).limit(1);
+                        if (trnList && trnList.length > 0) {
+                            resolvedTournamentRecord = trnList[0];
+                            isRealTournament = true;
+                        }
+                    }
                 }
             }
 
-            if (resolvedLeagueRecord) {
+            if (resolvedTournamentRecord) {
+                mergedTournament.id = resolvedTournamentRecord.id;
+                mergedTournament.organization_id = resolvedTournamentRecord.organization_id;
+                if (!mergedTournament.name) mergedTournament.name = resolvedTournamentRecord.name;
+                mergedTournament.logo_url = resolvedTournamentRecord.logo_url || mergedTournament.logo_url;
+                mergedTournament.description = resolvedTournamentRecord.description;
+                mergedTournament.status = resolvedTournamentRecord.status;
+                mergedTournament.is_tournament = true;
+                if (resolvedTournamentRecord.start_date) mergedTournament.startDate = resolvedTournamentRecord.start_date;
+                if (resolvedTournamentRecord.end_date) mergedTournament.endDate = resolvedTournamentRecord.end_date;
+            } else if (resolvedLeagueRecord) {
                 mergedTournament.id = resolvedLeagueRecord.id;
                 mergedTournament.organization_id = resolvedLeagueRecord.organization_id;
                 if (!mergedTournament.name) mergedTournament.name = resolvedLeagueRecord.name;
                 if (!mergedTournament.season) mergedTournament.season = resolvedLeagueRecord.season;
             }
 
-            const targetLeagueId = resolvedLeagueId || (mergedTournament?.id && !isNaN(Number(mergedTournament.id)) ? Number(mergedTournament.id) : null);
+            const targetLeagueId = resolvedLeagueId || (!isRealTournament && mergedTournament?.id && !isNaN(Number(mergedTournament.id)) ? Number(mergedTournament.id) : null);
+            const targetTournamentId = isRealTournament ? (resolvedTournamentRecord?.id || Number(potentialNumericId)) : null;
 
             let startDateVal = mergedTournament?.start_date || mergedTournament?.startDate || navTournament?.start_date || navTournament?.startDate;
             let endDateVal = mergedTournament?.end_date || mergedTournament?.endDate || navTournament?.end_date || navTournament?.endDate;
 
-            const tId = targetLeagueId || mergedTournament?.id || mergedTournament?._id || currentTournamentId;
-            if (tId && (!startDateVal || !endDateVal)) {
+            const tId = targetLeagueId || targetTournamentId || mergedTournament?.id || mergedTournament?._id || currentTournamentId;
+            if (tId && (!startDateVal || !endDateVal) && !isRealTournament) {
                 try {
                     const { data: dateSponsors } = await supabase.from('sponsors').select('name, logo_url').in('name', [
                         `LEAGUE_START_DATE_${tId}`,
@@ -300,7 +339,122 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
             setTournamentData(mergedTournament);
 
-            const resolvedTeams = teamsData && teamsData.length > 0 ? teamsData : (mergedTournament?.teams || []);
+            let resolvedTeams = teamsData && teamsData.length > 0 ? teamsData : (mergedTournament?.teams || []);
+            let tournamentMatchesDirect: any[] = [];
+
+            if (isRealTournament && targetTournamentId) {
+                // Direct tournament matches fetch
+                const { data: tMatches } = await supabase
+                    .from('matches')
+                    .select('*')
+                    .eq('tournament_id', targetTournamentId)
+                    .order('match_date', { ascending: false });
+
+                tournamentMatchesDirect = tMatches || [];
+
+                // If teams are not loaded via league search, resolve participant teams
+                if (resolvedTeams.length === 0) {
+                    // A. Linked leagues in tournament_leagues
+                    const { data: tlData } = await supabase
+                        .from('tournament_leagues')
+                        .select('league_id')
+                        .eq('tournament_id', targetTournamentId);
+
+                    let linkedLeagueNames: string[] = [];
+                    if (tlData && tlData.length > 0) {
+                        const lIds = tlData.map((tl: any) => tl.league_id).filter(Boolean);
+                        if (lIds.length > 0) {
+                            const { data: lgs } = await supabase.from('leagues').select('name').in('id', lIds);
+                            if (lgs) linkedLeagueNames = lgs.map((l: any) => l.name).filter(Boolean);
+                        }
+                    }
+
+                    if (linkedLeagueNames.length > 0) {
+                        const { data: lTeams } = await supabase.from('teams').select('*').in('league', linkedLeagueNames);
+                        if (lTeams && lTeams.length > 0) resolvedTeams = lTeams;
+                    }
+
+                    // B. Teams from tournament matches
+                    if (resolvedTeams.length === 0 && tournamentMatchesDirect.length > 0) {
+                        const mTeamIds = new Set<any>();
+                        tournamentMatchesDirect.forEach((m: any) => {
+                            if (m.home_team_id) mTeamIds.add(m.home_team_id);
+                            if (m.away_team_id) mTeamIds.add(m.away_team_id);
+                        });
+                        if (mTeamIds.size > 0) {
+                            const { data: mTeams } = await supabase.from('teams').select('*').in('id', Array.from(mTeamIds));
+                            if (mTeams && mTeams.length > 0) resolvedTeams = mTeams;
+                        }
+                    }
+
+                    // C. Fallback: organization teams
+                    const fallbackOrgId = resolvedTournamentRecord?.organization_id || mergedTournament?.organization_id;
+                    if (resolvedTeams.length === 0 && fallbackOrgId) {
+                        const { data: orgTeams } = await supabase.from('teams').select('*').eq('organization_id', fallbackOrgId);
+                        if (orgTeams && orgTeams.length > 0) resolvedTeams = orgTeams;
+                    }
+                }
+
+                // Standings calculation for tournament
+                if (resolvedTeams.length > 0 && tournamentMatchesDirect.length > 0) {
+                    const statsMap: Record<string, { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number }> = {};
+                    resolvedTeams.forEach((tm: any) => {
+                        statsMap[String(tm.id)] = { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+                    });
+
+                    tournamentMatchesDirect.forEach((m: any) => {
+                        const st = String(m.status || '').toLowerCase();
+                        const isFinished = st === 'finished' || st === 'completed';
+                        const homeId = String(m.home_team_id);
+                        const awayId = String(m.away_team_id);
+                        if (isFinished && m.home_score !== null && m.away_score !== null) {
+                            if (!statsMap[homeId]) statsMap[homeId] = { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+                            if (!statsMap[awayId]) statsMap[awayId] = { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+
+                            const hs = Number(m.home_score);
+                            const as = Number(m.away_score);
+
+                            statsMap[homeId].played += 1;
+                            statsMap[awayId].played += 1;
+                            statsMap[homeId].gf += hs;
+                            statsMap[homeId].ga += as;
+                            statsMap[awayId].gf += as;
+                            statsMap[awayId].ga += hs;
+
+                            if (hs > as) {
+                                statsMap[homeId].won += 1;
+                                statsMap[homeId].points += 3;
+                                statsMap[awayId].lost += 1;
+                            } else if (hs < as) {
+                                statsMap[awayId].won += 1;
+                                statsMap[awayId].points += 3;
+                                statsMap[homeId].lost += 1;
+                            } else {
+                                statsMap[homeId].drawn += 1;
+                                statsMap[homeId].points += 1;
+                                statsMap[awayId].drawn += 1;
+                                statsMap[awayId].points += 1;
+                            }
+                        }
+                    });
+
+                    resolvedTeams = resolvedTeams.map((tm: any) => {
+                        const st = statsMap[String(tm.id)] || { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 };
+                        return {
+                            ...tm,
+                            played: st.played,
+                            won: st.won,
+                            drawn: st.drawn,
+                            lost: st.lost,
+                            goalsFor: st.gf,
+                            goalsAgainst: st.ga,
+                            goalDifference: st.gf - st.ga,
+                            points: st.points,
+                            stats: st
+                        };
+                    });
+                }
+            }
 
             const sortedStandings = [...resolvedTeams].sort((a: any, b: any) => {
                 const ptsA = a.points ?? a.stats?.points ?? a.pts ?? 0;
@@ -405,9 +559,64 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 secondaryColor: orgSecondaryColor
             };
 
-            // Fetch co-host organizations from league_collabs table
+            // Fetch co-host organizations
             let coOrganizers: any[] = [];
-            if (targetLeagueId) {
+            if (isRealTournament && targetTournamentId) {
+                try {
+                    const { data: collabs } = await supabase
+                        .from('tournament_cohosts')
+                        .select('*')
+                        .eq('tournament_id', Number(targetTournamentId))
+                        .eq('status', 'accepted');
+
+                    if (collabs && collabs.length > 0) {
+                        const coHostOrgIds: any[] = [];
+                        collabs.forEach((c: any) => {
+                            const sId = c.sender_org_id;
+                            const rId = c.receiver_org_id;
+                            if (targetOrgId) {
+                                if (String(sId) === String(targetOrgId) && rId && String(rId) !== String(targetOrgId)) {
+                                    coHostOrgIds.push(rId);
+                                } else if (String(rId) === String(targetOrgId) && sId && String(sId) !== String(targetOrgId)) {
+                                    coHostOrgIds.push(sId);
+                                } else {
+                                    if (rId && String(rId) !== String(targetOrgId)) coHostOrgIds.push(rId);
+                                    if (sId && String(sId) !== String(targetOrgId)) coHostOrgIds.push(sId);
+                                }
+                            } else {
+                                if (rId) coHostOrgIds.push(rId);
+                                if (sId) coHostOrgIds.push(sId);
+                            }
+                        });
+
+                        const uniqueCoHostIds = Array.from(new Set(coHostOrgIds));
+
+                        if (uniqueCoHostIds.length > 0) {
+                            const { data: coOrgsData } = await supabase
+                                .from('organizations')
+                                .select('*')
+                                .in('id', uniqueCoHostIds);
+
+                            if (coOrgsData && coOrgsData.length > 0) {
+                                coOrganizers = coOrgsData.map((co: any) => {
+                                    const parsedColors = parseBrandColors(co.brand_colors || co.brand_color || co.colors);
+                                    return {
+                                        id: co.id,
+                                        name: co.name || co.title || co.organization_name || 'Hamkor Tashkilot',
+                                        logo: co.logo_url || co.logo || co.photo_url || '',
+                                        phone: co.phone || co.contact_phone || '',
+                                        primaryColor: parsedColors.primary || co.primary_color || null,
+                                        secondaryColor: parsedColors.secondary || co.secondary_color || parsedColors.primary || null,
+                                        roleType: 'cohost'
+                                    };
+                                });
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error fetching tournament_cohosts:', err);
+                }
+            } else if (targetLeagueId) {
                 try {
                     const { data: collabs } = await supabase
                         .from('league_collabs')
@@ -504,6 +713,27 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     return teamIdsSet.has(homeId) || teamIdsSet.has(awayId);
                 });
 
+                // If tournament and matches from apiService were empty, enrich direct tournament matches
+                if (isRealTournament && finalMatches.length === 0 && tournamentMatchesDirect.length > 0) {
+                    const teamsMap: Record<string, any> = {};
+                    resolvedTeams.forEach((t: any) => { teamsMap[String(t.id)] = t; });
+
+                    finalMatches = tournamentMatchesDirect.map((m: any) => {
+                        const ht = teamsMap[String(m.home_team_id)];
+                        const at = teamsMap[String(m.away_team_id)];
+                        return {
+                            ...m,
+                            _id: m.id,
+                            home_score: m.home_score ?? 0,
+                            away_score: m.away_score ?? 0,
+                            homeTeam: ht ? { id: ht.id, name: ht.name, logo_url: ht.logo_url } : null,
+                            awayTeam: at ? { id: at.id, name: at.name, logo_url: at.logo_url } : null,
+                            team1: ht ? { id: ht.id, name: ht.name, logo: ht.logo_url } : null,
+                            team2: at ? { id: at.id, name: at.name, logo: at.logo_url } : null,
+                        };
+                    });
+                }
+
                 setMatches(finalMatches);
 
                 const finishedLeagueMatches = finalMatches.filter((m: any) => m.status === 'finished' || m.status === 'completed');
@@ -515,35 +745,67 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 setLatestMatches([]);
             }
 
-            let seasonQuery = supabase
-                .from('leagues')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (targetOrgId) {
-                seasonQuery = seasonQuery.eq('organization_id', targetOrgId);
-            }
-
-            const { data: matchedSeasonsLeagues } = await seasonQuery;
             let finalTournaments: any[] = [];
+            if (isRealTournament) {
+                let tournQuery = supabase
+                    .from('tournaments')
+                    .select('*')
+                    .order('created_at', { ascending: false });
 
-            if (matchedSeasonsLeagues && matchedSeasonsLeagues.length > 0) {
-                finalTournaments = matchedSeasonsLeagues.map((l: any) => ({
-                    ...l,
-                    _id: l.id,
-                    id: l.id,
-                    season: l.season || '2026/2027',
-                    displayName: l.name
-                }));
-                setAvailableTournaments(finalTournaments);
+                if (targetOrgId) {
+                    tournQuery = tournQuery.eq('organization_id', targetOrgId);
+                }
+
+                const { data: matchedTournaments } = await tournQuery;
+                if (matchedTournaments && matchedTournaments.length > 0) {
+                    finalTournaments = matchedTournaments.map((tr: any) => ({
+                        ...tr,
+                        _id: tr.id,
+                        id: tr.id,
+                        is_tournament: true,
+                        season: tr.start_date || '2026/2027',
+                        displayName: tr.name
+                    }));
+                    setAvailableTournaments(finalTournaments);
+                } else {
+                    finalTournaments = mergedTournament ? [{
+                        ...mergedTournament,
+                        _id: mergedTournament.id,
+                        is_tournament: true,
+                        displayName: mergedTournament.name || 'Turnir'
+                    }] : [];
+                    setAvailableTournaments(finalTournaments);
+                }
             } else {
-                finalTournaments = mergedTournament ? [{
-                    ...mergedTournament,
-                    _id: mergedTournament.id,
-                    season: mergedTournament.season || '2026/2027',
-                    displayName: `${mergedTournament.name || 'Liga'} (${mergedTournament.season || '2026/2027'})`
-                }] : [];
-                setAvailableTournaments(finalTournaments);
+                let seasonQuery = supabase
+                    .from('leagues')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (targetOrgId) {
+                    seasonQuery = seasonQuery.eq('organization_id', targetOrgId);
+                }
+
+                const { data: matchedSeasonsLeagues } = await seasonQuery;
+
+                if (matchedSeasonsLeagues && matchedSeasonsLeagues.length > 0) {
+                    finalTournaments = matchedSeasonsLeagues.map((l: any) => ({
+                        ...l,
+                        _id: l.id,
+                        id: l.id,
+                        season: l.season || '2026/2027',
+                        displayName: l.name
+                    }));
+                    setAvailableTournaments(finalTournaments);
+                } else {
+                    finalTournaments = mergedTournament ? [{
+                        ...mergedTournament,
+                        _id: mergedTournament.id,
+                        season: mergedTournament.season || '2026/2027',
+                        displayName: `${mergedTournament.name || 'Liga'} (${mergedTournament.season || '2026/2027'})`
+                    }] : [];
+                    setAvailableTournaments(finalTournaments);
+                }
             }
 
             // Save to persistent AsyncStorage cache
@@ -770,13 +1032,52 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             const teamIdsSet = new Set((teams && teams.length > 0 ? teams : standings).map((t: any) => String(t.teamId || t.id || t._id)));
             const matchesData = await apiService.getMatches({ tournamentId: currentTournamentId });
 
-            const filteredLeagueMatches = (matchesData || []).filter((m: any) => {
+            let filteredLeagueMatches = (matchesData || []).filter((m: any) => {
                 if (m.tournament_id && String(m.tournament_id) === String(currentTournamentId)) return true;
                 if (m.league_id && String(m.league_id) === String(currentTournamentId)) return true;
                 const homeId = String(m.home_team_id || m.homeTeam?.id || m.homeTeamId);
                 const awayId = String(m.away_team_id || m.awayTeam?.id || m.awayTeamId);
                 return teamIdsSet.has(homeId) || teamIdsSet.has(awayId);
             });
+
+            if (filteredLeagueMatches.length === 0 && currentTournamentId) {
+                const { data: directMatches } = await supabase
+                    .from('matches')
+                    .select('*')
+                    .eq('tournament_id', Number(currentTournamentId))
+                    .order('match_date', { ascending: false });
+
+                if (directMatches && directMatches.length > 0) {
+                    const teamsMap: Record<string, any> = {};
+                    (teams || standings || []).forEach((t: any) => { teamsMap[String(t.id)] = t; });
+
+                    const missingTeamIds = new Set<any>();
+                    directMatches.forEach((m: any) => {
+                        if (m.home_team_id && !teamsMap[String(m.home_team_id)]) missingTeamIds.add(m.home_team_id);
+                        if (m.away_team_id && !teamsMap[String(m.away_team_id)]) missingTeamIds.add(m.away_team_id);
+                    });
+
+                    if (missingTeamIds.size > 0) {
+                        const { data: extraTeams } = await supabase.from('teams').select('id, name, logo_url').in('id', Array.from(missingTeamIds));
+                        (extraTeams || []).forEach((et: any) => { teamsMap[String(et.id)] = et; });
+                    }
+
+                    filteredLeagueMatches = directMatches.map((m: any) => {
+                        const ht = teamsMap[String(m.home_team_id)];
+                        const at = teamsMap[String(m.away_team_id)];
+                        return {
+                            ...m,
+                            _id: m.id,
+                            home_score: m.home_score ?? 0,
+                            away_score: m.away_score ?? 0,
+                            homeTeam: ht ? { id: ht.id, name: ht.name, logo_url: ht.logo_url } : null,
+                            awayTeam: at ? { id: at.id, name: at.name, logo_url: at.logo_url } : null,
+                            team1: ht ? { id: ht.id, name: ht.name, logo: ht.logo_url } : null,
+                            team2: at ? { id: at.id, name: at.name, logo: at.logo_url } : null,
+                        };
+                    });
+                }
+            }
 
             setMatches(filteredLeagueMatches);
             matchesLoadedRef.current = true;
