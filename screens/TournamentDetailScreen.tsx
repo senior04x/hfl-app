@@ -897,31 +897,29 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
     // 2. Fetch Players specifically for this tournament's teams
     // 2. Fetch Players specifically for this tournament's teams and calculate exact stats
-    const fetchTournamentPlayers = async (force = false) => {
+    const fetchTournamentPlayers = async (force = false, teamsList?: any[]) => {
         if (!force && playersLoadedRef.current && topPlayers.length > 0) return;
         setIsLoadingPlayers(true);
         try {
-            const teamIds = (teams && teams.length > 0 ? teams : standings).map((t: any) => t.teamId || t.id || t._id).filter(Boolean);
+            const currentTeams = (teamsList && teamsList.length > 0) 
+                ? teamsList 
+                : ((standings && standings.length > 0) ? standings : teams);
+            const teamIds = (currentTeams || []).map((t: any) => t.teamId || t.id || t._id).filter(Boolean);
             if (teamIds.length > 0) {
                 const teamIdsSet = new Set(teamIds.map(String));
 
-                const teamIdList = Array.from(teamIdsSet);
-                let matchesQuery = supabase
-                    .from('matches')
-                    .select('id, home_team_id, away_team_id, formation, home_formation, away_formation, status')
-                    .or('status.eq.finished,status.eq.completed');
-
-                if (teamIdList.length > 0) {
-                    matchesQuery = matchesQuery.or(`home_team_id.in.(${teamIdList.join(',')}),away_team_id.in.(${teamIdList.join(',')})`);
-                }
-
-                const [{ data: rawPlayers }, { data: matchesData }] = await Promise.all([
+                const [{ data: rawPlayers, error: pErr }, { data: matchesData, error: mErr }] = await Promise.all([
                     supabase.from('applications')
-                        .select('id, team_id, first_name, last_name, photo_url, position, number, phone, status, is_archived')
+                        .select('*')
                         .eq('status', 'approved')
                         .in('team_id', teamIds),
-                    matchesQuery
+                    supabase.from('matches')
+                        .select('id, home_team_id, away_team_id, home_formation, away_formation, status')
+                        .or('status.eq.finished,status.eq.completed')
                 ]);
+
+                if (pErr) console.warn('Supabase applications fetch error:', pErr);
+                if (mErr) console.warn('Supabase matches fetch error:', mErr);
 
                 const playersList = (rawPlayers || []).filter((p: any) => {
                     const st = String(p.status || '').toLowerCase().trim();
@@ -987,7 +985,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         };
 
                         const pIds = [
-                            ...parseLineup(m.formation),
                             ...parseLineup(m.home_formation),
                             ...parseLineup(m.away_formation)
                         ];
@@ -1143,7 +1140,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             }
                         }
                     } catch (e) {}
-                    fetchTournamentPlayers();
+                    fetchTournamentPlayers(false, standings);
                 })();
             }
         } else if (activeTab === 'matches') {
@@ -1165,7 +1162,13 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 })();
             }
         }
-    }, [activeTab, currentTournamentId]);
+    }, [activeTab, currentTournamentId, standings]);
+
+    useEffect(() => {
+        if (standings && standings.length > 0 && topPlayers.length === 0) {
+            fetchTournamentPlayers(false, standings);
+        }
+    }, [standings]);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'Belgilanmagan';
