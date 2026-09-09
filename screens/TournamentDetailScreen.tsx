@@ -786,8 +786,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 }
 
                 const { data: matchedTournaments } = await tournQuery;
-                if (matchedTournaments && matchedTournaments.length > 0) {
-                    finalTournaments = matchedTournaments.map((tr: any) => ({
+                const activeTournaments = (matchedTournaments || []).filter((tr: any) =>
+                    tr &&
+                    tr.status !== 'archived' &&
+                    tr.status !== 'inactive' &&
+                    tr.is_active !== false
+                );
+                if (activeTournaments.length > 0) {
+                    finalTournaments = activeTournaments.map((tr: any) => ({
                         ...tr,
                         _id: tr.id,
                         id: tr.id,
@@ -797,7 +803,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     }));
                     setAvailableTournaments(finalTournaments);
                 } else {
-                    finalTournaments = mergedTournament ? [{
+                    finalTournaments = mergedTournament && mergedTournament.status !== 'archived' && mergedTournament.status !== 'inactive' && mergedTournament.is_active !== false ? [{
                         ...mergedTournament,
                         _id: mergedTournament.id,
                         is_tournament: true,

@@ -473,9 +473,20 @@ export default function TournamentsScreen({ navigation }: any) {
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed && Array.isArray(parsed.leagues) && parsed.leagues.length > 0) {
-                    setLeagues(parsed.leagues);
+                    const validLeagues = parsed.leagues.filter((item: any) => {
+                        if (item?.is_tournament) {
+                            return item.status !== 'archived' && item.status !== 'inactive' && item.is_active !== false;
+                        }
+                        return true;
+                    });
+                    setLeagues(validLeagues);
                     if (parsed.selectedLeague) {
-                        setSelectedLeague(parsed.selectedLeague);
+                        const isSelTournInactive = parsed.selectedLeague.is_tournament && (
+                            parsed.selectedLeague.status === 'archived' ||
+                            parsed.selectedLeague.status === 'inactive' ||
+                            parsed.selectedLeague.is_active === false
+                        );
+                        setSelectedLeague(isSelTournInactive ? (validLeagues[0] || null) : parsed.selectedLeague);
                     }
                     if (Array.isArray(parsed.teams) && parsed.teams.length > 0) {
                         setTeams(parsed.teams);
@@ -495,12 +506,20 @@ export default function TournamentsScreen({ navigation }: any) {
                 }
             }
         } catch (e) {
-            console.error('Error loading tournaments cache:', e);
+            console.warn('Error loading cached leagues:', e);
         }
         return false;
     };
 
     const normalizeStr = (str: any) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const isTournActiveRecord = (t: any) =>
+        Boolean(
+            t &&
+            t.status !== 'archived' &&
+            t.status !== 'inactive' &&
+            t.is_active !== false
+        );
 
     const fetchLeagues = async (orgIdParam?: number, isSilent = false) => {
         const targetOrgId = orgIdParam || selectedOrganizationId || 1;
@@ -538,7 +557,7 @@ export default function TournamentsScreen({ navigation }: any) {
                     const mNorm = normalizeStr(m.league || m.tournament_name || '');
                     const isIdMatch = m.league_id && Number(m.league_id) === Number(l.id);
                     const isOrgMatch = (!m.organization_id || Number(m.organization_id) === targetOrgId);
-                    return isOrgMatch && (isIdMatch || (mNorm && lNorm && (mNorm === lNorm || mNorm.includes(lNorm) || lNorm.includes(mNorm))));
+                    return (isIdMatch || (mNorm && mNorm === lNorm)) && isOrgMatch;
                 });
 
                 let maxRound = 0;
@@ -571,12 +590,12 @@ export default function TournamentsScreen({ navigation }: any) {
                 };
             });
 
-            // 2. Process Tournaments (Own + Co-host + Fallback)
+            // 2. Process Tournaments (Own + Co-host + Fallback) - Filter out inactive/archived
             const tournamentsList: any[] = [];
             const tournIdMap = new Set<string>();
 
             (ownTournamentsRes?.data || []).forEach((t: any) => {
-                if (t && t.id && !tournIdMap.has(String(t.id))) {
+                if (t && t.id && isTournActiveRecord(t) && !tournIdMap.has(String(t.id))) {
                     tournIdMap.add(String(t.id));
                     tournamentsList.push({
                         ...t,
@@ -587,7 +606,7 @@ export default function TournamentsScreen({ navigation }: any) {
             });
 
             const processCollabTourn = (c: any) => {
-                if (c?.tournament && !tournIdMap.has(String(c.tournament.id))) {
+                if (c?.tournament && isTournActiveRecord(c.tournament) && !tournIdMap.has(String(c.tournament.id))) {
                     tournIdMap.add(String(c.tournament.id));
                     tournamentsList.push({
                         ...c.tournament,
@@ -604,7 +623,7 @@ export default function TournamentsScreen({ navigation }: any) {
             if (tournamentsList.length === 0) {
                 const { data: allActiveTourns } = await supabase.from('tournaments').select('*').order('id', { ascending: true });
                 (allActiveTourns || []).forEach((t: any) => {
-                    if (t && t.id && !tournIdMap.has(String(t.id))) {
+                    if (t && t.id && isTournActiveRecord(t) && !tournIdMap.has(String(t.id))) {
                         tournIdMap.add(String(t.id));
                         tournamentsList.push({
                             ...t,
