@@ -76,7 +76,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             onStartShouldSetPanResponderCapture: () => false,
             onMoveShouldSetPanResponderCapture: (_, gestureState) => {
                 if (activeTabRef.current !== 'overview') return false;
-                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+                return gestureState.x0 < 45 && gestureState.dx > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
             },
             onPanResponderMove: (_, gestureState) => {
                 if (gestureState.dx > 0) {
@@ -720,20 +720,16 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 setTotalPlayersCount(finalCount);
 
                 const teamIdsSet = new Set(teamIds.map(String));
-                finalMatches = (allMatchesData || []).filter((m: any) => {
-                    if (m.tournament_id && String(m.tournament_id) === String(currentTournamentId)) return true;
-                    if (m.league_id && String(m.league_id) === String(currentTournamentId)) return true;
-                    const homeId = String(m.home_team_id || m.homeTeam?.id || m.homeTeamId);
-                    const awayId = String(m.away_team_id || m.awayTeam?.id || m.awayTeamId);
-                    return teamIdsSet.has(homeId) || teamIdsSet.has(awayId);
-                });
-
-                // If tournament and matches from apiService were empty, enrich direct tournament matches
-                if (isRealTournament && finalMatches.length === 0 && tournamentMatchesDirect.length > 0) {
+                if (isRealTournament) {
+                    const tournIdStr = String(targetTournamentId || currentTournamentId);
                     const teamsMap: Record<string, any> = {};
                     resolvedTeams.forEach((t: any) => { teamsMap[String(t.id)] = t; });
 
-                    finalMatches = tournamentMatchesDirect.map((m: any) => {
+                    const matchesSource = (tournamentMatchesDirect && tournamentMatchesDirect.length > 0)
+                        ? tournamentMatchesDirect
+                        : (allMatchesData || []).filter((m: any) => m.tournament_id && String(m.tournament_id) === tournIdStr);
+
+                    finalMatches = matchesSource.map((m: any) => {
                         const ht = teamsMap[String(m.home_team_id)];
                         const at = teamsMap[String(m.away_team_id)];
                         return {
@@ -741,11 +737,27 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             _id: m.id,
                             home_score: m.home_score ?? 0,
                             away_score: m.away_score ?? 0,
-                            homeTeam: ht ? { id: ht.id, name: ht.name, logo_url: ht.logo_url } : null,
-                            awayTeam: at ? { id: at.id, name: at.name, logo_url: at.logo_url } : null,
-                            team1: ht ? { id: ht.id, name: ht.name, logo: ht.logo_url } : null,
-                            team2: at ? { id: at.id, name: at.name, logo: at.logo_url } : null,
+                            homeTeam: ht ? { id: ht.id, name: ht.name, logo_url: ht.logo_url } : (m.homeTeam || null),
+                            awayTeam: at ? { id: at.id, name: at.name, logo_url: at.logo_url } : (m.awayTeam || null),
+                            team1: ht ? { id: ht.id, name: ht.name, logo: ht.logo_url } : (m.team1 || null),
+                            team2: at ? { id: at.id, name: at.name, logo: at.logo_url } : (m.team2 || null),
                         };
+                    });
+                } else {
+                    const targetLgName = String(resolvedLeagueRecord?.name || mergedTournament?.name || currentTournamentId).toLowerCase().trim();
+                    const targetLgIdStr = resolvedLeagueId ? String(resolvedLeagueId) : (targetLeagueId ? String(targetLeagueId) : null);
+
+                    finalMatches = (allMatchesData || []).filter((m: any) => {
+                        // Exclude tournament matches from regular league view
+                        if (m.tournament_id) return false;
+
+                        const matchLgName = String(m.league || '').toLowerCase().trim();
+                        if (matchLgName && targetLgName && matchLgName === targetLgName) return true;
+                        if (targetLgIdStr && m.league_id && String(m.league_id) === targetLgIdStr) return true;
+
+                        const homeId = String(m.home_team_id || m.homeTeam?.id || m.homeTeamId || '');
+                        const awayId = String(m.away_team_id || m.awayTeam?.id || m.awayTeamId || '');
+                        return teamIdsSet.has(homeId) && teamIdsSet.has(awayId);
                     });
                 }
 
@@ -1055,21 +1067,15 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         setIsLoadingMatches(true);
         try {
             const teamIdsSet = new Set((teams && teams.length > 0 ? teams : standings).map((t: any) => String(t.teamId || t.id || t._id)));
-            const matchesData = await apiService.getMatches({ tournamentId: currentTournamentId });
+            const isRealTourn = Boolean(tournamentData?.is_tournament || route?.params?.is_tournament || route?.params?.isTournament);
+            let filteredLeagueMatches: any[] = [];
 
-            let filteredLeagueMatches = (matchesData || []).filter((m: any) => {
-                if (m.tournament_id && String(m.tournament_id) === String(currentTournamentId)) return true;
-                if (m.league_id && String(m.league_id) === String(currentTournamentId)) return true;
-                const homeId = String(m.home_team_id || m.homeTeam?.id || m.homeTeamId);
-                const awayId = String(m.away_team_id || m.awayTeam?.id || m.awayTeamId);
-                return teamIdsSet.has(homeId) || teamIdsSet.has(awayId);
-            });
-
-            if (filteredLeagueMatches.length === 0 && currentTournamentId) {
+            if (isRealTourn) {
+                const tournIdNum = Number(tournamentData?.id || currentTournamentId);
                 const { data: directMatches } = await supabase
                     .from('matches')
                     .select('*')
-                    .eq('tournament_id', Number(currentTournamentId))
+                    .eq('tournament_id', tournIdNum)
                     .order('match_date', { ascending: false });
 
                 if (directMatches && directMatches.length > 0) {
@@ -1102,6 +1108,20 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         };
                     });
                 }
+            } else {
+                const targetLgName = String(tournamentData?.name || route?.params?.tournamentName || currentTournamentId).toLowerCase().trim();
+                const targetLgId = tournamentData?.id ? String(tournamentData.id) : null;
+
+                const matchesData = await apiService.getMatches({ tournamentId: currentTournamentId });
+                filteredLeagueMatches = (matchesData || []).filter((m: any) => {
+                    if (m.tournament_id) return false;
+                    const matchLgName = String(m.league || '').toLowerCase().trim();
+                    if (matchLgName && targetLgName && matchLgName === targetLgName) return true;
+                    if (targetLgId && m.league_id && String(m.league_id) === targetLgId) return true;
+                    const homeId = String(m.home_team_id || m.homeTeam?.id || m.homeTeamId || '');
+                    const awayId = String(m.away_team_id || m.awayTeam?.id || m.awayTeamId || '');
+                    return teamIdsSet.has(homeId) && teamIdsSet.has(awayId);
+                });
             }
 
             setMatches(filteredLeagueMatches);
@@ -1389,15 +1409,16 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         const targetIdx = userPlayerIndexRef.current;
         if (targetIdx < 0) {
-            setIsUserRowVisible(false);
+            setIsUserRowVisible(prev => prev ? false : prev);
             return;
         }
         const isVisible = (viewableItems || []).some((vi: any) => vi.index === targetIdx);
-        setIsUserRowVisible(isVisible);
+        setIsUserRowVisible(prev => prev !== isVisible ? isVisible : prev);
     }).current;
 
     const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 25,
+        itemVisiblePercentThreshold: 20,
+        minimumViewTime: 120,
     }).current;
 
     const handleScrollToMyRow = useCallback(() => {
@@ -1765,7 +1786,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     };
 
     const renderStandings = () => (
-        <View style={styles.tabContent}>
+        <ScrollView 
+            style={styles.tabContent}
+            contentContainerStyle={{ paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+        >
             <View style={[styles.searchContainer, { backgroundColor: isDark ? homeColors.background : '#F2F2F4', borderColor: homeColors.border }]}>
                 <Ionicons name="search" size={18} color={homeColors.textSecondary} style={styles.searchIcon} />
                 <TextInput
@@ -1780,7 +1806,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             {isLoadingStandings ? (
                 <TableSkeleton />
             ) : (
-                <View style={[styles.screenshotCardWrapper, cardSurfaceStyle]}>
+                <View style={[styles.screenshotCardWrapper, cardSurfaceStyle, { marginBottom: 24 }]}>
                     {/* Header Columns */}
                     <View style={[styles.screenshotTableHeader, { backgroundColor: isDark ? homeColors.background : '#F0F0F2', borderBottomColor: homeColors.border }]}>
                         <Text style={[styles.screenshotHeaderPos, { color: homeColors.textSecondary }]}>{t('tournaments.table_rank', '#')}</Text>
@@ -1790,65 +1816,63 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         <Text style={[styles.screenshotHeaderPoints, { color: homeColors.textSecondary }]}>{t('tournaments.table_points', 'O')}</Text>
                     </View>
 
-                    <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
-                        {filteredStandings.length === 0 ? (
-                            <View style={styles.empty}>
-                                <Text style={[styles.emptyText, { color: homeColors.textSecondary }]}>{t('tournaments.no_data', 'Ma\'lumot topilmadi')}</Text>
-                            </View>
-                        ) : (
-                            filteredStandings.map((team, index) => {
-                                const s = team.stats || {};
-                                const gf = team.goalsFor ?? s.goalsFor ?? team.gf ?? 0;
-                                const ga = team.goalsAgainst ?? s.goalsAgainst ?? team.ga ?? 0;
-                                const gd = team.goalDifference ?? s.goalDifference ?? team.gd ?? (gf - ga);
-                                const points = team.points ?? s.points ?? team.pts ?? 0;
-                                const played = team.played ?? s.played ?? team.matchesPlayed ?? s.matchesPlayed ?? 0;
+                    {filteredStandings.length === 0 ? (
+                        <View style={styles.empty}>
+                            <Text style={[styles.emptyText, { color: homeColors.textSecondary }]}>{t('tournaments.no_data', 'Ma\'lumot topilmadi')}</Text>
+                        </View>
+                    ) : (
+                        filteredStandings.map((team, index) => {
+                            const s = team.stats || {};
+                            const gf = team.goalsFor ?? s.goalsFor ?? team.gf ?? 0;
+                            const ga = team.goalsAgainst ?? s.goalsAgainst ?? team.ga ?? 0;
+                            const gd = team.goalDifference ?? s.goalDifference ?? team.gd ?? (gf - ga);
+                            const points = team.points ?? s.points ?? team.pts ?? 0;
+                            const played = team.played ?? s.played ?? team.matchesPlayed ?? s.matchesPlayed ?? 0;
 
-                                return (
-                                    <TouchableOpacity 
-                                        key={team.teamId || team.id || team._id || index} 
-                                        style={[styles.screenshotRow, { borderBottomColor: homeColors.border }]}
-                                        onPress={() => navigation.navigate('TeamProfile', { team: team, teamId: team.teamId || team.id || team._id })}
-                                        activeOpacity={0.7}
-                                    >
-                                        {index === 0 ? (
-                                            <View style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
-                                                <FontAwesome5 name="medal" size={15} color="#FFB800" />
-                                            </View>
-                                        ) : index === 1 ? (
-                                            <View style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
-                                                <FontAwesome5 name="medal" size={15} color="#A0A0A0" />
-                                            </View>
-                                        ) : index === 2 ? (
-                                            <View style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
-                                                <FontAwesome5 name="medal" size={15} color="#CD7F32" />
-                                            </View>
-                                        ) : (
-                                            <Text style={[styles.screenshotPos, { color: homeColors.textSecondary }]}>{index + 1}</Text>
-                                        )}
-                                        
-                                        <View style={styles.screenshotTeamCol}>
-                                            <View style={[styles.screenshotLogoCircle, { backgroundColor: isDark ? homeColors.background : '#F2F2F4', borderColor: homeColors.border }]}>
-                                                {team.logo || team.logo_url ? (
-                                                    <Image source={{ uri: team.logo || team.logo_url }} style={styles.screenshotLogoImg} />
-                                                ) : (
-                                                    <Ionicons name="shield-outline" size={14} color={homeColors.textSecondary} />
-                                                )}
-                                            </View>
-                                            <Text style={[styles.screenshotTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{(team.name || 'JAMOA').toUpperCase()}</Text>
+                            return (
+                                <TouchableOpacity 
+                                    key={team.teamId || team.id || team._id || index} 
+                                    style={[styles.screenshotRow, { borderBottomColor: homeColors.border }]}
+                                    onPress={() => navigation.navigate('TeamProfile', { team: team, teamId: team.teamId || team.id || team._id })}
+                                    activeOpacity={0.7}
+                                >
+                                    {index === 0 ? (
+                                        <View style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
+                                            <FontAwesome5 name="medal" size={15} color="#FFB800" />
                                         </View>
-                                        
-                                        <Text style={[styles.screenshotStatPlayed, { color: homeColors.textPrimary }]}>{played}</Text>
-                                        <Text style={[styles.screenshotStatGd, { color: homeColors.textSecondary }]}>{gd}</Text>
-                                        <Text style={[styles.screenshotStatPoints, { color: homeColors.textPrimary }]}>{points}</Text>
-                                    </TouchableOpacity>
-                                );
-                            })
-                        )}
-                    </ScrollView>
+                                    ) : index === 1 ? (
+                                        <View style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
+                                            <FontAwesome5 name="medal" size={15} color="#A0A0A0" />
+                                        </View>
+                                    ) : index === 2 ? (
+                                        <View style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
+                                            <FontAwesome5 name="medal" size={15} color="#CD7F32" />
+                                        </View>
+                                    ) : (
+                                        <Text style={[styles.screenshotPos, { color: homeColors.textSecondary }]}>{index + 1}</Text>
+                                    )}
+                                    
+                                    <View style={styles.screenshotTeamCol}>
+                                        <View style={[styles.screenshotLogoCircle, { backgroundColor: isDark ? homeColors.background : '#F2F2F4', borderColor: homeColors.border }]}>
+                                            {team.logo || team.logo_url ? (
+                                                <Image source={{ uri: team.logo || team.logo_url }} style={styles.screenshotLogoImg} />
+                                            ) : (
+                                                <Ionicons name="shield-outline" size={14} color={homeColors.textSecondary} />
+                                            )}
+                                        </View>
+                                        <Text style={[styles.screenshotTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>{(team.name || 'JAMOA').toUpperCase()}</Text>
+                                    </View>
+                                    
+                                    <Text style={[styles.screenshotStatPlayed, { color: homeColors.textPrimary }]}>{played}</Text>
+                                    <Text style={[styles.screenshotStatGd, { color: homeColors.textSecondary }]}>{gd}</Text>
+                                    <Text style={[styles.screenshotStatPoints, { color: homeColors.textPrimary }]}>{points}</Text>
+                                </TouchableOpacity>
+                            );
+                        })
+                    )}
                 </View>
             )}
-        </View>
+        </ScrollView>
     );
 
     const renderPlayers = () => {
@@ -1938,6 +1962,16 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             keyExtractor={(player, index) => String(player._id || player.id || index)}
                             contentContainerStyle={{ paddingBottom: 130 }}
                             showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled={true}
+                            removeClippedSubviews={Platform.OS === 'android'}
+                            initialNumToRender={15}
+                            maxToRenderPerBatch={10}
+                            windowSize={5}
+                            getItemLayout={(_, index) => ({
+                                length: 64,
+                                offset: 64 * index,
+                                index,
+                            })}
                             onEndReached={() => {
                                 if (displayedPlayersCount < filteredPlayers.length) {
                                     setDisplayedPlayersCount(prev => Math.min(prev + 20, filteredPlayers.length));
@@ -2088,6 +2122,11 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     keyExtractor={(group: any) => group.tourKey}
                     contentContainerStyle={{ paddingBottom: 110, paddingHorizontal: 16 }}
                     showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled={true}
+                    removeClippedSubviews={Platform.OS === 'android'}
+                    initialNumToRender={4}
+                    maxToRenderPerBatch={4}
+                    windowSize={5}
                     onEndReached={() => {
                         if (displayedToursCount < groupedMatchesByTour.length) {
                             setDisplayedToursCount(prev => Math.min(prev + 3, groupedMatchesByTour.length));
@@ -2453,7 +2492,6 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
         borderRadius: 14,
         overflow: 'hidden',
-        flex: 1,
     },
     screenshotTableHeader: {
         flexDirection: 'row',
