@@ -181,35 +181,28 @@ const TournamentsHeader = ({
             >
                 <View style={styles.leagueCardCenteredContent}>
                     <View style={[styles.largeLogoWrapper, { backgroundColor: 'transparent', borderWidth: 0 }]}>
-                        {isGuest ? (
-                            isLeaguesLoading || !activeOrg ? (
-                                <Skeleton width={180} height={80} borderRadius={10} />
-                            ) : orgLogo && typeof orgLogo === 'string' && (orgLogo.startsWith('http') || orgLogo.length > 8) ? (
-                                <Image
-                                    source={{ uri: orgLogo }}
-                                    style={styles.headerLeagueLogoLarge}
-                                    resizeMode="contain"
-                                />
-                            ) : (
-                                <View style={styles.fallbackLogoBox}>
-                                    <Ionicons name="business" size={50} color={homeColors.accent} />
-                                    <Text style={[styles.fallbackOrgTitle, { color: '#FFFFFF' }]}>
-                                        {(activeOrg?.slug || activeOrg?.name || 'HFL').toUpperCase()}
-                                    </Text>
-                                </View>
-                            )
+                        {isLeaguesLoading && !selectedLeague ? (
+                            <Skeleton width={180} height={80} borderRadius={10} />
+                        ) : currentLeagueLogoSource ? (
+                            <Image
+                                source={currentLeagueLogoSource}
+                                style={styles.headerLeagueLogoLarge}
+                                resizeMode="contain"
+                            />
+                        ) : selectedLeague?.logo_url ? (
+                            <Image
+                                source={{ uri: selectedLeague.logo_url }}
+                                style={styles.headerLeagueLogoLarge}
+                                resizeMode="contain"
+                            />
+                        ) : orgLogo && typeof orgLogo === 'string' && (orgLogo.startsWith('http') || orgLogo.length > 8) && !selectedLeague ? (
+                            <Image
+                                source={{ uri: orgLogo }}
+                                style={styles.headerLeagueLogoLarge}
+                                resizeMode="contain"
+                            />
                         ) : (
-                            isLeaguesLoading || !selectedLeague ? (
-                                <Skeleton width={180} height={80} borderRadius={10} />
-                            ) : currentLeagueLogoSource ? (
-                                <Image
-                                    source={currentLeagueLogoSource}
-                                    style={styles.headerLeagueLogoLarge}
-                                    resizeMode="contain"
-                                />
-                            ) : (
-                                <Ionicons name={selectedLeague?.is_tournament ? "trophy" : "shield"} size={60} color={selectedLeague?.is_tournament ? "#38bdf8" : homeColors.accent} />
-                            )
+                            <Ionicons name={selectedLeague?.is_tournament ? "trophy" : "shield"} size={60} color={selectedLeague?.is_tournament ? "#38bdf8" : homeColors.accent} />
                         )}
                     </View>
 
@@ -217,11 +210,9 @@ const TournamentsHeader = ({
                     <View style={styles.selectorFooterRow}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 1 }}>
                             <Text style={[styles.selectedLeagueHeading, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                {isGuest 
-                                    ? (activeOrg?.name || 'TASHKILOT').toUpperCase()
-                                    : (selectedLeague?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()}
+                                {(selectedLeague?.name || activeOrg?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()}
                             </Text>
-                            {!isGuest && selectedLeague?.is_tournament && (
+                            {selectedLeague?.is_tournament && (
                                 <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.4)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
                                     <Text style={{ color: '#38bdf8', fontSize: 9, fontWeight: '800' }}>TURNIR</Text>
                                 </View>
@@ -251,48 +242,20 @@ const TournamentsHeader = ({
                     }),
                 }
             ]}>
-                <View style={styles.accordionContent}>
-                    {isGuest ? (
-                        (organizations || []).map((org: any) => {
-                            const isSelected = (activeOrg?.id === org.id);
-                            const itemOrgLogo = org.logo_url || org.logo || org.photo_url;
-                            return (
-                                <TouchableOpacity
-                                    key={org.id}
-                                    style={[
-                                        styles.accordionItem,
-                                        { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
-                                        isSelected && { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)' }
-                                    ]}
-                                    onPress={() => handleOrgSelect(org)}
-                                    activeOpacity={0.65}
-                                >
-                                    <View style={[styles.accordionLogoContainer, { backgroundColor: 'transparent', borderWidth: 0 }]}>
-                                        {itemOrgLogo && typeof itemOrgLogo === 'string' && (itemOrgLogo.startsWith('http') || itemOrgLogo.length > 8) ? (
-                                            <Image source={{ uri: itemOrgLogo }} style={styles.accordionLogo} resizeMode="contain" />
-                                        ) : (
-                                            <Ionicons name="business" size={16} color={homeColors.accent} />
-                                        )}
-                                    </View>
-                                    <Text style={[
-                                        styles.accordionItemName,
-                                        { color: isSelected ? homeColors.textPrimary : homeColors.textSecondary },
-                                        isSelected && { fontWeight: '800' }
-                                    ]} numberOfLines={1}>
-                                        {(org.name || 'TASHKILOT').toUpperCase()}
-                                    </Text>
-                                    {isSelected && (
-                                        <Ionicons name="checkmark-circle" size={18} color={homeColors.accent} style={{ marginLeft: 8 }} />
-                                    )}
-                                </TouchableOpacity>
-                            );
-                        })
-                    ) : (
-                        isLeaguesLoading ? (
+                <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 360 }}>
+                    <View style={styles.accordionContent}>
+                        {isLeaguesLoading && (!leagues || leagues.length === 0) ? (
                             <View style={{ padding: 16 }}>
                                 <Skeleton width="100%" height={38} borderRadius={8} style={{ marginBottom: 10 }} />
                                 <Skeleton width="100%" height={38} borderRadius={8} style={{ marginBottom: 10 }} />
                                 <Skeleton width="100%" height={38} borderRadius={8} />
+                            </View>
+                        ) : (!leagues || leagues.length === 0) ? (
+                            <View style={{ padding: 20, alignItems: 'center' }}>
+                                <Ionicons name="alert-circle-outline" size={24} color={homeColors.textSecondary} />
+                                <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 6 }}>
+                                    {t('tournaments.no_tournaments', "Musobaqalar topilmadi")}
+                                </Text>
                             </View>
                         ) : (
                             leagues.map((league: any) => {
@@ -313,6 +276,8 @@ const TournamentsHeader = ({
                                         <View style={[styles.accordionLogoContainer, { backgroundColor: 'transparent', borderWidth: 0 }]}>
                                             {itemLogo ? (
                                                 <Image source={itemLogo} style={styles.accordionLogo} resizeMode="contain" />
+                                            ) : league.logo_url ? (
+                                                <Image source={{ uri: league.logo_url }} style={styles.accordionLogo} resizeMode="contain" />
                                             ) : (
                                                 <Ionicons name={isTourn ? "trophy" : "football"} size={16} color={isTourn ? "#38bdf8" : homeColors.accent} />
                                             )}
@@ -337,13 +302,13 @@ const TournamentsHeader = ({
                                     </TouchableOpacity>
                                 );
                             })
-                        )
-                    )}
-                </View>
+                        )}
+                    </View>
+                </ScrollView>
             </Animated.View>
 
             {/* 4. About League Button (Auth Mode only) */}
-            {!isGuest && selectedLeague ? (
+            {selectedLeague ? (
                 <TouchableOpacity
                     style={[
                         styles.aboutLeagueButton,
@@ -362,7 +327,7 @@ const TournamentsHeader = ({
                 >
                     <View style={styles.aboutLeagueButtonInner}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="information-circle-outline" size={17} color={homeColors.textSecondary} style={{ marginRight: 8 }} />
+                            <Ionicons name={selectedLeague?.is_tournament ? "trophy-outline" : "information-circle-outline"} size={17} color={selectedLeague?.is_tournament ? "#38bdf8" : homeColors.textSecondary} style={{ marginRight: 8 }} />
                             <Text style={[styles.aboutLeagueButtonText, { color: homeColors.textPrimary }]}>
                                 {selectedLeague?.is_tournament 
                                     ? t('tournaments.about_tournament', 'TURNIR HAQIDA').toUpperCase()
@@ -499,10 +464,11 @@ export default function TournamentsScreen({ navigation }: any) {
     }, [isLeagueSelectorOpen]);
 
     const TOURNAMENTS_CACHE_TTL = 5 * 60 * 1000; // 5 minut
+    const TOURNAMENTS_CACHE_KEY = '@amatora_tournaments_v5_';
 
     const loadCachedLeagues = async (targetOrgId: number): Promise<boolean> => {
         try {
-            const cacheKey = `@amatora_tournaments_cache_${targetOrgId}`;
+            const cacheKey = `${TOURNAMENTS_CACHE_KEY}${targetOrgId}`;
             const raw = await AsyncStorage.getItem(cacheKey);
             if (raw) {
                 const parsed = JSON.parse(raw);
@@ -547,7 +513,7 @@ export default function TournamentsScreen({ navigation }: any) {
                 apiService.getLeaguesByOrgId(targetOrgId),
                 apiService.getTeams(1, 500),
                 supabase.from('matches').select('id, league, round, tour, status, organization_id, league_id, tournament_id, stage, home_team_id, away_team_id'),
-                supabase.from('tournaments').select('*').eq('organization_id', targetOrgId).order('id', { ascending: true }),
+                supabase.from('tournaments').select('*').or(`organization_id.eq.${targetOrgId},organization_id.is.null`).order('id', { ascending: true }),
                 supabase.from('tournament_cohosts').select('*, tournament:tournament_id (*)').eq('receiver_org_id', targetOrgId).eq('status', 'accepted'),
                 supabase.from('tournament_cohosts').select('*, tournament:tournament_id (*)').eq('sender_org_id', targetOrgId).eq('status', 'accepted'),
             ]);
@@ -605,7 +571,7 @@ export default function TournamentsScreen({ navigation }: any) {
                 };
             });
 
-            // 2. Process Tournaments (Own + Co-host)
+            // 2. Process Tournaments (Own + Co-host + Fallback)
             const tournamentsList: any[] = [];
             const tournIdMap = new Set<string>();
 
@@ -634,6 +600,20 @@ export default function TournamentsScreen({ navigation }: any) {
 
             (collabRecvRes?.data || []).forEach(processCollabTourn);
             (collabSendRes?.data || []).forEach(processCollabTourn);
+
+            if (tournamentsList.length === 0) {
+                const { data: allActiveTourns } = await supabase.from('tournaments').select('*').order('id', { ascending: true });
+                (allActiveTourns || []).forEach((t: any) => {
+                    if (t && t.id && !tournIdMap.has(String(t.id))) {
+                        tournIdMap.add(String(t.id));
+                        tournamentsList.push({
+                            ...t,
+                            is_tournament: true,
+                            isOwn: true,
+                        });
+                    }
+                });
+            }
 
             const enrichedTournaments = tournamentsList.map((t: any) => {
                 const tournMatches = matchesList.filter((m: any) => {
@@ -666,22 +646,25 @@ export default function TournamentsScreen({ navigation }: any) {
                 };
             });
 
-            // 3. Combine Leagues + Tournaments seamlessly
+            // 3. Combine Tournaments + Leagues seamlessly (Tournaments first for high prominence)
             const combinedItems = [
-                ...enrichedLeagues,
-                ...enrichedTournaments
+                ...enrichedTournaments,
+                ...enrichedLeagues
             ];
 
             setLeagues(combinedItems);
 
             if (combinedItems.length > 0) {
-                const firstLeague = combinedItems[0];
-                setSelectedLeague(firstLeague);
-                const fetchedTeams = await fetchLeagueTeams(firstLeague.name || firstLeague.id || '', firstLeague);
+                const currentSelected = selectedLeague 
+                    ? combinedItems.find(i => i.id === selectedLeague.id && !!i.is_tournament === !!selectedLeague.is_tournament)
+                    : null;
+                const firstItem = currentSelected || combinedItems[0];
+                setSelectedLeague(firstItem);
+                const fetchedTeams = await fetchLeagueTeams(firstItem.name || firstItem.id || '', firstItem);
                 
-                await AsyncStorage.setItem(`@amatora_tournaments_cache_${targetOrgId}`, JSON.stringify({
+                await AsyncStorage.setItem(`${TOURNAMENTS_CACHE_KEY}${targetOrgId}`, JSON.stringify({
                     leagues: combinedItems,
-                    selectedLeague: firstLeague,
+                    selectedLeague: firstItem,
                     teams: fetchedTeams || [],
                     totalTeamsCount: orgTeamsTotal,
                     leaguePlayersCount: leaguePlayersCount,
@@ -701,10 +684,8 @@ export default function TournamentsScreen({ navigation }: any) {
     useEffect(() => {
         const init = async () => {
             const targetOrgId = selectedOrganizationId || 1;
-            const isFresh = await loadCachedLeagues(targetOrgId);
-            if (!isFresh) {
-                fetchLeagues(targetOrgId, hasCachedLeaguesRef.current);
-            }
+            await loadCachedLeagues(targetOrgId);
+            fetchLeagues(targetOrgId, hasCachedLeaguesRef.current);
         };
         init();
     }, [selectedOrganizationId]);
