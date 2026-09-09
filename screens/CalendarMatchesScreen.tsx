@@ -385,10 +385,11 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                             <Text style={[styles.emptyText, { marginTop: 12, color: homeColors.textSecondary }]}>{t('common.loading')}</Text>
                         </View>
                     ) : (
-                        <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                        <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
                             <ScrollView
                                 contentContainerStyle={styles.listContent}
                                 showsVerticalScrollIndicator={false}
+                                nestedScrollEnabled={true}
                                 refreshControl={
                                     <CustomRefreshControl
                                         refreshing={refreshing}

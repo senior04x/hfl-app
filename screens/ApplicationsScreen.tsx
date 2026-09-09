@@ -275,7 +275,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                     transform: [{ translateX: swipeBackAnim }]
                 }
             ]}
-            {...swipeBackPanResponder.panHandlers}
+            {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}
         >
             <SafeAreaView style={{ flex: 1, backgroundColor: homeColors.background }}>
                 <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />

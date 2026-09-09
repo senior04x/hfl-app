@@ -551,11 +551,12 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             </View>
 
             {/* PAGER WITH 3 ATTACHED PANELS */}
-            <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+            <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
             <Animated.ScrollView
                 ref={pagerScrollRef}
                 horizontal
                 pagingEnabled
+                directionalLockEnabled={true}
                 showsHorizontalScrollIndicator={false}
                 bounces={false}
                 scrollEventThrottle={16}
@@ -572,6 +573,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                 <View style={{ width, flex: 1 }}>
                     <ScrollView
                             showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled={true}
                             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}
                             refreshControl={
                                 <RefreshControl
@@ -667,7 +669,11 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
                 {/* TAB 1: TAKTIKA */}
                 <View style={{ width, flex: 1 }}>
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}>
+                    <ScrollView 
+                        showsVerticalScrollIndicator={false} 
+                        nestedScrollEnabled={true}
+                        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}
+                    >
                         {(team?.formation?.players && team.formation.players.length > 0) ? (
                             <TacticsBoard
                                 formation={team?.formation}
@@ -701,7 +707,11 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
                 {/* TAB 2: O'YINLAR */}
                 <View style={{ width, flex: 1 }}>
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}>
+                    <ScrollView 
+                        showsVerticalScrollIndicator={false} 
+                        nestedScrollEnabled={true}
+                        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}
+                    >
                         {isMatchesLoading ? (
                             [1, 2, 3].map((key) => (
                                 <View

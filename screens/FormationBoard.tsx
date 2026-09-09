@@ -822,7 +822,7 @@ export default function FormationBoard({ route, navigation }: any) {
                     shadowRadius: 10,
                     elevation: 10,
                 }}
-                {...swipeBackPanResponder.panHandlers}
+                {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}
             >
                 <GestureHandlerRootView style={{ flex: 1 }}>
                     <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>

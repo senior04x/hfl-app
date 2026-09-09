@@ -131,10 +131,11 @@ export default function SystemSettingsScreen({ navigation }: any) {
                         onBackPress={() => navigation.goBack()}
                     />
 
-                    <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                    <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
                         <ScrollView
                             style={styles.container}
                             showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled={true}
                             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 60, paddingTop: 10 }}
                         >
                             {/* Section 1: Mavzu & Ko'rinish (Theme & Appearance) */}

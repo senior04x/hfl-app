@@ -615,7 +615,12 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     const renderOverviewSkeleton = () => (
-        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <ScrollView 
+            style={styles.tabContent} 
+            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+        >
             {[1, 2, 3, 4, 5].map((i) => (
                 <View key={i} style={styles.timelineRow}>
                     <View style={styles.timelineLeftColumn}>
@@ -654,6 +659,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             <ScrollView 
                 style={styles.tabContent} 
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -675,7 +682,12 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     const renderPreviewSkeleton = () => (
-        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <ScrollView 
+            style={styles.tabContent} 
+            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+        >
             {/* 1. Pre-Match Overview Header Skeleton */}
             <View style={[styles.previewSectionCard, cardSurface]}>
                 <View style={{ padding: 16 }}>
@@ -756,6 +768,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             <ScrollView 
                 style={styles.tabContent} 
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -978,7 +992,12 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     const renderLineupsSkeleton = () => (
-        <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <ScrollView 
+            style={styles.tabContent} 
+            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+        >
             {/* Team Carousel skeleton */}
             <View style={[styles.carouselContainer, { backgroundColor: homeColors.background, paddingHorizontal: 0, marginBottom: 12 }]}>
                 <View style={[styles.teamCarouselCard, cardSurface, { flex: 1, padding: 8, flexDirection: 'row', alignItems: 'center' }]}>
@@ -1171,6 +1190,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             <ScrollView 
                 style={styles.tabContent} 
                 contentContainerStyle={{ paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -1262,6 +1283,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                 <ScrollView 
                     style={styles.tabContent} 
                     contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled={true}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -1283,6 +1306,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             <ScrollView 
                 style={styles.tabContent} 
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -1398,6 +1423,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             <ScrollView 
                 style={styles.tabContent} 
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -1564,11 +1591,12 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     {renderTabs()}
 
                     {/* 1:1 Instagram-Style Real-Time Interactive Horizontal Pager */}
-                    <View style={{ flex: 1 }} {...matchDetailExitPanResponder.panHandlers}>
+                    <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? matchDetailExitPanResponder.panHandlers : {})}>
                         <Animated.ScrollView
                             ref={pagerScrollRef}
                             horizontal
                             pagingEnabled
+                            directionalLockEnabled={true}
                             showsHorizontalScrollIndicator={false}
                             bounces={false}
                             scrollEventThrottle={16}

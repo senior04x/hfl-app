@@ -230,10 +230,11 @@ export default function NewsDetailScreen({ route, navigation }: any) {
                     elevation: 10,
                 }}
             >
-                <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
                     <ScrollView
                         style={{ flex: 1 }}
                         showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled={true}
                         contentContainerStyle={{ paddingBottom: 80 }}
                         bounces={true}
                     >

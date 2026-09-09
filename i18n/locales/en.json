@@ -50,7 +50,8 @@
     "copy": "Copy",
     "version": "VERSION",
     "understood": "Understood",
-    "logout": "Log Out"
+    "logout": "Log Out",
+    "you": "YOU"
   },
   "nav": {
     "home": "Home",

@@ -19,7 +19,7 @@ import {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../constants/Colors';
@@ -42,9 +42,11 @@ import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 
 export default function TournamentDetailScreen({ route, navigation }: any) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
+    const youBadgeText = (t('common.you', i18n.language === 'ru' ? 'ВЫ' : i18n.language === 'en' ? 'YOU' : 'SIZ') || 'SIZ').toUpperCase();
 
     const { tournamentId, tournamentName, tournament } = route?.params || {};
     const currentTournamentId = route?.params?.tournamentId || tournamentId || tournament?.id || tournament?._id || route?.params?.id || route?.params?.leagueId || tournamentName || route?.params?.name;
@@ -1579,7 +1581,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         const endDateVal = tournamentData?.end_date || tournamentData?.endDate;
 
         return (
-            <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 110 }}>
+            <ScrollView 
+                style={styles.tabContent} 
+                contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+            >
                 {/* Information Card */}
                 <View style={[styles.sectionCard, cardSurfaceStyle]}>
                     <View style={styles.sectionHeader}>
@@ -1788,7 +1795,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const renderStandings = () => (
         <ScrollView 
             style={styles.tabContent}
-            contentContainerStyle={{ paddingBottom: 120 }}
+            contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled={true}
         >
@@ -1960,10 +1967,10 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             ref={playersListRef}
                             data={visiblePlayers}
                             keyExtractor={(player, index) => String(player._id || player.id || index)}
-                            contentContainerStyle={{ paddingBottom: 130 }}
+                            contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}
                             showsVerticalScrollIndicator={false}
                             nestedScrollEnabled={true}
-                            removeClippedSubviews={Platform.OS === 'android'}
+                            removeClippedSubviews={false}
                             initialNumToRender={15}
                             maxToRenderPerBatch={10}
                             windowSize={5}
@@ -2031,7 +2038,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                                     <Text style={[styles.playerStatName, { color: homeColors.textPrimary }]}>{(`${player.firstName || ''} ${player.lastName || ''}`).trim().toUpperCase()}</Text>
                                                     {isCurrentUser && (
                                                         <View style={styles.stickySizBadge}>
-                                                            <Text style={styles.stickySizText}>SIZ</Text>
+                                                            <Text style={styles.stickySizText}>{youBadgeText}</Text>
                                                         </View>
                                                     )}
                                                 </View>
@@ -2052,6 +2059,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                 style={[
                                     styles.stickyUserBar,
                                     {
+                                        bottom: insets.bottom + 12,
                                         backgroundColor: isDark ? '#181A20' : '#FFFFFF',
                                         borderColor: Colors.primary,
                                         shadowColor: '#000',
@@ -2081,7 +2089,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                                 {(`${userPlayer.firstName || ''} ${userPlayer.lastName || ''}`).trim().toUpperCase()}
                                             </Text>
                                             <View style={styles.stickySizBadge}>
-                                                <Text style={styles.stickySizText}>SIZ</Text>
+                                                <Text style={styles.stickySizText}>{youBadgeText}</Text>
                                             </View>
                                         </View>
                                         <Text style={[styles.stickyUserTeam, { color: homeColors.textSecondary }]} numberOfLines={1}>
@@ -2120,10 +2128,10 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 <FlatList
                     data={visibleTours}
                     keyExtractor={(group: any) => group.tourKey}
-                    contentContainerStyle={{ paddingBottom: 110, paddingHorizontal: 16 }}
+                    contentContainerStyle={{ paddingBottom: 120 + insets.bottom, paddingHorizontal: 16 }}
                     showsVerticalScrollIndicator={false}
                     nestedScrollEnabled={true}
-                    removeClippedSubviews={Platform.OS === 'android'}
+                    removeClippedSubviews={false}
                     initialNumToRender={4}
                     maxToRenderPerBatch={4}
                     windowSize={5}
@@ -2387,13 +2395,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     {isLoading ? (
                         <TournamentDetailSkeleton />
                     ) : (
-                        <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                        <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
                             <FlatList
                                 ref={pagerRef}
                                 data={pagerPages}
                                 keyExtractor={(item) => item.key}
                                 horizontal
                                 pagingEnabled
+                                directionalLockEnabled={true}
                                 showsHorizontalScrollIndicator={false}
                                 bounces={false}
                                 overScrollMode="never"

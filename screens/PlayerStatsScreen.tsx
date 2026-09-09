@@ -660,7 +660,12 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const playerNameFull = `${player.firstName || player.name || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim() || t('teams.player_fallback', 'O\'YINCHI');
 
     const renderProfil = () => (
-        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+        <ScrollView 
+            style={styles.tabContent} 
+            showsVerticalScrollIndicator={false} 
+            nestedScrollEnabled={true}
+            contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+        >
             {/* PHYSICAL STATS CARD */}
             <View style={[styles.infoSectionCard, cardSurface]}>
                 <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
@@ -777,7 +782,12 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     );
 
     const renderKaryera = () => (
-        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+        <ScrollView 
+            style={styles.tabContent} 
+            showsVerticalScrollIndicator={false} 
+            nestedScrollEnabled={true}
+            contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+        >
             {/* CURRENT TEAM */}
             <View style={[styles.infoSectionCard, cardSurface]}>
                 <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
@@ -867,6 +877,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         <ScrollView
             style={styles.tabContent}
             showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}
             refreshControl={
                 <RefreshControl
@@ -1199,11 +1210,12 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     </View>
 
                     {/* 1:1 REAL-TIME LINKED HORIZONTAL PAGER */}
-                    <View style={{ flex: 1 }} {...swipeBackPanResponder.panHandlers}>
+                    <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
                         <Animated.ScrollView
                             ref={pagerScrollRef as any}
                             horizontal
                             pagingEnabled
+                            directionalLockEnabled={true}
                             showsHorizontalScrollIndicator={false}
                             bounces={false}
                             scrollEventThrottle={16}
