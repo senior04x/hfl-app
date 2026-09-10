@@ -128,7 +128,16 @@ export default function CompetitionTop4Slider({ matches, onSelectCompetition }: 
     if (competitions.length === 0) return null;
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? homeColors.background : '#FFFFFF', shadowColor: isDark ? '#FFFFFF' : '#000000', shadowOpacity: isDark ? 0.14 : 0.18 }]}>
+        <View style={[styles.container, {
+            backgroundColor: isDark ? homeColors.background : '#FFFFFF',
+            shadowColor: isDark ? '#FFFFFF' : '#000000',
+            shadowOpacity: isDark ? 0.14 : 0.18,
+            ...(Platform.OS === 'android' && isDark ? {
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.10)',
+                elevation: 0,
+            } : {}),
+        }]}>
             <View style={styles.header}>
                 <View>
                     <Text style={[styles.eyebrow, { color: homeColors.accent }]}>{t('home.standings_label', 'STANDINGS').toUpperCase()}</Text>

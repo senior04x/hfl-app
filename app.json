@@ -62,14 +62,14 @@
     ],
     "notification": {
       "icon": "./assets/images/app-icon.png",
-      "color": "#00DF82"
+      "color": "#E85002"
     },
     "plugins": [
       [
         "expo-notifications",
         {
           "icon": "./assets/images/app-icon.png",
-          "color": "#00DF82"
+        "color": "#E85002"
         }
       ],
       [

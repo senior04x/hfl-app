@@ -8,7 +8,7 @@ if (typeof global !== 'undefined' && (global as any).ErrorUtils) {
 
 import 'expo-dev-client';
 import React from 'react';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
@@ -44,6 +44,13 @@ import { notificationService } from './services/notificationService';
 
 import * as SplashScreenExpo from 'expo-splash-screen';
 import SplashScreen from './screens/SplashScreen';
+
+// Android users can set very large system fonts. A modest cap prevents the
+// dense match cards from overflowing while retaining readable text scaling.
+if (Platform.OS === 'android') {
+    (Text as any).defaultProps = (Text as any).defaultProps || {};
+    (Text as any).defaultProps.maxFontSizeMultiplier = 1.2;
+}
 
 // Keep the splash screen visible while we fetch resources on native devices
 if (Platform.OS !== 'web') {

@@ -860,8 +860,9 @@ export default function HomeScreen({ navigation }: any) {
                             shadowRadius: 10,
                         } : {}),
                         ...(Platform.OS === 'android' ? {
-                            shadowColor: isDark ? '#FFFFFF' : '#000000',
-                            elevation: 4,
+                            borderWidth: isDark ? 1 : 0,
+                            borderColor: isDark ? 'rgba(255,255,255,0.10)' : homeColors.border,
+                            elevation: isDark ? 0 : 2,
                         } : {}),
                     },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
@@ -1034,19 +1035,22 @@ export default function HomeScreen({ navigation }: any) {
                                                         minHeight: 140,
                                                         borderRadius: 14,
                                                         backgroundColor: isAndroidLight ? '#FFFFFF' : homeColors.background,
-                                                        borderWidth: 0,
+                                                        borderWidth: Platform.OS === 'android' && isDark ? 1 : 0,
+                                                        borderColor: Platform.OS === 'android' && isDark ? 'rgba(255,255,255,0.10)' : 'transparent',
                                                         shadowColor: isDark ? '#FFFFFF' : '#000000',
                                                         shadowOffset: { width: 0, height: 4 },
                                                         shadowOpacity: isDark ? 0.12 : 0.08,
                                                         shadowRadius: 10,
-                                                        elevation: 4,
+                                                        elevation: Platform.OS === 'android' && isDark ? 0 : 4,
                                                     }}
                                                 >
                                                     <TouchableOpacity
                                                         style={{ flex: 1, borderRadius: 14, overflow: 'hidden' }}
                                                         activeOpacity={0.8}
                                                         onPress={() => {
-                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                                                            if (Platform.OS === 'ios') {
+                                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                                                            }
                                                             navigation.navigate('NewsDetail', { newsId: item._id || item.id, news: item });
                                                         }}
                                                     >
