@@ -35,6 +35,9 @@ const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.88;
 const CARD_SPACING = 12;
 const SIDE_PADDING = (width - CARD_WIDTH) / 2;
+const HOME_COMPETITION_PREVIEW_LIMIT = 2;
+const HOME_MATCH_PREVIEW_LIMIT = 4;
+const HOME_LIVE_PREVIEW_LIMIT = 3;
 
 const CACHE_KEY_PREFIX = '@amatora_home_cache_v4_org_';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minut
@@ -429,7 +432,7 @@ export default function HomeScreen({ navigation }: any) {
             groupsMap[leagueId].matches.push(m);
         });
 
-        return Object.values(groupsMap).map(group => {
+        const groups = Object.values(groupsMap).map(group => {
             const sortedByDate = [...group.matches].sort((a, b) => {
                 const dateA = new Date(a.date || a.match_date || a.createdAt || 0).getTime();
                 const dateB = new Date(b.date || b.match_date || b.createdAt || 0).getTime();
@@ -457,6 +460,12 @@ export default function HomeScreen({ navigation }: any) {
                 matches: upcomingTourMatches
             };
         }).filter(group => group.matches.length > 0);
+
+        return groups.sort((a, b) => {
+            const aDate = new Date(a.matches[0]?.date || a.matches[0]?.match_date || a.matches[0]?.createdAt || 0).getTime();
+            const bDate = new Date(b.matches[0]?.date || b.matches[0]?.match_date || b.matches[0]?.createdAt || 0).getTime();
+            return aDate - bDate;
+        });
     }, [matches]);
 
     // Group finished matches by League (FAQAT SO'NGGI TUR NATIJALARI)
@@ -478,7 +487,7 @@ export default function HomeScreen({ navigation }: any) {
             groupsMap[leagueId].matches.push(m);
         });
 
-        return Object.values(groupsMap).map(group => {
+        const groups = Object.values(groupsMap).map(group => {
             // Sort matches by date descending (eng oxirgi o'yinlar boshida)
             const sortedByDate = [...group.matches].sort((a, b) => {
                 const dateA = new Date(a.date || a.match_date || a.createdAt || 0).getTime();
@@ -509,6 +518,12 @@ export default function HomeScreen({ navigation }: any) {
                 matches: latestTourMatches
             };
         }).filter(group => group.matches.length > 0);
+
+        return groups.sort((a, b) => {
+            const aDate = new Date(a.matches[0]?.date || a.matches[0]?.match_date || a.matches[0]?.createdAt || 0).getTime();
+            const bDate = new Date(b.matches[0]?.date || b.matches[0]?.match_date || b.matches[0]?.createdAt || 0).getTime();
+            return bDate - aDate;
+        });
     }, [matches]);
 
     const handleViewAllResults = async () => {
@@ -661,9 +676,9 @@ export default function HomeScreen({ navigation }: any) {
                             {match.homeTeamName || match.homeTeam?.name || 'UY'}
                         </Text>
                         <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                            {match.homeTeam?.logo || match.home_team_logo ? (
+                            {match.homeTeam?.logo || match.homeTeam?.logo_url || match.home_team_logo ? (
                                 <SmartImage
-                                    uri={match.homeTeam?.logo || match.home_team_logo}
+                                    uri={match.homeTeam?.logo || match.homeTeam?.logo_url || match.home_team_logo}
                                     style={{ width: 18, height: 18 }}
                                     contentFit="contain"
                                     fallbackIcon="shield-outline"
@@ -720,9 +735,9 @@ export default function HomeScreen({ navigation }: any) {
                     {/* O'NG: Away Team Logo + Name (flex: 1, chapga) */}
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 4, paddingLeft: 8 }}>
                         <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                            {match.awayTeam?.logo || match.away_team_logo ? (
+                            {match.awayTeam?.logo || match.awayTeam?.logo_url || match.away_team_logo ? (
                                 <SmartImage
-                                    uri={match.awayTeam?.logo || match.away_team_logo}
+                                    uri={match.awayTeam?.logo || match.awayTeam?.logo_url || match.away_team_logo}
                                     style={{ width: 18, height: 18 }}
                                     contentFit="contain"
                                     fallbackIcon="shield-outline"
@@ -758,10 +773,7 @@ export default function HomeScreen({ navigation }: any) {
                             {
                                 width: '100%',
                                 backgroundColor: '#FFFFFF',
-                                borderTopLeftRadius: 0,
-                                borderTopRightRadius: 0,
-                                borderBottomLeftRadius: 18,
-                                borderBottomRightRadius: 18,
+                                borderRadius: 12,
                             },
                             matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                         ]}
@@ -797,14 +809,10 @@ export default function HomeScreen({ navigation }: any) {
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
                     {
-                        backgroundColor: homeColors.background,
+                        backgroundColor: isDark ? '#141414' : '#FFFFFF',
                         borderWidth: 1,
                         borderColor: homeColors.border,
-                        borderTopColor: 'transparent',
-                        borderBottomLeftRadius: 22,
-                        borderBottomRightRadius: 22,
-                        borderTopLeftRadius: 0,
-                        borderTopRightRadius: 0,
+                        borderRadius: Platform.OS === 'ios' ? 16 : 12,
                         marginBottom: 8,
                     },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
@@ -870,7 +878,7 @@ export default function HomeScreen({ navigation }: any) {
                                                             />
                                                         ) : (
                                                             <View style={styles.squircleAvatarFallback}>
-                                                                <Ionicons name="person" size={20} color="#00FF87" />
+                                                        <Ionicons name="person" size={20} color={homeColors.accent} />
                                                             </View>
                                                         )}
                                                     </View>
@@ -1045,89 +1053,105 @@ export default function HomeScreen({ navigation }: any) {
                                             </View>
 
                                             <View style={styles.verticalMatchList}>
-                                                {liveMatches.map(m => renderMatchCard(m, true, true))}
+                                                {liveMatches.slice(0, HOME_LIVE_PREVIEW_LIMIT).map(m => renderMatchCard(m, true, true))}
                                             </View>
                                         </View>
                                     )}
 
-                                    {/* 2. BO'LAJAK / ENG YAQIN O'YINLAR (Liga nomi bo'yicha) */}
+                                    {/* 2. BO'LAJAK / ENG YAQIN O'YINLAR */}
                                     {groupedUpcomingMatches.length > 0 && (
-                                        groupedUpcomingMatches.map((group: any, groupIdx: number) => {
+                                        <View style={styles.sectionContainer}>
+                                            <View style={styles.sectionHeader}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <View style={[styles.sectionIcon, { backgroundColor: isDark ? 'rgba(232,80,2,0.16)' : 'rgba(232,80,2,0.10)' }]}>
+                                                        <Ionicons name="calendar-outline" size={15} color={homeColors.accent} />
+                                                    </View>
+                                                    <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>
+                                                        {t('home.upcoming_matches', 'KEYINGI O‘YINLAR').toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                                <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Taqvim' })} activeOpacity={0.75}>
+                                                    <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                        {groupedUpcomingMatches.slice(0, HOME_COMPETITION_PREVIEW_LIMIT).map((group: any, groupIdx: number) => {
                                             const firstMatch = group.matches?.[0];
                                             const roundTag = formatRoundName(firstMatch);
-                                            const titleText = roundTag ? `${group.leagueName.toUpperCase()} (${roundTag})` : group.leagueName.toUpperCase();
 
                                             return (
-                                                <View key={`upcoming_${group.leagueId || groupIdx}`} style={styles.sectionContainer}>
-                                                    <View style={styles.sectionHeader}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                            <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                                {titleText}
-                                                            </Text>
+                                                <View key={`upcoming_${group.leagueId || groupIdx}`} style={[styles.competitionHub, { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderColor: homeColors.border }]}>
+                                                    <TouchableOpacity
+                                                        style={styles.competitionHubHeader}
+                                                        onPress={() => navigation.navigate('TournamentDetail', {
+                                                            tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
+                                                            tournamentName: group.leagueName,
+                                                            initialTab: 'matches',
+                                                            tab: 'matches'
+                                                        })}
+                                                        activeOpacity={0.75}
+                                                    >
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={[styles.competitionName, { color: homeColors.textPrimary }]} numberOfLines={1}>{group.leagueName.toUpperCase()}</Text>
+                                                            {roundTag ? <Text style={[styles.competitionMeta, { color: homeColors.textSecondary }]}>{roundTag}</Text> : null}
                                                         </View>
-                                                        <TouchableOpacity
-                                                            onPress={() => {
-                                                                navigation.navigate('TournamentDetail', {
-                                                                    tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
-                                                                    tournamentName: group.leagueName,
-                                                                    initialTab: 'matches',
-                                                                    tab: 'matches'
-                                                                });
-                                                            }}
-                                                            activeOpacity={0.75}
-                                                        >
-                                                            <Text style={styles.viewAllText}>
-                                                                {t('common.details', 'BATAFSIL').toUpperCase()}
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-
-                                                    <View style={styles.verticalMatchList}>
-                                                        {group.matches.map((m: any) => renderMatchCard(m, false, true))}
+                                                        <Ionicons name="chevron-forward" size={17} color={homeColors.textSecondary} />
+                                                    </TouchableOpacity>
+                                                    <View style={styles.competitionMatches}>
+                                                        {group.matches.slice(0, HOME_MATCH_PREVIEW_LIMIT).map((m: any) => renderMatchCard(m, false, true))}
                                                     </View>
                                                 </View>
                                             );
-                                        })
+                                        })}
+                                        </View>
                                     )}
 
-                                    {/* 3. BO'LIB O'TGAN NATIJALAR (Liga nomi bo'yicha) */}
+                                    {/* 3. SO'NGGI NATIJALAR */}
                                     {groupedFinishedMatches.length > 0 && (
-                                        groupedFinishedMatches.map((group: any, groupIdx: number) => {
+                                        <View style={styles.sectionContainer}>
+                                            <View style={styles.sectionHeader}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <View style={[styles.sectionIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F5F5F5' }]}>
+                                                        <Ionicons name="trophy-outline" size={15} color={homeColors.textPrimary} />
+                                                    </View>
+                                                    <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>
+                                                        {t('home.recent_results', 'SO‘NGGI NATIJALAR').toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                                <TouchableOpacity onPress={handleViewAllResults} activeOpacity={0.75}>
+                                                    <Text style={styles.viewAllText}>{t('common.details', 'BATAFSIL').toUpperCase()}</Text>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                        {groupedFinishedMatches.slice(0, HOME_COMPETITION_PREVIEW_LIMIT).map((group: any, groupIdx: number) => {
                                             const firstMatch = group.matches?.[0];
                                             const roundTag = formatRoundName(firstMatch);
-                                            const titleText = roundTag ? `${group.leagueName.toUpperCase()} (${roundTag})` : group.leagueName.toUpperCase();
 
                                             return (
-                                                <View key={`finished_${group.leagueId || groupIdx}`} style={styles.sectionContainer}>
-                                                    <View style={styles.sectionHeader}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                                                            <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                                {titleText}
-                                                            </Text>
+                                                <View key={`finished_${group.leagueId || groupIdx}`} style={[styles.competitionHub, { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderColor: homeColors.border }]}>
+                                                    <TouchableOpacity
+                                                        style={styles.competitionHubHeader}
+                                                        onPress={() => navigation.navigate('TournamentDetail', {
+                                                            tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
+                                                            tournamentName: group.leagueName,
+                                                            initialTab: 'matches',
+                                                            tab: 'matches'
+                                                        })}
+                                                        activeOpacity={0.75}
+                                                    >
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={[styles.competitionName, { color: homeColors.textPrimary }]} numberOfLines={1}>{group.leagueName.toUpperCase()}</Text>
+                                                            {roundTag ? <Text style={[styles.competitionMeta, { color: homeColors.textSecondary }]}>{roundTag}</Text> : null}
                                                         </View>
-                                                        <TouchableOpacity
-                                                            onPress={() => {
-                                                                navigation.navigate('TournamentDetail', {
-                                                                    tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
-                                                                    tournamentName: group.leagueName,
-                                                                    initialTab: 'matches',
-                                                                    tab: 'matches'
-                                                                });
-                                                            }}
-                                                            activeOpacity={0.75}
-                                                        >
-                                                            <Text style={styles.viewAllText}>
-                                                                {t('common.details', 'BATAFSIL').toUpperCase()}
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-
-                                                    <View style={styles.verticalMatchList}>
-                                                        {group.matches.map((m: any) => renderMatchCard(m, false, true))}
+                                                        <Ionicons name="chevron-forward" size={17} color={homeColors.textSecondary} />
+                                                    </TouchableOpacity>
+                                                    <View style={styles.competitionMatches}>
+                                                        {group.matches.slice(0, HOME_MATCH_PREVIEW_LIMIT).map((m: any) => renderMatchCard(m, false, true))}
                                                     </View>
                                                 </View>
                                             );
-                                        })
+                                        })}
+                                        </View>
                                     )}
 
                                     {/* 4. HECH QANDAY O'YIN MAVJUD BO'LMASA */}
@@ -1513,6 +1537,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 15,
     },
+    sectionIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     sectionTitle: {
         color: '#FFF',
         fontSize: 13.5,
@@ -1523,6 +1554,36 @@ const styles = StyleSheet.create({
         color: Colors.primary,
         fontSize: 11,
         fontWeight: '700',
+    },
+    competitionHub: {
+        marginHorizontal: 20,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderRadius: Platform.OS === 'ios' ? 16 : 12,
+        overflow: 'hidden',
+    },
+    competitionHubHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: 52,
+        paddingHorizontal: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(127,127,127,0.16)',
+    },
+    competitionName: {
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.25,
+    },
+    competitionMeta: {
+        marginTop: 2,
+        fontSize: 9.5,
+        fontWeight: '700',
+        letterSpacing: 0.4,
+    },
+    competitionMatches: {
+        paddingHorizontal: 8,
+        paddingTop: 8,
     },
 
     // Recent Matches Row (List Style)
