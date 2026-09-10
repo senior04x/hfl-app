@@ -13,6 +13,7 @@ import {
     PanResponder,
     StatusBar,
     Animated as RNAnimated,
+    Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -50,6 +51,13 @@ import { getLocalizedPosition } from '../utils/localizationUtils';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const FIELD_WIDTH = SCREEN_WIDTH - 32;
 const FIELD_HEIGHT = FIELD_WIDTH * 1.34;
+const FORMAT_PLAYER_LIMITS: Record<MatchFormat, number> = {
+    '5v5': 5,
+    '6v6': 6,
+    '7v7': 7,
+    '8v8': 8,
+    '11v11': 11,
+};
 
 export const computePlayerStatsAndRating = (player: any, allEvents: any[] = [], teamMatchesCount: number = 0) => {
     if (!player) return { goals: 0, assists: 0, yellowCards: 0, redCards: 0, rating: '7.0' };
@@ -166,6 +174,11 @@ export default function FormationBoard({ route, navigation }: any) {
     const [saving, setSaving] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const [formatValidation, setFormatValidation] = useState<{
+        type: 'add' | 'remove';
+        format: MatchFormat;
+        count: number;
+    } | null>(null);
 
     // Format & Preset State
     const [selectedFormat, setSelectedFormat] = useState<MatchFormat>(initialMem?.format || '8v8');
@@ -237,16 +250,7 @@ export default function FormationBoard({ route, navigation }: any) {
         return (total / playersOnPitch.length).toFixed(1);
     }, [playersOnPitch]);
 
-    const maxPitchPlayers = useMemo(() => {
-        switch (selectedFormat) {
-            case '5v5': return 5;
-            case '6v6': return 6;
-            case '7v7': return 7;
-            case '8v8': return 8;
-            case '11v11': return 11;
-            default: return 8;
-        }
-    }, [selectedFormat]);
+    const maxPitchPlayers = FORMAT_PLAYER_LIMITS[selectedFormat];
 
     // Sorted Players List: Primary by Rating Descending, Secondary by Position (GK -> DEF -> MID -> ATT)
     const sortedAvailablePlayers = useMemo(() => {
@@ -484,7 +488,12 @@ export default function FormationBoard({ route, navigation }: any) {
             const availableSlots = [...preset.slots];
 
             return previousPlayers.map((player) => {
-                const playerCategory = getPositionCategory(player.position || player.role);
+                const positionCategory = player.position ? getPositionCategory(player.position) : null;
+                const roleCategory = player.role ? getPositionCategory(player.role) : null;
+                // GK hech qachon oldingi sxemadagi fallback slot sabab boshqa qatlamga tushmasin.
+                const playerCategory = positionCategory === 'GK' || roleCategory === 'GK'
+                    ? 'GK'
+                    : positionCategory || roleCategory || 'ATT';
                 const matchingSlotIndex = availableSlots.findIndex(
                     (slot) => slot.category === playerCategory
                 );
@@ -518,6 +527,20 @@ export default function FormationBoard({ route, navigation }: any) {
         try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         } catch (e) {}
+
+        const requiredCount = FORMAT_PLAYER_LIMITS[fmt];
+        const currentCount = playersOnPitch.length;
+
+        if (currentCount > requiredCount) {
+            setFormatValidation({ type: 'remove', format: fmt, count: currentCount - requiredCount });
+            return;
+        }
+
+        // 7v7 tarkib yetarli bo'lmasa ham taktikani ko'rishga ruxsat beriladi.
+        if (fmt !== '7v7' && currentCount < requiredCount) {
+            setFormatValidation({ type: 'add', format: fmt, count: requiredCount - currentCount });
+            return;
+        }
 
         setSelectedFormat(fmt);
         const presets = FORMATION_PRESETS[fmt] || [];
@@ -1135,6 +1158,46 @@ export default function FormationBoard({ route, navigation }: any) {
                         </View>
                     </View>
                 </ScrollView>
+
+                <Modal
+                    visible={Boolean(formatValidation)}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setFormatValidation(null)}
+                >
+                    <View style={styles.formatModalOverlay}>
+                        <View style={[
+                            styles.formatModalCard,
+                            {
+                                backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                                borderColor: homeColors.border,
+                            },
+                        ]}>
+                            <View style={styles.formatModalIcon}>
+                                <Ionicons
+                                    name={formatValidation?.type === 'remove' ? 'person-remove-outline' : 'person-add-outline'}
+                                    size={24}
+                                    color="#E85002"
+                                />
+                            </View>
+                            <Text style={[styles.formatModalTitle, { color: homeColors.textPrimary }]}>
+                                {t('teams.format_roster_title')}
+                            </Text>
+                            <Text style={[styles.formatModalText, { color: homeColors.textSecondary }]}>
+                                {formatValidation?.type === 'remove'
+                                    ? t('teams.format_remove_players', formatValidation)
+                                    : t('teams.format_add_players', formatValidation)}
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.formatModalButton}
+                                onPress={() => setFormatValidation(null)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.formatModalButtonText}>{t('teams.format_notice_confirm')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
                     </SafeAreaView>
                 </GestureHandlerRootView>
             </RNAnimated.View>
@@ -1243,6 +1306,57 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    formatModalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+        backgroundColor: 'rgba(0, 0, 0, 0.56)',
+    },
+    formatModalCard: {
+        width: '100%',
+        maxWidth: 360,
+        alignItems: 'center',
+        borderRadius: 20,
+        borderWidth: 1,
+        padding: 24,
+    },
+    formatModalIcon: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+        backgroundColor: 'rgba(232, 80, 2, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(232, 80, 2, 0.24)',
+    },
+    formatModalTitle: {
+        fontSize: 15,
+        fontWeight: '900',
+        letterSpacing: 0.4,
+        textAlign: 'center',
+    },
+    formatModalText: {
+        fontSize: 13,
+        lineHeight: 19,
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    formatModalButton: {
+        width: '100%',
+        alignItems: 'center',
+        marginTop: 20,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: '#E85002',
+    },
+    formatModalButtonText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '800',
     },
     header: {
         flexDirection: 'row',
