@@ -222,7 +222,17 @@ function App() {
                                             gestureDirection: 'horizontal',
                                         }}
                                     />
-                                    <Stack.Screen name="Applications" component={ApplicationsScreen} />
+                                    <Stack.Screen
+                                        name="Applications"
+                                        component={ApplicationsScreen}
+                                        options={{
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }}
+                                    />
                                     <Stack.Screen 
                                         name="FormationBoard" 
                                         component={FormationBoard} 
