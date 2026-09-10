@@ -432,20 +432,23 @@ export default function HomeScreen({ navigation }: any) {
     // Group upcoming matches by League (faqat eng yaqin kutilayotgan tur o'yinlari)
     const groupedUpcomingMatches = useMemo(() => {
         const allUpcoming = matches.filter(m => isMatchUpcoming(m.status));
-        const groupsMap: Record<string, { leagueId: string; leagueName: string; matches: any[] }> = {};
+        const groupsMap: Record<string, { leagueId: string; leagueName: string; isTournament: boolean; matches: any[] }> = {};
 
         allUpcoming.forEach(m => {
-            const leagueId = String(m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.league || 'amatora_default');
+            const isTournament = Boolean(m.tournament_id || m.tournamentId);
+            const leagueId = String(isTournament ? (m.tournament_id || m.tournamentId) : (m.league_id || m.leagueId || m.league || 'amatora_default'));
             const leagueName = m.tournamentName || m.league || t('home.default_league', 'Amatora League');
+            const groupKey = `${isTournament ? 'tournament' : 'league'}_${leagueId}`;
 
-            if (!groupsMap[leagueId]) {
-                groupsMap[leagueId] = {
+            if (!groupsMap[groupKey]) {
+                groupsMap[groupKey] = {
                     leagueId,
                     leagueName,
+                    isTournament,
                     matches: []
                 };
             }
-            groupsMap[leagueId].matches.push(m);
+            groupsMap[groupKey].matches.push(m);
         });
 
         const groups = Object.values(groupsMap).map(group => {
@@ -474,20 +477,23 @@ export default function HomeScreen({ navigation }: any) {
     // Group finished matches by League (FAQAT SO'NGGI TUR NATIJALARI)
     const groupedFinishedMatches = useMemo(() => {
         const allFinished = matches.filter(m => isMatchFinished(m.status));
-        const groupsMap: Record<string, { leagueId: string; leagueName: string; matches: any[] }> = {};
+        const groupsMap: Record<string, { leagueId: string; leagueName: string; isTournament: boolean; matches: any[] }> = {};
 
         allFinished.forEach(m => {
-            const leagueId = String(m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.league || 'amatora_default');
+            const isTournament = Boolean(m.tournament_id || m.tournamentId);
+            const leagueId = String(isTournament ? (m.tournament_id || m.tournamentId) : (m.league_id || m.leagueId || m.league || 'amatora_default'));
             const leagueName = m.tournamentName || m.league || t('home.default_league', 'Amatora League');
+            const groupKey = `${isTournament ? 'tournament' : 'league'}_${leagueId}`;
 
-            if (!groupsMap[leagueId]) {
-                groupsMap[leagueId] = {
+            if (!groupsMap[groupKey]) {
+                groupsMap[groupKey] = {
                     leagueId,
                     leagueName,
+                    isTournament,
                     matches: []
                 };
             }
-            groupsMap[leagueId].matches.push(m);
+            groupsMap[groupKey].matches.push(m);
         });
 
         const groups = Object.values(groupsMap).map(group => {
@@ -574,6 +580,7 @@ export default function HomeScreen({ navigation }: any) {
                 navigation.navigate('TournamentDetail', {
                     tournamentId: targetTournamentId,
                     tournamentName: targetTournamentName,
+                    is_tournament: Boolean(targetMatch?.tournament_id || targetMatch?.tournamentId),
                     initialTab: 'matches',
                     tab: 'matches'
                 });
@@ -1149,6 +1156,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         onPress={() => navigation.navigate('TournamentDetail', {
                                                             tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
                                                             tournamentName: group.leagueName,
+                                                            is_tournament: group.isTournament,
                                                             initialTab: 'matches',
                                                             tab: 'matches'
                                                         })}
@@ -1197,6 +1205,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         onPress={() => navigation.navigate('TournamentDetail', {
                                                             tournamentId: group.leagueId !== 'amatora_default' ? group.leagueId : undefined,
                                                             tournamentName: group.leagueName,
+                                                            is_tournament: group.isTournament,
                                                             initialTab: 'matches',
                                                             tab: 'matches'
                                                         })}
