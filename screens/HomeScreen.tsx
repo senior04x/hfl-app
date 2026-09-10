@@ -26,7 +26,7 @@ import TeamStoryReplayPickerModal from '../components/TeamStoryReplayPickerModal
 import { supabase } from '../services/supabase';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
-import SuperLigaTop4 from '../components/SuperLigaTop4';
+import CompetitionTop4Slider from '../components/CompetitionTop4Slider';
 import { useNavBarScroll } from '../context/NavBarScrollContext';
 import { getLocalizedNewsField, getLocalizedNewsCategory } from '../utils/localizationUtils';
 import { formatLocalizedRelativeTime } from '../utils/dateLocalization';
@@ -957,12 +957,13 @@ export default function HomeScreen({ navigation }: any) {
                                 />
                             )}
 
-                            {/* Super Liga Top-4 Widget (Bosqich 2) */}
-                            <SuperLigaTop4
-                                onViewAll={() => {
+                            <CompetitionTop4Slider
+                                matches={matches}
+                                onSelectCompetition={(competition) => {
                                     navigation.navigate('TournamentDetail', {
-                                        tournamentId: 'super',
-                                        tournamentName: 'Super Liga',
+                                        tournamentId: competition.id,
+                                        tournamentName: competition.name,
+                                        is_tournament: competition.isTournament,
                                         initialTab: 'standings',
                                         tab: 'standings'
                                     });
