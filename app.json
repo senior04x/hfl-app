@@ -34,7 +34,6 @@
     "android": {
       "package": "com.amatora.mobile",
       "softwareKeyboardLayoutMode": "resize",
-      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
