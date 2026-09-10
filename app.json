@@ -32,7 +32,7 @@
       }
     },
     "android": {
-      "package": "com.amatora.app",
+      "package": "com.amatora.mobile",
       "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
@@ -88,7 +88,8 @@
       "expo-router",
       "expo-web-browser",
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-localization"
     ],
     "experiments": {},
     "extra": {
@@ -101,8 +102,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/14fddb89-af52-47b3-90ab-f437d786254b",
-      "enabled": true,
-      "checkOnLaunch": "ALWAYS"
+      "enabled": true
     }
   }
 }
