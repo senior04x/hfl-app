@@ -40,6 +40,7 @@ export default function ApplicationsScreen({ navigation }: any) {
     const [userProfileApps, setUserProfileApps] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isSwipeBackActive, setIsSwipeBackActive] = useState(false);
 
     // Detail Modal State
     const [selectedApp, setSelectedApp] = useState<any>(null);
@@ -53,6 +54,12 @@ export default function ApplicationsScreen({ navigation }: any) {
             onMoveShouldSetPanResponderCapture: (_, gestureState) => {
                 return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
             },
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                return gestureState.dx > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3;
+            },
+            onPanResponderGrant: () => {
+                setIsSwipeBackActive(true);
+            },
             onPanResponderMove: (_, gestureState) => {
                 if (gestureState.dx > 0) {
                     swipeBackAnim.setValue(gestureState.dx);
@@ -61,6 +68,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                 }
             },
             onPanResponderRelease: (_, gestureState) => {
+                setIsSwipeBackActive(false);
                 const shouldExit = gestureState.dx > width * 0.35 || (gestureState.dx > 60 && gestureState.vx > 0.6);
                 if (shouldExit) {
                     Animated.timing(swipeBackAnim, {
@@ -80,13 +88,15 @@ export default function ApplicationsScreen({ navigation }: any) {
                 }
             },
             onPanResponderTerminate: () => {
+                setIsSwipeBackActive(false);
                 Animated.spring(swipeBackAnim, {
                     toValue: 0,
                     friction: 8,
                     tension: 45,
                     useNativeDriver: true,
                 }).start();
-            }
+            },
+            onPanResponderTerminationRequest: () => false,
         })
     ).current;
 
@@ -395,6 +405,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                     <ScrollView
                         style={styles.scrollList}
                         contentContainerStyle={styles.scrollContent}
+                        scrollEnabled={!isSwipeBackActive}
                         showsVerticalScrollIndicator={false}
                         refreshControl={
                             <RefreshControl
