@@ -74,7 +74,7 @@ const NotificationSkeletonItem = ({ isDark }: { isDark: boolean }) => {
             {
                 opacity,
                 padding: 16,
-                backgroundColor: isDark ? '#333333' : '#FFFFFF',
+                backgroundColor: isDark ? '#141414' : '#FFFFFF',
                 borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
             },
         ]}>
@@ -356,7 +356,7 @@ export default function NotificationsScreen({ navigation }: any) {
                                     key={filter.key}
                                     style={[
                                         styles.filterChip,
-                                        { backgroundColor: isDark ? '#333333' : '#F5F5F5', borderColor: homeColors.border },
+                                        { backgroundColor: isDark ? '#141414' : '#F5F5F5', borderColor: homeColors.border },
                                         isActive && styles.filterChipActive,
                                     ]}
                                     onPress={() => setActiveFilter(filter.key as any)}
@@ -390,7 +390,7 @@ export default function NotificationsScreen({ navigation }: any) {
                             ))}
                         </View>
                     ) : filteredNotifications.length === 0 ? (
-                        <View style={[styles.emptyContainer, { backgroundColor: isDark ? '#333333' : '#FFFFFF', borderColor: homeColors.border }]}>
+                        <View style={[styles.emptyContainer, { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderColor: homeColors.border }]}>
                             <Ionicons name="notifications-off-outline" size={42} color={Colors.primary} />
                             <Text style={[styles.emptyTitle, { color: homeColors.textPrimary }]}>{t('notifications.no_notifications')}</Text>
                             <Text style={[styles.emptySubtitle, { color: homeColors.textSecondary }]}>{t('notifications.no_notifications_sub')}</Text>
@@ -407,7 +407,7 @@ export default function NotificationsScreen({ navigation }: any) {
                                     key={item.id}
                                     style={[
                                         styles.notifCard,
-                                        { backgroundColor: isDark ? '#333333' : '#FFFFFF', borderColor: homeColors.border },
+                                        { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderColor: homeColors.border },
                                         !isRead && styles.notifCardUnread,
                                     ]}
                                     onPress={() => handleNotificationPress(item)}
