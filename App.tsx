@@ -211,7 +211,17 @@ function App() {
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
-                                    <Stack.Screen name="TransferRequest" component={TransferRequestScreen} />
+                                    <Stack.Screen
+                                        name="TransferRequest"
+                                        component={TransferRequestScreen}
+                                        options={{
+                                            presentation: 'transparentModal',
+                                            cardStyle: { backgroundColor: 'transparent' },
+                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                                            gestureEnabled: true,
+                                            gestureDirection: 'horizontal',
+                                        }}
+                                    />
                                     <Stack.Screen name="Applications" component={ApplicationsScreen} />
                                     <Stack.Screen 
                                         name="FormationBoard" 
