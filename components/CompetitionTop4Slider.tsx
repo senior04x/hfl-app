@@ -5,6 +5,7 @@ import SmartImage from './SmartImage';
 import { supabase } from '../services/supabase';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 const SLIDE_WIDTH = width - 40;
@@ -32,6 +33,7 @@ const getTeamDetails = (match: any, side: 'home' | 'away') => {
 };
 
 export default function CompetitionTop4Slider({ matches, onSelectCompetition }: { matches: any[]; onSelectCompetition: (competition: Competition) => void }) {
+    const { t } = useTranslation();
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -47,8 +49,8 @@ export default function CompetitionTop4Slider({ matches, onSelectCompetition }: 
                 ? (match.tournament_id || match.tournamentId)
                 : (match.league_id || match.leagueId || match.league || ''));
             const name = isTournament
-                ? (match.tournamentName || match.tournament?.name || match.league || 'Turnir')
-                : (match.league || match.leagueName || match.tournamentName || 'Liga');
+                ? (match.tournamentName || match.tournament?.name || match.league || t('home.competition_tournament', 'Tournament'))
+                : (match.league || match.leagueName || match.tournamentName || t('home.competition_league', 'League'));
 
             if (!id) return;
             const key = `${isTournament ? 'tournament' : 'league'}_${id}`;
@@ -97,7 +99,7 @@ export default function CompetitionTop4Slider({ matches, onSelectCompetition }: 
 
             return { id: group.id, name: group.name, isTournament: group.isTournament, standings };
         }).filter((competition) => competition.standings.length > 0);
-    }, [matches]);
+    }, [matches, t]);
 
     useEffect(() => {
         if (activeIndex >= competitions.length) setActiveIndex(0);
@@ -129,11 +131,11 @@ export default function CompetitionTop4Slider({ matches, onSelectCompetition }: 
         <View style={[styles.container, { backgroundColor: isDark ? homeColors.background : '#FFFFFF', shadowColor: isDark ? '#FFFFFF' : '#000000', shadowOpacity: isDark ? 0.14 : 0.18 }]}>
             <View style={styles.header}>
                 <View>
-                    <Text style={[styles.eyebrow, { color: homeColors.accent }]}>JADVAL</Text>
-                    <Text style={[styles.title, { color: homeColors.textPrimary }]}>TOP 4</Text>
+                    <Text style={[styles.eyebrow, { color: homeColors.accent }]}>{t('home.standings_label', 'STANDINGS').toUpperCase()}</Text>
+                    <Text style={[styles.title, { color: homeColors.textPrimary }]}>{t('home.top_four', 'TOP 4').toUpperCase()}</Text>
                 </View>
                 <TouchableOpacity onPress={() => onSelectCompetition(competitions[activeIndex])} style={[styles.detailButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F5F5F5' }]} activeOpacity={0.75}>
-                    <Text style={[styles.detailText, { color: homeColors.textPrimary }]}>BATAFSIL</Text>
+                    <Text style={[styles.detailText, { color: homeColors.textPrimary }]}>{t('common.details', 'DETAILS').toUpperCase()}</Text>
                     <Ionicons name="chevron-forward" size={14} color={homeColors.textPrimary} />
                 </TouchableOpacity>
             </View>
@@ -150,14 +152,14 @@ export default function CompetitionTop4Slider({ matches, onSelectCompetition }: 
                         <View style={styles.competitionRow}>
                             <View style={[styles.competitionDot, { backgroundColor: homeColors.accent }]} />
                             <Text style={[styles.competitionName, { color: homeColors.textPrimary }]} numberOfLines={1}>{competition.name.toUpperCase()}</Text>
-                            <Text style={[styles.competitionType, { color: homeColors.textSecondary }]}>{competition.isTournament ? 'TURNIR' : 'LIGA'}</Text>
+                            <Text style={[styles.competitionType, { color: homeColors.textSecondary }]}>{t(competition.isTournament ? 'home.competition_tournament' : 'home.competition_league', competition.isTournament ? 'TOURNAMENT' : 'LEAGUE').toUpperCase()}</Text>
                         </View>
                         <View style={[styles.tableHeader, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
                             <Text style={[styles.position, styles.tableMuted, { color: homeColors.textSecondary }]}>#</Text>
-                            <Text style={[styles.team, styles.tableMuted, { color: homeColors.textSecondary }]}>JAMOA</Text>
-                            <Text style={[styles.stat, styles.tableMuted, { color: homeColors.textSecondary }]}>O</Text>
+                            <Text style={[styles.team, styles.tableMuted, { color: homeColors.textSecondary }]}>{t('standings.team', 'TEAM').toUpperCase()}</Text>
+                            <Text style={[styles.stat, styles.tableMuted, { color: homeColors.textSecondary }]}>{t('standings.played', 'P').toUpperCase()}</Text>
                             <Text style={[styles.stat, styles.tableMuted, { color: homeColors.textSecondary }]}>GD</Text>
-                            <Text style={[styles.points, styles.tableMuted, { color: homeColors.textSecondary }]}>OCHKO</Text>
+                            <Text style={[styles.points, styles.tableMuted, { color: homeColors.textSecondary }]}>{t('standings.points', 'PTS').toUpperCase()}</Text>
                         </View>
                         {competition.standings.map((item: any, index: number) => {
                             const resolvedTeam = teamData[item.id];

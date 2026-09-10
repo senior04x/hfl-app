@@ -121,7 +121,16 @@
     "view_league_results": "{{league}} NATIJALARI →",
     "view_all_results": "BARCHA NATIJALAR →",
     "no_finished_matches": "Tugallangan o'yinlar mavjud emas",
-    "news": "Yangiliklar"
+    "news": "Yangiliklar",
+    "default_league": "Amatora Ligasi",
+    "upcoming_matches": "Keyingi o'yinlar",
+    "for_you": "Siz uchun",
+    "your_team": "Jamoangiz",
+    "no_matches": "Hozircha o'yinlar mavjud emas",
+    "standings_label": "Jadval",
+    "top_four": "Top 4",
+    "competition_tournament": "Turnir",
+    "competition_league": "Liga"
   },
   "stories": {
     "title": "Storislar",
@@ -216,6 +225,10 @@
     "title": "O'yinlar",
     "starts": "BOSHLANISHI",
     "live": "JONLI",
+    "halftime": "TANAFFUS",
+    "paused": "PAUZA",
+    "first_half": "1-TAYM",
+    "second_half": "2-TAYM",
     "finished": "TUGADI",
     "postponed": "QOLDIRILDI",
     "cancelled": "BEKOR QILINDI",

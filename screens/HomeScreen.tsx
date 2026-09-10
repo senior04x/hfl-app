@@ -420,7 +420,7 @@ export default function HomeScreen({ navigation }: any) {
 
         allUpcoming.forEach(m => {
             const leagueId = String(m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.league || 'amatora_default');
-            const leagueName = m.tournamentName || m.league || "Amatora Liga";
+            const leagueName = m.tournamentName || m.league || t('home.default_league', 'Amatora League');
 
             if (!groupsMap[leagueId]) {
                 groupsMap[leagueId] = {
@@ -466,7 +466,7 @@ export default function HomeScreen({ navigation }: any) {
             const bDate = new Date(b.matches[0]?.date || b.matches[0]?.match_date || b.matches[0]?.createdAt || 0).getTime();
             return aDate - bDate;
         });
-    }, [matches]);
+    }, [matches, t]);
 
     // Group finished matches by League (FAQAT SO'NGGI TUR NATIJALARI)
     const groupedFinishedMatches = useMemo(() => {
@@ -475,7 +475,7 @@ export default function HomeScreen({ navigation }: any) {
 
         allFinished.forEach(m => {
             const leagueId = String(m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.league || 'amatora_default');
-            const leagueName = m.tournamentName || m.league || "Amatora Liga";
+            const leagueName = m.tournamentName || m.league || t('home.default_league', 'Amatora League');
 
             if (!groupsMap[leagueId]) {
                 groupsMap[leagueId] = {
@@ -524,7 +524,7 @@ export default function HomeScreen({ navigation }: any) {
             const bDate = new Date(b.matches[0]?.date || b.matches[0]?.match_date || b.matches[0]?.createdAt || 0).getTime();
             return bDate - aDate;
         });
-    }, [matches]);
+    }, [matches, t]);
 
     const personalMatch = useMemo(() => {
         if (isGuest) return null;
@@ -565,7 +565,7 @@ export default function HomeScreen({ navigation }: any) {
             // Find active tournament from current matches
             const targetMatch = matches.find(m => m.tournament_id || m.tournamentId || m.league_id || m.leagueId || m.tournamentName || m.league);
             const targetTournamentId = targetMatch?.tournament_id || targetMatch?.tournamentId || targetMatch?.league_id || targetMatch?.leagueId || targetMatch?.league;
-            const targetTournamentName = targetMatch?.tournamentName || targetMatch?.league || "Amatora Liga";
+            const targetTournamentName = targetMatch?.tournamentName || targetMatch?.league || t('home.default_league', 'Amatora League');
 
             if (targetTournamentId) {
                 navigation.navigate('TournamentDetail', {
@@ -651,25 +651,20 @@ export default function HomeScreen({ navigation }: any) {
             const ss = (totalElapsedSec % 60).toString().padStart(2, '0');
 
             if (isHalfTime) {
-                liveBadgeLabel = 'TANAFFUS';
-                liveTimerTime = 'TANAFFUS';
+                liveBadgeLabel = t('matches.halftime', 'HALF-TIME');
+                liveTimerTime = liveBadgeLabel;
                 livePeriodLabel = '';
             } else {
-                liveBadgeLabel = isPaused ? 'PAUZA' : 'LIVE';
+                liveBadgeLabel = isPaused ? t('matches.paused', 'PAUSED') : t('matches.live', 'LIVE');
                 liveTimerTime = `${mm}:${ss}`;
-                livePeriodLabel = isPaused 
-                    ? `PAUZA (${isSecondHalf ? '2-TAYM' : '1-TAYM'})`
-                    : (isSecondHalf ? '2-TAYM' : '1-TAYM');
+                const halfLabel = isSecondHalf ? t('matches.second_half', 'SECOND HALF') : t('matches.first_half', 'FIRST HALF');
+                livePeriodLabel = isPaused ? `${t('matches.paused', 'PAUSED')} (${halfLabel})` : halfLabel;
             }
         }
 
-        const months = [
-            'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 
-            'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
-        ];
-        const day = isValidDate ? matchDate.getDate() : '';
-        const month = isValidDate ? months[matchDate.getMonth()] : '';
-        const year = isValidDate ? matchDate.getFullYear() : '';
+        const shortMatchDate = isValidDate
+            ? matchDate.toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : currentLang === 'en' ? 'en-US' : 'uz-UZ', { day: 'numeric', month: 'short' })
+            : '';
         
         let formattedTime = String(match.match_time || match.time || '').trim();
         if (formattedTime && formattedTime.includes(':')) {
@@ -749,7 +744,7 @@ export default function HomeScreen({ navigation }: any) {
                                 </Text>
                                 {/* Bo'lib o'tgan sanasi */}
                                 <Text style={{ fontSize: 8.5, color: homeColors.textSecondary, marginTop: 1, fontWeight: '600' }}>
-                                    {day} {month}
+                                    {shortMatchDate}
                                 </Text>
                             </View>
                         ) : (
@@ -760,7 +755,7 @@ export default function HomeScreen({ navigation }: any) {
                                 </Text>
                                 {/* Rejalashtirilgan o'yin sanasi */}
                                 <Text style={{ fontSize: 8.5, color: homeColors.textSecondary, marginTop: 1, fontWeight: '600' }}>
-                                    {day} {month}
+                                    {shortMatchDate}
                                 </Text>
                             </View>
                         )}

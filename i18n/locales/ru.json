@@ -121,7 +121,16 @@
     "view_league_results": "РЕЗУЛЬТАТЫ {{league}} →",
     "view_all_results": "ВСЕ РЕЗУЛЬТАТЫ →",
     "no_finished_matches": "Завершенных матчей нет",
-    "news": "Новости"
+    "news": "Новости",
+    "default_league": "Лига Amatora",
+    "upcoming_matches": "Ближайшие матчи",
+    "for_you": "Для вас",
+    "your_team": "Ваша команда",
+    "no_matches": "Матчей пока нет",
+    "standings_label": "Таблица",
+    "top_four": "Топ-4",
+    "competition_tournament": "Турнир",
+    "competition_league": "Лига"
   },
   "stories": {
     "title": "Истории",
@@ -216,6 +225,10 @@
     "title": "Матчи",
     "starts": "НАЧАЛО",
     "live": "В ПРЯМОМ ЭФИРЕ",
+    "halftime": "ПЕРЕРЫВ",
+    "paused": "ПАУЗА",
+    "first_half": "1-Й ТАЙМ",
+    "second_half": "2-Й ТАЙМ",
     "finished": "ЗАВЕРШЕН",
     "postponed": "ОТЛОЖЕН",
     "cancelled": "ОТМЕНЕН",

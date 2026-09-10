@@ -121,7 +121,16 @@
     "view_league_results": "{{league}} RESULTS →",
     "view_all_results": "ALL RESULTS →",
     "no_finished_matches": "No finished matches",
-    "news": "News"
+    "news": "News",
+    "default_league": "Amatora League",
+    "upcoming_matches": "Upcoming matches",
+    "for_you": "For you",
+    "your_team": "Your team",
+    "no_matches": "No matches yet",
+    "standings_label": "Standings",
+    "top_four": "Top 4",
+    "competition_tournament": "Tournament",
+    "competition_league": "League"
   },
   "stories": {
     "title": "Stories",
@@ -216,6 +225,10 @@
     "title": "Matches",
     "starts": "STARTS",
     "live": "LIVE",
+    "halftime": "HALF-TIME",
+    "paused": "PAUSED",
+    "first_half": "FIRST HALF",
+    "second_half": "SECOND HALF",
     "finished": "FINISHED",
     "postponed": "POSTPONED",
     "cancelled": "CANCELLED",
