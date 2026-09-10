@@ -1,19 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Animated, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BlurView } from 'expo-blur';
 import Colors from '../constants/Colors';
-import AnimatedBackground from '../components/AnimatedBackground';
-import backgroundImage from '../assets/images/backroud-image.png';
-import { apiService, supabase } from '../services/apiService';
+import { apiService } from '../services/apiService';
 import { useAuthStore } from '../store/useAuthStore';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedRelativeTime } from '../utils/dateLocalization';
 import { getLocalizedNotification } from '../utils/localizationUtils';
-import { getPlatformCardStyle, isIOS } from '../constants/PlatformUI';
+import { useThemeStore } from '../store/useThemeStore';
+import { getHomeScreenColors } from '../constants/homeTheme';
 
 const NOTIFICATIONS_CACHE_KEY = 'cached_notifications_v2';
 const READ_STORAGE_KEY = 'read_notification_ids_v1';
@@ -48,14 +46,7 @@ const mergeNotifications = (existing: any[], fetched: any[]) => {
     return result;
 };
 
-const getNotificationAccent = (item: any) => {
-    if (item.type === 'match_live') return '#FF3B30';
-    if (item.type === 'match_scheduled') return '#38BDF8';
-    if (item.type === 'match_finished') return '#F59E0B';
-    return Colors.primary;
-};
-
-const NotificationSkeletonItem = () => {
+const NotificationSkeletonItem = ({ isDark }: { isDark: boolean }) => {
     const opacity = useRef(new Animated.Value(0.35)).current;
 
     useEffect(() => {
@@ -78,18 +69,26 @@ const NotificationSkeletonItem = () => {
     }, [opacity]);
 
     return (
-        <Animated.View style={[styles.notifCard, { opacity, padding: 16, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.08)' }]}>
+        <Animated.View style={[
+            styles.notifCard,
+            {
+                opacity,
+                padding: 16,
+                backgroundColor: isDark ? '#333333' : '#FFFFFF',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+            },
+        ]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255, 255, 255, 0.12)' }} />
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)' }} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <View style={{ width: '65%', height: 14, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.15)' }} />
+                        <View style={{ width: '65%', height: 14, borderRadius: 4, backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)' }} />
                         <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(232, 80, 2, 0.3)' }} />
                     </View>
-                    <View style={{ width: '92%', height: 12, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)', marginBottom: 6 }} />
-                    <View style={{ width: '60%', height: 12, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)', marginBottom: 12 }} />
+                    <View style={{ width: '92%', height: 12, borderRadius: 4, backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)', marginBottom: 6 }} />
+                    <View style={{ width: '60%', height: 12, borderRadius: 4, backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)', marginBottom: 12 }} />
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ width: 80, height: 10, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
+                        <View style={{ width: 80, height: 10, borderRadius: 4, backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' }} />
                         <View style={{ width: 45, height: 10, borderRadius: 4, backgroundColor: 'rgba(232, 80, 2, 0.25)' }} />
                     </View>
                 </View>
@@ -100,6 +99,8 @@ const NotificationSkeletonItem = () => {
 
 export default function NotificationsScreen({ navigation }: any) {
     const { t, i18n } = useTranslation();
+    const { isDark } = useThemeStore();
+    const homeColors = getHomeScreenColors(isDark);
     const { user } = useAuthStore();
     const [notifications, setNotifications] = useState<any[]>([]);
     const [readIds, setReadIds] = useState<string[]>([]);
@@ -186,11 +187,10 @@ export default function NotificationsScreen({ navigation }: any) {
                             targetId: mId,
                             category: 'match',
                             type: 'match_live',
-                            title: '🔴 JONLI UCHRASHUV DAKIQALARI',
+                            title: 'JONLI UCHRASHUV DAKIQALARI',
                             subtitle: `${homeName} vs ${awayName} uchrashuvi ayni damda jonli efirda! Natija: ${m.score?.home || 0} - ${m.score?.away || 0}`,
                             date: m.date || new Date().toISOString(),
                             icon: 'football',
-                            iconColor: '#FF3B30',
                             screenName: 'MatchDetail',
                             params: { matchId: mId }
                         });
@@ -205,11 +205,10 @@ export default function NotificationsScreen({ navigation }: any) {
                             targetId: mId,
                             category: 'match',
                             type: 'match_scheduled',
-                            title: '📅 NAVBATDAGI O\'YIN BOSHSI',
+                            title: 'NAVBATDAGI O\'YIN BOSHLANADI',
                             subtitle: `${homeName} vs ${awayName} uchrashuvi ${dateStr} sanasida bo'lib o'tadi. O'tkazilmay qolmang!`,
                             date: m.date || new Date().toISOString(),
                             icon: 'calendar',
-                            iconColor: '#38BDF8',
                             screenName: 'MatchDetail',
                             params: { matchId: mId }
                         });
@@ -219,11 +218,10 @@ export default function NotificationsScreen({ navigation }: any) {
                             targetId: mId,
                             category: 'match',
                             type: 'match_finished',
-                            title: '⚽ O\'YIN NATIJASI YAKUNLANDI',
+                            title: 'O\'YIN NATIJASI YAKUNLANDI',
                             subtitle: `${homeName} ${m.score?.home || 0} - ${m.score?.away || 0} ${awayName} uchrashuvi yakunlandi. Barcha statistikalar mavjud.`,
                             date: m.date || new Date().toISOString(),
                             icon: 'trophy',
-                            iconColor: '#FFD700',
                             screenName: 'MatchDetail',
                             params: { matchId: mId }
                         });
@@ -240,11 +238,10 @@ export default function NotificationsScreen({ navigation }: any) {
                         targetId: nId,
                         category: 'news',
                         type: 'news_item',
-                        title: `📰 ${n.title || 'Yangi Liga Yangiligi'}`,
+                        title: n.title || 'Yangi Liga Yangiligi',
                         subtitle: n.summary || (n.content ? n.content.slice(0, 110) + '...' : 'Batafsil ma\'lumot bilan tanishing.'),
                         date: n.created_at || new Date().toISOString(),
                         icon: 'newspaper',
-                        iconColor: Colors.primary,
                         screenName: 'NewsDetail',
                         params: { newsId: nId }
                     });
@@ -256,11 +253,10 @@ export default function NotificationsScreen({ navigation }: any) {
                 id: 'notif_system_welcome',
                 category: 'system',
                 type: 'system_welcome',
-                title: '⚡ AMATORA LIGA XUSH KELIBSIZ',
+                title: 'AMATORA LIGA XUSH KELIBSIZ',
                 subtitle: 'Akkountingiz muvaffaqiyatli ulangan. Barcha tur natijalari va yangiliklarni bildirishnomalar orqali kuzatib boring.',
                 date: new Date(Date.now() - 3600 * 1000 * 24).toISOString(),
                 icon: 'shield-checkmark',
-                iconColor: Colors.primary,
             });
 
             // Merge with current list and save to device cache
@@ -313,21 +309,22 @@ export default function NotificationsScreen({ navigation }: any) {
     const unreadCount = notifications.filter(n => !readIds.includes(n.id)).length;
 
     return (
-        <AnimatedBackground overlayOpacity={0.8} backgroundImage={backgroundImage}>
-            <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={[styles.page, { backgroundColor: homeColors.background }]}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={homeColors.background} />
+            <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
                 {/* Header Bar */}
-                <View style={styles.header}>
+                <View style={[styles.header, { borderBottomColor: homeColors.border }]}>
                     <TouchableOpacity 
-                        style={styles.backBtn} 
+                        style={[styles.backBtn, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}
                         onPress={() => navigation.goBack()}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
+                        <Ionicons name="arrow-back" size={22} color={homeColors.textPrimary} />
                     </TouchableOpacity>
 
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
-                        <Text style={styles.headerSubtitle}>
+                        <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]}>{t('notifications.title')}</Text>
+                        <Text style={[styles.headerSubtitle, { color: homeColors.textSecondary }]}>
                             {unreadCount > 0 ? t('notifications.unread_count', { count: unreadCount }) : t('notifications.all_read')}
                         </Text>
                     </View>
@@ -345,7 +342,7 @@ export default function NotificationsScreen({ navigation }: any) {
                 </View>
 
                 {/* Filter Tabs */}
-                <View style={styles.filterRow}>
+                <View style={[styles.filterRow, { borderBottomColor: homeColors.border }]}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
                         {[
                             { key: 'all', label: t('common.all').toUpperCase() },
@@ -357,11 +354,15 @@ export default function NotificationsScreen({ navigation }: any) {
                             return (
                                 <TouchableOpacity
                                     key={filter.key}
-                                    style={[styles.filterChip, isActive && styles.filterChipActive]}
+                                    style={[
+                                        styles.filterChip,
+                                        { backgroundColor: isDark ? '#333333' : '#F5F5F5', borderColor: homeColors.border },
+                                        isActive && styles.filterChipActive,
+                                    ]}
                                     onPress={() => setActiveFilter(filter.key as any)}
                                     activeOpacity={0.75}
                                 >
-                                    <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                                    <Text style={[styles.filterChipText, { color: homeColors.textSecondary }, isActive && styles.filterChipTextActive]}>
                                         {filter.label}
                                     </Text>
                                 </TouchableOpacity>
@@ -373,7 +374,7 @@ export default function NotificationsScreen({ navigation }: any) {
                 {/* Main List */}
                 <ScrollView
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+                    contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
                     refreshControl={
                         <RefreshControl 
                             refreshing={refreshing} 
@@ -385,19 +386,18 @@ export default function NotificationsScreen({ navigation }: any) {
                     {loading ? (
                         <View style={{ gap: 12, paddingTop: 4 }}>
                             {[1, 2, 3, 4, 5].map((key) => (
-                                <NotificationSkeletonItem key={key} />
+                                <NotificationSkeletonItem key={key} isDark={isDark} />
                             ))}
                         </View>
                     ) : filteredNotifications.length === 0 ? (
-                        <View style={styles.emptyContainer}>
-                            <Ionicons name="notifications-off-outline" size={48} color="rgba(255,255,255,0.3)" />
-                            <Text style={styles.emptyTitle}>{t('notifications.no_notifications')}</Text>
-                            <Text style={styles.emptySubtitle}>{t('notifications.no_notifications_sub')}</Text>
+                        <View style={[styles.emptyContainer, { backgroundColor: isDark ? '#333333' : '#FFFFFF', borderColor: homeColors.border }]}>
+                            <Ionicons name="notifications-off-outline" size={42} color={Colors.primary} />
+                            <Text style={[styles.emptyTitle, { color: homeColors.textPrimary }]}>{t('notifications.no_notifications')}</Text>
+                            <Text style={[styles.emptySubtitle, { color: homeColors.textSecondary }]}>{t('notifications.no_notifications_sub')}</Text>
                         </View>
                     ) : (
                         filteredNotifications.map((item) => {
                             const isRead = readIds.includes(item.id);
-                            const accentColor = getNotificationAccent(item);
                             const localized = getLocalizedNotification(item, t);
                             const displayTitle = localized.title || item.title;
                             const displaySubtitle = localized.subtitle || item.subtitle;
@@ -405,31 +405,33 @@ export default function NotificationsScreen({ navigation }: any) {
                             return (
                                 <TouchableOpacity
                                     key={item.id}
-                                    style={[styles.notifCard, getPlatformCardStyle(), !isRead && styles.notifCardUnread]}
+                                    style={[
+                                        styles.notifCard,
+                                        { backgroundColor: isDark ? '#333333' : '#FFFFFF', borderColor: homeColors.border },
+                                        !isRead && styles.notifCardUnread,
+                                    ]}
                                     onPress={() => handleNotificationPress(item)}
                                     activeOpacity={0.8}
                                 >
-                                    {isIOS && <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />}
-
                                     <View style={styles.cardContent}>
-                                        <View style={[styles.iconContainer, { backgroundColor: `${accentColor}18`, borderColor: `${accentColor}40` }]}>
-                                            <Ionicons name={item.icon as any} size={22} color={accentColor} />
+                                        <View style={styles.iconContainer}>
+                                            <Ionicons name={item.icon as any} size={21} color={Colors.primary} />
                                         </View>
 
                                         <View style={{ flex: 1, marginLeft: 14 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                <Text style={[styles.notifTitle, !isRead && styles.notifTitleUnread]} numberOfLines={1}>
+                                                <Text style={[styles.notifTitle, { color: homeColors.textPrimary }, !isRead && styles.notifTitleUnread]} numberOfLines={1}>
                                                     {displayTitle}
                                                 </Text>
                                                 {!isRead && <View style={styles.unreadDot} />}
                                             </View>
 
-                                            <Text style={styles.notifSubtitle} numberOfLines={2}>
+                                            <Text style={[styles.notifSubtitle, { color: homeColors.textSecondary }]} numberOfLines={2}>
                                                 {displaySubtitle}
                                             </Text>
 
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-                                                <Text style={styles.notifDate}>
+                                                <Text style={[styles.notifDate, { color: homeColors.textSecondary }]}>
                                                     {formatLocalizedRelativeTime(item.date, i18n.language)}
                                                 </Text>
                                                 {item.screenName && (
@@ -447,11 +449,14 @@ export default function NotificationsScreen({ navigation }: any) {
                     )}
                 </ScrollView>
             </SafeAreaView>
-        </AnimatedBackground>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    page: {
+        flex: 1,
+    },
     container: {
         flex: 1,
         backgroundColor: 'transparent',
@@ -461,16 +466,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingVertical: 14,
+        borderBottomWidth: 1,
     },
     backBtn: {
         width: 40,
         height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
     },
     headerTitle: {
         fontSize: 17,
@@ -500,15 +504,14 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     filterRow: {
-        marginBottom: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
     },
     filterChip: {
         paddingHorizontal: 16,
         paddingVertical: 8,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     filterChipActive: {
         backgroundColor: 'rgba(232, 80, 2, 0.15)',
@@ -524,12 +527,10 @@ const styles = StyleSheet.create({
         color: Colors.primary,
     },
     notifCard: {
-        borderRadius: 20,
+        borderRadius: 14,
         overflow: 'hidden',
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
-        backgroundColor: 'rgba(20, 25, 40, 0.4)',
     },
     notifCardUnread: {
         borderColor: 'rgba(232, 80, 2, 0.35)',
@@ -542,19 +543,19 @@ const styles = StyleSheet.create({
     iconContainer: {
         width: 44,
         height: 44,
-        borderRadius: 14,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
+        backgroundColor: 'rgba(232, 80, 2, 0.1)',
+        borderColor: 'rgba(232, 80, 2, 0.24)',
     },
     notifTitle: {
         fontSize: 14,
         fontWeight: '700',
-        color: 'rgba(255, 255, 255, 0.85)',
         flex: 1,
     },
     notifTitleUnread: {
-        color: '#FFFFFF',
         fontWeight: '900',
     },
     unreadDot: {
@@ -566,12 +567,10 @@ const styles = StyleSheet.create({
     },
     notifSubtitle: {
         fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.65)',
         lineHeight: 17,
     },
     notifDate: {
         fontSize: 11,
-        color: 'rgba(255, 255, 255, 0.4)',
         fontWeight: '500',
     },
     actionArrow: {
@@ -586,6 +585,8 @@ const styles = StyleSheet.create({
     },
     emptyContainer: {
         paddingVertical: 60,
+        borderWidth: 1,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
     },
