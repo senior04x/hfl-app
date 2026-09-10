@@ -30,7 +30,7 @@ import Animated, {
     useAnimatedStyle,
     useSharedValue,
     runOnJS,
-    withSpring,
+    withTiming,
 } from 'react-native-reanimated';
 import { useSocket } from '../context/SocketContext';
 import { useAuthStore } from '../store/useAuthStore';
@@ -479,6 +479,30 @@ export default function FormationBoard({ route, navigation }: any) {
         }
     };
 
+    const applyPresetLayout = (preset: FormationPreset) => {
+        setPlayersOnPitch(previousPlayers => {
+            const availableSlots = [...preset.slots];
+
+            return previousPlayers.map((player) => {
+                const playerCategory = getPositionCategory(player.position || player.role);
+                const matchingSlotIndex = availableSlots.findIndex(
+                    (slot) => slot.category === playerCategory
+                );
+                const slotIndex = matchingSlotIndex >= 0 ? matchingSlotIndex : 0;
+                const slot = availableSlots.splice(slotIndex, 1)[0];
+
+                if (!slot) return player;
+
+                return {
+                    ...player,
+                    role: slot.role,
+                    x: slot.x,
+                    y: slot.y,
+                };
+            });
+        });
+    };
+
     // Switch Preset Scheme
     const handleSelectPreset = (preset: FormationPreset) => {
         try {
@@ -486,19 +510,7 @@ export default function FormationBoard({ route, navigation }: any) {
         } catch (e) {}
 
         setSelectedPresetId(preset.id);
-
-        if (playersOnPitch.length > 0) {
-            const remapped = playersOnPitch.map((player, idx) => {
-                const slot = preset.slots[idx] || preset.slots[preset.slots.length - 1];
-                return {
-                    ...player,
-                    role: slot?.role || player.role,
-                    x: slot ? slot.x : player.x,
-                    y: slot ? slot.y : player.y,
-                };
-            });
-            setPlayersOnPitch(remapped);
-        }
+        applyPresetLayout(preset);
     };
 
     // Switch Format (e.g. 5v5 -> 8v8)
@@ -511,6 +523,7 @@ export default function FormationBoard({ route, navigation }: any) {
         const presets = FORMATION_PRESETS[fmt] || [];
         if (presets.length > 0) {
             setSelectedPresetId(presets[0].id);
+            applyPresetLayout(presets[0]);
         }
     };
 
@@ -1147,8 +1160,8 @@ const PesDraggablePlayer = ({
     const context = useSharedValue({ x: 0, y: 0 });
 
     useEffect(() => {
-        translateX.value = withSpring((player.x / 100) * FIELD_WIDTH, { damping: 15 });
-        translateY.value = withSpring((player.y / 100) * FIELD_HEIGHT, { damping: 15 });
+        translateX.value = withTiming((player.x / 100) * FIELD_WIDTH, { duration: 420 });
+        translateY.value = withTiming((player.y / 100) * FIELD_HEIGHT, { duration: 420 });
     }, [player.x, player.y]);
 
     const panGesture = Gesture.Pan()
