@@ -216,6 +216,18 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const PLAYERS_CACHE_KEY = `tournament_players_v4_${dataScope}_${currentTournamentId}`;
     const MATCHES_CACHE_KEY = `tournament_matches_v3_${dataScope}_${currentTournamentId}`;
 
+    // Preserve string tournament IDs as well as numeric IDs for Supabase queries.
+    const toDatabaseId = (value: any): string | number | null => {
+        if (value === undefined || value === null || value === '') return null;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+        const normalized = String(value).trim();
+        if (!normalized) return null;
+
+        const numericValue = Number(normalized);
+        return Number.isFinite(numericValue) ? numericValue : normalized;
+    };
+
     /**
      * Load cached data and return whether cache is fresh (< 5 min old).
      * If fresh, no need to re-fetch from network.
@@ -270,20 +282,20 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             let resolvedTournamentRecord: any = null;
             let isRealTournament = Boolean(route?.params?.is_tournament || navTournament?.is_tournament || route?.params?.isTournament);
 
-            const potentialNumericId = currentTournamentId || navTournament?.id || navTournament?._id || t?.id || t?._id;
-            if (potentialNumericId && !isNaN(Number(potentialNumericId))) {
+            const potentialTournamentId = toDatabaseId(currentTournamentId || navTournament?.id || navTournament?._id || t?.id || t?._id);
+            if (potentialTournamentId !== null) {
                 if (isRealTournament) {
-                    const { data: trn } = await supabase.from('tournaments').select('*').eq('id', Number(potentialNumericId)).maybeSingle();
+                    const { data: trn } = await supabase.from('tournaments').select('*').eq('id', potentialTournamentId).maybeSingle();
                     if (trn) {
                         resolvedTournamentRecord = trn;
                     }
                 } else {
-                    const { data: lg } = await supabase.from('leagues').select('*').eq('id', Number(potentialNumericId)).maybeSingle();
+                    const { data: lg } = await supabase.from('leagues').select('*').eq('id', potentialTournamentId).maybeSingle();
                     if (lg) {
                         resolvedLeagueRecord = lg;
                         resolvedLeagueId = lg.id;
                     } else {
-                        const { data: trn } = await supabase.from('tournaments').select('*').eq('id', Number(potentialNumericId)).maybeSingle();
+                        const { data: trn } = await supabase.from('tournaments').select('*').eq('id', potentialTournamentId).maybeSingle();
                         if (trn) {
                             resolvedTournamentRecord = trn;
                             isRealTournament = true;
@@ -332,7 +344,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             }
 
             const targetLeagueId = resolvedLeagueId || (!isRealTournament && mergedTournament?.id && !isNaN(Number(mergedTournament.id)) ? Number(mergedTournament.id) : null);
-            const targetTournamentId = isRealTournament ? (resolvedTournamentRecord?.id || Number(potentialNumericId)) : null;
+            const targetTournamentId = isRealTournament ? (resolvedTournamentRecord?.id || potentialTournamentId) : null;
 
             let startDateVal = mergedTournament?.start_date || mergedTournament?.startDate || navTournament?.start_date || navTournament?.startDate;
             let endDateVal = mergedTournament?.end_date || mergedTournament?.endDate || navTournament?.end_date || navTournament?.endDate;
@@ -600,7 +612,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     const { data: collabs } = await supabase
                         .from('tournament_cohosts')
                         .select('*')
-                        .eq('tournament_id', Number(targetTournamentId))
+                        .eq('tournament_id', targetTournamentId)
                         .eq('status', 'accepted');
 
                     if (collabs && collabs.length > 0) {
@@ -945,13 +957,13 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             if (teamIds.length > 0) {
                 const teamIdsSet = new Set(teamIds.map(String));
                 const isRealTournament = Boolean(tournamentData?.is_tournament || isTournamentRoute);
-                const tournamentId = Number(tournamentData?.id || currentTournamentId);
+                const tournamentId = toDatabaseId(tournamentData?.id || currentTournamentId);
                 let matchesQuery = supabase
                     .from('matches')
                     .select('id, home_team_id, away_team_id, home_formation, away_formation, status')
                     .or('status.eq.finished,status.eq.completed');
 
-                if (isRealTournament && Number.isFinite(tournamentId)) {
+                if (isRealTournament && tournamentId !== null) {
                     matchesQuery = matchesQuery.eq('tournament_id', tournamentId);
                 }
 
@@ -1128,7 +1140,11 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             let filteredLeagueMatches: any[] = [];
 
             if (isRealTourn) {
-                const tournIdNum = Number(tournamentData?.id || currentTournamentId);
+                const tournIdNum = toDatabaseId(tournamentData?.id || currentTournamentId);
+                if (tournIdNum === null) {
+                    setMatches([]);
+                    return;
+                }
                 const { data: directMatches } = await supabase
                     .from('matches')
                     .select('*')
