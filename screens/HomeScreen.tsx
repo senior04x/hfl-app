@@ -413,6 +413,22 @@ export default function HomeScreen({ navigation }: any) {
         return `${s}-TUR`.toUpperCase();
     };
 
+    // match_date can be a date-only value while the kickoff time is stored
+    // separately. Combine both so the nearest scheduled match is truly first.
+    const getMatchScheduleTimestamp = (match: any): number => {
+        const rawDate = match?.date || match?.match_date || match?.scheduledAt || match?.createdAt;
+        const scheduledDate = new Date(rawDate || 0);
+        if (isNaN(scheduledDate.getTime())) return Number.MAX_SAFE_INTEGER;
+
+        const rawTime = String(match?.match_time || match?.time || match?.matchTime || match?.scheduled_time || match?.start_time || '').trim();
+        const timeParts = rawTime.match(/^(\d{1,2}):(\d{2})/);
+        if (timeParts) {
+            scheduledDate.setHours(Number(timeParts[1]), Number(timeParts[2]), 0, 0);
+        }
+
+        return scheduledDate.getTime();
+    };
+
     // Group upcoming matches by League (faqat eng yaqin kutilayotgan tur o'yinlari)
     const groupedUpcomingMatches = useMemo(() => {
         const allUpcoming = matches.filter(m => isMatchUpcoming(m.status));
@@ -434,26 +450,15 @@ export default function HomeScreen({ navigation }: any) {
 
         const groups = Object.values(groupsMap).map(group => {
             const sortedByDate = [...group.matches].sort((a, b) => {
-                const dateA = new Date(a.date || a.match_date || a.createdAt || 0).getTime();
-                const dateB = new Date(b.date || b.match_date || b.createdAt || 0).getTime();
-                return dateA - dateB;
+                return getMatchScheduleTimestamp(a) - getMatchScheduleTimestamp(b);
             });
 
-            // Eng yaqin bo'lajak tur
-            const tourNums = sortedByDate.map(parseMatchTourNumber).filter(n => n > 0);
-            let upcomingTourMatches: any[] = [];
-
-            if (tourNums.length > 0) {
-                const minTourNum = Math.min(...tourNums);
-                upcomingTourMatches = sortedByDate.filter(m => parseMatchTourNumber(m) === minTourNum);
-            } else {
-                const earliestKey = getMatchTourKey(sortedByDate[0]);
-                if (earliestKey) {
-                    upcomingTourMatches = sortedByDate.filter(m => getMatchTourKey(m) === earliestKey);
-                } else {
-                    upcomingTourMatches = sortedByDate;
-                }
-            }
+            // Round number is not a schedule. Show the round containing the
+            // chronologically nearest kickoff, then keep its matches time-ordered.
+            const nearestTourKey = getMatchTourKey(sortedByDate[0]);
+            const upcomingTourMatches = nearestTourKey
+                ? sortedByDate.filter(m => getMatchTourKey(m) === nearestTourKey)
+                : sortedByDate;
 
             return {
                 ...group,
@@ -462,9 +467,7 @@ export default function HomeScreen({ navigation }: any) {
         }).filter(group => group.matches.length > 0);
 
         return groups.sort((a, b) => {
-            const aDate = new Date(a.matches[0]?.date || a.matches[0]?.match_date || a.matches[0]?.createdAt || 0).getTime();
-            const bDate = new Date(b.matches[0]?.date || b.matches[0]?.match_date || b.matches[0]?.createdAt || 0).getTime();
-            return aDate - bDate;
+            return getMatchScheduleTimestamp(a.matches[0]) - getMatchScheduleTimestamp(b.matches[0]);
         });
     }, [matches, t]);
 
