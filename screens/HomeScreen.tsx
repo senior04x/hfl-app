@@ -846,17 +846,21 @@ export default function HomeScreen({ navigation }: any) {
                     isContained && styles.containedMatchCard,
                     {
                         backgroundColor: isDark ? '#141414' : '#FFFFFF',
-                        borderWidth: 1,
-                        borderColor: homeColors.border,
                         borderRadius: Platform.OS === 'ios' ? 16 : 12,
                         marginBottom: 8,
+                        ...(Platform.OS === 'ios' ? {
+                            shadowColor: '#000000',
+                            shadowOffset: { width: 0, height: 5 },
+                            shadowOpacity: isDark ? 0.32 : 0.12,
+                            shadowRadius: 10,
+                        } : {}),
                     },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
                 ]}
                 onPress={() => navigation.navigate('MatchDetail', { matchId: match._id || match.id, matchData: match })}
                 activeOpacity={0.85}
             >
-                {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
+                {Platform.OS === 'ios' && isDark && <BlurView intensity={25} tint="dark" style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} />}
                 {cardContent}
             </TouchableOpacity>
         );
@@ -1137,7 +1141,7 @@ export default function HomeScreen({ navigation }: any) {
                                             const roundTag = formatRoundName(firstMatch);
 
                                             return (
-                                                <View key={`upcoming_${group.leagueId || groupIdx}`} style={[styles.competitionHub, { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderColor: homeColors.border }]}>
+                                                <View key={`upcoming_${group.leagueId || groupIdx}`} style={styles.competitionHub}>
                                                     <TouchableOpacity
                                                         style={styles.competitionHubHeader}
                                                         onPress={() => navigation.navigate('TournamentDetail', {
@@ -1185,7 +1189,7 @@ export default function HomeScreen({ navigation }: any) {
                                             const roundTag = formatRoundName(firstMatch);
 
                                             return (
-                                                <View key={`finished_${group.leagueId || groupIdx}`} style={[styles.competitionHub, { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderColor: homeColors.border }]}>
+                                                <View key={`finished_${group.leagueId || groupIdx}`} style={styles.competitionHub}>
                                                     <TouchableOpacity
                                                         style={styles.competitionHubHeader}
                                                         onPress={() => navigation.navigate('TournamentDetail', {
@@ -1543,11 +1547,9 @@ const styles = StyleSheet.create({
     },
     hMatchCard: {
         width: CARD_WIDTH,
-        overflow: 'hidden',
     },
     vMatchCard: {
         width: width - 40,
-        overflow: 'hidden',
     },
     containedMatchCard: {
         width: '100%',
@@ -1617,18 +1619,13 @@ const styles = StyleSheet.create({
     },
     competitionHub: {
         marginHorizontal: 20,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderRadius: Platform.OS === 'ios' ? 16 : 12,
-        overflow: 'hidden',
+        marginBottom: 16,
     },
     competitionHubHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         minHeight: 52,
         paddingHorizontal: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(127,127,127,0.16)',
     },
     competitionName: {
         fontSize: 12,
