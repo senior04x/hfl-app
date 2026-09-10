@@ -211,7 +211,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const { socket, isConnected } = useSocket();
     const CACHE_KEY = `tournament_detail_v2_${currentTournamentId}`;
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-    const PLAYERS_CACHE_KEY = `tournament_players_v2_${currentTournamentId}`;
+    const PLAYERS_CACHE_KEY = `tournament_players_v3_${currentTournamentId}`;
     const MATCHES_CACHE_KEY = `tournament_matches_v2_${currentTournamentId}`;
 
     /**
@@ -1033,6 +1033,17 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 const processedPlayers = playersList.map((p: any) => {
                     const pid = String(p.id);
                     const st = eventsMap[pid] || { goals: 0, assists: 0, yellowCards: 0, redCards: 0, matchesPlayed: 0 };
+                    const savedRating = Number(p.rating ?? p.stats?.rating ?? p.player_rating ?? 0);
+                    const rawScore = (st.goals * 0.5) + (st.assists * 0.3) - (st.yellowCards * 0.2) - (st.redCards * 0.5);
+                    const calculatedRating = st.matchesPlayed > 0
+                        ? Math.round(Math.min(10, Math.max(1, st.matchesPlayed >= 3
+                            ? 5 + (rawScore / st.matchesPlayed) * 3
+                            : 5 + rawScore)) * 10) / 10
+                        : 0;
+                    const rating = Number.isFinite(savedRating) && savedRating > 0
+                        ? (savedRating > 10 ? savedRating / 10 : savedRating)
+                        : calculatedRating;
+                    const stats = { ...st, rating };
                     return {
                         ...p,
                         _id: p.id,
@@ -1046,7 +1057,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         yellowCards: st.yellowCards,
                         redCards: st.redCards,
                         matchesPlayed: st.matchesPlayed,
-                        stats: st
+                        rating,
+                        stats
                     };
                 });
 
