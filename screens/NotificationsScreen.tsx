@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedRelativeTime } from '../utils/dateLocalization';
 import { getLocalizedNotification } from '../utils/localizationUtils';
+import { getPlatformCardStyle, isIOS } from '../constants/PlatformUI';
 
 const NOTIFICATIONS_CACHE_KEY = 'cached_notifications_v2';
 const READ_STORAGE_KEY = 'read_notification_ids_v1';
@@ -47,6 +48,13 @@ const mergeNotifications = (existing: any[], fetched: any[]) => {
     return result;
 };
 
+const getNotificationAccent = (item: any) => {
+    if (item.type === 'match_live') return '#FF3B30';
+    if (item.type === 'match_scheduled') return '#38BDF8';
+    if (item.type === 'match_finished') return '#F59E0B';
+    return Colors.primary;
+};
+
 const NotificationSkeletonItem = () => {
     const opacity = useRef(new Animated.Value(0.35)).current;
 
@@ -76,13 +84,13 @@ const NotificationSkeletonItem = () => {
                 <View style={{ flex: 1, marginLeft: 14 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <View style={{ width: '65%', height: 14, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.15)' }} />
-                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(0, 255, 135, 0.3)' }} />
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(232, 80, 2, 0.3)' }} />
                     </View>
                     <View style={{ width: '92%', height: 12, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)', marginBottom: 6 }} />
                     <View style={{ width: '60%', height: 12, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)', marginBottom: 12 }} />
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View style={{ width: 80, height: 10, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
-                        <View style={{ width: 45, height: 10, borderRadius: 4, backgroundColor: 'rgba(0, 255, 135, 0.25)' }} />
+                        <View style={{ width: 45, height: 10, borderRadius: 4, backgroundColor: 'rgba(232, 80, 2, 0.25)' }} />
                     </View>
                 </View>
             </View>
@@ -201,7 +209,7 @@ export default function NotificationsScreen({ navigation }: any) {
                             subtitle: `${homeName} vs ${awayName} uchrashuvi ${dateStr} sanasida bo'lib o'tadi. O'tkazilmay qolmang!`,
                             date: m.date || new Date().toISOString(),
                             icon: 'calendar',
-                            iconColor: '#00E5FF',
+                            iconColor: '#38BDF8',
                             screenName: 'MatchDetail',
                             params: { matchId: mId }
                         });
@@ -236,7 +244,7 @@ export default function NotificationsScreen({ navigation }: any) {
                         subtitle: n.summary || (n.content ? n.content.slice(0, 110) + '...' : 'Batafsil ma\'lumot bilan tanishing.'),
                         date: n.created_at || new Date().toISOString(),
                         icon: 'newspaper',
-                        iconColor: '#00FF87',
+                        iconColor: Colors.primary,
                         screenName: 'NewsDetail',
                         params: { newsId: nId }
                     });
@@ -252,7 +260,7 @@ export default function NotificationsScreen({ navigation }: any) {
                 subtitle: 'Akkountingiz muvaffaqiyatli ulangan. Barcha tur natijalari va yangiliklarni bildirishnomalar orqali kuzatib boring.',
                 date: new Date(Date.now() - 3600 * 1000 * 24).toISOString(),
                 icon: 'shield-checkmark',
-                iconColor: '#00FF87',
+                iconColor: Colors.primary,
             });
 
             // Merge with current list and save to device cache
@@ -330,7 +338,7 @@ export default function NotificationsScreen({ navigation }: any) {
                             onPress={handleMarkAllRead}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="checkmark-done" size={18} color="#00FF87" />
+                            <Ionicons name="checkmark-done" size={18} color={Colors.primary} />
                             <Text style={styles.markAllText}>{t('notifications.mark_read')}</Text>
                         </TouchableOpacity>
                     )}
@@ -389,6 +397,7 @@ export default function NotificationsScreen({ navigation }: any) {
                     ) : (
                         filteredNotifications.map((item) => {
                             const isRead = readIds.includes(item.id);
+                            const accentColor = getNotificationAccent(item);
                             const localized = getLocalizedNotification(item, t);
                             const displayTitle = localized.title || item.title;
                             const displaySubtitle = localized.subtitle || item.subtitle;
@@ -396,15 +405,15 @@ export default function NotificationsScreen({ navigation }: any) {
                             return (
                                 <TouchableOpacity
                                     key={item.id}
-                                    style={[styles.notifCard, !isRead && styles.notifCardUnread]}
+                                    style={[styles.notifCard, getPlatformCardStyle(), !isRead && styles.notifCardUnread]}
                                     onPress={() => handleNotificationPress(item)}
                                     activeOpacity={0.8}
                                 >
-                                    <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                                    {isIOS && <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />}
 
                                     <View style={styles.cardContent}>
-                                        <View style={[styles.iconContainer, { backgroundColor: `${item.iconColor}18`, borderColor: `${item.iconColor}40` }]}>
-                                            <Ionicons name={item.icon as any} size={22} color={item.iconColor} />
+                                        <View style={[styles.iconContainer, { backgroundColor: `${accentColor}18`, borderColor: `${accentColor}40` }]}>
+                                            <Ionicons name={item.icon as any} size={22} color={accentColor} />
                                         </View>
 
                                         <View style={{ flex: 1, marginLeft: 14 }}>
@@ -426,7 +435,7 @@ export default function NotificationsScreen({ navigation }: any) {
                                                 {item.screenName && (
                                                     <View style={styles.actionArrow}>
                                                         <Text style={styles.actionArrowText}>{t('common.details')}</Text>
-                                                        <Ionicons name="chevron-forward" size={14} color="#00FF87" />
+                                                        <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
                                                     </View>
                                                 )}
                                             </View>
@@ -477,16 +486,16 @@ const styles = StyleSheet.create({
     markAllBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 255, 135, 0.12)',
+        backgroundColor: 'rgba(232, 80, 2, 0.12)',
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 135, 0.3)',
+        borderColor: 'rgba(232, 80, 2, 0.3)',
         gap: 4,
     },
     markAllText: {
-        color: '#00FF87',
+        color: Colors.primary,
         fontSize: 12,
         fontWeight: '700',
     },
@@ -502,8 +511,8 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     filterChipActive: {
-        backgroundColor: 'rgba(0, 255, 135, 0.15)',
-        borderColor: 'rgba(0, 255, 135, 0.5)',
+        backgroundColor: 'rgba(232, 80, 2, 0.15)',
+        borderColor: 'rgba(232, 80, 2, 0.5)',
     },
     filterChipText: {
         color: 'rgba(255, 255, 255, 0.6)',
@@ -512,7 +521,7 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
     filterChipTextActive: {
-        color: '#00FF87',
+        color: Colors.primary,
     },
     notifCard: {
         borderRadius: 20,
@@ -523,8 +532,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(20, 25, 40, 0.4)',
     },
     notifCardUnread: {
-        borderColor: 'rgba(0, 255, 135, 0.35)',
-        backgroundColor: 'rgba(0, 255, 135, 0.06)',
+        borderColor: 'rgba(232, 80, 2, 0.35)',
+        backgroundColor: 'rgba(232, 80, 2, 0.06)',
     },
     cardContent: {
         flexDirection: 'row',
@@ -552,7 +561,7 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#00FF87',
+        backgroundColor: Colors.primary,
         marginLeft: 6,
     },
     notifSubtitle: {
@@ -573,7 +582,7 @@ const styles = StyleSheet.create({
     actionArrowText: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#00FF87',
+        color: Colors.primary,
     },
     emptyContainer: {
         paddingVertical: 60,
