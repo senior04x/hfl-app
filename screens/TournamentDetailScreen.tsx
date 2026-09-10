@@ -209,10 +209,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     }, [searchQuery]);
 
     const { socket, isConnected } = useSocket();
-    const CACHE_KEY = `tournament_detail_v2_${currentTournamentId}`;
+    const isTournamentRoute = Boolean(route?.params?.is_tournament || route?.params?.isTournament || tournament?.is_tournament);
+    const dataScope = isTournamentRoute ? 'tournament' : 'league';
+    const CACHE_KEY = `tournament_detail_v3_${dataScope}_${currentTournamentId}`;
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-    const PLAYERS_CACHE_KEY = `tournament_players_v3_${currentTournamentId}`;
-    const MATCHES_CACHE_KEY = `tournament_matches_v2_${currentTournamentId}`;
+    const PLAYERS_CACHE_KEY = `tournament_players_v4_${dataScope}_${currentTournamentId}`;
+    const MATCHES_CACHE_KEY = `tournament_matches_v3_${dataScope}_${currentTournamentId}`;
 
     /**
      * Load cached data and return whether cache is fresh (< 5 min old).
@@ -368,6 +370,21 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     .order('match_date', { ascending: false });
 
                 tournamentMatchesDirect = tMatches || [];
+
+                // Tournament participants must come from its own matches. The league
+                // team list can contain the same teams' older competition data.
+                const tournamentTeamIds = Array.from(new Set(
+                    tournamentMatchesDirect.flatMap((match: any) => [match.home_team_id, match.away_team_id]).filter(Boolean)
+                ));
+                if (tournamentTeamIds.length > 0) {
+                    const { data: tournamentTeams } = await supabase
+                        .from('teams')
+                        .select('*')
+                        .in('id', tournamentTeamIds);
+                    if (tournamentTeams && tournamentTeams.length > 0) {
+                        resolvedTeams = tournamentTeams;
+                    }
+                }
 
                 // If teams are not loaded via league search, resolve participant teams
                 if (resolvedTeams.length === 0) {
@@ -739,8 +756,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             _id: m.id,
                             home_score: m.home_score ?? 0,
                             away_score: m.away_score ?? 0,
-                            homeTeam: ht ? { id: ht.id, name: ht.name, logo_url: ht.logo_url } : (m.homeTeam || null),
-                            awayTeam: at ? { id: at.id, name: at.name, logo_url: at.logo_url } : (m.awayTeam || null),
+                            homeTeam: ht ? { id: ht.id, name: ht.name, logo: ht.logo || ht.logo_url, logo_url: ht.logo_url || ht.logo } : (m.homeTeam || null),
+                            awayTeam: at ? { id: at.id, name: at.name, logo: at.logo || at.logo_url, logo_url: at.logo_url || at.logo } : (m.awayTeam || null),
                             team1: ht ? { id: ht.id, name: ht.name, logo: ht.logo_url } : (m.team1 || null),
                             team2: at ? { id: at.id, name: at.name, logo: at.logo_url } : (m.team2 || null),
                         };
@@ -927,15 +944,23 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             const teamIds = (currentTeams || []).map((t: any) => t.teamId || t.id || t._id).filter(Boolean);
             if (teamIds.length > 0) {
                 const teamIdsSet = new Set(teamIds.map(String));
+                const isRealTournament = Boolean(tournamentData?.is_tournament || isTournamentRoute);
+                const tournamentId = Number(tournamentData?.id || currentTournamentId);
+                let matchesQuery = supabase
+                    .from('matches')
+                    .select('id, home_team_id, away_team_id, home_formation, away_formation, status')
+                    .or('status.eq.finished,status.eq.completed');
+
+                if (isRealTournament && Number.isFinite(tournamentId)) {
+                    matchesQuery = matchesQuery.eq('tournament_id', tournamentId);
+                }
 
                 const [{ data: rawPlayers, error: pErr }, { data: matchesData, error: mErr }] = await Promise.all([
                     supabase.from('applications')
                         .select('*')
                         .eq('status', 'approved')
                         .in('team_id', teamIds),
-                    supabase.from('matches')
-                        .select('id, home_team_id, away_team_id, home_formation, away_formation, status')
-                        .or('status.eq.finished,status.eq.completed')
+                    matchesQuery
                 ]);
 
                 if (pErr) console.warn('Supabase applications fetch error:', pErr);
@@ -959,10 +984,22 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
                 // 1. Process match events (goals, assists, cards)
                 if (playerIds.length > 0) {
-                    const { data: eventsData } = await supabase
-                        .from('match_events')
-                        .select('player_id, match_id, event_type')
-                        .in('player_id', playerIds);
+                    const tournamentMatchIds = (matchesData || []).map((match: any) => match.id).filter(Boolean);
+                    let eventsData: any[] = [];
+
+                    if (!isRealTournament || tournamentMatchIds.length > 0) {
+                        let eventsQuery = supabase
+                            .from('match_events')
+                            .select('player_id, match_id, event_type')
+                            .in('player_id', playerIds);
+
+                        if (isRealTournament) {
+                            eventsQuery = eventsQuery.in('match_id', tournamentMatchIds);
+                        }
+
+                        const { data } = await eventsQuery;
+                        eventsData = data || [];
+                    }
 
                     (eventsData || []).forEach((e: any) => {
                         const pid = String(e.player_id);
@@ -1121,8 +1158,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             _id: m.id,
                             home_score: m.home_score ?? 0,
                             away_score: m.away_score ?? 0,
-                            homeTeam: ht ? { id: ht.id, name: ht.name, logo_url: ht.logo_url } : null,
-                            awayTeam: at ? { id: at.id, name: at.name, logo_url: at.logo_url } : null,
+                            homeTeam: ht ? { id: ht.id, name: ht.name, logo: ht.logo || ht.logo_url, logo_url: ht.logo_url || ht.logo } : null,
+                            awayTeam: at ? { id: at.id, name: at.name, logo: at.logo || at.logo_url, logo_url: at.logo_url || at.logo } : null,
                             team1: ht ? { id: ht.id, name: ht.name, logo: ht.logo_url } : null,
                             team2: at ? { id: at.id, name: at.name, logo: at.logo_url } : null,
                         };
