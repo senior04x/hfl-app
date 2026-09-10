@@ -526,6 +526,40 @@ export default function HomeScreen({ navigation }: any) {
         });
     }, [matches]);
 
+    const personalMatch = useMemo(() => {
+        if (isGuest) return null;
+
+        const teamIds = new Set([
+            ownTeamId,
+            user?.teamId,
+            user?.team_id,
+            userProfile?.teamId,
+            userProfile?.team_id,
+            userProfile?.team?.id,
+            userProfile?.teams?.id,
+        ].filter(Boolean).map(String));
+
+        if (teamIds.size === 0) return null;
+
+        const ownMatches = matches.filter((match: any) => teamIds.has(String(
+            match.home_team_id || match.homeTeam?.id || match.homeTeamId || ''
+        )) || teamIds.has(String(
+            match.away_team_id || match.awayTeam?.id || match.awayTeamId || ''
+        )));
+
+        const liveMatch = ownMatches.find((match: any) => isMatchLive(match.status));
+        if (liveMatch) return liveMatch;
+
+        const upcomingMatch = ownMatches
+            .filter((match: any) => isMatchUpcoming(match.status))
+            .sort((a: any, b: any) => new Date(a.date || a.match_date || 0).getTime() - new Date(b.date || b.match_date || 0).getTime())[0];
+        if (upcomingMatch) return upcomingMatch;
+
+        return ownMatches
+            .filter((match: any) => isMatchFinished(match.status))
+            .sort((a: any, b: any) => new Date(b.date || b.match_date || 0).getTime() - new Date(a.date || a.match_date || 0).getTime())[0] || null;
+    }, [isGuest, matches, ownTeamId, user, userProfile]);
+
     const handleViewAllResults = async () => {
         try {
             // Find active tournament from current matches
@@ -560,7 +594,7 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     // Reusable Match Card Component with Importance Border & Badge
-    const renderMatchCard = (match: any, isLive: boolean = false, isVertical: boolean = false) => {
+    const renderMatchCard = (match: any, isLive: boolean = false, isVertical: boolean = false, isContained: boolean = false) => {
         const matchIsLive = isLive || isMatchLive(match.status);
         const matchIsFinished = isMatchFinished(match.status);
         const rawDate = match.date || match.match_date;
@@ -763,6 +797,7 @@ export default function HomeScreen({ navigation }: any) {
                     key={match._id || Math.random().toString()}
                     style={[
                         isVertical ? styles.vMatchCard : styles.hMatchCard,
+                        isContained && styles.containedMatchCard,
                         {
                             marginBottom: 8,
                         }
@@ -808,6 +843,7 @@ export default function HomeScreen({ navigation }: any) {
                 key={match._id || Math.random().toString()}
                 style={[
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
+                    isContained && styles.containedMatchCard,
                     {
                         backgroundColor: isDark ? '#141414' : '#FFFFFF',
                         borderWidth: 1,
@@ -928,6 +964,27 @@ export default function HomeScreen({ navigation }: any) {
                                     });
                                 }}
                             />
+
+                            {personalMatch && (
+                                <View style={styles.sectionContainer}>
+                                    <View style={styles.sectionHeader}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <View style={[styles.sectionIcon, { backgroundColor: isDark ? 'rgba(232,80,2,0.16)' : 'rgba(232,80,2,0.10)' }]}>
+                                                <Ionicons name="person-outline" size={15} color={homeColors.accent} />
+                                            </View>
+                                            <Text style={[styles.sectionTitle, { color: homeColors.textPrimary }]}>
+                                                {t('home.for_you', 'SIZ UCHUN').toUpperCase()}
+                                            </Text>
+                                        </View>
+                                        <Text style={[styles.personalMatchHint, { color: homeColors.textSecondary }]}>
+                                            {isMatchLive(personalMatch.status) ? t('matches.live', 'JONLI').toUpperCase() : t('home.your_team', 'JAMOANGIZ')}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.verticalMatchList}>
+                                        {renderMatchCard(personalMatch, isMatchLive(personalMatch.status), true)}
+                                    </View>
+                                </View>
+                            )}
 
                             {/* Yangiliklar Section */}
                             <View style={styles.sectionContainer}>
@@ -1098,7 +1155,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         <Ionicons name="chevron-forward" size={17} color={homeColors.textSecondary} />
                                                     </TouchableOpacity>
                                                     <View style={styles.competitionMatches}>
-                                                        {group.matches.slice(0, HOME_MATCH_PREVIEW_LIMIT).map((m: any) => renderMatchCard(m, false, true))}
+                                                        {group.matches.slice(0, HOME_MATCH_PREVIEW_LIMIT).map((m: any) => renderMatchCard(m, false, true, true))}
                                                     </View>
                                                 </View>
                                             );
@@ -1146,7 +1203,7 @@ export default function HomeScreen({ navigation }: any) {
                                                         <Ionicons name="chevron-forward" size={17} color={homeColors.textSecondary} />
                                                     </TouchableOpacity>
                                                     <View style={styles.competitionMatches}>
-                                                        {group.matches.slice(0, HOME_MATCH_PREVIEW_LIMIT).map((m: any) => renderMatchCard(m, false, true))}
+                                                        {group.matches.slice(0, HOME_MATCH_PREVIEW_LIMIT).map((m: any) => renderMatchCard(m, false, true, true))}
                                                     </View>
                                                 </View>
                                             );
@@ -1492,6 +1549,9 @@ const styles = StyleSheet.create({
         width: width - 40,
         overflow: 'hidden',
     },
+    containedMatchCard: {
+        width: '100%',
+    },
 
     hMatchCardWrapper: {
         width: CARD_WIDTH,
@@ -1582,8 +1642,13 @@ const styles = StyleSheet.create({
         letterSpacing: 0.4,
     },
     competitionMatches: {
-        paddingHorizontal: 8,
+        paddingHorizontal: 0,
         paddingTop: 8,
+    },
+    personalMatchHint: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.5,
     },
 
     // Recent Matches Row (List Style)
