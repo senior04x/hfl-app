@@ -284,6 +284,8 @@
     "format_add_players": "Add {{count}} more player(s) before switching to {{format}}.",
     "format_remove_players": "Remove {{count}} player(s) from the pitch before switching to {{format}}.",
     "format_notice_confirm": "Got it",
+    "formation_full_title": "PITCH IS FULL",
+    "formation_full_message": "A {{format}} pitch can have up to {{count}} players. Select a player on the pitch first to swap them.",
     "swap_hint": "Tap or drag to swap players",
     "pitch_count": "On pitch: {{count}}",
     "bench_count": "Bench: {{count}}",

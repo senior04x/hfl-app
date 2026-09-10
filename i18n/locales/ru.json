@@ -284,6 +284,8 @@
     "format_add_players": "Чтобы перейти на формат {{format}}, добавьте еще {{count}} игрока(ов).",
     "format_remove_players": "Чтобы перейти на формат {{format}}, уберите с поля {{count}} игрока(ов).",
     "format_notice_confirm": "Понятно",
+    "formation_full_title": "ПОЛЕ ЗАПОЛНЕНО",
+    "formation_full_message": "На поле {{format}} может быть максимум {{count}} игроков. Сначала выберите игрока на поле для замены.",
     "swap_hint": "Нажмите или перетащите для замены игрока",
     "pitch_count": "На поле: {{count}}",
     "bench_count": "В запасе: {{count}}",

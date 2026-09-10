@@ -284,6 +284,8 @@
     "format_add_players": "{{format}} formatiga o'tish uchun yana {{count}} ta o'yinchi qo'shing.",
     "format_remove_players": "{{format}} formatiga o'tish uchun maydondan {{count}} ta o'yinchini olib tashlang.",
     "format_notice_confirm": "Tushundim",
+    "formation_full_title": "MAYDON TO'LA",
+    "formation_full_message": "{{format}} maydonida maksimal {{count}} ta o'yinchi bo'lishi mumkin. Almashtirish uchun avval maydondagi o'yinchini tanlang.",
     "swap_hint": "O'yinchi almashtirish uchun bosing yoki suring",
     "pitch_count": "Maydonda: {{count}}",
     "bench_count": "Zaxira: {{count}}",

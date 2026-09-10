@@ -179,6 +179,7 @@ export default function FormationBoard({ route, navigation }: any) {
         format: MatchFormat;
         count: number;
     } | null>(null);
+    const [isPitchFullModalVisible, setIsPitchFullModalVisible] = useState(false);
 
     // Format & Preset State
     const [selectedFormat, setSelectedFormat] = useState<MatchFormat>(initialMem?.format || '8v8');
@@ -703,10 +704,7 @@ export default function FormationBoard({ route, navigation }: any) {
         } else {
             // ADD to pitch if under max
             if (playersOnPitch.length >= maxPitchPlayers) {
-                Alert.alert(
-                    'Maydon to\'la',
-                    `Maydonda maksimal ${maxPitchPlayers} ta o'yinchi bo'lishi mumkin. O'yinchi almashtirish uchun maydondagi o'yinchini tanlang.`
-                );
+                setIsPitchFullModalVisible(true);
                 return;
             }
 
@@ -1191,6 +1189,43 @@ export default function FormationBoard({ route, navigation }: any) {
                             <TouchableOpacity
                                 style={styles.formatModalButton}
                                 onPress={() => setFormatValidation(null)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.formatModalButtonText}>{t('teams.format_notice_confirm')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+
+                <Modal
+                    visible={isPitchFullModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setIsPitchFullModalVisible(false)}
+                >
+                    <View style={styles.formatModalOverlay}>
+                        <View style={[
+                            styles.formatModalCard,
+                            {
+                                backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                                borderColor: homeColors.border,
+                            },
+                        ]}>
+                            <View style={styles.formatModalIcon}>
+                                <Ionicons name="people-outline" size={24} color="#E85002" />
+                            </View>
+                            <Text style={[styles.formatModalTitle, { color: homeColors.textPrimary }]}>
+                                {t('teams.formation_full_title')}
+                            </Text>
+                            <Text style={[styles.formatModalText, { color: homeColors.textSecondary }]}>
+                                {t('teams.formation_full_message', {
+                                    format: selectedFormat,
+                                    count: maxPitchPlayers,
+                                })}
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.formatModalButton}
+                                onPress={() => setIsPitchFullModalVisible(false)}
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.formatModalButtonText}>{t('teams.format_notice_confirm')}</Text>
