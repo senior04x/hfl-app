@@ -126,7 +126,7 @@ export default function CompetitionTop4Slider({ matches, onSelectCompetition }: 
     if (competitions.length === 0) return null;
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? '#141414' : '#FFFFFF' }]}>
+        <View style={[styles.container, { backgroundColor: isDark ? homeColors.background : '#FFFFFF', shadowColor: isDark ? '#FFFFFF' : '#000000', shadowOpacity: isDark ? 0.14 : 0.18 }]}>
             <View style={styles.header}>
                 <View>
                     <Text style={[styles.eyebrow, { color: homeColors.accent }]}>JADVAL</Text>

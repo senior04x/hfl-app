@@ -845,14 +845,18 @@ export default function HomeScreen({ navigation }: any) {
                     isVertical ? styles.vMatchCard : styles.hMatchCard,
                     isContained && styles.containedMatchCard,
                     {
-                        backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                        backgroundColor: isDark ? homeColors.background : '#FFFFFF',
                         borderRadius: Platform.OS === 'ios' ? 16 : 12,
                         marginBottom: 8,
                         ...(Platform.OS === 'ios' ? {
-                            shadowColor: '#000000',
+                            shadowColor: isDark ? '#FFFFFF' : '#000000',
                             shadowOffset: { width: 0, height: 5 },
-                            shadowOpacity: isDark ? 0.32 : 0.12,
+                            shadowOpacity: isDark ? 0.16 : 0.12,
                             shadowRadius: 10,
+                        } : {}),
+                        ...(Platform.OS === 'android' ? {
+                            shadowColor: isDark ? '#FFFFFF' : '#000000',
+                            elevation: 4,
                         } : {}),
                     },
                     matchIsLive && ((isHalfTime || isPaused) ? styles.hMatchCardHalftime : styles.hMatchCardLive)
@@ -1025,13 +1029,12 @@ export default function HomeScreen({ navigation }: any) {
                                                         minHeight: 140,
                                                         borderRadius: 14,
                                                         backgroundColor: isAndroidLight ? '#FFFFFF' : homeColors.background,
-                                                        borderWidth: isAndroidLight ? 0 : 1,
-                                                        borderColor: homeColors.border,
-                                                        shadowColor: '#000000',
+                                                        borderWidth: 0,
+                                                        shadowColor: isDark ? '#FFFFFF' : '#000000',
                                                         shadowOffset: { width: 0, height: 4 },
-                                                        shadowOpacity: isAndroidLight ? 0.08 : 0.1,
+                                                        shadowOpacity: isDark ? 0.12 : 0.08,
                                                         shadowRadius: 10,
-                                                        elevation: isAndroidLight ? 3 : 6,
+                                                        elevation: 4,
                                                     }}
                                                 >
                                                     <TouchableOpacity
