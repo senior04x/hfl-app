@@ -25,7 +25,7 @@ import { apiService, supabase } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 
 const { width } = Dimensions.get('window');
-const BRAND_ORANGE = '#FF6B00';
+const BRAND_ORANGE = '#E85002';
 const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
 
 export default function ApplicationsScreen({ navigation }: any) {
@@ -91,7 +91,7 @@ export default function ApplicationsScreen({ navigation }: any) {
     ).current;
 
     const cardSurface = {
-        backgroundColor: homeColors.background,
+        backgroundColor: isDark ? '#141414' : '#FFFFFF',
         ...Platform.select({
             ios: {
                 borderWidth: 1,
@@ -238,16 +238,13 @@ export default function ApplicationsScreen({ navigation }: any) {
         const isApproved = status === 'approved' || status === 'accepted' || status === 'tasdiqlangan';
         const isRejected = status === 'rejected' || status === 'rad etilgan';
 
-        let badgeBg = isDark ? 'rgba(234, 179, 8, 0.15)' : 'rgba(234, 179, 8, 0.1)';
-        let badgeBorder = isDark ? 'rgba(234, 179, 8, 0.35)' : 'rgba(234, 179, 8, 0.25)';
-        let badgeColor = '#EAB308';
+        let badgeBg = isDark ? 'rgba(232, 80, 2, 0.14)' : 'rgba(232, 80, 2, 0.08)';
+        let badgeBorder = isDark ? 'rgba(232, 80, 2, 0.32)' : 'rgba(232, 80, 2, 0.24)';
+        let badgeColor = BRAND_ORANGE;
         let iconName: any = 'time-outline';
         let label = t('common.pending', 'KUTILMOQDA');
 
         if (isApproved) {
-            badgeBg = isDark ? 'rgba(34, 197, 94, 0.15)' : 'rgba(34, 197, 94, 0.1)';
-            badgeBorder = isDark ? 'rgba(34, 197, 94, 0.35)' : 'rgba(34, 197, 94, 0.25)';
-            badgeColor = '#22C55E';
             iconName = 'checkmark-circle-outline';
             label = t('common.approved', 'TASDIQLANDI');
         } else if (isRejected) {
@@ -310,8 +307,8 @@ export default function ApplicationsScreen({ navigation }: any) {
                             style={[
                                 styles.tabBtn,
                                 appTab === 'profile' && {
-                                    backgroundColor: isDark ? '#FFFFFF' : '#000000',
-                                    shadowColor: BRAND_ORANGE,
+                                    backgroundColor: BRAND_ORANGE,
+                                    shadowColor: '#000000',
                                     shadowOffset: { width: 0, height: 2 },
                                     shadowOpacity: 0.15,
                                     shadowRadius: 4,
@@ -327,7 +324,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                             <Ionicons
                                 name="person"
                                 size={14}
-                                color={appTab === 'profile' ? (isDark ? '#000000' : '#FFFFFF') : BRAND_ORANGE}
+                                color={appTab === 'profile' ? '#FFFFFF' : homeColors.textSecondary}
                                 style={{ marginRight: 6 }}
                             />
                             <Text
@@ -335,7 +332,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                                     styles.tabBtnText,
                                     {
                                         color: appTab === 'profile'
-                                            ? (isDark ? '#000000' : '#FFFFFF')
+                                            ? '#FFFFFF'
                                             : homeColors.textSecondary,
                                         fontWeight: appTab === 'profile' ? '800' : '600'
                                     }
@@ -349,8 +346,8 @@ export default function ApplicationsScreen({ navigation }: any) {
                             style={[
                                 styles.tabBtn,
                                 appTab === 'transfers' && {
-                                    backgroundColor: isDark ? '#FFFFFF' : '#000000',
-                                    shadowColor: BRAND_ORANGE,
+                                    backgroundColor: BRAND_ORANGE,
+                                    shadowColor: '#000000',
                                     shadowOffset: { width: 0, height: 2 },
                                     shadowOpacity: 0.15,
                                     shadowRadius: 4,
@@ -366,7 +363,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                             <Ionicons
                                 name="swap-horizontal"
                                 size={15}
-                                color={appTab === 'transfers' ? (isDark ? '#000000' : '#FFFFFF') : BRAND_ORANGE}
+                                color={appTab === 'transfers' ? '#FFFFFF' : homeColors.textSecondary}
                                 style={{ marginRight: 6 }}
                             />
                             <Text
@@ -374,7 +371,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                                     styles.tabBtnText,
                                     {
                                         color: appTab === 'transfers'
-                                            ? (isDark ? '#000000' : '#FFFFFF')
+                                            ? '#FFFFFF'
                                             : homeColors.textSecondary,
                                         fontWeight: appTab === 'transfers' ? '800' : '600'
                                     }
@@ -465,24 +462,24 @@ export default function ApplicationsScreen({ navigation }: any) {
                                                         styles.cooldownNoticeChip,
                                                         {
                                                             backgroundColor: cooldown.isActive
-                                                                ? (isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(56, 189, 248, 0.08)')
-                                                                : (isDark ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.08)'),
+                                                                ? (isDark ? 'rgba(232, 80, 2, 0.12)' : 'rgba(232, 80, 2, 0.08)')
+                                                                : (isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.03)'),
                                                             borderColor: cooldown.isActive
-                                                                ? (isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(56, 189, 248, 0.2)')
-                                                                : (isDark ? 'rgba(34, 197, 94, 0.3)' : 'rgba(34, 197, 94, 0.2)')
+                                                                ? (isDark ? 'rgba(232, 80, 2, 0.3)' : 'rgba(232, 80, 2, 0.2)')
+                                                                : homeColors.border
                                                         }
                                                     ]}
                                                 >
                                                     <Ionicons
                                                         name={cooldown.isActive ? 'time-outline' : 'checkmark-circle-outline'}
                                                         size={14}
-                                                        color={cooldown.isActive ? '#38BDF8' : '#22C55E'}
+                                                        color={cooldown.isActive ? BRAND_ORANGE : homeColors.textSecondary}
                                                         style={{ marginRight: 6 }}
                                                     />
                                                     <Text
                                                         style={[
                                                             styles.cooldownChipText,
-                                                            { color: cooldown.isActive ? '#38BDF8' : '#22C55E' }
+                                                            { color: cooldown.isActive ? BRAND_ORANGE : homeColors.textSecondary }
                                                         ]}
                                                     >
                                                         {cooldown.isActive
@@ -495,7 +492,7 @@ export default function ApplicationsScreen({ navigation }: any) {
                                             {/* Footer Row */}
                                             <View style={[styles.cardFooterRow, { borderTopColor: homeColors.border }]}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <Ionicons name="calendar-outline" size={13} color={BRAND_ORANGE} style={{ marginRight: 5 }} />
+                                                    <Ionicons name="calendar-outline" size={13} color={homeColors.textSecondary} style={{ marginRight: 5 }} />
                                                     <Text style={[styles.dateText, { color: homeColors.textSecondary }]}>
                                                         {formatDate(item.created_at)}
                                                     </Text>
@@ -542,12 +539,18 @@ export default function ApplicationsScreen({ navigation }: any) {
                                                     <Ionicons name="swap-horizontal" size={18} color={BRAND_ORANGE} />
                                                 </View>
                                                 <View style={{ flex: 1 }}>
-                                                    <Text style={[styles.appNameTitle, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                        {item.old_team_name || 'Eski Jamoa'} ➔ {item.new_team_name || 'Yangi Jamoa'}
-                                                    </Text>
                                                     <Text style={[styles.appTypeSubtitle, { color: homeColors.textSecondary }]}>
                                                         {t('nav.transfers', 'Transfer')}
                                                     </Text>
+                                                    <View style={styles.transferRoute}>
+                                                        <Text style={[styles.appNameTitle, styles.transferTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                            {item.old_team_name || 'Eski jamoa'}
+                                                        </Text>
+                                                        <Ionicons name="arrow-forward" size={14} color={homeColors.textSecondary} style={styles.transferRouteArrow} />
+                                                        <Text style={[styles.appNameTitle, styles.transferTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                                                            {item.new_team_name || 'Yangi jamoa'}
+                                                        </Text>
+                                                    </View>
                                                 </View>
                                             </View>
                                             {renderStatusBadge(item.status)}
@@ -555,7 +558,7 @@ export default function ApplicationsScreen({ navigation }: any) {
 
                                         {item.reason ? (
                                             <View style={[styles.transferReasonChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderColor: homeColors.border }]}>
-                                                <Text style={[styles.reasonLabelText, { color: BRAND_ORANGE }]}>
+                                                <Text style={[styles.reasonLabelText, { color: homeColors.textSecondary }]}>
                                                     {t('applications.reason', "O'tish sababi")}:
                                                 </Text>
                                                 <Text style={[styles.reasonContentText, { color: homeColors.textPrimary }]} numberOfLines={2}>
@@ -566,7 +569,7 @@ export default function ApplicationsScreen({ navigation }: any) {
 
                                         <View style={[styles.cardFooterRow, { borderTopColor: homeColors.border }]}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Ionicons name="calendar-outline" size={13} color={BRAND_ORANGE} style={{ marginRight: 5 }} />
+                                                    <Ionicons name="calendar-outline" size={13} color={homeColors.textSecondary} style={{ marginRight: 5 }} />
                                                 <Text style={[styles.dateText, { color: homeColors.textSecondary }]}>
                                                     {formatDate(item.created_at)}
                                                 </Text>
@@ -648,12 +651,12 @@ export default function ApplicationsScreen({ navigation }: any) {
                                                         padding: 12,
                                                         borderRadius: 14,
                                                         backgroundColor: cooldown.isActive
-                                                            ? (isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(56, 189, 248, 0.08)')
-                                                            : (isDark ? 'rgba(34, 197, 94, 0.12)' : 'rgba(34, 197, 94, 0.08)'),
+                                                            ? (isDark ? 'rgba(232, 80, 2, 0.12)' : 'rgba(232, 80, 2, 0.08)')
+                                                            : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)'),
                                                         borderWidth: 1,
                                                         borderColor: cooldown.isActive
-                                                            ? (isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(56, 189, 248, 0.2)')
-                                                            : (isDark ? 'rgba(34, 197, 94, 0.3)' : 'rgba(34, 197, 94, 0.2)'),
+                                                            ? (isDark ? 'rgba(232, 80, 2, 0.3)' : 'rgba(232, 80, 2, 0.2)')
+                                                            : homeColors.border,
                                                         alignItems: 'center',
                                                     }}
                                                 >
@@ -661,14 +664,14 @@ export default function ApplicationsScreen({ navigation }: any) {
                                                         <Ionicons
                                                             name={cooldown.isActive ? 'time' : 'shield-checkmark'}
                                                             size={16}
-                                                            color={cooldown.isActive ? '#38BDF8' : '#22C55E'}
+                                                            color={cooldown.isActive ? BRAND_ORANGE : homeColors.textSecondary}
                                                             style={{ marginRight: 6 }}
                                                         />
                                                         <Text
                                                             style={{
                                                                 fontSize: 13,
                                                                 fontWeight: '800',
-                                                                color: cooldown.isActive ? '#38BDF8' : '#22C55E'
+                                                                color: cooldown.isActive ? BRAND_ORANGE : homeColors.textSecondary
                                                             }}
                                                         >
                                                             {t('applications.cooldown_notice_title', '3 haftalik cheklov')}
@@ -898,14 +901,26 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     appNameTitle: {
-        fontSize: 14.5,
+        fontSize: 15.5,
         fontWeight: '800',
-        letterSpacing: 0.2,
+        letterSpacing: 0.1,
     },
     appTypeSubtitle: {
-        fontSize: 11.5,
-        fontWeight: '600',
-        marginTop: 2,
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.7,
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    transferRoute: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    transferRouteArrow: {
+        marginHorizontal: 6,
+    },
+    transferTeamName: {
+        flex: 1,
     },
     statusBadgePill: {
         flexDirection: 'row',
@@ -941,13 +956,15 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     reasonLabelText: {
-        fontSize: 11,
-        fontWeight: '700',
-        marginBottom: 2,
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.6,
+        textTransform: 'uppercase',
+        marginBottom: 5,
     },
     reasonContentText: {
-        fontSize: 12.5,
-        lineHeight: 17,
+        fontSize: 13,
+        lineHeight: 18,
         fontWeight: '500',
     },
     cardFooterRow: {
@@ -958,12 +975,13 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
     },
     dateText: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '500',
     },
     detailsLinkText: {
-        fontSize: 12.5,
-        fontWeight: '700',
+        fontSize: 11.5,
+        fontWeight: '800',
+        letterSpacing: 0.2,
         marginRight: 2,
     },
     modalOverlay: {
