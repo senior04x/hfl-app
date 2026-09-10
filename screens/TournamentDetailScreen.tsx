@@ -245,7 +245,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 if (parsed.organizerInfo) setOrganizerInfo(parsed.organizerInfo);
                 if (parsed.organizersList) setOrganizersList(parsed.organizersList);
                 if (parsed.totalPlayersCount !== undefined) setTotalPlayersCount(parsed.totalPlayersCount);
-                if (parsed.matches) setMatches(parsed.matches);
                 if (parsed.latestMatches) setLatestMatches(parsed.latestMatches);
                 if (parsed.availableTournaments) setAvailableTournaments(parsed.availableTournaments);
                 setIsLoading(false);
@@ -792,8 +791,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     });
                 }
 
-                setMatches(finalMatches);
-
                 const finishedLeagueMatches = finalMatches.filter((m: any) => m.status === 'finished' || m.status === 'completed');
                 finalLatestMatches = finishedLeagueMatches.length > 0 ? finishedLeagueMatches.slice(0, 2) : finalMatches.slice(0, 2);
                 setLatestMatches(finalLatestMatches);
@@ -879,7 +876,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 organizerInfo: computedOrgInfo,
                 organizersList: allOrganizers,
                 totalPlayersCount: finalCount,
-                matches: finalMatches,
                 latestMatches: finalLatestMatches,
                 availableTournaments: finalTournaments,
                 timestamp: Date.now()
@@ -1256,12 +1252,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             }
         }
     }, [activeTab, currentTournamentId, standings]);
-
-    useEffect(() => {
-        if (standings && standings.length > 0 && topPlayers.length === 0) {
-            fetchTournamentPlayers(false, standings);
-        }
-    }, [standings]);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'Belgilanmagan';
@@ -2059,12 +2049,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                 offset: 64 * index,
                                 index,
                             })}
-                            onEndReached={() => {
-                                if (displayedPlayersCount < filteredPlayers.length) {
-                                    setDisplayedPlayersCount(prev => Math.min(prev + 20, filteredPlayers.length));
-                                }
-                            }}
-                            onEndReachedThreshold={0.5}
                             onViewableItemsChanged={onViewableItemsChanged}
                             viewabilityConfig={viewabilityConfig}
                             onScrollToIndexFailed={(info) => {
@@ -2077,6 +2061,16 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                     <Text style={[styles.emptyText, { color: homeColors.textSecondary }]}>{t('tournaments.no_data', 'Ma\'lumot topilmadi')}</Text>
                                 </View>
                             }
+                            ListFooterComponent={displayedPlayersCount < filteredPlayers.length ? (
+                                <TouchableOpacity
+                                    style={[styles.loadMoreButton, { backgroundColor: homeColors.accent }]}
+                                    onPress={() => setDisplayedPlayersCount(prev => Math.min(prev + 20, filteredPlayers.length))}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.loadMoreButtonText}>{t('common.load_more', 'KO‘PROQ KO‘RSATISH')}</Text>
+                                    <Ionicons name="chevron-down" size={16} color="#FFFFFF" />
+                                </TouchableOpacity>
+                            ) : null}
                             renderItem={({ item: player, index }) => {
                                 const isCurrentUser = userPlayerIndex === index;
                                 const statValue = player[statFilter] ?? player.stats?.[statFilter] ?? 0;
@@ -2215,17 +2209,21 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     initialNumToRender={4}
                     maxToRenderPerBatch={4}
                     windowSize={5}
-                    onEndReached={() => {
-                        if (displayedToursCount < groupedMatchesByTour.length) {
-                            setDisplayedToursCount(prev => Math.min(prev + 3, groupedMatchesByTour.length));
-                        }
-                    }}
-                    onEndReachedThreshold={0.5}
                     ListEmptyComponent={
                         <View style={styles.empty}>
                             <Text style={[styles.emptyText, { color: homeColors.textSecondary }]}>{t('tournaments.no_data', 'Ma\'lumot topilmadi')}</Text>
                         </View>
                     }
+                    ListFooterComponent={displayedToursCount < groupedMatchesByTour.length ? (
+                        <TouchableOpacity
+                            style={[styles.loadMoreButton, { backgroundColor: homeColors.accent }]}
+                            onPress={() => setDisplayedToursCount(prev => Math.min(prev + 3, groupedMatchesByTour.length))}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.loadMoreButtonText}>{t('common.load_more', 'KO‘PROQ KO‘RSATISH')}</Text>
+                            <Ionicons name="chevron-down" size={16} color="#FFFFFF" />
+                        </TouchableOpacity>
+                    ) : null}
                     renderItem={({ item: group }: any) => (
                             <View
                                 key={group.tourKey}
@@ -2735,6 +2733,8 @@ const styles = StyleSheet.create({
     stadiumRowFull: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
     stadiumTextFull: { fontSize: 10, marginLeft: 4, fontWeight: '500' },
     logoCircleSmall: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', marginHorizontal: 6, borderWidth: 1 },
+    loadMoreButton: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 40, paddingHorizontal: 18, borderRadius: Platform.OS === 'ios' ? 12 : 8, marginTop: 8, marginBottom: 24 },
+    loadMoreButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.3 },
     empty: { alignItems: 'center', marginTop: 40, paddingHorizontal: 20 },
     emptyText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
 
