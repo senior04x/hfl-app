@@ -1217,7 +1217,16 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         let sortedPlayers = [...topPlayers].sort((a, b) => {
             const valA = a[statFilter] ?? a.stats?.[statFilter] ?? 0;
             const valB = b[statFilter] ?? b.stats?.[statFilter] ?? 0;
-            return valB - valA;
+            const statisticDifference = Number(valB) - Number(valA);
+
+            // Top scorers with equal goal totals are ranked by their player rating.
+            if (statFilter === 'goals' && statisticDifference === 0) {
+                const ratingA = Number(a.rating ?? a.stats?.rating ?? 0);
+                const ratingB = Number(b.rating ?? b.stats?.rating ?? 0);
+                return ratingB - ratingA;
+            }
+
+            return statisticDifference;
         });
 
         if (!query) {
