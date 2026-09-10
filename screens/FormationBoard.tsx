@@ -705,20 +705,37 @@ export default function FormationBoard({ route, navigation }: any) {
 
     if (loading) {
         return (
-            <GestureHandlerRootView style={{ flex: 1 }}>
-                <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
-                    {/* HEADER SKELETON — real header bilan bir xil o'lcham */}
+            <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+                <RNAnimated.View
+                    style={{
+                        flex: 1,
+                        backgroundColor: homeColors.background,
+                        transform: [{ translateX: swipeBackAnim }],
+                        shadowColor: '#000000',
+                        shadowOffset: { width: -4, height: 0 },
+                        shadowOpacity: isDark ? 0.4 : 0.15,
+                        shadowRadius: 10,
+                        elevation: 10,
+                    }}
+                    {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}
+                >
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                    <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
+                    {/* Header loading vaqtida ham faol qoladi */}
                     <View style={styles.header}>
-                        <Skeleton width={38} height={38} borderRadius={12} />
+                        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, cardSurface]}>
+                            <Ionicons name="arrow-back" size={20} color={homeColors.textPrimary} />
+                        </TouchableOpacity>
                         <View style={{ alignItems: 'center' }}>
-                            <Skeleton width={130} height={14} borderRadius={4} style={{ marginBottom: 5 }} />
-                            <Skeleton width={80} height={11} borderRadius={4} />
+                            <Text style={[styles.headerTitle, { color: homeColors.textPrimary }]}>
+                                {isReadOnly ? t('teams.squad') : t('teams.edit_formation')}
+                            </Text>
+                            <Text style={[styles.headerSub, { color: homeColors.textSecondary }]}>
+                                {activePreset.name} • {selectedFormat}
+                            </Text>
                         </View>
-                        {!isReadOnly ? (
-                            <Skeleton width={76} height={34} borderRadius={10} />
-                        ) : (
-                            <View style={{ width: 40 }} />
-                        )}
+                        <View style={{ width: isReadOnly ? 40 : 76 }} />
                     </View>
 
                     <ScrollView
@@ -803,7 +820,9 @@ export default function FormationBoard({ route, navigation }: any) {
                         </View>
                     </ScrollView>
                 </SafeAreaView>
-            </GestureHandlerRootView>
+                    </GestureHandlerRootView>
+                </RNAnimated.View>
+            </View>
         );
     }
 
