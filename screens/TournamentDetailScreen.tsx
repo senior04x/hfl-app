@@ -2456,39 +2456,35 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     {renderHeader()}
                     {renderTabs()}
 
-                    {isLoading ? (
-                        <TournamentDetailSkeleton />
-                    ) : (
-                        <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
-                            <FlatList
-                                ref={pagerRef}
-                                data={pagerPages}
-                                keyExtractor={(item) => item.key}
-                                horizontal
-                                pagingEnabled
-                                directionalLockEnabled={true}
-                                showsHorizontalScrollIndicator={false}
-                                bounces={false}
-                                overScrollMode="never"
-                                onScroll={Animated.event(
-                                    [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
-                                    { useNativeDriver: false }
-                                )}
-                                scrollEventThrottle={16}
-                                onMomentumScrollEnd={onPagerMomentumEnd}
-                                getItemLayout={(_, index) => ({
-                                    length: SCREEN_WIDTH,
-                                    offset: SCREEN_WIDTH * index,
-                                    index,
-                                })}
-                                renderItem={({ item }) => (
-                                    <View style={{ width: SCREEN_WIDTH, flex: 1 }}>
-                                        {item.render()}
-                                    </View>
-                                )}
-                            />
-                        </View>
-                    )}
+                    <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
+                        <FlatList
+                            ref={pagerRef}
+                            data={pagerPages}
+                            keyExtractor={(item) => item.key}
+                            horizontal
+                            pagingEnabled
+                            directionalLockEnabled={true}
+                            showsHorizontalScrollIndicator={false}
+                            bounces={false}
+                            overScrollMode="never"
+                            onScroll={Animated.event(
+                                [{ nativeEvent: { contentOffset: { x: scrollXPager } } }],
+                                { useNativeDriver: false }
+                            )}
+                            scrollEventThrottle={16}
+                            onMomentumScrollEnd={onPagerMomentumEnd}
+                            getItemLayout={(_, index) => ({
+                                length: SCREEN_WIDTH,
+                                offset: SCREEN_WIDTH * index,
+                                index,
+                            })}
+                            renderItem={({ item }) => (
+                                <View style={{ width: SCREEN_WIDTH, flex: 1 }}>
+                                    {isLoading ? <TournamentDetailSkeleton /> : item.render()}
+                                </View>
+                            )}
+                        />
+                    </View>
                 </SafeAreaView>
             </Animated.View>
         </View>
