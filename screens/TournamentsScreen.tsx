@@ -1112,7 +1112,9 @@ export default function TournamentsScreen({ navigation }: any) {
                         data={isGuest 
                             ? (isLeaguesLoading ? Array(4).fill({ _isSkeleton: true }) : filteredLeagues)
                             : (teamsLoading ? Array(5).fill({ _isSkeleton: true }) : filteredTeams)}
-                        keyExtractor={(item, index) => item?.id || item?._id || `item-${index}`}
+                        keyExtractor={(item, index) => item?._isSkeleton
+                            ? `skeleton:${index}`
+                            : `${isGuest ? (item?.is_tournament ? 'tournament' : 'league') : 'team'}:${item?.id ?? item?._id ?? `row-${index}`}`}
                         renderItem={isGuest ? renderLeagueItemForGuest : renderTeamItem}
                         onScroll={(e) => handleNavBarScroll('tournaments', e)}
                         scrollEventThrottle={16}
