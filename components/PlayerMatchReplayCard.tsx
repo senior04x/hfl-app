@@ -26,14 +26,20 @@ interface PlayerMatchReplayCardProps {
 }
 
 function SingleReplayPlayer({ replay }: { replay: ReplayEvent }) {
+  const { t } = useTranslation();
   const videoRef = useRef<Video>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const rawUrl = replay.replay_video_url || replay.video_url || replay.replay_url || replay.video || '';
   const [sourceUri, setSourceUri] = useState<string>(rawUrl);
 
   useEffect(() => {
     let isMounted = true;
+    setSourceUri(rawUrl);
+    setLoading(true);
+    setVideoError(false);
     if (rawUrl) {
       getCachedVideoUri(rawUrl).then((cached) => {
         if (isMounted) setSourceUri(cached);
@@ -64,6 +70,7 @@ function SingleReplayPlayer({ replay }: { replay: ReplayEvent }) {
       )}
 
       <Video
+        key={`${sourceUri}:${retryKey}`}
         ref={videoRef}
         source={{ uri: sourceUri }}
         style={styles.video}
@@ -72,10 +79,22 @@ function SingleReplayPlayer({ replay }: { replay: ReplayEvent }) {
         isLooping={true}
         useNativeControls={true}
         onLoad={() => setLoading(false)}
-        onError={(e) => console.log('Replay video error:', e)}
+        onError={() => { setLoading(false); setIsPlaying(false); setVideoError(true); }}
       />
 
-      {!isPlaying && !loading && (
+      {videoError && (
+        <View style={styles.loadingOverlay}>
+          <Text style={{ color: '#FFFFFF', textAlign: 'center' }}>{t('replays.load_error', 'Video ochilmadi')}</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => { setSourceUri(rawUrl); setVideoError(false); setLoading(true); setRetryKey(value => value + 1); }}
+            style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 16 }}
+          >
+            <Text style={{ color: '#E85002', fontWeight: '700' }}>{t('common.retry', 'Qayta urinish')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {!isPlaying && !loading && !videoError && (
         <TouchableOpacity style={styles.playButton} onPress={togglePlay} activeOpacity={0.8}>
           <Ionicons name="play" size={30} color="#FFFFFF" style={{ marginLeft: 4 }} />
         </TouchableOpacity>

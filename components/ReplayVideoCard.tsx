@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } fr
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { useTranslation } from 'react-i18next';
 import Colors from '../constants/Colors';
 import { getCachedVideoUri } from '../utils/videoCache';
 
@@ -39,15 +40,21 @@ export default function ReplayVideoCard({
   onPlay,
   onPause
 }: ReplayVideoCardProps) {
+  const { t } = useTranslation();
   const cardId = id || videoUrl;
   const isCurrentActive = activePlayingId === cardId;
   const videoRef = useRef<Video>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [sourceUri, setSourceUri] = useState<string>(videoUrl);
 
   useEffect(() => {
     let isMounted = true;
+    setSourceUri(videoUrl);
+    setLoading(true);
+    setVideoError(false);
     if (videoUrl) {
       getCachedVideoUri(videoUrl).then((cached) => {
         if (isMounted) setSourceUri(cached);
@@ -126,6 +133,7 @@ export default function ReplayVideoCard({
         )}
 
         <Video
+          key={`${sourceUri}:${retryKey}`}
           ref={videoRef}
           source={{ uri: sourceUri }}
           style={styles.video}
@@ -135,10 +143,22 @@ export default function ReplayVideoCard({
           useNativeControls={true}
           onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
           onLoad={() => setLoading(false)}
-          onError={(e) => console.log('Replay video error:', e)}
+          onError={() => { setLoading(false); setIsPlaying(false); setVideoError(true); }}
         />
 
-        {!isPlaying && !loading && (
+        {videoError && (
+          <View style={styles.loadingOverlay}>
+            <Text style={{ color: '#FFFFFF', textAlign: 'center' }}>{t('replays.load_error', 'Video ochilmadi')}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => { setSourceUri(videoUrl); setVideoError(false); setLoading(true); setRetryKey(value => value + 1); }}
+              style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 16 }}
+            >
+              <Text style={{ color: '#E85002', fontWeight: '700' }}>{t('common.retry', 'Qayta urinish')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {!isPlaying && !loading && !videoError && (
           <TouchableOpacity style={styles.playButton} onPress={togglePlay} activeOpacity={0.8}>
             <Ionicons name="play" size={32} color="#FFFFFF" style={{ marginLeft: 4 }} />
           </TouchableOpacity>

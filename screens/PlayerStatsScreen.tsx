@@ -511,6 +511,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     };
 
     const onRefresh = async () => {
+        setReplayRefreshKey(value => value + 1);
         setRefreshing(true);
         try {
             await Promise.all([
@@ -548,8 +549,11 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
 
     const [playerReplays, setPlayerReplays] = useState<any[]>([]);
     const [replaysLoading, setReplaysLoading] = useState(false);
+    const [replayRefreshKey, setReplayRefreshKey] = useState(0);
 
     useEffect(() => {
+        if (currentTabIndex !== 1) return;
+        let cancelled = false;
         const fetchPlayerReplays = async () => {
             const pId = player?.id || player?._id || playerId;
             if (!pId) return;
@@ -557,7 +561,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             try {
                 const playerPhone = player?.phone;
                 let targetPlayerIds = [pId];
-                if (playerPhone) {
+                if (playerPhone && String(playerPhone).replace(/\D/g, '').length >= 9) {
                     const cleanPhone = String(playerPhone).replace(/\D/g, '').slice(-9);
                     const { data: siblings } = await supabase
                         .from('applications')
@@ -574,6 +578,8 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     .in('player_id', targetPlayerIds)
                     .order('created_at', { ascending: false });
 
+                if (cancelled) return;
+                if (error) throw error;
                 if (!error && events && events.length > 0) {
                     const validReplays = events.filter((e: any) =>
                         Boolean(e.replay_video_url || e.video_url || e.replay_url || e.video)
@@ -585,12 +591,13 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             } catch (e) {
                 console.warn('Error fetching player replays:', e);
             } finally {
-                setReplaysLoading(false);
+                if (!cancelled) setReplaysLoading(false);
             }
         };
 
         fetchPlayerReplays();
-    }, [player?.id, player?._id, playerId, player?.phone]);
+        return () => { cancelled = true; };
+    }, [player?.id, player?._id, playerId, player?.phone, currentTabIndex, replayRefreshKey]);
 
     if (loading && !player) {
         return <PlayerStatsScreenSkeleton />;
