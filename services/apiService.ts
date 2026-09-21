@@ -724,78 +724,52 @@ export const apiService = {
     // Transfers
     createTransferRequest: async (data: any) => {
         try {
-            // Fetch player info
-            let playerName = '';
-            let playerPhoto = '';
-            if (data.playerId) {
-                const { data: player } = await supabase.from('applications').select('first_name, last_name, photo_url').eq('id', data.playerId).single();
-                if (player) {
-                    playerName = `${player.first_name || ''} ${player.last_name || ''}`.trim();
-                    playerPhoto = player.photo_url || '';
-                }
+            // 1. Get session token from AsyncStorage
+            const sessionToken = await AsyncStorage.getItem('amatora_session_token');
+            if (!sessionToken) {
+                throw new Error('Authentication required. Please verify OTP first.');
             }
 
-            // Fetch old team info
-            let oldTeamName = '';
-            let oldTeamLogo = '';
-            let organizationId: any = null;
-            if (data.currentTeamId && data.currentTeamId !== 'unknown_old_team') {
-                const { data: oldTeam } = await supabase.from('teams').select('name, logo_url, organization_id').eq('id', data.currentTeamId).single();
-                if (oldTeam) {
-                    oldTeamName = oldTeam.name || '';
-                    oldTeamLogo = oldTeam.logo_url || '';
-                    organizationId = oldTeam.organization_id || null;
-                }
+            // 2. Call Edge Function with Bearer token (secure player-initiated transfer)
+            const response = await fetch('https://xzzyhfyazwohdqqbjiiy.supabase.co/functions/v1/create-player-transfer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionToken}`
+                },
+                body: JSON.stringify({
+                    new_team_id: data.newTeamId,
+                    reason: data.reason || null
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to create transfer request');
             }
 
-            // Fetch new team info
-            let newTeamName = '';
-            let newTeamLogo = '';
-            if (data.newTeamId) {
-                const { data: newTeam } = await supabase.from('teams').select('name, logo_url, organization_id').eq('id', data.newTeamId).single();
-                if (newTeam) {
-                    newTeamName = newTeam.name || '';
-                    newTeamLogo = newTeam.logo_url || '';
-                    if (!organizationId) organizationId = newTeam.organization_id || null;
-                }
-            }
-
-            const transferPayload: any = {
-                player_id: data.playerId,
-                old_team_id: data.currentTeamId !== 'unknown_old_team' ? data.currentTeamId : null,
-                new_team_id: data.newTeamId,
-                reason: data.reason || null,
-                status: 'pending',
-                player_name: playerName,
-                player_photo: playerPhoto,
-                old_team_name: oldTeamName,
-                old_team_logo: oldTeamLogo,
-                new_team_name: newTeamName,
-                new_team_logo: newTeamLogo
-            };
-
-            const { data: created, error } = await supabase.from('transfers').insert(transferPayload).select().single();
-            if (error) throw error;
-
-            // Notify Admin
+            // 3. Notify admin (optional - keep existing notification)
             try {
                 const { API_BASE_URL } = require('../constants/ApiConfig');
+                const transfer = result.transfer;
                 fetch(`${API_BASE_URL}/api/notifications/notify-admin-transfer`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        playerName: playerName || 'O\'yinchi',
-                        oldTeamName: oldTeamName || '',
-                        newTeamName: newTeamName || '',
-                        playerId: data.playerId,
-                        organizationId: organizationId || 1,
+                        playerName: transfer.player_name || 'O\'yinchi',
+                        oldTeamName: transfer.old_team_name || '',
+                        newTeamName: transfer.new_team_name || '',
+                        playerId: transfer.player_id,
+                        organizationId: transfer.organization_id || 1,
                     }),
                 }).catch(() => {});
             } catch (notifErr) {}
 
-            return { success: true, data: created };
-        } catch (err) {
+            return { success: true, data: result.transfer };
+        } catch (err: any) {
             console.error('Transfer request error:', err);
+            return { success: false, error: err.message || 'Transfer request failed' };
         }
     },
 
