@@ -721,58 +721,8 @@ export const apiService = {
         }
     },
 
-    // Transfers
-    createTransferRequest: async (data: any) => {
-        try {
-            // 1. Get session token from AsyncStorage
-            const sessionToken = await AsyncStorage.getItem('amatora_session_token');
-            if (!sessionToken) {
-                throw new Error('Authentication required. Please verify OTP first.');
-            }
-
-            // 2. Call Edge Function with Bearer token (secure player-initiated transfer)
-            const response = await fetch('https://xzzyhfyazwohdqqbjiiy.supabase.co/functions/v1/create-player-transfer', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${sessionToken}`
-                },
-                body: JSON.stringify({
-                    new_team_id: data.newTeamId,
-                    reason: data.reason || null
-                })
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Failed to create transfer request');
-            }
-
-            // 3. Notify admin (optional - keep existing notification)
-            try {
-                const { API_BASE_URL } = require('../constants/ApiConfig');
-                const transfer = result.transfer;
-                fetch(`${API_BASE_URL}/api/notifications/notify-admin-transfer`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        playerName: transfer.player_name || 'O\'yinchi',
-                        oldTeamName: transfer.old_team_name || '',
-                        newTeamName: transfer.new_team_name || '',
-                        playerId: transfer.player_id,
-                        organizationId: transfer.organization_id || 1,
-                    }),
-                }).catch(() => {});
-            } catch (notifErr) {}
-
-            return { success: true, data: result.transfer };
-        } catch (err: any) {
-            console.error('Transfer request error:', err);
-            return { success: false, error: err.message || 'Transfer request failed' };
-        }
-    },
-
+    // Transfers are created by verified team captains on the organization site.
+    // Players can only view requests involving their application.
     getPlayerTransfers: async (playerId: string | number) => {
         try {
             const { data, error } = await supabase

@@ -22,7 +22,6 @@ import AuthNavigator from './navigation/AuthNavigator';
 import WelcomeScreen from './screens/WelcomeScreen';
 import JoinApplicationScreen from './screens/JoinApplicationScreen';
 import MyStatsScreen from './screens/MyStatsScreen';
-import TransferRequestScreen from './screens/TransferRequestScreen';
 import FormationBoard from './screens/FormationBoard';
 import TeamChatScreen from './screens/TeamChatScreen';
 import StandingsScreen from './screens/StandingsScreen';
@@ -110,7 +109,7 @@ function App() {
                     }
                 } else if (data.type === 'transfer_status' || data.type === 'transfer') {
                     if (navigationRef.isReady()) {
-                        (navigationRef as any).navigate('TransferRequest');
+                        (navigationRef as any).navigate('Applications', { initialTab: 'transfers' });
                     }
                 } else if (data.type === 'team_chat' || data.type === 'chat' || data.teamId) {
                     if (navigationRef.isReady() && data.teamId) {
@@ -137,8 +136,8 @@ function App() {
                                 (navigationRef as any).navigate('MatchDetail', { matchId: data.matchId });
                             } else if (data.type === 'profile_update_status') {
                                 (navigationRef as any).navigate('Applications');
-                            } else if (data.type === 'transfer_status') {
-                                (navigationRef as any).navigate('TransferRequest');
+                            } else if (data.type === 'transfer_status' || data.type === 'transfer') {
+                                (navigationRef as any).navigate('Applications', { initialTab: 'transfers' });
                             } else if (data.type === 'team_chat' || data.type === 'chat' || data.teamId) {
                                 (navigationRef as any).navigate('TeamChat', { teamId: data.teamId });
                             }
@@ -217,17 +216,6 @@ function App() {
                                             gestureEnabled: Platform.OS === 'ios',
                                             gestureDirection: 'horizontal',
                                         }} 
-                                    />
-                                    <Stack.Screen
-                                        name="TransferRequest"
-                                        component={TransferRequestScreen}
-                                        options={{
-                                            presentation: 'transparentModal',
-                                            cardStyle: { backgroundColor: 'transparent' },
-                                            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
-                                            gestureDirection: 'horizontal',
-                                        }}
                                     />
                                     <Stack.Screen
                                         name="Applications"

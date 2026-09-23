@@ -25,7 +25,6 @@ import LanguageSelectModal from '../components/LanguageSelectModal';
 import { SUPPORTED_LANGUAGES } from '../store/useLanguageStore';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 
-import { useFocusEffect } from '@react-navigation/native';
 import { useJuniorStore } from '../store/useJuniorStore';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -58,7 +57,6 @@ export default function AccountScreen({ navigation }: any) {
 
     const [detailedData, setDetailedData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    const [transferWindowOpen, setTransferWindowOpen] = useState(false);
     const currentTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
 
     const [storyPickerVisible, setStoryPickerVisible] = useState(false);
@@ -91,17 +89,8 @@ export default function AccountScreen({ navigation }: any) {
                 loadDetailedData();
                 loadUserApplications();
             }
-            checkTransferWindow();
         }
     }, [isGuest, user?.id, selectedOrganizationId]);
-
-    useFocusEffect(
-        React.useCallback(() => {
-            if (!isGuest) {
-                checkTransferWindow();
-            }
-        }, [isGuest, selectedOrganizationId])
-    );
 
     const loadOwnActiveReplayIds = async () => {
         if (!currentTeamId) return;
@@ -141,16 +130,6 @@ export default function AccountScreen({ navigation }: any) {
             console.error('Error loading applications in AccountScreen:', err);
         } finally {
             setAppsLoading(false);
-        }
-    };
-
-    const checkTransferWindow = async () => {
-        try {
-            const orgId = selectedOrganizationId || user?.organizationId || user?.organization_id || 1;
-            const open = await apiService.getTransferWindowStatus(orgId);
-            setTransferWindowOpen(open);
-        } catch (err) {
-            console.error('Error checking transfer window:', err);
         }
     };
 
@@ -564,13 +543,11 @@ export default function AccountScreen({ navigation }: any) {
                                             title={t('profile.applications', 'Arizalar')}
                                             onPress={() => navigation.navigate('Applications')}
                                         />
-                                        {transferWindowOpen && (
-                                            <SettingRow
-                                                icon="swap-horizontal-outline"
-                                                title={t('profile.transfer_requests', 'Transfer so\'rovlari')}
-                                                onPress={() => navigation.navigate('TransferRequest', { playerId: user?.id })}
-                                            />
-                                        )}
+                                        <SettingRow
+                                            icon="swap-horizontal-outline"
+                                            title={t('profile.transfer_requests', 'Transfer so\'rovlari')}
+                                            onPress={() => navigation.navigate('Applications', { initialTab: 'transfers' })}
+                                        />
                                     </>
                                 )}
 

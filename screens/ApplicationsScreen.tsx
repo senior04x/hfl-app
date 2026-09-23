@@ -28,14 +28,16 @@ const { width } = Dimensions.get('window');
 const BRAND_ORANGE = '#E85002';
 const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
 
-export default function ApplicationsScreen({ navigation }: any) {
+export default function ApplicationsScreen({ navigation, route }: any) {
     const { user, isGuest } = useAuthStore();
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
     const { t, i18n } = useTranslation();
     const currentLang = i18n?.language || 'uz';
 
-    const [appTab, setAppTab] = useState<'transfers' | 'profile'>('profile');
+    const [appTab, setAppTab] = useState<'transfers' | 'profile'>(
+        route?.params?.initialTab === 'transfers' ? 'transfers' : 'profile'
+    );
     const [userTransfers, setUserTransfers] = useState<any[]>([]);
     const [userProfileApps, setUserProfileApps] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
