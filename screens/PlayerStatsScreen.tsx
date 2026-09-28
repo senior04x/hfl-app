@@ -1,3 +1,5 @@
+import PlayerCompetitionHistory, { PlayerCareerGoals } from '../components/PlayerCompetitionHistory';
+import { getPlayerHistory } from '../services/playerHistory';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -21,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import ViewShot, { captureRef } from 'react-native-view-shot';
-import { apiService } from '../services/apiService';
+import { apiService, clearApiCache } from '../services/apiService';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
@@ -230,7 +232,7 @@ const PlayerStatsScreenSkeleton = () => {
                 </View>
 
                 {/* Tab switcher */}
-                <View style={[styles.tabBarContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
+                <View style={[styles.tabsContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
                     {[1, 2, 3].map((i) => (
                         <View key={i} style={[styles.tabBtn, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
                             <InlineSkeleton width={55} height={14} borderRadius={4} />
@@ -287,12 +289,15 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         }),
     };
 
-    const { playerId, player: initialPlayer } = route.params || {};
+    const { player: initialPlayer } = route.params || {};
+    const playerId = route.params?.playerId || initialPlayer?.id || initialPlayer?._id;
     const [loading, setLoading] = useState(!initialPlayer);
     const [player, setPlayer] = useState<any>(initialPlayer ? extractPlayerData(initialPlayer) : null);
     const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
+    const [matchesError, setMatchesError] = useState('');
+    const matchesRequestRef = useRef(0);
     const [refreshing, setRefreshing] = useState(false);
     const [openingInstagram, setOpeningInstagram] = useState(false);
     const [showComparisonModal, setShowComparisonModal] = useState(false);
@@ -472,9 +477,6 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         if (newIdx !== currentTabIndexRef.current) {
             currentTabIndexRef.current = newIdx;
             setCurrentTabIndex(newIdx);
-            if (tabs[newIdx] === 'oyinlari' && matches.length === 0) {
-                fetchPlayerMatches();
-            }
         }
         isPagerScrolling.current = false;
     };
@@ -511,12 +513,15 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     };
 
     const onRefresh = async () => {
+        clearApiCache('player_' + playerId);
+        clearApiCache('player_stats_' + playerId);
+        clearApiCache('player_transfers_' + playerId);
         setReplayRefreshKey(value => value + 1);
         setRefreshing(true);
         try {
             await Promise.all([
                 fetchPlayer(),
-                fetchPlayerMatches(),
+                fetchPlayerMatches(true),
             ]);
         } catch (error) {
             console.error('Error refreshing player stats:', error);
@@ -525,19 +530,23 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         }
     };
 
-    const fetchPlayerMatches = async () => {
+    const fetchPlayerMatches = async (refresh = false) => {
+        const request = ++matchesRequestRef.current;
+        setMatchesLoading(true);
+        setMatchesError('');
         try {
-            setMatchesLoading(true);
-            const data = await apiService.getPlayerMatches(playerId);
-            setMatches(data || []);
+            const data = await getPlayerHistory(playerId, refresh);
+            if (request === matchesRequestRef.current) setMatches(data);
         } catch (error) {
+            if (request === matchesRequestRef.current) setMatchesError('load_failed');
             console.error('Error fetching player matches:', error);
         } finally {
-            setMatchesLoading(false);
+            if (request === matchesRequestRef.current) setMatchesLoading(false);
         }
     };
 
     useEffect(() => {
+        setMatches([]);
         if (playerId) {
             fetchPlayer();
             fetchPlayerMatches();
@@ -545,6 +554,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             setLoading(false);
             setMatchesLoading(false);
         }
+        return () => { matchesRequestRef.current += 1; };
     }, [playerId]);
 
     const [playerReplays, setPlayerReplays] = useState<any[]>([]);
@@ -795,6 +805,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             nestedScrollEnabled={true}
             contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
         >
+            <PlayerCareerGoals matches={matches} isDark={isDark} loading={matchesLoading} error={matchesError} onRefresh={() => fetchPlayerMatches(true)} />
             {/* CURRENT TEAM */}
             <View style={[styles.infoSectionCard, cardSurface]}>
                 <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
@@ -880,152 +891,11 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         </ScrollView>
     );
 
-    const renderMatches = () => (
-        <ScrollView
-            style={styles.tabContent}
-            showsVerticalScrollIndicator={false}
-            nestedScrollEnabled={true}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    tintColor={homeColors.textPrimary}
-                    colors={[homeColors.accent || '#F59E0B']}
-                />
-            }
-        >
-            {matchesLoading ? (
-                [1, 2, 3, 4].map((key) => (
-                    <View
-                        key={key}
-                        style={[
-                            styles.hMatchCard,
-                            cardSurface,
-                            { opacity: 0.5 }
-                        ]}
-                    >
-                        <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <View style={{ width: '35%', height: 14, backgroundColor: homeColors.surface, borderRadius: 4 }} />
-                            <View style={{ width: 40, height: 16, backgroundColor: homeColors.surface, borderRadius: 6 }} />
-                            <View style={{ width: '35%', height: 14, backgroundColor: homeColors.surface, borderRadius: 4 }} />
-                        </View>
-                    </View>
-                ))
-            ) : matches.length > 0 ? (
-                matches.map((match: any) => {
-                    const st = String(match.status || '').toLowerCase().trim();
-                    const matchIsLive = ['live', 'first_half', 'second_half', 'half_time', 'halftime', 'ongoing', 'in_progress', '1st_half', '2nd_half', '1-taym', '2-taym', 'tanaffus'].includes(st);
-                    const matchIsFinished = ['finished', 'completed', 'ended', 'tugadi'].includes(st);
-                    const rawDate = match.date || match.match_date;
-                    const matchDate = new Date(rawDate);
-                    const isValidDate = !isNaN(matchDate.getTime());
-                    const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
-                    const day = isValidDate ? matchDate.getDate() : '';
-                    const month = isValidDate ? months[matchDate.getMonth()] : '';
-                    let formattedTime = String(match.match_time || match.time || '').trim();
-                    if (formattedTime.includes(':')) {
-                        const timeParts = formattedTime.split(':');
-                        formattedTime = `${timeParts[0].padStart(2, '0')}:${(timeParts[1] || '00').padStart(2, '0')}`;
-                    }
-                    if (!formattedTime && isValidDate) {
-                        const hrs = String(matchDate.getHours()).padStart(2, '0');
-                        const mins = String(matchDate.getMinutes()).padStart(2, '0');
-                        if (hrs !== '00' || mins !== '00') formattedTime = `${hrs}:${mins}`;
-                    }
-                    if (!formattedTime) formattedTime = '18:00';
-
-                    return (
-                        <TouchableOpacity
-                            key={match.id || match._id}
-                            style={[
-                                styles.hMatchCard,
-                                cardSurface,
-                                matchIsLive && { borderColor: homeColors.accent }
-                            ]}
-                            onPress={() => navigation.navigate('MatchDetail', { matchId: match.id || match._id })}
-                            activeOpacity={0.85}
-                        >
-                            <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    {/* CHAP: Uy jamoasi */}
-                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, paddingRight: 8 }}>
-                                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                            {match.homeTeamName || match.homeTeam?.name || match.home_team?.name || t('matches.home_short', 'UY')}
-                                        </Text>
-                                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                                            <SmartImage
-                                                uri={match.homeTeamLogo || match.homeTeam?.logo || match.home_team?.logo_url}
-                                                style={{ width: 20, height: 20 }}
-                                                contentFit="contain"
-                                                fallbackIcon="shield-outline"
-                                            />
-                                        </View>
-                                    </View>
-
-                                    {/* O'RTA: Hisob yoki vaqt */}
-                                    <View style={{ width: 72, alignItems: 'center' }}>
-                                        {(matchIsLive || matchIsFinished) ? (
-                                            <View style={{ alignItems: 'center' }}>
-                                                <Text style={{ fontSize: 20, fontWeight: '900', color: homeColors.textPrimary, letterSpacing: -0.5 }}>
-                                                    {match.score?.home ?? match.home_score ?? 0} - {match.score?.away ?? match.away_score ?? 0}
-                                                </Text>
-                                                {matchIsLive && (
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                                                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: homeColors.accent }} />
-                                                        <Text style={{ fontSize: 8, fontWeight: '700', color: homeColors.accent, letterSpacing: 0.3 }}>LIVE</Text>
-                                                    </View>
-                                                )}
-                                                {!!(match.round || match.tour) && (
-                                                    <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 2 }}>
-                                                        {match.round || match.tour}-{t('teams.tour_short', 'tur')}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        ) : (
-                                            <View style={{ alignItems: 'center' }}>
-                                                <Text style={{ fontSize: 15, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: -0.3 }}>
-                                                    {formattedTime}
-                                                </Text>
-                                                <Text style={{ fontSize: 8.5, color: homeColors.textSecondary, marginTop: 1 }}>
-                                                    {day} {month}
-                                                </Text>
-                                                {!!(match.round || match.tour) && (
-                                                    <Text style={{ fontSize: 8, color: homeColors.textSecondary, marginTop: 1 }}>
-                                                        {match.round || match.tour}-{t('teams.tour_short', 'tur')}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        )}
-                                    </View>
-
-                                    {/* O'NG: Mehmon jamoa */}
-                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 6, paddingLeft: 8 }}>
-                                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                                            <SmartImage
-                                                uri={match.awayTeamLogo || match.awayTeam?.logo || match.away_team?.logo_url}
-                                                style={{ width: 20, height: 20 }}
-                                                contentFit="contain"
-                                                fallbackIcon="shield-outline"
-                                            />
-                                        </View>
-                                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                            {match.awayTeamName || match.awayTeam?.name || match.away_team?.name || t('matches.away_short', 'MEH')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })
-            ) : (
-                <View style={[styles.emptyState, cardSurface]}>
-                    <Ionicons name="football-outline" size={24} color={homeColors.textSecondary} />
-                    <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>{t('teams.no_matches', "O'yinlar tarixi mavjud emas")}</Text>
-                </View>
-            )}
-        </ScrollView>
-    );
+    const renderMatches = () => <PlayerCompetitionHistory
+        matches={matches} isDark={isDark} loading={matchesLoading} error={matchesError}
+        refreshing={refreshing} onRefresh={onRefresh}
+        onMatchPress={matchId => navigation.navigate('MatchDetail', { matchId })}
+    />;
 
     return (
         <View style={{ flex: 1, backgroundColor: 'transparent' }}>
@@ -1246,7 +1116,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             <PlayerComparisonModal
                 visible={showComparisonModal}
                 onClose={() => setShowComparisonModal(false)}
-                currentPlayer={player}
+                player1={player}
             />
 
             {/* ZOOM MODAL */}
