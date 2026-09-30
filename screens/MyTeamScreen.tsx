@@ -413,6 +413,12 @@ export default function MyTeamScreen({ route, navigation }: any) {
                     </TouchableOpacity>
 
                     <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {isOwnerOrMember && user?.role === 'manager' && (
+                            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('transfer_app.title')}
+                                style={[styles.iconBtn, cardSurface]} onPress={() => navigation.navigate('Transfers')}>
+                                <Ionicons name="swap-horizontal-outline" size={18} color={homeColors.textPrimary} />
+                            </TouchableOpacity>
+                        )}
                         {canChat && (
                             <TouchableOpacity
                                 style={[styles.iconBtn, cardSurface]}

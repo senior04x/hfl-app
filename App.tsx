@@ -36,6 +36,8 @@ import CalendarMatchesScreen from './screens/CalendarMatchesScreen';
 import TeamProfileScreen from './screens/TeamProfileScreen';
 import MyTeamScreen from './screens/MyTeamScreen';
 import ApplicationsScreen from './screens/ApplicationsScreen';
+import TransferScreen from './screens/TransferScreen';
+import { clearTransferSessions } from './services/transferAppService';
 import { parseTransferAppLink } from './utils/transferAppLink';
 import SecuritySettingsScreen from './screens/SecuritySettingsScreen';
 import SystemSettingsScreen from './screens/SystemSettingsScreen';
@@ -71,11 +73,12 @@ function App() {
     const pendingTransferLink = React.useRef<string | null>(null);
     const canOpenTransferLink = React.useRef(false);
     canOpenTransferLink.current = isAuthenticated && !isGuest;
+    React.useEffect(() => { if (!isAuthenticated) clearTransferSessions(); }, [isAuthenticated]);
     const flushTransferLink = React.useCallback(() => {
         const transferId = pendingTransferLink.current;
         if (!transferId || !canOpenTransferLink.current || !navigationRef.isReady()) return;
         pendingTransferLink.current = null;
-        (navigationRef as any).navigate('Applications', { initialTab: 'transfers', transferId });
+        (navigationRef as any).navigate('Transfers', { transferId });
     }, []);
 
     React.useEffect(() => {
@@ -226,6 +229,7 @@ function App() {
                                 }}
                             >
                                 <Stack.Screen name="MainTabs" component={AppNavigator} />
+                                <Stack.Screen name="Transfers" component={TransferScreen} />
                                     <Stack.Screen name="Welcome" component={WelcomeScreen} />
                                     <Stack.Screen 
                                         name="JoinApplication" 

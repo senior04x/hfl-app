@@ -548,6 +548,8 @@ export default function AccountScreen({ navigation }: any) {
                                             title={t('profile.transfer_requests', 'Transfer so\'rovlari')}
                                             onPress={() => navigation.navigate('Applications', { initialTab: 'transfers' })}
                                         />
+                                        <SettingRow icon="swap-horizontal" title={t('transfer_app.title')}
+                                            onPress={() => navigation.navigate('Transfers')} />
                                     </>
                                 )}
 
