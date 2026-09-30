@@ -1,3 +1,4 @@
+import { PagerScrollView, PagerContentScrollView } from '../components/PlatformPager';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -552,10 +553,11 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
             {/* PAGER WITH 3 ATTACHED PANELS */}
             <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
-            <Animated.ScrollView
+            <PagerScrollView
                 ref={pagerScrollRef}
                 horizontal
                 pagingEnabled
+                nestedScrollEnabled={Platform.OS === 'android'}
                 directionalLockEnabled={true}
                 showsHorizontalScrollIndicator={false}
                 bounces={false}
@@ -571,7 +573,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
             >
                 {/* TAB 0: TARKIB */}
                 <View style={{ width, flex: 1 }}>
-                    <ScrollView
+                    <PagerContentScrollView
                             showsVerticalScrollIndicator={false}
                             nestedScrollEnabled={true}
                             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}
@@ -664,12 +666,12 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                 <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>{t('teams.no_players')}</Text>
                             </View>
                         )}
-                    </ScrollView>
+                    </PagerContentScrollView>
                 </View>
 
                 {/* TAB 1: TAKTIKA */}
                 <View style={{ width, flex: 1 }}>
-                    <ScrollView 
+                    <PagerContentScrollView
                         showsVerticalScrollIndicator={false} 
                         nestedScrollEnabled={true}
                         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60 }}
@@ -702,12 +704,12 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                 )}
                             </View>
                         )}
-                    </ScrollView>
+                    </PagerContentScrollView>
                 </View>
 
                 {/* TAB 2: O'YINLAR */}
                 <View style={{ width, flex: 1 }}>
-                    <ScrollView 
+                    <PagerContentScrollView
                         showsVerticalScrollIndicator={false} 
                         nestedScrollEnabled={true}
                         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}
@@ -848,9 +850,9 @@ export default function TeamProfileScreen({ route, navigation }: any) {
                                 <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>{t('teams.no_matches', "O'yinlar tarixi mavjud emas")}</Text>
                             </View>
                         )}
-                    </ScrollView>
+                    </PagerContentScrollView>
                 </View>
-            </Animated.ScrollView>
+            </PagerScrollView>
             </View>
 
             {/* ADD PHONE MODAL */}

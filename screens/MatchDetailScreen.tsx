@@ -1,3 +1,4 @@
+import { PagerScrollView, PagerContentScrollView } from '../components/PlatformPager';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -615,7 +616,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     };
 
     const renderOverviewSkeleton = () => (
-        <ScrollView 
+        <PagerContentScrollView
             style={styles.tabContent} 
             contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
             showsVerticalScrollIndicator={false}
@@ -637,7 +638,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     </View>
                 </View>
             ))}
-        </ScrollView>
+        </PagerContentScrollView>
     );
 
     const renderOverview = () => {
@@ -656,7 +657,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const events = match?.events || [];
 
         return (
-            <ScrollView 
+            <PagerContentScrollView
                 style={styles.tabContent} 
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
@@ -677,12 +678,12 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         <Text style={[styles.notStartedText, { color: homeColors.textSecondary }]}>{t('match_detail.no_events')}</Text>
                     </View>
                 )}
-            </ScrollView>
+            </PagerContentScrollView>
         );
     };
 
     const renderPreviewSkeleton = () => (
-        <ScrollView 
+        <PagerContentScrollView
             style={styles.tabContent} 
             contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
             showsVerticalScrollIndicator={false}
@@ -743,7 +744,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     ))}
                 </View>
             </View>
-        </ScrollView>
+        </PagerContentScrollView>
     );
 
     const renderPreview = () => {
@@ -765,7 +766,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const awayKeyPlayer = awayPlayers[0];
 
         return (
-            <ScrollView 
+            <PagerContentScrollView
                 style={styles.tabContent} 
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
@@ -987,12 +988,12 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         </View>
                     </View>
                 )}
-            </ScrollView>
+            </PagerContentScrollView>
         );
     };
 
     const renderLineupsSkeleton = () => (
-        <ScrollView 
+        <PagerContentScrollView
             style={styles.tabContent} 
             contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
             showsVerticalScrollIndicator={false}
@@ -1033,7 +1034,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     <Skeleton width={16} height={16} borderRadius={4} style={{ backgroundColor: homeColors.surface }} />
                 </View>
             ))}
-        </ScrollView>
+        </PagerContentScrollView>
     );
 
     const renderLineups = () => {
@@ -1187,7 +1188,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         };
 
         return (
-            <ScrollView 
+            <PagerContentScrollView
                 style={styles.tabContent} 
                 contentContainerStyle={{ paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
@@ -1259,7 +1260,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         )}
                     </View>
                 )}
-            </ScrollView>
+            </PagerContentScrollView>
         );
     };
 
@@ -1280,7 +1281,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
         if (!videoUrl && !hasAnyReplays) {
             return (
-                <ScrollView 
+                <PagerContentScrollView
                     style={styles.tabContent} 
                     contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                     showsVerticalScrollIndicator={false}
@@ -1298,12 +1299,12 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         <Ionicons name="film-outline" size={42} color={homeColors.textSecondary} style={{ opacity: 0.4 }} />
                         <Text style={[styles.notStartedText, { color: homeColors.textSecondary, marginTop: 12 }]}>{t('match_detail.no_media', 'Media materiallar mavjud emas')}</Text>
                     </View>
-                </ScrollView>
+                </PagerContentScrollView>
             );
         }
 
         return (
-            <ScrollView 
+            <PagerContentScrollView
                 style={styles.tabContent} 
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
@@ -1393,7 +1394,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         })}
                     </View>
                 )}
-            </ScrollView>
+            </PagerContentScrollView>
         );
     };
 
@@ -1420,7 +1421,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const awayCaptain = rawAwayCaptain ? rawAwayCaptain.toUpperCase() : t('match_detail.not_appointed');
 
         return (
-            <ScrollView 
+            <PagerContentScrollView
                 style={styles.tabContent} 
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
@@ -1548,7 +1549,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         </View>
                     </View>
                 </View>
-            </ScrollView>
+            </PagerContentScrollView>
         );
     };
 
@@ -1592,10 +1593,11 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
                     {/* 1:1 Instagram-Style Real-Time Interactive Horizontal Pager */}
                     <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? matchDetailExitPanResponder.panHandlers : {})}>
-                        <Animated.ScrollView
+                        <PagerScrollView
                             ref={pagerScrollRef}
                             horizontal
                             pagingEnabled
+                            nestedScrollEnabled={Platform.OS === 'android'}
                             directionalLockEnabled={true}
                             showsHorizontalScrollIndicator={false}
                             bounces={false}
@@ -1624,7 +1626,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             <View style={{ width, height: '100%' }}>
                                 {renderStaff()}
                             </View>
-                        </Animated.ScrollView>
+                        </PagerScrollView>
                     </View>
                 </SafeAreaView>
             </Animated.View>

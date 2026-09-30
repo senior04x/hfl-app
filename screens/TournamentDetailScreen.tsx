@@ -1,3 +1,4 @@
+import { PagerFlatList, PagerContentScrollView } from '../components/PlatformPager';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
@@ -1651,7 +1652,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         const endDateVal = tournamentData?.end_date || tournamentData?.endDate;
 
         return (
-            <ScrollView 
+            <PagerContentScrollView
                 style={styles.tabContent} 
                 contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}
                 showsVerticalScrollIndicator={false}
@@ -1858,12 +1859,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         </View>
                     </View>
                 )}
-            </ScrollView>
+            </PagerContentScrollView>
         );
     };
 
     const renderStandings = () => (
-        <ScrollView 
+        <PagerContentScrollView
             style={styles.tabContent}
             contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
             showsVerticalScrollIndicator={false}
@@ -1949,7 +1950,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     )}
                 </View>
             )}
-        </ScrollView>
+        </PagerContentScrollView>
     );
 
     const renderPlayers = () => {
@@ -2033,7 +2034,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     <PlayerListSkeleton />
                 ) : (
                     <View style={{ flex: 1, position: 'relative' }}>
-                        <FlatList
+                        <PagerFlatList
                             ref={playersListRef}
                             data={visiblePlayers}
                             keyExtractor={(player, index) => String(player._id || player.id || index)}
@@ -2199,7 +2200,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             {isLoadingMatches ? (
                 <MatchesListSkeleton count={6} />
             ) : (
-                <FlatList
+                <PagerFlatList
                     data={visibleTours}
                     keyExtractor={(group: any) => group.tourKey}
                     contentContainerStyle={{ paddingBottom: 120 + insets.bottom, paddingHorizontal: 16 }}
@@ -2471,12 +2472,13 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     {renderTabs()}
 
                     <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
-                        <FlatList
+                        <PagerFlatList
                             ref={pagerRef}
                             data={pagerPages}
                             keyExtractor={(item) => item.key}
                             horizontal
                             pagingEnabled
+                            nestedScrollEnabled={Platform.OS === 'android'}
                             directionalLockEnabled={true}
                             showsHorizontalScrollIndicator={false}
                             bounces={false}

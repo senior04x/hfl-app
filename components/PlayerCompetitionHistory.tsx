@@ -3,6 +3,7 @@ import { View, Text, SectionList, TouchableOpacity, StyleSheet, Platform, Activi
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import SmartImage from './SmartImage';
+import { PagerContentScrollView } from './PlatformPager';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { groupPlayerMatches, isFinishedMatch, playerGoals } from '../utils/playerCompetitions';
 
@@ -28,6 +29,8 @@ export default function PlayerCompetitionHistory({ matches, isDark, loading, err
     const { t, i18n } = useTranslation();
     if (loading && !matches.length) return <ActivityIndicator style={{ marginTop: 32 }} color={colors.accent} />;
     return <SectionList sections={sections} keyExtractor={m => String(m.id || m._id)} stickySectionHeadersEnabled={false}
+        nestedScrollEnabled={Platform.OS === 'android'}
+        renderScrollComponent={Platform.OS === 'android' ? props => <PagerContentScrollView {...props} nestedScrollEnabled /> : undefined}
         contentContainerStyle={{ padding: 16, paddingBottom: 60 }} initialNumToRender={12} maxToRenderPerBatch={10} windowSize={5}
         refreshing={refreshing} onRefresh={onRefresh}
         ListHeaderComponent={error ? <TouchableOpacity onPress={onRefresh} style={styles.row}><Text style={{ color: colors.textPrimary }}>{t('stats.matches_load_failed', "O‘yinlarni yuklab bo‘lmadi. Qayta urinish")}</Text></TouchableOpacity> : null}

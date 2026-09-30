@@ -1,3 +1,4 @@
+import { PagerScrollView, PagerContentScrollView } from '../components/PlatformPager';
 import PlayerCompetitionHistory, { PlayerCareerGoals } from '../components/PlayerCompetitionHistory';
 import { getPlayerHistory } from '../services/playerHistory';
 import React, { useState, useEffect, useRef } from 'react';
@@ -242,7 +243,7 @@ const PlayerStatsScreenSkeleton = () => {
             </View>
 
             {/* Scroll body with FIFA card skeleton */}
-            <ScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+            <PagerContentScrollView style={styles.tabContent} contentContainerStyle={{ padding: 16, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
                 <View style={[styles.infoSectionCard, cardSurface, { width: '100%' }]}>
                     <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>
                         <InlineSkeleton width={110} height={16} borderRadius={4} />
@@ -263,7 +264,7 @@ const PlayerStatsScreenSkeleton = () => {
                 <View style={[styles.infoSectionCard, cardSurface, { width: '100%', marginTop: 14, alignItems: 'center', paddingVertical: 18 }]}>
                     <FifaCardSkeleton size="lg" showAttributes={true} />
                 </View>
-            </ScrollView>
+            </PagerContentScrollView>
         </SafeAreaView>
     );
 };
@@ -677,7 +678,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const playerNameFull = `${player.firstName || player.name || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim() || t('teams.player_fallback', 'O\'YINCHI');
 
     const renderProfil = () => (
-        <ScrollView 
+        <PagerContentScrollView
             style={styles.tabContent} 
             showsVerticalScrollIndicator={false} 
             nestedScrollEnabled={true}
@@ -795,11 +796,11 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     )}
                 </TouchableOpacity>
             </View>
-        </ScrollView>
+        </PagerContentScrollView>
     );
 
     const renderKaryera = () => (
-        <ScrollView 
+        <PagerContentScrollView
             style={styles.tabContent} 
             showsVerticalScrollIndicator={false} 
             nestedScrollEnabled={true}
@@ -888,7 +889,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     )}
                 </View>
             )}
-        </ScrollView>
+        </PagerContentScrollView>
     );
 
     const renderMatches = () => <PlayerCompetitionHistory
@@ -1088,10 +1089,11 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
 
                     {/* 1:1 REAL-TIME LINKED HORIZONTAL PAGER */}
                     <View style={{ flex: 1 }} {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}>
-                        <Animated.ScrollView
+                        <PagerScrollView
                             ref={pagerScrollRef as any}
                             horizontal
                             pagingEnabled
+                            nestedScrollEnabled={Platform.OS === 'android'}
                             directionalLockEnabled={true}
                             showsHorizontalScrollIndicator={false}
                             bounces={false}
@@ -1107,7 +1109,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                             <View style={{ width, flex: 1 }}>{renderProfil()}</View>
                             <View style={{ width, flex: 1 }}>{renderKaryera()}</View>
                             <View style={{ width, flex: 1 }}>{renderMatches()}</View>
-                        </Animated.ScrollView>
+                        </PagerScrollView>
                     </View>
                 </SafeAreaView>
             </Animated.View>
