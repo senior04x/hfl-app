@@ -1,3 +1,4 @@
+import LiveMatchBadge from '../components/LiveMatchBadge';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Dimensions, RefreshControl, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -738,13 +739,7 @@ export default function HomeScreen({ navigation }: any) {
                                 <Text style={{ fontSize: 16, fontWeight: '900', color: homeColors.textPrimary, letterSpacing: 0.5 }}>
                                     {match.score?.home ?? match.home_score ?? 0} : {match.score?.away ?? match.away_score ?? 0}
                                 </Text>
-                                {/* LIVE badge */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.primary }} />
-                                    <Text style={{ fontSize: 8, fontWeight: '800', color: Colors.primary, letterSpacing: 0.3 }}>
-                                        {liveBadgeLabel}
-                                    </Text>
-                                </View>
+                                <LiveMatchBadge />
                             </View>
                         ) : matchIsFinished ? (
                             <View style={{ alignItems: 'center' }}>
