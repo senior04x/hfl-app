@@ -1269,10 +1269,10 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const videoUrl = match?.youtube_link || match?.youtubeLink || match?.youtube_url || match?.youtubeUrl || match?.video_url || match?.videoUrl || match?.video || match?.stream_link || match?.streamUrl;
         
         const isYoutube = typeof videoUrl === 'string' && /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\//i.test(videoUrl);
-        // Filter events that have replay videos and sort by minute DESC (latest goal first)
+        // Show replay videos in match order, starting with the first goal.
         const replayEvents = (match?.events || [])
             .filter((e: any) => e.replay_video_url || e.video_url || e.replay_url)
-            .sort((a: any, b: any) => (Number(b.minute) || 0) - (Number(a.minute) || 0));
+            .sort((a: any, b: any) => (Number(a.minute) || 0) - (Number(b.minute) || 0));
 
         // Additional storage replay clips from storage bucket replays/<org_id>/<match_id>/
         const extraStorageClips = (match?.storageReplays || []).filter((s: any) => 
