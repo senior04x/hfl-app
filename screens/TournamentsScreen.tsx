@@ -269,7 +269,6 @@ const TournamentsHeader = ({
                         ) : (
                             leagues.map((league: any) => {
                                 const isSelected = (selectedLeague?.id === league.id && !!selectedLeague?.is_tournament === !!league.is_tournament);
-                                const itemLogo = getLeagueLogoSource(league);
                                 const isTourn = !!league.is_tournament;
                                 return (
                                     <TouchableOpacity
@@ -282,28 +281,17 @@ const TournamentsHeader = ({
                                         onPress={() => handleLeagueSelect(league)}
                                         activeOpacity={0.65}
                                     >
-                                        <View style={[styles.accordionLogoContainer, { backgroundColor: 'transparent', borderWidth: 0 }]}>
-                                            {itemLogo ? (
-                                                <Image source={itemLogo} style={styles.accordionLogo} resizeMode="contain" />
-                                            ) : league.logo_url ? (
-                                                <Image source={{ uri: league.logo_url }} style={styles.accordionLogo} resizeMode="contain" />
-                                            ) : (
-                                                <Ionicons name={isTourn ? "trophy" : "football"} size={16} color={isTourn ? "#38bdf8" : homeColors.accent} />
-                                            )}
-                                        </View>
                                         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                             <Text style={[
                                                 styles.accordionItemName,
-                                                { color: isSelected ? homeColors.textPrimary : homeColors.textSecondary, flexShrink: 1 },
+                                                { color: homeColors.textPrimary, flexShrink: 1 },
                                                 isSelected && { fontWeight: '800' }
                                             ]} numberOfLines={1}>
                                                 {league.name?.toUpperCase()}
                                             </Text>
-                                            {isTourn && (
-                                                <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.4)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                                    <Text style={{ color: '#38bdf8', fontSize: 9, fontWeight: '800' }}>TURNIR</Text>
-                                                </View>
-                                            )}
+                                            <Text style={{ color: homeColors.textSecondary, fontSize: 11 }}>
+                                                {isTourn ? t('stats.match_tournament', 'Turnir') : t('stats.match_league', 'Liga')}
+                                            </Text>
                                         </View>
                                         {isSelected && (
                                             <Ionicons name="checkmark-circle" size={18} color={homeColors.accent} style={{ marginLeft: 8 }} />

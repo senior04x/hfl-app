@@ -61,7 +61,8 @@
     "version": "ВЕРСИЯ",
     "understood": "Понятно",
     "logout": "Выйти",
-    "you": "ВЫ"
+    "you": "ВЫ",
+    "show_more": "Показать ещё"
   },
   "nav": {
     "home": "Главная",
@@ -270,7 +271,9 @@
     "semi_final": "ПОЛУФИНАЛ",
     "quarter_final": "ЧЕТВЕРТЬФИНАЛ",
     "round_of_16": "1/8 ФИНАЛА",
-    "arena_default": "Amatora Арена"
+    "arena_default": "Amatora Арена",
+    "home_short": "ХОЗ",
+    "away_short": "ГОСТ"
   },
   "teams": {
     "title": "Команды",
@@ -521,7 +524,12 @@
     "gold_stat": "Гол",
     "assist_stat": "Пас",
     "matches_stat": "Игры",
-    "cards_stat": "Карты"
+    "cards_stat": "Карты",
+    "career_goals_title": "Голы за карьеру",
+    "total_goals": "Всего",
+    "recorded_career_goals": "Голы в завершённых матчах. Лиги и турниры учитываются отдельно.",
+    "matches_load_failed": "Не удалось загрузить матчи. Повторить",
+    "matches_short": "матчей"
   },
   "applications": {
     "title": "МОИ ЗАЯВКИ",

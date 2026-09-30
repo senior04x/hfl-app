@@ -61,7 +61,8 @@
     "version": "VERSIYA",
     "understood": "Tushundim",
     "logout": "Chiqish",
-    "you": "SIZ"
+    "you": "SIZ",
+    "show_more": "Yana ko‘rsatish"
   },
   "nav": {
     "home": "Asosiy",
@@ -270,7 +271,9 @@
     "semi_final": "YARIM FINAL",
     "quarter_final": "CHORAK FINAL",
     "round_of_16": "1/8 FINAL",
-    "arena_default": "Amatora Arena"
+    "arena_default": "Amatora Arena",
+    "home_short": "UY",
+    "away_short": "MEH"
   },
   "teams": {
     "title": "Jamoalar",
@@ -521,7 +524,12 @@
     "gold_stat": "Gol",
     "assist_stat": "Asist",
     "matches_stat": "O'yin",
-    "cards_stat": "Karta"
+    "cards_stat": "Karta",
+    "career_goals_title": "Karyera gollari",
+    "total_goals": "Jami",
+    "recorded_career_goals": "Yakunlangan o‘yinlarda qayd etilgan gollar. Liga va turnir alohida hisoblanadi.",
+    "matches_load_failed": "O‘yinlarni yuklab bo‘lmadi. Qayta urinish",
+    "matches_short": "o‘yin"
   },
   "applications": {
     "title": "MENING ARIZALARIM",

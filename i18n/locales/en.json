@@ -61,7 +61,8 @@
     "version": "VERSION",
     "understood": "Understood",
     "logout": "Log Out",
-    "you": "YOU"
+    "you": "YOU",
+    "show_more": "Show more"
   },
   "nav": {
     "home": "Home",
@@ -270,7 +271,9 @@
     "semi_final": "SEMI-FINAL",
     "quarter_final": "QUARTER-FINAL",
     "round_of_16": "ROUND OF 16",
-    "arena_default": "Amatora Arena"
+    "arena_default": "Amatora Arena",
+    "home_short": "HOME",
+    "away_short": "AWAY"
   },
   "teams": {
     "title": "Teams",
@@ -521,7 +524,12 @@
     "gold_stat": "Goal",
     "assist_stat": "Ast",
     "matches_stat": "Apps",
-    "cards_stat": "Cards"
+    "cards_stat": "Cards",
+    "career_goals_title": "Career goals",
+    "total_goals": "Total",
+    "recorded_career_goals": "Recorded goals in finished matches. Leagues and tournaments are counted separately.",
+    "matches_load_failed": "Could not load matches. Try again",
+    "matches_short": "matches"
   },
   "applications": {
     "title": "MY APPLICATIONS",
