@@ -281,7 +281,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                 setIsPlayersLoading(false);
             });
 
-        apiService.getMatches({ teamId: currentId })
+        apiService.getMatches({ teamId: currentId, includeCompetitionMetadata: true })
             .then((matchesData) => {
                 const sliced = matchesData?.slice(0, 8) || [];
                 setMatches(matchesData || []);
@@ -783,6 +783,9 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                         activeOpacity={0.85}
                                     >
                                         <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                                            <Text numberOfLines={1} style={{ fontSize: 10, color: homeColors.textSecondary, marginBottom: 8 }}>
+                                                {[match.competitionSeason, match.competitionName || match.tournamentName || match.league].filter(Boolean).join(' · ')}
+                                            </Text>
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 {/* CHAP: Uy jamoasi */}
                                                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 8 }}>

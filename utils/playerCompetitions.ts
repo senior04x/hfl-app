@@ -8,8 +8,9 @@ export function groupPlayerMatches(matches: any[]) {
         if (seen.has(id)) continue;
         seen.add(id);
         const tournament = match.tournament_id != null;
-        const key = tournament ? 'tournament:' + match.tournament_id : 'league:' + (match.organization_id || '') + ':' + (match.league || 'unknown');
-        if (!groups.has(key)) groups.set(key, { key, tournament, title: tournament ? (match.tournament?.name || 'Turnir #' + match.tournament_id) : (match.league || 'Liga'), goals: 0, data: [] });
+        const key = (tournament ? 'tournament:' + match.tournament_id : 'league:' + (match.organization_id || '') + ':' + (match.league || 'unknown')) + ':' + (match.competitionSeason || '');
+        const name = match.competitionName || (tournament ? (match.tournament?.name || 'Turnir #' + match.tournament_id) : (match.league || 'Liga'));
+        if (!groups.has(key)) groups.set(key, { key, tournament, title: [match.competitionSeason, name].filter(Boolean).join(' · '), goals: 0, data: [] });
         const group = groups.get(key)!;
         group.data.push(match);
         if (isFinishedMatch(match)) group.goals += playerGoals(match);

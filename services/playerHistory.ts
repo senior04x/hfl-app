@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { loadMatchCompetitionMetadata } from './matchCompetitionMetadata';
 
 const MATCH_FIELDS = 'id,home_team_id,away_team_id,home_score,away_score,status,match_date,match_time,round,stage,league,tournament_id,organization_id';
 const cache = new Map<string, { time: number; data: any[] }>();
@@ -38,12 +39,11 @@ export async function getPlayerHistory(id: string, refresh = false): Promise<any
         const historical = await byIds('matches', MATCH_FIELDS, events.map(e => e.match_id).filter(id => !matchMap.has(String(id))));
         historical.forEach(m => matchMap.set(String(m.id), m));
         const allMatches = [...matchMap.values()];
-        const [teams, tournaments] = await Promise.all([
+        const [teams, competitionMetadata] = await Promise.all([
             byIds('teams', 'id,name,logo_url', allMatches.flatMap(m => [m.home_team_id, m.away_team_id])),
-            byIds('tournaments', 'id,name,logo_url', allMatches.map(m => m.tournament_id)),
+            loadMatchCompetitionMetadata(allMatches),
         ]);
         const teamMap = new Map(teams.map(t => [String(t.id), t]));
-        const tournamentMap = new Map(tournaments.map(t => [String(t.id), t]));
         const eventMap = new Map<string, any[]>();
         const seen = new Set<string>();
         events.forEach(event => {
@@ -58,7 +58,7 @@ export async function getPlayerHistory(id: string, refresh = false): Promise<any
             homeTeamLogo: teamMap.get(String(m.home_team_id))?.logo_url,
             awayTeamName: teamMap.get(String(m.away_team_id))?.name,
             awayTeamLogo: teamMap.get(String(m.away_team_id))?.logo_url,
-            tournament: tournamentMap.get(String(m.tournament_id)),
+            ...competitionMetadata.get(String(m.id)),
             playerEvents: eventMap.get(String(m.id)) || [],
         }));
         if (cache.size >= 30) cache.delete(cache.keys().next().value!);

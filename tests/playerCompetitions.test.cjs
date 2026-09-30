@@ -29,7 +29,8 @@ test('history pages player events, includes former team matches, requests only r
     match_events: Array.from({ length: 501 }, (_, i) => ({ id: i + 1, player_id: 'p1', match_id: 2, event_type: 'goal' })),
     matches: [{ id: 1, home_team_id: 10, away_team_id: 11, match_date: '2026-09-02' }, { id: 2, home_team_id: 20, away_team_id: 21, tournament_id: 7, match_date: '2026-09-01' }],
     teams: [10, 11, 20, 21, 999].map(id => ({ id, name: String(id) })),
-    tournaments: [{ id: 7, name: 'Champions' }],
+    tournaments: [{ id: 7, name: 'Champions', start_date: '2026-09-01', end_date: '2028-05-01' }],
+    leagues: [],
   };
   const calls = [];
   const supabase = { from(table) {
@@ -43,12 +44,15 @@ test('history pages player events, includes former team matches, requests only r
       then(resolve) { calls.push({ table, start, columns, filtered: filters.length > 0 }); const rows = db[table].filter(row => filters.every(f => f(row))).slice(start, end + 1); return Promise.resolve({ data: single ? rows[0] : rows, error: null }).then(resolve); },
     }; return q;
   } };
-  const { getPlayerHistory } = load('services/playerHistory.ts', { './supabase': { supabase } });
+  const season = load('utils/competitionSeason.ts');
+  const metadata = load('services/matchCompetitionMetadata.ts', { './supabase': { supabase }, '../utils/competitionSeason': season });
+  const { getPlayerHistory } = load('services/playerHistory.ts', { './supabase': { supabase }, './matchCompetitionMetadata': metadata });
   const [a, b] = await Promise.all([getPlayerHistory('p1'), getPlayerHistory('p1')]);
   assert.equal(a, b);
   assert.equal(a.length, 2);
   assert.equal(a[1].playerEvents.length, 501);
   assert.equal(a[1].tournament.name, 'Champions');
+  assert.equal(a[1].competitionSeason, '2026/2028');
   assert.equal(calls.filter(c => c.table === 'match_events').length, 2);
   assert.ok(calls.every(c => !c.columns.includes('*') && c.filtered));
   const count = calls.length; await getPlayerHistory('p1'); assert.equal(calls.length, count);

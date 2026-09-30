@@ -5,6 +5,7 @@ import { useOrganizationStore } from '../store/useOrganizationStore';
 import { useJuniorStore } from '../store/useJuniorStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { resolveMatchAssist } from './matchEventAssist';
+import { loadMatchCompetitionMetadata } from './matchCompetitionMetadata';
 
 export { supabase };
 
@@ -1049,13 +1050,16 @@ export const apiService = {
                 ...matchesData.map((m: any) => m.away_team_id)
             ])].filter(Boolean);
 
-            const [{ data: teamsData }, { data: timerSponsors }] = await Promise.all([
+            const [{ data: teamsData }, { data: timerSponsors }, competitionMetadata] = await Promise.all([
                 teamIds.length > 0
                     ? supabase.from('teams').select('id, name, logo_url, captain_phone').in('id', teamIds)
                     : Promise.resolve({ data: [] }),
                 timerKeys.length > 0
                     ? supabase.from('sponsors').select('name, logo_url').in('name', timerKeys)
-                    : Promise.resolve({ data: [] })
+                    : Promise.resolve({ data: [] }),
+                params?.includeCompetitionMetadata
+                    ? loadMatchCompetitionMetadata(matchesData).catch(() => new Map<string, any>())
+                    : Promise.resolve(new Map<string, any>()),
             ]);
 
             const teamsMap: Record<string, any> = {};
@@ -1088,6 +1092,7 @@ export const apiService = {
                 return {
                     ...timerData,
                     ...m,
+                    ...competitionMetadata.get(String(m.id)),
                     _id: m.id,
                     importance: m.importance || 'oddiy',
                     date: m.match_date || m.date || new Date().toISOString(),

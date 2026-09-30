@@ -31,6 +31,7 @@ function loadService(teams, matches, matchError = null) {
         return q;
     } };
     const dependencies = {
+        './matchCompetitionMetadata': { loadMatchCompetitionMetadata: async () => new Map() },
         axios: { default: { create: () => ({ get: async () => { throw new Error('Unexpected fallback'); } }) } },
         './supabase': { supabase },
         '../store/useOrganizationStore': { useOrganizationStore: { getState: () => ({ selectedOrganizationId: 1 }) } },
