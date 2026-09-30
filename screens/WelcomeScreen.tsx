@@ -5,7 +5,6 @@ import {
     StyleSheet,
     TouchableOpacity,
     Image,
-    SafeAreaView,
     StatusBar,
     TextInput,
     KeyboardAvoidingView,
@@ -29,6 +28,7 @@ import Animated, {
     interpolate,
     Easing
 } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedBackground from '../components/AnimatedBackground';
 import backgroundImage from '../assets/images/backroud-image.png';
 import { BlurView } from 'expo-blur';

@@ -27,6 +27,10 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
     const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
     useEffect(() => {
+        setIsVideoLoaded(false);
+    }, [source]);
+
+    useEffect(() => {
         const setupAudioAndPlay = async () => {
             try {
                 if (Platform.OS !== 'web') {
@@ -83,14 +87,6 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
 
     return (
         <View style={[styles.container, style]}>
-            {/* Fallback Image - Only shows if poster specified and video not ready */}
-            {posterSource && !isVideoLoaded && (
-                <Image 
-                    source={posterSource} 
-                    style={StyleSheet.absoluteFill} 
-                    resizeMode={posterResizeMode}
-                />
-            )}
 
             <Video
                 ref={videoRef}
@@ -103,7 +99,6 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
                 useNativeControls={false}
                 usePoster={false}
                 onLoad={() => {
-                    setIsVideoLoaded(true);
                     if (videoRef.current) {
                         videoRef.current.playAsync().catch(() => {});
                     }
@@ -114,10 +109,18 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
                         videoRef.current.playAsync().catch(() => {});
                     }
                 }}
-                onError={(err) => {
-                    console.log('Video Playback Error:', err);
+                onError={() => {
+                    setIsVideoLoaded(false);
                 }}
             />
+            {/* Keep the poster above the native video until a frame is displayed. */}
+            {posterSource && !isVideoLoaded && (
+                <Image
+                    source={posterSource}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode={posterResizeMode}
+                />
+            )}
             {/* Dark Overlay */}
             <View 
                 style={[

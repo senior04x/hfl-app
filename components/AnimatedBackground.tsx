@@ -11,12 +11,14 @@ interface AnimatedBackgroundProps {
 const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ 
     children, 
     overlayOpacity = 0.72,
+    backgroundImage,
 }) => {
     return (
         <View style={styles.wrapper}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
             <VideoBackground 
                 source={require('../assets/images/welcomeScreenVideo1.mp4')} 
+                posterSource={backgroundImage}
                 overlayOpacity={overlayOpacity}
                 style={StyleSheet.absoluteFill}
             />
