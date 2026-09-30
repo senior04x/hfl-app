@@ -24,7 +24,7 @@ import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService, clearApiCache } from '../services/apiService';
 import SmartImage from '../components/SmartImage';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../store/useThemeStore';
 import { TabSwipeProvider, useTabSwipe } from '../context/TabSwipeContext';
 import { NavBarScrollProvider, useNavBarScroll } from '../context/NavBarScrollContext';
@@ -460,6 +460,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                 animationType="none"
                 onRequestClose={closeSwitcherModal}
             >
+                <SafeAreaProvider>
                 <View style={styles.modalOverlay}>
                     <TouchableOpacity
                         style={StyleSheet.absoluteFillObject}
@@ -495,7 +496,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                             </View>
                         </View>
 
-                        <View style={{ paddingHorizontal: 22, paddingTop: 2, paddingBottom: Platform.OS === 'ios' ? 34 : 20 }}>
+                        <SafeAreaView edges={['bottom']} style={{ paddingHorizontal: 22, paddingTop: 2, paddingBottom: 20 }}>
                             {loadingAccounts ? (
                                 <View style={{ paddingVertical: 36, alignItems: 'center' }}>
                                     <ActivityIndicator size="small" color={colors.text} />
@@ -555,9 +556,10 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                                     })}
                                 </ScrollView>
                             )}
-                        </View>
+                        </SafeAreaView>
                     </Animated.View>
                 </View>
+                </SafeAreaProvider>
             </Modal>
         </Animated.View>
     );
