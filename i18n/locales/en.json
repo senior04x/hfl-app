@@ -159,6 +159,10 @@
     "unknown_player": "Unknown player"
   },
   "replays": {
+    "play_video": "Play video",
+    "team_goal": "Team goal",
+    "assist": "Assist",
+    "load_error": "Unable to load video",
     "title": "Replays",
     "match_replay": "MATCH REPLAY",
     "goals_count": "{{count}} GOALS",

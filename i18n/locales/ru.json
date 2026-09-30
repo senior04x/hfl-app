@@ -159,6 +159,10 @@
     "unknown_player": "Неизвестный игрок"
   },
   "replays": {
+    "play_video": "Открыть видео",
+    "team_goal": "Гол команды",
+    "assist": "Голевая передача",
+    "load_error": "Не удалось открыть видео",
     "title": "Повторы",
     "match_replay": "ПОВТОР МАТЧА",
     "goals_count": "{{count}} ГОЛ(ОВ)",

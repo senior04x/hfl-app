@@ -159,6 +159,10 @@
     "unknown_player": "Noma'lum o'yinchi"
   },
   "replays": {
+    "play_video": "Videoni ochish",
+    "team_goal": "Jamoa goli",
+    "assist": "Assist",
+    "load_error": "Video ochilmadi",
     "title": "Replaylar",
     "match_replay": "O'YIN REPLAYI",
     "goals_count": "{{count}} TA GOL",
