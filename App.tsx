@@ -224,7 +224,9 @@ function App() {
                                     headerShown: false,
                                     cardStyle: { backgroundColor: '#000000' },
                                     cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                    gestureEnabled: Platform.OS === 'ios',
+                                    gestureEnabled: true,
+                                    // Reserve Android back navigation for the edge, leaving pagers in the body.
+                                    gestureResponseDistance: Platform.OS === 'android' ? 24 : undefined,
                                     gestureDirection: 'horizontal',
                                 }}
                             >
@@ -238,7 +240,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -249,7 +251,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -260,7 +262,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }}
                                     />
@@ -271,7 +273,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -282,7 +284,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -294,7 +296,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -305,7 +307,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -316,7 +318,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -327,7 +329,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -339,7 +341,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -350,7 +352,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -362,7 +364,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -373,7 +375,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -384,7 +386,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
@@ -395,7 +397,7 @@ function App() {
                                             presentation: 'transparentModal',
                                             cardStyle: { backgroundColor: 'transparent' },
                                             cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-                                            gestureEnabled: Platform.OS === 'ios',
+                                            gestureEnabled: true,
                                             gestureDirection: 'horizontal',
                                         }} 
                                     />
