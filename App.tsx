@@ -8,7 +8,7 @@ if (typeof global !== 'undefined' && (global as any).ErrorUtils) {
 
 import 'expo-dev-client';
 import React from 'react';
-import { StyleSheet, Platform, Text } from 'react-native';
+import { StyleSheet, Platform, Text, Linking } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
@@ -36,6 +36,7 @@ import CalendarMatchesScreen from './screens/CalendarMatchesScreen';
 import TeamProfileScreen from './screens/TeamProfileScreen';
 import MyTeamScreen from './screens/MyTeamScreen';
 import ApplicationsScreen from './screens/ApplicationsScreen';
+import { parseTransferAppLink } from './utils/transferAppLink';
 import SecuritySettingsScreen from './screens/SecuritySettingsScreen';
 import SystemSettingsScreen from './screens/SystemSettingsScreen';
 import Colors from './constants/Colors';
@@ -67,6 +68,35 @@ export const navigationRef = createNavigationContainerRef();
 function App() {
     const { isAuthenticated, isGuest, user } = useAuthStore();
     const [isSplashVisible, setIsSplashVisible] = React.useState(Platform.OS !== 'web');
+    const pendingTransferLink = React.useRef<string | null>(null);
+    const canOpenTransferLink = React.useRef(false);
+    canOpenTransferLink.current = isAuthenticated && !isGuest;
+    const flushTransferLink = React.useCallback(() => {
+        const transferId = pendingTransferLink.current;
+        if (!transferId || !canOpenTransferLink.current || !navigationRef.isReady()) return;
+        pendingTransferLink.current = null;
+        (navigationRef as any).navigate('Applications', { initialTab: 'transfers', transferId });
+    }, []);
+
+    React.useEffect(() => {
+        if (Platform.OS === 'web') return;
+        let disposed = false;
+        let receivedLiveLink = false;
+        const acceptLink = (url: string) => {
+            const transferId = parseTransferAppLink(url);
+            if (!transferId) return;
+            pendingTransferLink.current = transferId;
+            flushTransferLink();
+        };
+        const subscription = Linking.addEventListener('url', ({ url }) => {
+            receivedLiveLink = true;
+            acceptLink(url);
+        });
+        Linking.getInitialURL().then(url => {
+            if (!disposed && !receivedLiveLink && url) acceptLink(url);
+        }).catch(() => {});
+        return () => { disposed = true; subscription.remove(); };
+    }, [flushTransferLink]);
 
     React.useEffect(() => {
         initI18n().catch((e) => console.warn('i18n init error:', e));
@@ -171,6 +201,7 @@ function App() {
                 <SocketProvider>
                     <NavigationContainer 
                         ref={navigationRef}
+                        onReady={flushTransferLink}
                         key={isAuthenticated ? `auth_user_${(user as any)?._id || (user as any)?.id}` : (isGuest ? 'guest' : 'unauth')}
                         theme={{
                         ...DarkTheme,

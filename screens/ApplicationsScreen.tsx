@@ -48,6 +48,10 @@ export default function ApplicationsScreen({ navigation, route }: any) {
     const [selectedApp, setSelectedApp] = useState<any>(null);
     const [selectedAppType, setSelectedAppType] = useState<'transfer' | 'profile'>('profile');
 
+    useEffect(() => {
+        if (route?.params?.initialTab === 'transfers') setAppTab('transfers');
+    }, [route?.params?.initialTab, route?.params?.transferId]);
+
     // Interactive Swipe to Back Animation
     const swipeBackAnim = useRef(new Animated.Value(0)).current;
     const swipeBackPanResponder = useRef(
