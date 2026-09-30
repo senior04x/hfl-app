@@ -1,4 +1,13 @@
 {
+  "app_update": {
+    "title": "Yangi versiya mavjud",
+    "description": "Yangilash uchun quyidagi tugmani bosing.",
+    "ready": "Yangilanish tayyor. Ilova qayta ochiladi.",
+    "action": "Ilovani yangilash",
+    "loading": "Yangilanmoqda…",
+    "retry": "Qayta urinish",
+    "error": "Yangilab bo‘lmadi. Internetni tekshirib, qayta urining."
+  },
   "common": {
     "save": "Saqlash",
     "cancel": "Bekor qilish",

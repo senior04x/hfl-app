@@ -18,6 +18,7 @@ import { useAuthStore } from './store/useAuthStore';
 import { useThemeStore } from './store/useThemeStore';
 import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from '@react-navigation/stack';
 import AppNavigator from './navigation/AppNavigator';
+import AppUpdateBanner from './components/AppUpdateBanner';
 import AuthNavigator from './navigation/AuthNavigator';
 import WelcomeScreen from './screens/WelcomeScreen';
 import JoinApplicationScreen from './screens/JoinApplicationScreen';
@@ -370,6 +371,7 @@ function App() {
                             <StatusBar style="light" />
                         </NavigationContainer>
                 </SocketProvider>
+                <AppUpdateBanner />
             </SafeAreaProvider>
         </GestureHandlerRootView>
     );

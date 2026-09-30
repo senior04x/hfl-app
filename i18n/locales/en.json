@@ -1,4 +1,13 @@
 {
+  "app_update": {
+    "title": "New version available",
+    "description": "Tap the button below to update the app.",
+    "ready": "Update ready. The app will restart.",
+    "action": "Update app",
+    "loading": "Updating…",
+    "retry": "Try again",
+    "error": "Could not update. Check your connection and try again."
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
