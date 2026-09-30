@@ -1,4 +1,6 @@
 import LiveMatchBadge from '../components/LiveMatchBadge';
+import { useIsFocused } from '@react-navigation/native';
+import { createHomeStoryRefresh, getHomeMatchEventFilters } from '../services/homeRealtime';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Dimensions, RefreshControl, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -82,6 +84,8 @@ export default function HomeScreen({ navigation }: any) {
     // Refs to eliminate stale closure in realtime listeners
     const matchesRef = useRef<any[]>([]);
     const sliderItemsRef = useRef<any[]>([]);
+    const isFocused = useIsFocused();
+    const realtimeMatchKey = JSON.stringify([...new Set(matches.map(m => String(m.id || m._id || '')).filter(Boolean))].sort());
     useEffect(() => { matchesRef.current = matches; }, [matches]);
     useEffect(() => { sliderItemsRef.current = sliderItems; }, [sliderItems]);
 
@@ -148,11 +152,15 @@ export default function HomeScreen({ navigation }: any) {
     }, [userUniqueKey, userRole, currentOrgId]);
 
     useEffect(() => {
-        // 🔥 PERFORMANCE FIX: Single unified channel instead of 4 separate channels
-        // Before: 50k user × 4 channels = 200k connections (limit: 500) = CRASH!
-        // After: 50k user × 1 channel = 50k connections = OK
-
-        const orgId = user?.organization_id || user?.organizationId || 1;
+        if (!isFocused) return;
+        const orgId = currentOrgId;
+        const storyRefresh = createHomeStoryRefresh(
+            () => storyService.fetchLatestTourGoalStories(
+                matchesRef.current, sliderItemsRef.current, viewedStoryIdsRef.current, orgId, ownTeamId
+            ),
+            setStoryGroups,
+            error => console.warn('Home story refresh failed:', error),
+        );
 
         // BITTA unified broadcast & realtime channel for barcha updates
         const unifiedChannel = supabase
@@ -176,42 +184,36 @@ export default function HomeScreen({ navigation }: any) {
                     }
                     return m;
                 }));
-            })
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'match_events',
-            }, async (payload: any) => {
-                const newRow = payload?.new;
-                if (newRow && newRow.replay_video_url) {
-                    const freshStories = await storyService.fetchLatestTourGoalStories(
-                        matchesRef.current,
-                        sliderItemsRef.current,
-                        viewedStoryIdsRef.current,
-                        orgId,
-                        ownTeamId
-                    );
-                    setStoryGroups(freshStories);
-                }
-            })
-            .subscribe();
+            });
+
+        for (const filter of getHomeMatchEventFilters(JSON.parse(realtimeMatchKey))) {
+            for (const event of ['INSERT', 'UPDATE'] as const) {
+                unifiedChannel.on('postgres_changes', {
+                    event, schema: 'public', table: 'match_events', filter,
+                }, (payload: any) => {
+                    if (payload.new?.replay_video_url) storyRefresh.schedule();
+                });
+            }
+        }
+        unifiedChannel.subscribe(status => {
+            // Refresh once after reconnecting to catch events missed while away.
+            if (status === 'SUBSCRIBED' && matchesRef.current.length > 0) storyRefresh.schedule();
+        });
 
         // Socket fallback faqat Realtime ishlamasa (rare case)
-        if (socket && isConnected) {
-            socket.on('match-update', (updatedMatch: any) => {
-                setMatches(prev => {
-                    const updated = prev.map(m => (m._id === updatedMatch.matchId || m.id === updatedMatch.matchId) ? { ...m, ...updatedMatch.match } : m);
-                    storyService.fetchLatestTourGoalStories(updated, sliderItemsRef.current, viewedStoryIdsRef.current, orgId, ownTeamId).then(setStoryGroups);
-                    return updated;
-                });
-            });
-        }
+        const onMatchUpdate = (updatedMatch: any) => {
+            if (!matchesRef.current.some(m => String(m.id || m._id) === String(updatedMatch.matchId))) return;
+            setMatches(prev => prev.map(m => String(m.id || m._id) === String(updatedMatch.matchId) ? { ...m, ...updatedMatch.match } : m));
+            storyRefresh.schedule();
+        };
+        if (socket && isConnected) socket.on('match-update', onMatchUpdate);
 
         return () => {
+            storyRefresh.dispose();
             supabase.removeChannel(unifiedChannel);
-            if (socket) socket.off('match-update');
+            if (socket) socket.off('match-update', onMatchUpdate);
         };
-    }, [socket, isConnected, sliderItems, user]);
+    }, [socket, isConnected, currentOrgId, ownTeamId, realtimeMatchKey, isFocused]);
 
     const fetchUserProfileData = async () => {
         if (!user) return null;
