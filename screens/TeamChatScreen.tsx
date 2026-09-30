@@ -49,6 +49,7 @@ function TeamChatScreen({ route, navigation }: any) {
     const { user } = useAuthStore();
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
+    const cardBackground = isDark ? '#141414' : '#FFFFFF';
     const insets = useSafeAreaInsets();
     
     const [messages, setMessages] = useState<any[]>([]);
@@ -1606,7 +1607,7 @@ function TeamChatScreen({ route, navigation }: any) {
                 </View>
 
                 <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={{ flex: 1 }}
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
                 >
@@ -1727,7 +1728,7 @@ function TeamChatScreen({ route, navigation }: any) {
                                 style={[
                                     styles.newMessagesPill,
                                     {
-                                        backgroundColor: homeColors.card,
+                                        backgroundColor: cardBackground,
                                         borderColor: homeColors.border,
                                         shadowColor: isDark ? '#FFFFFF' : '#000000'
                                     }
@@ -1785,12 +1786,12 @@ function TeamChatScreen({ route, navigation }: any) {
                     <View style={[
                         styles.floatingInputDock,
                         {
-                            backgroundColor: homeColors.card,
+                            backgroundColor: cardBackground,
                             borderColor: homeColors.border,
                             shadowColor: isDark ? '#FFFFFF' : '#000000',
                             marginBottom: isKeyboardOpen 
                                 ? (Platform.OS === 'ios' ? 6 : 8) 
-                                : (Platform.OS === 'ios' ? Math.max(insets.bottom ? insets.bottom - 4 : 10, 10) : 12),
+                                : Math.max(insets.bottom, Platform.OS === 'ios' ? 10 : 12),
                         }
                     ]}>
                         <View style={styles.inputWrapper}>
@@ -1808,6 +1809,7 @@ function TeamChatScreen({ route, navigation }: any) {
                                         handleTyping();
                                     }
                                 }}
+                                keyboardAppearance={isDark ? 'dark' : 'light'}
                                 multiline
                             />
                             <View 
@@ -1893,7 +1895,7 @@ function TeamChatScreen({ route, navigation }: any) {
                                 <View style={[
                                     styles.actionMenuGlassCard,
                                     {
-                                        backgroundColor: homeColors.card,
+                                        backgroundColor: cardBackground,
                                         borderColor: homeColors.border,
                                         shadowColor: isDark ? '#FFFFFF' : '#000000',
                                     }
@@ -2000,7 +2002,7 @@ function TeamChatScreen({ route, navigation }: any) {
                                 style={[
                                     styles.memberItem,
                                     {
-                                        backgroundColor: homeColors.card,
+                                        backgroundColor: cardBackground,
                                         borderColor: homeColors.border,
                                         shadowColor: isDark ? '#FFFFFF' : '#000000',
                                     }
