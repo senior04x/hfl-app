@@ -993,7 +993,8 @@ export const apiService = {
             const orgId = getOrgId();
             const collabLeagueNames = !isGuest ? await apiService.getOrgCollabLeagues(orgId) : [];
 
-            let query = supabase.from('matches').select('*').order('match_date', { ascending: false });
+            let query = supabase.from('matches').select('*')
+                .order('match_date', { ascending: false }).order('id', { ascending: false });
 
             if (!isGuest) {
                 if (collabLeagueNames && collabLeagueNames.length > 0) {
@@ -1006,6 +1007,14 @@ export const apiService = {
 
             if (params?.teamId) {
                 query = query.or(`home_team_id.eq.${params.teamId},away_team_id.eq.${params.teamId}`);
+            }
+
+            if (params?.dateFrom) query = query.gte('match_date', params.dateFrom);
+            if (params?.dateBefore) query = query.lt('match_date', params.dateBefore);
+            if (params?.pageSize) {
+                const pageSize = Math.min(500, Math.max(1, Math.floor(Number(params.pageSize)) || 200));
+                const page = Math.max(1, Math.floor(Number(params.page)) || 1);
+                query = query.range((page - 1) * pageSize, page * pageSize - 1);
             }
 
             const { data: matchesData, error: mErr } = await query;
@@ -1090,6 +1099,8 @@ export const apiService = {
 
             return formattedMatches;
         } catch (err) {
+            // The legacy endpoint does not guarantee the same paging contract.
+            if (params?.pageSize) throw err;
             console.warn('getMatches error fallback:', err);
             return api.get('/matches', { params }).then(res => res.data.data).catch(() => []);
         }

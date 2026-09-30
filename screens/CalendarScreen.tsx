@@ -209,6 +209,7 @@ export default function CalendarScreen({ navigation }: any) {
     const [displayData, setDisplayData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const matchRequestRef = useRef(0);
 
     // Date Picker State
     const [isDatePickerVisible, setDatePickerVisible] = useState(false);
@@ -225,6 +226,7 @@ export default function CalendarScreen({ navigation }: any) {
 
     useEffect(() => {
         fetchMatches();
+        return () => { matchRequestRef.current += 1; };
     }, [startDate, endDate, viewDate, currentLang, selectedTab, userTeamId]);
 
     const getMatchFieldNum = (m: any): number => {
@@ -281,6 +283,7 @@ export default function CalendarScreen({ navigation }: any) {
     };
 
     const fetchMatches = async () => {
+        const requestId = ++matchRequestRef.current;
         try {
             setLoading(true);
             
@@ -290,8 +293,27 @@ export default function CalendarScreen({ navigation }: any) {
             const endLimit = new Date(viewDate.getFullYear(), viewDate.getMonth(), endDate || startDate);
             endLimit.setHours(23, 59, 59, 999);
             
-            // Fetch all matches
-            const data = await apiService.getMatches();
+            // Cover the local interval for both date-only and timestamp match_date values.
+            const dateFrom = startLimit.toISOString().slice(0, 10);
+            const nextUtcDay = new Date(endLimit.toISOString().slice(0, 10));
+            nextUtcDay.setUTCDate(nextUtcDay.getUTCDate() + 1);
+            const dateBefore = nextUtcDay.toISOString().slice(0, 10);
+            const data: any[] = [];
+            const pageSize = 200;
+            if (selectedTab !== 'my' || userTeamId) {
+                for (let page = 1; ; page++) {
+                    const batch = await apiService.getMatches({
+                        dateFrom,
+                        dateBefore,
+                        teamId: selectedTab === 'my' ? userTeamId : undefined,
+                        page,
+                        pageSize,
+                    });
+                    if (requestId !== matchRequestRef.current) return;
+                    data.push(...batch);
+                    if (batch.length < pageSize) break;
+                }
+            }
 
             if (data && Array.isArray(data)) {
                 // "Mening taqvimim": faqat foydalanuvchining o'z jamoasi qatnashgan o'yinlar
@@ -356,8 +378,10 @@ export default function CalendarScreen({ navigation }: any) {
         } catch (error) {
             console.error('Error fetching calendar matches:', error);
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (requestId === matchRequestRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     };
 

@@ -3,21 +3,29 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 
-function loadService(teams, matches) {
+function loadService(teams, matches, matchError = null) {
     const calls = [];
     const supabase = { from(table) {
         let ids, start = 0, end = Infinity, columns;
+        const filters = [];
         const q = {
             select(value) { columns = value; return q; },
             in() { return q; }, neq() { return q; }, eq() { return q; },
             ilike() { return q; }, order() { return q; },
-            or(value) { ids = [...value.matchAll(/"([^"]+)"/g)].map(m => m[1]); return q; },
+            or(value) {
+                ids = value.includes('.eq.')
+                    ? [value.split('.eq.')[1].split(',')[0]]
+                    : [...value.matchAll(/"([^"]+)"/g)].map(m => m[1]);
+                return q;
+            },
+            gte(k, v) { filters.push(r => r[k] >= v); return q; },
+            lt(k, v) { filters.push(r => r[k] < v); return q; },
             range(a, b) { start = a; end = b; return q; },
             then(resolve) {
                 calls.push({ table, ids, start, end, columns });
-                const rows = table === 'teams' ? teams : matches.filter(m =>
-                    ids.includes(String(m.home_team_id)) || ids.includes(String(m.away_team_id)));
-                return Promise.resolve({ data: rows.slice(start, end + 1), error: null }).then(resolve);
+                const rows = table === 'teams' ? teams : table === 'sponsors' ? [] : matches.filter(m =>
+                    (!ids || ids.includes(String(m.home_team_id)) || ids.includes(String(m.away_team_id))) && filters.every(f => f(m)));
+                return Promise.resolve({ data: rows.slice(start, end + 1), error: table === 'matches' ? matchError : null }).then(resolve);
             },
         };
         return q;
@@ -27,7 +35,7 @@ function loadService(teams, matches) {
         './supabase': { supabase },
         '../store/useOrganizationStore': { useOrganizationStore: { getState: () => ({ selectedOrganizationId: 1 }) } },
         '../store/useJuniorStore': { useJuniorStore: { getState: () => ({ isJuniorMode: false }) } },
-        '../store/useAuthStore': { useAuthStore: { getState: () => ({ user: null }) } },
+        '../store/useAuthStore': { useAuthStore: { getState: () => ({ user: null, isGuest: true }) } },
     };
     const exports = {};
     const source = ts.transpileModule(fs.readFileSync('services/apiService.ts', 'utf8'), {
@@ -66,4 +74,25 @@ test('empty team list sends no match request', async () => {
     const { service, calls } = loadService([], []);
     assert.deepEqual(await service.getTeams(), []);
     assert.equal(calls.length, 1);
+});
+
+test('match pages respect date and team scope before enrichment', async () => {
+    const matches = [
+        { id: 1, home_team_id: 1, away_team_id: 2, match_date: '2026-10-01' },
+        { id: 2, home_team_id: 1, away_team_id: 3, match_date: '2026-10-02' },
+        { id: 3, home_team_id: 1, away_team_id: 4, match_date: '2026-10-03' },
+        { id: 4, home_team_id: 2, away_team_id: 3, match_date: '2026-10-02' },
+    ];
+    const { service, calls } = loadService([], matches);
+    const params = { dateFrom: '2026-10-01', dateBefore: '2026-10-03', teamId: 1, pageSize: 1 };
+    assert.deepEqual((await service.getMatches({ ...params, page: 1 })).map(m => m.id), [1]);
+    assert.deepEqual((await service.getMatches({ ...params, page: 2 })).map(m => m.id), [2]);
+    assert.deepEqual(await service.getMatches({ ...params, page: 3 }), []);
+    assert.deepEqual(calls.filter(c => c.table === 'matches').map(c => [c.start, c.end]), [[0, 0], [1, 1], [2, 2]]);
+});
+
+test('failed paged request preserves the error instead of returning an empty or unpaged fallback', async () => {
+    const failure = new Error('Simulated network failure');
+    const { service } = loadService([], [], failure);
+    await assert.rejects(service.getMatches({ page: 2, pageSize: 200 }), error => error === failure);
 });
