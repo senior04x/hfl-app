@@ -25,9 +25,10 @@ import MatchDetailSkeleton from '../components/MatchDetailSkeleton';
 import YoutubePlayerCard from '../components/YoutubePlayerCard';
 import TacticsBoard from '../components/TacticsBoard';
 import ReplayVideoCard from '../components/ReplayVideoCard';
+import ReplayPlayer from '../components/ReplayPlayer';
 import { apiService, supabase } from '../services/apiService';
 import { useSocket } from '../context/SocketContext';
-import { formatShortTeamName, formatLocalizedVenue, formatLocalizedDate } from '../utils/stringUtils';
+import { formatMatchTeamName, formatLocalizedVenue, formatLocalizedDate } from '../utils/stringUtils';
 import SmartImage from '../components/SmartImage';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -368,7 +369,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             }}
                         >
                             <Text style={[styles.teamNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                {(formatShortTeamName(match?.homeTeamName || match?.homeTeam?.name || 'JAMOA A', 12) || 'JAMOA A').toUpperCase()}
+                                {(formatMatchTeamName(match?.homeTeamName || match?.homeTeam?.name || 'JAMOA A') || 'JAMOA A').toUpperCase()}
                             </Text>
                             <View style={[styles.logoCircle, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
                                 <SmartImage
@@ -405,7 +406,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                 />
                             </View>
                             <Text style={[styles.teamNameText, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                {(formatShortTeamName(match?.awayTeamName || match?.awayTeam?.name || 'JAMOA B', 12) || 'JAMOA B').toUpperCase()}
+                                {(formatMatchTeamName(match?.awayTeamName || match?.awayTeam?.name || 'JAMOA B') || 'JAMOA B').toUpperCase()}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -1267,6 +1268,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const renderMedia = () => {
         const videoUrl = match?.youtube_link || match?.youtubeLink || match?.youtube_url || match?.youtubeUrl || match?.video_url || match?.videoUrl || match?.video || match?.stream_link || match?.streamUrl;
         
+        const isYoutube = typeof videoUrl === 'string' && /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\//i.test(videoUrl);
         // Filter events that have replay videos and sort by minute DESC (latest goal first)
         const replayEvents = (match?.events || [])
             .filter((e: any) => e.replay_video_url || e.video_url || e.replay_url)
@@ -1321,14 +1323,14 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                 {/* 1. YouTube Online Stream */}
                 {videoUrl && (
                     <View style={{ width: '100%', alignItems: 'center', marginBottom: hasAnyReplays ? 20 : 0 }}>
-                        <YoutubePlayerCard videoUrl={videoUrl} />
+                        {isYoutube ? <YoutubePlayerCard videoUrl={videoUrl} /> : <ReplayPlayer uri={videoUrl} enabled={activePlayingVideoId === 'full-match'} autoplay onActivate={() => setActivePlayingVideoId('full-match')} onPause={() => setActivePlayingVideoId(null)} />}
                         <TouchableOpacity
                             style={styles.openYtLinkBtn}
                             activeOpacity={0.8}
                             onPress={() => Linking.openURL(videoUrl).catch(() => {})}
                         >
-                            <Ionicons name="logo-youtube" size={20} color="#FF0000" style={{ marginRight: 8 }} />
-                            <Text style={[styles.openYtLinkText, { color: homeColors.textPrimary }]}>{t('match_detail.watch_on_youtube')}</Text>
+                            <Ionicons name={isYoutube ? "logo-youtube" : "videocam-outline"} size={20} color="#FF0000" style={{ marginRight: 8 }} />
+                            <Text style={[styles.openYtLinkText, { color: homeColors.textPrimary }]}>{isYoutube ? t('match_detail.watch_on_youtube') : t('replays.open_external', 'Tashqarida ochish')}</Text>
                             <Ionicons name="open-outline" size={16} color={homeColors.textSecondary} style={{ marginLeft: 'auto' }} />
                         </TouchableOpacity>
                     </View>
@@ -1339,8 +1341,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                     <View style={{ marginTop: videoUrl ? 10 : 0, width: '100%' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 }}>
                             <Ionicons name="videocam-outline" size={22} color={Colors.primary || '#7c3aed'} />
-                            <Text style={{ color: homeColors.textPrimary, fontSize: 16, fontWeight: '800' }}>
-                                {t('match_detail.match_highlights_replays')}
+                            <Text style={{ color: homeColors.textPrimary, fontSize: 14, fontWeight: '800' }}>
+                                {t('replays.highlights', 'Gol videolari')}
                             </Text>
                         </View>
 

@@ -11,20 +11,28 @@ export default function ReplayPlayer({ uri, enabled = true, autoplay = false, on
     const [loading, setLoading] = useState(true);
     const [failed, setFailed] = useState(false);
     const ready = useRef(false);
+    const [failureKind, setFailureKind] = useState<'load_error' | 'format_error' | 'network_error' | 'slow_loading'>('load_error');
+    const fail = (error: unknown) => {
+        ready.current = true;
+        const detail = String(error || '').toLowerCase();
+        setFailureKind(/decoder|codec|unsupported|format_supported=no/.test(detail) ? 'format_error' : /network|http|connection|source error|unable to connect/.test(detail) ? 'network_error' : 'load_error');
+        setLoading(false);
+        setFailed(true);
+    };
     useEffect(() => {
         ready.current = false;
         setLoading(true);
         setFailed(!uri);
         if (!enabled || !uri) return;
-        const timer = setTimeout(() => { if (!ready.current) { setLoading(false); setFailed(true); } }, 25000);
+        const timer = setTimeout(() => { if (!ready.current) { setLoading(false); setFailureKind('slow_loading'); setFailed(true); } }, 45000);
         return () => clearTimeout(timer);
     }, [uri, enabled, attempt]);
     return <View style={styles.box}>
-        {enabled && uri ? <Video key={uri + ':' + attempt} source={{ uri }} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.CONTAIN} useNativeControls shouldPlay={autoplay} isLooping={false}
+        {enabled && uri ? <Video key={uri + ':' + attempt} source={{ uri: uri.trim() }} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.CONTAIN} useNativeControls shouldPlay={autoplay} isLooping={false}
             onLoad={() => { ready.current = true; setLoading(false); setFailed(false); }}
-            onError={() => { ready.current = true; setLoading(false); setFailed(true); }}
+            onError={fail}
             onPlaybackStatusUpdate={status => {
-                if (!status.isLoaded) { if (status.error) { ready.current = true; setLoading(false); setFailed(true); } return; }
+                if (!status.isLoaded) { if (status.error) fail(status.error); return; }
                 if (status.didJustFinish) onPause?.();
             }} /> : <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('replays.play_video', 'Videoni ochish')} onPress={onActivate} style={styles.cover}>
                 <Ionicons name="play-circle" size={48} color="#E85002" />
@@ -32,7 +40,7 @@ export default function ReplayPlayer({ uri, enabled = true, autoplay = false, on
             </TouchableOpacity>}
         {enabled && loading && !failed && <View pointerEvents="none" style={styles.cover}><ActivityIndicator color="#E85002" /></View>}
         {enabled && failed && <View style={[styles.cover, { backgroundColor: '#141414' }]}>
-            <Text style={styles.text}>{t('replays.load_error', 'Video ochilmadi')}</Text>
+            <Text style={styles.text}>{t('replays.' + failureKind, 'Video ochilmadi')}</Text>
             <TouchableOpacity accessibilityRole="button" onPress={() => setAttempt(value => value + 1)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 }}><Text style={{ color: '#E85002', fontWeight: '700' }}>{t('common.retry', 'Qayta urinish')}</Text></TouchableOpacity>
         </View>}
     </View>;

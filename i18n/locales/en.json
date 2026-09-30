@@ -159,6 +159,11 @@
     "unknown_player": "Unknown player"
   },
   "replays": {
+    "format_error": "Video format is not supported on this device",
+    "network_error": "Unable to load video over the network",
+    "slow_loading": "Video is taking too long. Try again",
+    "highlights": "Goal videos",
+    "open_external": "Open externally",
     "play_video": "Play video",
     "team_goal": "Team goal",
     "assist": "Assist",

@@ -1,3 +1,4 @@
+import { formatMatchTeamName } from '../utils/stringUtils';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     View,
@@ -496,7 +497,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                                                                         style={[styles.teamNameText, { color: homeColors.textPrimary }]}
                                                                         numberOfLines={1}
                                                                     >
-                                                                        {homeName}
+                                                                        {formatMatchTeamName(homeName)}
                                                                     </Text>
                                                                     <View
                                                                         style={[
@@ -569,7 +570,7 @@ export default function CalendarMatchesScreen({ route, navigation }: any) {
                                                                         style={[styles.teamNameText, { color: homeColors.textPrimary, textAlign: 'left' }]}
                                                                         numberOfLines={1}
                                                                     >
-                                                                        {awayName}
+                                                                        {formatMatchTeamName(awayName)}
                                                                     </Text>
                                                                 </View>
                                                             </View>

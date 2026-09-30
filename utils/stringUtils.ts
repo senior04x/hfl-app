@@ -173,3 +173,14 @@ export const cleanPhoneForDb = (formatted: string | undefined | null): string =>
     return `+998${digits}`;
 };
 
+
+/** Compact match labels; deliberately separate from home cards and standings. */
+export const formatMatchTeamName = (name: any): string => {
+    if (typeof name !== 'string') return '';
+    const full = name.trim().replace(/\s+/g, ' ');
+    if (!full) return '';
+    const words = full.split(' ').filter(word => !/^(FC|FK|CF)$/i.test(word));
+    if (!words.length) return full.toUpperCase();
+    if (words.length === 1) return (words[0].length <= 10 ? words[0] : words[0].slice(0, 3)).toUpperCase();
+    return words.map(word => /^\d/.test(word) ? word : word[0]).join('').toUpperCase();
+};

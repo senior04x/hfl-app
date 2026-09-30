@@ -5,7 +5,7 @@ import ReplayPlayer from './ReplayPlayer';
 import SmartImage from './SmartImage';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
-import { formatShortTeamName } from '../utils/stringUtils';
+import { formatMatchTeamName } from '../utils/stringUtils';
 
 type Props = { id?: string; videoUrl: string; minute?: number | string; teamName?: string; teamLogo?: string; scorerName?: string; scorerPhoto?: string; assistantName?: string; assistantPhoto?: string; eventType?: string; activePlayingId?: string | null; onPlay?: (id: string) => void; onPause?: (id: string) => void };
 export default function ReplayVideoCard({ id, videoUrl, minute, teamName, teamLogo, scorerName, scorerPhoto, assistantName, activePlayingId, onPlay, onPause }: Props) {
@@ -18,7 +18,7 @@ export default function ReplayVideoCard({ id, videoUrl, minute, teamName, teamLo
             <Text style={{ color: colors.accent, fontWeight: '800', fontSize: 12 }}>{minute != null ? minute + '′' : t('replays.match_replay', 'Replay')}</Text>
             <View style={{ flex: 1 }} />
             {teamLogo && <SmartImage uri={teamLogo} style={{ width: 22, height: 22 }} contentFit="contain" />}
-            <Text numberOfLines={1} style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 11, maxWidth: '65%' }}>{formatShortTeamName(teamName, 18)}</Text>
+            <Text numberOfLines={1} style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 11, maxWidth: '65%' }}>{formatMatchTeamName(teamName)}</Text>
         </View>
         <ReplayPlayer uri={videoUrl} enabled={activePlayingId === cardId} autoplay onActivate={() => onPlay?.(cardId)} onPause={() => onPause?.(cardId)} />
         <View style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>

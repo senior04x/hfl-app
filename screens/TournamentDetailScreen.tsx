@@ -36,7 +36,7 @@ import PlayerListSkeleton from '../components/PlayerListSkeleton';
 import MatchesListSkeleton from '../components/MatchesListSkeleton';
 import GenericListSkeleton from '../components/GenericListSkeleton';
 import SmartImage from '../components/SmartImage';
-import { getTeamAbbreviation } from '../utils/stringUtils';
+import { formatMatchTeamName } from '../utils/stringUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSocket } from '../context/SocketContext';
 import { useTranslation } from 'react-i18next';
@@ -1792,7 +1792,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
                                             <View style={styles.matchTeamsRowFull}>
                                                 <Text style={[styles.teamShortFull, { color: homeColors.textPrimary }]}>
-                                                    {getTeamAbbreviation(match.homeTeam?.name || match.homeTeamName || 'HME')}
+                                                    {formatMatchTeamName(match.homeTeam?.name || match.homeTeamName || 'HME')}
                                                 </Text>
                                                 <View style={[styles.logoCircleSmall, { backgroundColor: isDark ? homeColors.background : '#F2F2F4', borderColor: homeColors.border }]}>
                                                     {match.homeTeam?.logo || match.homeTeamLogo ? (
@@ -1831,7 +1831,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                                     )}
                                                 </View>
                                                 <Text style={[styles.teamShortFull, { color: homeColors.textPrimary }]}>
-                                                    {getTeamAbbreviation(match.awayTeam?.name || match.awayTeamName || 'AWY')}
+                                                    {formatMatchTeamName(match.awayTeam?.name || match.awayTeamName || 'AWY')}
                                                 </Text>
                                             </View>
                                         </View>

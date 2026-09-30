@@ -1,3 +1,4 @@
+import { formatMatchTeamName } from '../utils/stringUtils';
 import { PagerScrollView, PagerContentScrollView } from '../components/PlatformPager';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -781,7 +782,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                 {/* CHAP: Uy jamoasi */}
                                                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 8 }}>
                                                     <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                                        {match.homeTeamName || match.homeTeam?.name || t('matches.home_short', 'UY')}
+                                                        {formatMatchTeamName(match.homeTeamName || match.homeTeam?.name || t('matches.home_short', 'UY'))}
                                                     </Text>
                                                     <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
                                                         <SmartImage
@@ -840,7 +841,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                                         />
                                                     </View>
                                                     <Text style={{ fontSize: 11, fontWeight: '700', color: homeColors.textPrimary, letterSpacing: 0.1 }} numberOfLines={1}>
-                                                        {match.awayTeamName || match.awayTeam?.name || t('matches.away_short', 'MEH')}
+                                                        {formatMatchTeamName(match.awayTeamName || match.awayTeam?.name || t('matches.away_short', 'MEH'))}
                                                     </Text>
                                                 </View>
                                             </View>

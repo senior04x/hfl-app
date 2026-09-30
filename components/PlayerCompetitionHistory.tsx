@@ -1,3 +1,4 @@
+import { formatMatchTeamName } from '../utils/stringUtils';
 import React, { useMemo, useState } from 'react';
 import { View, Text, SectionList, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,9 +48,9 @@ export default function PlayerCompetitionHistory({ matches, isDark, loading, err
             const time = String(match.match_time || '').slice(0, 5) || '—';
             const goals = playerGoals(match);
             return <TouchableOpacity accessibilityRole="button" onPress={() => onMatchPress?.(match.id || match._id)} style={[styles.row, { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderBottomColor: colors.border }]}>
-                <View style={styles.teams}><View style={styles.team}><Text numberOfLines={2} style={[styles.teamName, { color: colors.textPrimary, textAlign: 'right' }]}>{match.homeTeamName || t('matches.home_short', 'UY')}</Text><SmartImage uri={match.homeTeamLogo} style={styles.logo} contentFit="contain" fallbackIcon="shield-outline" /></View>
+                <View style={styles.teams}><View style={styles.team}><Text numberOfLines={2} style={[styles.teamName, { color: colors.textPrimary, textAlign: 'right' }]}>{formatMatchTeamName(match.homeTeamName || t('matches.home_short', 'UY'))}</Text><SmartImage uri={match.homeTeamLogo} style={styles.logo} contentFit="contain" fallbackIcon="shield-outline" /></View>
                     <View style={{ width: 76, alignItems: 'center' }}><Text style={{ fontSize: 20, fontWeight: '900', color: live ? colors.accent : colors.textPrimary }}>{scored ? (match.home_score ?? 0) + ' : ' + (match.away_score ?? 0) : time}</Text><Text style={{ fontSize: 10, color: live ? colors.accent : colors.textSecondary }}>{live ? 'LIVE' : dateLabel}</Text></View>
-                    <View style={styles.team}><SmartImage uri={match.awayTeamLogo} style={styles.logo} contentFit="contain" fallbackIcon="shield-outline" /><Text numberOfLines={2} style={[styles.teamName, { color: colors.textPrimary }]}>{match.awayTeamName || t('matches.away_short', 'MEH')}</Text></View></View>
+                    <View style={styles.team}><SmartImage uri={match.awayTeamLogo} style={styles.logo} contentFit="contain" fallbackIcon="shield-outline" /><Text numberOfLines={2} style={[styles.teamName, { color: colors.textPrimary }]}>{formatMatchTeamName(match.awayTeamName || t('matches.away_short', 'MEH'))}</Text></View></View>
                 {goals > 0 && <Text style={{ color: colors.accent, textAlign: 'center', fontSize: 11, marginTop: 8 }}>⚽ {goals} {t('stats.goals_short', 'gol')}</Text>}
             </TouchableOpacity>;
         }} />;

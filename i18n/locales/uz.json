@@ -159,6 +159,11 @@
     "unknown_player": "Noma'lum o'yinchi"
   },
   "replays": {
+    "format_error": "Video formati qurilmaga mos kelmadi",
+    "network_error": "Video tarmoq orqali yuklanmadi",
+    "slow_loading": "Video yuklanishi cho‘zildi. Qayta urinib ko‘ring",
+    "highlights": "Gol videolari",
+    "open_external": "Tashqarida ochish",
     "play_video": "Videoni ochish",
     "team_goal": "Jamoa goli",
     "assist": "Assist",
