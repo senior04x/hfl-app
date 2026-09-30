@@ -59,6 +59,32 @@ export default function AccountScreen({ navigation }: any) {
     const [loading, setLoading] = useState(false);
     const currentTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
 
+    const [transferWindowOpen, setTransferWindowOpen] = useState(false);
+    const transferOrgId = user?.organization_id || user?.organizationId || detailedData?.organization_id || detailedData?.organizationId;
+    useEffect(() => {
+        let active = true;
+        let generation = 0;
+        const refresh = async () => {
+            const epoch = ++generation;
+            setTransferWindowOpen(false);
+            if (isGuest || !user || !['player', 'manager'].includes(user.role)) return;
+            try {
+                let orgId = transferOrgId;
+                if (!orgId && currentTeamId) {
+                    const { data, error } = await supabase.from('teams').select('organization_id').eq('id', currentTeamId).maybeSingle();
+                    if (error) return;
+                    orgId = data?.organization_id;
+                }
+                if (!orgId) return;
+                const { data, error } = await supabase.from('organizations').select('transfer_window_open').eq('id', orgId).maybeSingle();
+                if (active && epoch === generation && !error) setTransferWindowOpen(data?.transfer_window_open === true);
+            } catch { /* Keep the action hidden when the organization cannot be verified. */ }
+        };
+        void refresh();
+        const unsubscribe = navigation.addListener('focus', refresh);
+        return () => { active = false; generation++; unsubscribe(); };
+    }, [navigation, isGuest, user?.id, user?._id, user?.role, currentTeamId, transferOrgId]);
+
     const [storyPickerVisible, setStoryPickerVisible] = useState(false);
     const [ownActiveReplayIds, setOwnActiveReplayIds] = useState<any[]>([]);
 
@@ -525,6 +551,8 @@ export default function AccountScreen({ navigation }: any) {
                                     }
                                 ]}
                             >
+                                {transferWindowOpen && <SettingRow icon="swap-horizontal-outline" title={t('transfer_app.title')}
+                                    onPress={() => navigation.navigate('Transfers')} />}
                                 {isPlayer && (
                                     <>
                                         <SettingRow
@@ -548,8 +576,6 @@ export default function AccountScreen({ navigation }: any) {
                                             title={t('profile.transfer_requests', 'Transfer so\'rovlari')}
                                             onPress={() => navigation.navigate('Applications', { initialTab: 'transfers' })}
                                         />
-                                        <SettingRow icon="swap-horizontal" title={t('transfer_app.title')}
-                                            onPress={() => navigation.navigate('Transfers')} />
                                     </>
                                 )}
 
