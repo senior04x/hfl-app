@@ -65,7 +65,8 @@ export default function TransferScreen({ navigation, route }: any) {
     useEffect(() => {
         generation.current++; listAbort.current?.abort();
         setSession(getTransferSession(actor, subjectId)); setItems([]); setCursor(null); setError(''); setNotice('');
-        setNewRequest(false); setSelected(null); setCode('');
+        setNewRequest(false); setSelected(null); setCode(''); setWindowOpen(false);
+        setCandidates([]); setCandidateCursor(null); setQuery(''); setReason('');
         setWriteUncertain(false);
     }, [actor, subjectId]);
     useEffect(() => { setFocusedId(route?.params?.transferId); }, [route?.params?.transferId]);
@@ -85,19 +86,12 @@ export default function TransferScreen({ navigation, route }: any) {
             if (!isCurrentAccount() || epoch !== generation.current) return;
             setItems(previous => after ? [...previous, ...data.items.filter(item => !previous.some(existing => existing.id === item.id))] : data.items);
             setCursor(data.next_cursor);
-            setWriteUncertain(false);
+            if (!after) setWriteUncertain(false);
+            if (actor === 'captain') setWindowOpen(data.transfer_window_open === true);
         } catch (e) { if (epoch === generation.current && !controller.signal.aborted) fail(e); }
         finally { if (isCurrentAccount() && epoch === generation.current) setLoading(false); }
     }, [session, direction, focusedId, fail]);
     useEffect(() => { void load(); return () => { generation.current++; listAbort.current?.abort(); }; }, [load]);
-    useEffect(() => {
-        if (!session || actor !== 'captain') { setWindowOpen(false); return; }
-        const controller = new AbortController();
-        transferAppService.captainPage(session, 'context', '', null, controller.signal)
-            .then(data => { if (!controller.signal.aborted) setWindowOpen(data.transfer_window_open === true); })
-            .catch(e => { if (!controller.signal.aborted) fail(e); });
-        return () => controller.abort();
-    }, [session, actor, fail]);
 
     const findPlayers = useCallback(async (after: string | null, signal?: AbortSignal) => {
         if (!session) return;

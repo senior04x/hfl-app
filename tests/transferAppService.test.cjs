@@ -53,3 +53,14 @@ test('aborted reads never send a request',async t => {
     await assert.rejects(api.transferAppService.page({token,actor:'player'},'all',null,undefined,controller.signal));
     assert.equal(mock.mock.callCount(),0);
 });
+
+test('malformed or oversized transfer pages fail safely before reaching screen rendering', async t => {
+ const api=load();const session={token,actor:'player',subjectId:id};
+ const valid={id,status:'pending',actor_party:'player',consents:[]};
+ for(const body of [{items:null,next_cursor:null},{items:[{...valid,consents:null}],next_cursor:null},{items:[{...valid,status:'unknown'}],next_cursor:null},{items:Array(21).fill(valid),next_cursor:null}]) {
+  t.mock.method(global,'fetch',async()=>success(body));
+  await assert.rejects(api.transferAppService.page(session,'all'),error=>error.status===500);
+ }
+ t.mock.method(global,'fetch',async()=>success({items:[valid],next_cursor:null,transfer_window_open:false}));
+ assert.equal((await api.transferAppService.page(session,'all')).items.length,1);
+});

@@ -57,8 +57,20 @@ export const transferAppService = {
         sessions.set(sessionKey(actor, subjectId), session);
         return session;
     },
-    async page(session: TransferSession, direction: TransferDirection, after?: string | null, transferId?: string, signal?: AbortSignal): Promise<{ items: AppTransfer[]; next_cursor: string | null }> {
-        return post('transfer-app-page', { actor: session.actor, direction, after: after ?? null, transfer_id: transferId ?? null }, session.token, signal);
+    async page(session: TransferSession, direction: TransferDirection, after?: string | null, transferId?: string, signal?: AbortSignal): Promise<{ items: AppTransfer[]; next_cursor: string | null; transfer_window_open?: boolean }> {
+        const data = await post('transfer-app-page', { actor: session.actor, direction, after: after ?? null, transfer_id: transferId ?? null }, session.token, signal);
+        if (!Array.isArray(data?.items) || data.items.length > 20 ||
+            !(data.next_cursor === null || typeof data.next_cursor === 'string') ||
+            data.items.some((item: any) => !item || typeof item.id !== 'string' ||
+                !['pending', 'approved', 'rejected'].includes(item.status) ||
+                !['player', 'old_team', 'new_team'].includes(item.actor_party) ||
+                !Array.isArray(item.consents) || item.consents.length > 3 ||
+                item.consents.some((consent: any) => !consent ||
+                    !['player', 'old_team', 'new_team'].includes(consent.party) ||
+                    !['approved', 'rejected'].includes(consent.decision)))) {
+            throw new TransferApiError(500);
+        }
+        return data;
     },
     async captainPage(session: TransferSession, action: 'context' | 'players', query = '', after?: string | null, signal?: AbortSignal) {
         return post('team-transfer-page', { action, query, after: after ?? null, team_id: session.subjectId }, session.token, signal);
