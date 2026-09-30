@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { useJuniorStore } from '../store/useJuniorStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { resolveMatchAssist } from './matchEventAssist';
 
 export { supabase };
 
@@ -1158,12 +1159,7 @@ export const apiService = {
                 else if (eType.includes('assist')) normalizedType = 'assist';
                 else if (eType.includes('goal')) normalizedType = 'goal';
 
-                // Look for assist event recorded for the same team at the same minute
-                const assistEvent = eventsData.find((ae: any) => 
-                    String(ae.event_type || '').toLowerCase().includes('assist') && 
-                    String(ae.team_id) === String(e.team_id) && 
-                    Math.abs((ae.minute || 0) - (e.minute || 0)) <= 1
-                );
+                const assistEvent = resolveMatchAssist(e, eventsData);
 
                 let videoUrl = e.replay_video_url || e.video_url || null;
 
@@ -1177,9 +1173,10 @@ export const apiService = {
                     time: e.minute || 0,
                     player: e.player,
                     player_photo: e.player?.photo_url || e.player?.photo || e.player?.avatar || null,
-                    playerName: e.player ? `${e.player.first_name || ''} ${e.player.last_name || ''}`.trim() : 'Futbolchi',
-                    player_name: e.player ? `${e.player.first_name || ''} ${e.player.last_name || ''}`.trim() : 'Futbolchi',
-                    assist_player_name: assistEvent?.player ? `${assistEvent.player.first_name || ''} ${assistEvent.player.last_name || ''}`.trim() : null,
+                    playerName: e.player_name || (`${e.player?.first_name || ''} ${e.player?.last_name || ''}`.trim()) || e.player?.name || 'Futbolchi',
+                    player_name: e.player_name || (`${e.player?.first_name || ''} ${e.player?.last_name || ''}`.trim()) || e.player?.name || 'Futbolchi',
+                    assist_player_name: e.assist_player_name || (assistEvent?.player ?
+                        (`${assistEvent.player.first_name || ''} ${assistEvent.player.last_name || ''}`.trim() || assistEvent.player.name) : assistEvent?.player_name) || null,
                     assist_player_photo: assistEvent?.player?.photo_url || assistEvent?.player?.photo || null,
                     isHomeTeam: String(e.team_id) === String(m.home_team_id),
                     replay_video_url: videoUrl,

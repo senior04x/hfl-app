@@ -181,6 +181,6 @@ export const formatMatchTeamName = (name: any): string => {
     if (!full) return '';
     const words = full.split(' ').filter(word => !/^(FC|FK|CF)$/i.test(word));
     if (!words.length) return full.toUpperCase();
-    if (words.length === 1) return (words[0].length <= 10 ? words[0] : words[0].slice(0, 3)).toUpperCase();
-    return words.map(word => /^\d/.test(word) ? word : word[0]).join('').toUpperCase();
+    if (words.length === 1) return Array.from(words[0]).slice(0, 3).join('').toUpperCase();
+    return words.map(word => /\d/.test(word) ? word : Array.from(word)[0]).join('').toUpperCase();
 };

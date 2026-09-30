@@ -753,8 +753,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
             return renderPreviewSkeleton();
         }
 
-        const homeName = match?.homeTeamName || match?.homeTeam?.name || 'UY JAMOA';
-        const awayName = match?.awayTeamName || match?.awayTeam?.name || 'MEHMON';
+        const homeName = formatMatchTeamName(match?.homeTeamName || match?.homeTeam?.name || 'UY JAMOA');
+        const awayName = formatMatchTeamName(match?.awayTeamName || match?.awayTeam?.name || 'MEHMON');
         const homeLogo = match?.homeTeamLogo || match?.homeTeam?.logo;
         const awayLogo = match?.awayTeamLogo || match?.awayTeam?.logo;
         const leagueName = match?.tournamentName || match?.league || "HFL Liga";
@@ -1041,7 +1041,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
     const renderLineups = () => {
         const isHome = selectedTeamId === match?.homeTeamId;
         const currentPlayers = isHome ? homePlayers : awayPlayers;
-        const currentTeamName = isHome ? (match?.homeTeamName || 'UY JAMOA') : (match?.awayTeamName || 'MEHMON');
+        const currentTeamName = formatMatchTeamName(isHome ? (match?.homeTeamName || 'UY JAMOA') : (match?.awayTeamName || 'MEHMON'));
         const currentLogo = isHome ? (match?.homeTeamLogo || match?.homeTeam?.logo) : (match?.awayTeamLogo || match?.awayTeam?.logo);
 
         if (playersLoading && currentPlayers.length === 0) {
@@ -1347,7 +1347,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         </View>
 
                         {replayEvents.map((ev: any, idx: number) => {
-                            const isHome = ev.team_id ? (ev.team_id === (match?.homeTeamId || match?.home_team_id)) : ev.isHomeTeam;
+                            const isHome = ev.team_id != null ? (String(ev.team_id) === String(match?.homeTeamId || match?.home_team_id)) : ev.isHomeTeam;
                             const currentTeamName = ev.team_name || (isHome ? (match?.homeTeamName || match?.home_team?.name) : (match?.awayTeamName || match?.away_team?.name));
                             const currentTeamLogo = isHome ? (match?.homeTeamLogo || match?.home_team?.logo_url) : (match?.awayTeamLogo || match?.away_team?.logo_url);
                             const scorer = ev.player_name || (ev.player ? `${ev.player.first_name || ''} ${ev.player.last_name || ''}`.trim() : null);
@@ -1407,8 +1407,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
         const rawCommissioner = (match?.commissioner || match?.inspector || '').trim();
         const commissionerName = rawCommissioner ? rawCommissioner.toUpperCase() : t('match_detail.commissioner_not_appointed');
 
-        const homeName = (match?.homeTeamName || match?.homeTeam?.name || 'UY JAMOA').toUpperCase();
-        const awayName = (match?.awayTeamName || match?.awayTeam?.name || 'MEHMON JAMOA').toUpperCase();
+        const homeName = formatMatchTeamName(match?.homeTeamName || match?.homeTeam?.name || 'UY JAMOA');
+        const awayName = formatMatchTeamName(match?.awayTeamName || match?.awayTeam?.name || 'MEHMON JAMOA');
 
         const rawHomeManager = (match?.homeTeam?.manager_name || match?.homeTeam?.coach_name || match?.homeTeam?.trainer_name || match?.homeTeam?.owner_name || '').trim();
         const homeManager = rawHomeManager ? rawHomeManager.toUpperCase() : t('match_detail.not_appointed');

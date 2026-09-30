@@ -23,7 +23,7 @@ export default function ReplayVideoCard({ id, videoUrl, minute, teamName, teamLo
         <ReplayPlayer uri={videoUrl} enabled={activePlayingId === cardId} autoplay onActivate={() => onPlay?.(cardId)} onPause={() => onPause?.(cardId)} />
         <View style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <SmartImage uri={scorerPhoto || teamLogo} style={{ width: 30, height: 30, borderRadius: 15 }} fallbackIcon="person-outline" fallbackIconSize={18} />
-            <View style={{ flex: 1 }}><Text numberOfLines={1} style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 12 }}>{scorerName || teamName || t('replays.team_goal', 'Jamoa goli')}</Text>
+            <View style={{ flex: 1 }}><Text numberOfLines={1} style={{ color: scorerName ? colors.accent : colors.textPrimary, fontWeight: '700', fontSize: 12 }}>{scorerName || teamName || t('replays.team_goal', 'Jamoa goli')}</Text>
                 {assistantName && <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 11, marginTop: 3 }}>{t('replays.assist', 'Assist')} · {assistantName}</Text>}
             </View>
         </View>
