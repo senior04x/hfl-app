@@ -14,12 +14,22 @@ export class TransferApiError extends Error {
 }
 const endpoint = 'https://xzzyhfyazwohdqqbjiiy.supabase.co/functions/v1/';
 
-// Memory only: sessions are not persisted in AsyncStorage or shared across accounts.
+// In-memory cache; verified login credentials are persisted separately in SecureStore.
 const sessions = new Map<string, TransferSession>();
 const sessionKey = (actor: TransferActor, id: string) => `${actor}:${id}`;
 export function getTransferSession(actor: TransferActor, id: string): TransferSession | null {
     const key = sessionKey(actor, id), session = sessions.get(key);
     if (!session || session.expiresAt <= Date.now()) { sessions.delete(key); return null; }
+    return session;
+}
+export function installTransferSession(value: unknown): TransferSession | null {
+    const data = value as Partial<TransferSession> | null;
+    if (!data || !['player', 'captain'].includes(String(data.actor)) ||
+        typeof data.subjectId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.subjectId) ||
+        typeof data.token !== 'string' || !/^[a-f0-9]{64}$/i.test(data.token) ||
+        typeof data.expiresAt !== 'number' || !Number.isFinite(data.expiresAt) || data.expiresAt <= Date.now()) return null;
+    const session: TransferSession = { actor: data.actor as TransferActor, subjectId: data.subjectId, token: data.token, expiresAt: data.expiresAt };
+    sessions.set(sessionKey(session.actor, session.subjectId), session);
     return session;
 }
 export function clearTransferSession(session: TransferSession) { sessions.delete(sessionKey(session.actor, session.subjectId)); }

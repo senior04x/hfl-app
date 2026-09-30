@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { clearTransferLoginStorage } from '../services/transferLoginStorage';
 
 interface AuthState {
     isGuest: boolean;
@@ -28,7 +29,7 @@ export const useAuthStore = create<AuthState>()(
             userAccounts: [],
             unreadCount: 0,
             isChatMuted: false,
-            setGuest: (isGuest) => set({ isGuest, isAuthenticated: false, user: null, userAccounts: [], unreadCount: 0, isChatMuted: false }),
+            setGuest: (isGuest) => { void clearTransferLoginStorage().catch(() => undefined); set({ isGuest, isAuthenticated: false, user: null, userAccounts: [], unreadCount: 0, isChatMuted: false }); },
             setAuth: (user, accounts) => set((state) => {
                 let mergedAccounts = accounts && accounts.length > 0 ? accounts : state.userAccounts;
                 if (!mergedAccounts || mergedAccounts.length === 0) {
@@ -58,7 +59,7 @@ export const useAuthStore = create<AuthState>()(
                     userAccounts: updatedAccounts,
                 };
             }),
-            logout: () => set({ user: null, userAccounts: [], isAuthenticated: false, isGuest: false, unreadCount: 0, isChatMuted: false }),
+            logout: () => { void clearTransferLoginStorage().catch(() => undefined); set({ user: null, userAccounts: [], isAuthenticated: false, isGuest: false, unreadCount: 0, isChatMuted: false }); },
             incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
             resetUnreadCount: () => set({ unreadCount: 0 }),
             toggleChatMute: () => set((state) => ({ isChatMuted: !state.isChatMuted })),

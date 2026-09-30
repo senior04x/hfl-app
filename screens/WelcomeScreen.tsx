@@ -30,6 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedBackground from '../components/AnimatedBackground';
+import { saveTransferLoginSessions } from '../services/transferLoginStorage';
 import backgroundImage from '../assets/images/backroud-image.png';
 import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -349,6 +350,7 @@ const formatPhoneInput = (val: string) => {
             const verifyData = await verifyRes.json();
 
             if (verifyData.success) {
+                await saveTransferLoginSessions(verifyData.transferSessions);
                 const accList = verifyData.accounts || (verifyData.user ? [verifyData.user] : []);
                 setAccountOptions(accList);
                 useAuthStore.getState().setUserAccounts(accList);
