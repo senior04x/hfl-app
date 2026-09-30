@@ -19,13 +19,14 @@ const getOrgId = () => {
 };
 const getIsJunior = () => useJuniorStore.getState().isJuniorMode;
 
-// Memory Cache Engine for High Performance & 90% Database Load Reduction
+// Memory cache with one active request per key.
 interface CacheEntry<T> {
     data: T;
     timestamp: number;
 }
 
 const memoryCache = new Map<string, CacheEntry<any>>();
+const pendingCacheRequests = new Map<string, Promise<any>>();
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
 
 export const getCachedData = async <T>(
@@ -38,19 +39,34 @@ export const getCachedData = async <T>(
     if (cached && (now - cached.timestamp < ttlMs)) {
         return cached.data;
     }
-    const data = await fetcher();
-    memoryCache.set(key, { data, timestamp: now });
-    return data;
+    const pending = pendingCacheRequests.get(key);
+    if (pending) return pending;
+
+    const request: Promise<T> = Promise.resolve().then(fetcher).then(data => {
+        // Clearing the cache invalidates requests already in flight.
+        if (pendingCacheRequests.get(key) === request) {
+            memoryCache.set(key, { data, timestamp: Date.now() });
+        }
+        return data;
+    }).finally(() => {
+        if (pendingCacheRequests.get(key) === request) pendingCacheRequests.delete(key);
+    });
+    pendingCacheRequests.set(key, request);
+    return request;
 };
 
 export const clearApiCache = (keyPrefix?: string) => {
     if (!keyPrefix) {
         memoryCache.clear();
+        pendingCacheRequests.clear();
     } else {
         for (const key of memoryCache.keys()) {
             if (key.startsWith(keyPrefix)) {
                 memoryCache.delete(key);
             }
+        }
+        for (const key of pendingCacheRequests.keys()) {
+            if (key.startsWith(keyPrefix)) pendingCacheRequests.delete(key);
         }
     }
 };
