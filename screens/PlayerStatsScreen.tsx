@@ -1,3 +1,4 @@
+import { enrichReplayTeams } from '../services/replayTeams';
 import { PagerScrollView, PagerContentScrollView } from '../components/PlatformPager';
 import PlayerCompetitionHistory, { PlayerCareerGoals } from '../components/PlayerCompetitionHistory';
 import { getPlayerHistory } from '../services/playerHistory';
@@ -595,7 +596,8 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                     const validReplays = events.filter((e: any) =>
                         Boolean(e.replay_video_url || e.video_url || e.replay_url || e.video)
                     );
-                    setPlayerReplays(validReplays);
+                    const enriched = await enrichReplayTeams(validReplays);
+                    if (!cancelled) setPlayerReplays(enriched);
                 } else {
                     setPlayerReplays([]);
                 }

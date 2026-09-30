@@ -93,6 +93,7 @@ const TournamentsHeader = ({
     const bannerCandidate = selectedLeague?.bg_image || selectedLeague?.export_bg_url || selectedLeague?.banner_url;
     const bannerUri = typeof bannerCandidate === 'string' && bannerCandidate.startsWith('https://') ? bannerCandidate : null;
     const [failedBanner, setFailedBanner] = useState<string | null>(null);
+    const hasBanner = Boolean(bannerUri && failedBanner !== bannerUri);
 
     const cardSurfaceStyle = {
         backgroundColor: isDark ? homeColors.background : '#FFFFFF',
@@ -182,12 +183,13 @@ const TournamentsHeader = ({
                 onPress={toggleLeagueSelector}
                 activeOpacity={0.85}
             >
+                        {bannerUri && hasBanner && <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                            <Image source={{ uri: bannerUri }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setFailedBanner(bannerUri)} />
+                            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.60)' }]} />
+                        </View>}
                 <View style={styles.leagueCardCenteredContent}>
                     <View style={[styles.largeLogoWrapper, { backgroundColor: 'transparent', borderWidth: 0, overflow: 'hidden' }]}>
-                        {bannerUri && failedBanner !== bannerUri && <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-                            <Image source={{ uri: bannerUri }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setFailedBanner(bannerUri)} />
-                            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)' }]} />
-                        </View>}
+
                         {isLeaguesLoading && !selectedLeague ? (
                             <Skeleton width={180} height={80} borderRadius={10} />
                         ) : currentLeagueLogoSource ? (
@@ -216,7 +218,7 @@ const TournamentsHeader = ({
                     {/* League / Organization Label & Switcher Cue */}
                     <View style={styles.selectorFooterRow}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 1 }}>
-                            <Text style={[styles.selectedLeagueHeading, { color: homeColors.textPrimary }]} numberOfLines={1}>
+                            <Text style={[styles.selectedLeagueHeading, { color: hasBanner ? '#FFFFFF' : homeColors.textPrimary }]} numberOfLines={1}>
                                 {(selectedLeague?.name || activeOrg?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()}
                             </Text>
                             {selectedLeague?.is_tournament && (
@@ -228,7 +230,7 @@ const TournamentsHeader = ({
                         <Ionicons
                             name={isLeagueSelectorOpen ? "chevron-up" : "chevron-down"}
                             size={16}
-                            color={homeColors.textSecondary}
+                            color={hasBanner ? '#FFFFFF' : homeColors.textSecondary}
                             style={{ marginLeft: 6 }}
                         />
                     </View>

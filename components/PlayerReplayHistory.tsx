@@ -1,3 +1,4 @@
+import ReplayMatchHeader from './ReplayMatchHeader';
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,11 +17,10 @@ export default function PlayerReplayHistory({ groups, isDark, playerName, active
             const id = String(group.match.id);
             const date = new Date(group.match.match_date || group.match.date);
             const dateLabel = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' });
-            const title = [group.match.home_team?.name || group.match.home_team_name, group.match.away_team?.name || group.match.away_team_name].filter(Boolean).join(' — ') || t('replays.match_replay', "O‘yin replayi");
             return <View key={id}>
                 <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: opened === id }} onPress={() => setOpened(opened === id ? null : id)} style={{ minHeight: 64, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 0.5, borderTopColor: colors.border }}>
                     <Ionicons name="play-circle-outline" size={28} color={colors.accent} />
-                    <View style={{ flex: 1 }}><Text numberOfLines={1} style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 12 }}>{title}</Text><Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>{dateLabel} · {group.replays.length} {t('stats.goals_short', 'gol')}</Text></View>
+                    <View style={{ flex: 1 }}><ReplayMatchHeader match={group.match} color={colors.textPrimary} /><Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>{dateLabel} · {group.replays.length} {t('stats.goals_short', 'gol')}</Text></View>
                     <Ionicons name={opened === id ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
                 {active && opened === id && <PlayerMatchReplayCard match={group.match} replays={group.replays} playerName={playerName} />}

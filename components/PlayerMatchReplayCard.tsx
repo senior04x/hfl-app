@@ -1,3 +1,4 @@
+import ReplayMatchHeader from './ReplayMatchHeader';
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Platform } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
@@ -144,13 +145,8 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
       {Platform.OS === 'ios' && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
 
       {/* Header Info */}
-      <View style={styles.topHeaderRow}>
-        <View style={styles.leagueBadge}>
-          <Ionicons name="trophy-outline" size={12} color="#E85002" />
-          <Text style={styles.leagueBadgeText}>
-            {[league, round].filter(Boolean).join(' • ') || t('replays.match_replay', "O'YIN REPLAYI")}
-          </Text>
-        </View>
+      <View style={[styles.topHeaderRow, { flexWrap: 'wrap', gap: 8 }]}>
+        <ReplayMatchHeader match={match} />
 
         {sortedReplays.length > 1 ? (
           <View style={styles.multiGoalPill}>
@@ -338,7 +334,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     minHeight: 44,
-    alignItems: 'center',
     borderRadius: 8,
     gap: 5,
   },
