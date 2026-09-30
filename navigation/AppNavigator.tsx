@@ -293,7 +293,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
 
     const handleProfilLongPress = () => {
         try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            if (Platform.OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
         } catch (e) {}
 
         if (isGuest) {
@@ -329,7 +329,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
 
     const handleSwitchAccount = (acc: any) => {
         try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            if (Platform.OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
         } catch (e) {}
 
         try {
@@ -588,7 +588,7 @@ function MainSwipeableTabs({ navigation, route }: any) {
 
     const handleTabPress = useCallback((targetIndex: number) => {
         try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (Platform.OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         } catch (e) {}
         isManualScrolling.current = true;
         activeIndexRef.current = targetIndex;
@@ -626,19 +626,21 @@ function MainSwipeableTabs({ navigation, route }: any) {
             setActiveIndex(newIndex);
             resetNavBarShrink();
             try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                if (Platform.OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
             } catch (e) {}
         }
     };
 
     return (
         <View style={styles.mainContainer}>
-            {/* Real-time 60/120fps Continuous Horizontal Paging on iOS, Click-only on Android */}
+            {/* Horizontal paging on both platforms; inner sliders can temporarily disable it */}
             <Animated.ScrollView
                 ref={scrollViewRef}
                 horizontal
                 pagingEnabled
-                scrollEnabled={Platform.OS === 'android' ? false : !isSwipeDisabled}
+                scrollEnabled={!isSwipeDisabled}
+                nestedScrollEnabled
+                directionalLockEnabled
                 showsHorizontalScrollIndicator={false}
                 bounces={false}
                 scrollEventThrottle={16}
