@@ -23,9 +23,11 @@ Quyidagilar mahalliy manba kodidan tekshirildi; productionda barcha migrationlar
 - `20260925000100_transfer_notifications.sql`: mavjud outbox faqat futbolchi uchun; to‘rt tomon yetkazilishi hali mavjud emas.
 - `services/apiService.ts`: futbolchiga tegishli transferlarni ko‘rish mavjud. Bu metod jamoaning barcha kiruvchi/chiquvchi arizalarini boshqarish uchun yetarli emas.
 
-## Aniqlanishi kerak
+## Tasdiqlangan tomonlar
 
-To‘rt qabul qiluvchi: futbolchi, eski jamoa sardori, yangi jamoa sardori, tashkilot administratori — foydalanuvchi javobi kutilmoqda. Har biri uchun tekshirilgan aloqa identifikatori va qaysi hodisada xabar olish qoidasi belgilanadi. Futbolchi yoki eski jamoa roziligi yangi majburiy bosqich sifatida o‘zicha kiritilmaydi.
+Foydalanuvchi to‘rt tomonni tasdiqladi: futbolchi, eski jamoa sardori, yangi jamoa sardori, tashkilot administratori. Administrator mavjud amatora-organization/admin va amatora-admin-app orqali ko‘radi va tasdiqlaydi; unga Telegram yetkazilishi qo‘shilmaydi. Qolgan uch tomon uchun Telegram ishlatiladi. Futbolchi yoki eski jamoa roziligi yangi majburiy bosqich sifatida o‘zicha kiritilmaydi.
+
+Botdagi 4571c03 commit futbolchi va ikki jamoa uchun qabul qiluvchini aniqlashni tayyorladi; 46 offline test o‘tdi. Yangi queue qatorlari va sardorlarga mos xabar matnlari hali ulanmagan; o‘zgarish productionga joylanmagan.
 
 ## Keyingi implementatsiya chegarasi
 
