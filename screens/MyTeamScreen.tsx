@@ -1,3 +1,4 @@
+import CompetitionMatchFilter, { CompetitionMatchFilterValue } from '../components/CompetitionMatchFilter';
 import { formatMatchTeamName } from '../utils/stringUtils';
 import { PagerScrollView, PagerContentScrollView } from '../components/PlatformPager';
 import React, { useState, useEffect, useRef } from 'react';
@@ -69,6 +70,9 @@ export default function MyTeamScreen({ route, navigation }: any) {
     const [matches, setMatches] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(!initialTeam && !route?.params?.team);
     const [isPlayersLoading, setIsPlayersLoading] = useState(true);
+    const [matchFilter, setMatchFilter] = useState<CompetitionMatchFilterValue>('all');
+    const [visibleMatchCount, setVisibleMatchCount] = useState(20);
+    const filteredTeamMatches = matches.filter(match => matchFilter === 'all' || (match.tournament_id != null) === (matchFilter === 'tournament'));
     const [isMatchesLoading, setIsMatchesLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -280,7 +284,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
         apiService.getMatches({ teamId: currentId })
             .then((matchesData) => {
                 const sliced = matchesData?.slice(0, 8) || [];
-                setMatches(sliced);
+                setMatches(matchesData || []);
                 globalTeamMemoryCache[currentId] = {
                     ...globalTeamMemoryCache[currentId],
                     matches: sliced,
@@ -719,6 +723,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
                         nestedScrollEnabled={true}
                         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 60, gap: 12 }}
                     >
+                        <CompetitionMatchFilter value={matchFilter} isDark={isDark} onChange={value => { setMatchFilter(value); setVisibleMatchCount(20); }} />
                         {isMatchesLoading ? (
                             [1, 2, 3].map((key) => (
                                 <View
@@ -740,8 +745,8 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                     </View>
                                 </View>
                             ))
-                        ) : matches.length > 0 ? (
-                            matches.map((match: any) => {
+                        ) : filteredTeamMatches.length > 0 ? (
+                            filteredTeamMatches.slice(0, visibleMatchCount).map((match: any) => {
                                 const st = String(match.status || '').toLowerCase().trim();
                                 const matchIsLive = ['live', 'first_half', 'second_half', 'half_time', 'halftime', 'ongoing', 'in_progress', '1st_half', '2nd_half', '1-taym', '2-taym', 'tanaffus'].includes(st);
                                 const matchIsFinished = ['finished', 'completed', 'ended', 'tugadi'].includes(st);
@@ -854,6 +859,11 @@ export default function MyTeamScreen({ route, navigation }: any) {
                                 <Ionicons name="football-outline" size={22} color={homeColors.textSecondary} />
                                 <Text style={[styles.emptyStateText, { color: homeColors.textSecondary }]}>{t('teams.no_matches', "O'yinlar tarixi mavjud emas")}</Text>
                             </View>
+                        )}
+                        {!isMatchesLoading && filteredTeamMatches.length > visibleMatchCount && (
+                            <TouchableOpacity onPress={() => setVisibleMatchCount(count => count + 20)} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={{ color: homeColors.accent, fontWeight: '700' }}>{t('common.show_more', 'Yana ko‘rsatish')}</Text>
+                            </TouchableOpacity>
                         )}
                     </PagerContentScrollView>
                 </View>
