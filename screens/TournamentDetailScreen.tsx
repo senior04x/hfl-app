@@ -1,4 +1,5 @@
 import { PagerFlatList, PagerContentScrollView } from '../components/PlatformPager';
+import { loadCompetitionPlayerStats } from '../services/competitionPlayerStats';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
@@ -143,6 +144,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     
     // Flags to prevent redundant re-fetching when switching tabs
     const playersLoadedRef = useRef(false);
+    const playersRequestRef = useRef(0);
+    const [playersError, setPlayersError] = useState(false);
     const matchesLoadedRef = useRef(false);
     
     const [tournamentData, setTournamentData] = useState<any>(tournament);
@@ -214,8 +217,15 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const dataScope = isTournamentRoute ? 'tournament' : 'league';
     const CACHE_KEY = `tournament_detail_v3_${dataScope}_${currentTournamentId}`;
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-    const PLAYERS_CACHE_KEY = `tournament_players_v4_${dataScope}_${currentTournamentId}`;
+    const PLAYERS_CACHE_KEY = `tournament_players_v6_${tournamentData?.is_tournament || isTournamentRoute ? 'tournament' : 'league'}_${currentTournamentId}`;
     const MATCHES_CACHE_KEY = `tournament_matches_v3_${dataScope}_${currentTournamentId}`;
+
+    useEffect(() => {
+        playersLoadedRef.current = false;
+        setTopPlayers([]);
+        setPlayersError(false);
+        return () => { playersRequestRef.current += 1; };
+    }, [PLAYERS_CACHE_KEY]);
 
     // Preserve string tournament IDs as well as numeric IDs for Supabase queries.
     const toDatabaseId = (value: any): string | number | null => {
@@ -945,41 +955,26 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     // 2. Fetch Players specifically for this tournament's teams and calculate exact stats
     const fetchTournamentPlayers = async (force = false, teamsList?: any[]) => {
         if (!force && playersLoadedRef.current && topPlayers.length > 0) return;
+        const request = ++playersRequestRef.current;
         setIsLoadingPlayers(true);
+        setPlayersError(false);
         try {
             const currentTeams = (teamsList && teamsList.length > 0) 
                 ? teamsList 
                 : ((standings && standings.length > 0) ? standings : teams);
             const teamIds = (currentTeams || []).map((t: any) => t.teamId || t.id || t._id).filter(Boolean);
-            if (teamIds.length > 0) {
+            {
                 const teamIdsSet = new Set(teamIds.map(String));
                 const isRealTournament = Boolean(tournamentData?.is_tournament || isTournamentRoute);
                 const tournamentId = toDatabaseId(tournamentData?.id || currentTournamentId);
-                let matchesQuery = supabase
-                    .from('matches')
-                    .select('id, home_team_id, away_team_id, home_formation, away_formation, status')
-                    .or('status.eq.finished,status.eq.completed');
-
-                if (isRealTournament && tournamentId !== null) {
-                    matchesQuery = matchesQuery.eq('tournament_id', tournamentId);
-                }
-
-                const [{ data: rawPlayers, error: pErr }, { data: matchesData, error: mErr }] = await Promise.all([
-                    supabase.from('applications')
-                        .select('*')
-                        .eq('status', 'approved')
-                        .in('team_id', teamIds),
-                    matchesQuery
-                ]);
-
-                if (pErr) console.warn('Supabase applications fetch error:', pErr);
-                if (mErr) console.warn('Supabase matches fetch error:', mErr);
-
-                const playersList = (rawPlayers || []).filter((p: any) => {
-                    const st = String(p.status || '').toLowerCase().trim();
-                    const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
-                    return !isArchived && st === 'approved';
+                const result = await loadCompetitionPlayerStats({
+                    tournament: isRealTournament, id: tournamentId,
+                    name: String(tournamentData?.name || tournamentName || ''),
+                    organizationId: tournamentData?.organization_id, teamIds,
                 });
+                if (request !== playersRequestRef.current) return;
+                const playersList = result.players;
+                const matchesData = result.matches;
                 const playerIds = playersList.map((p: any) => p.id);
 
                 let eventsMap: Record<string, any> = {};
@@ -993,22 +988,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
                 // 1. Process match events (goals, assists, cards)
                 if (playerIds.length > 0) {
-                    const tournamentMatchIds = (matchesData || []).map((match: any) => match.id).filter(Boolean);
-                    let eventsData: any[] = [];
-
-                    if (!isRealTournament || tournamentMatchIds.length > 0) {
-                        let eventsQuery = supabase
-                            .from('match_events')
-                            .select('player_id, match_id, event_type')
-                            .in('player_id', playerIds);
-
-                        if (isRealTournament) {
-                            eventsQuery = eventsQuery.in('match_id', tournamentMatchIds);
-                        }
-
-                        const { data } = await eventsQuery;
-                        eventsData = data || [];
-                    }
+                    const eventsData = result.events;
 
                     (eventsData || []).forEach((e: any) => {
                         const pid = String(e.player_id);
@@ -1023,7 +1003,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         }
 
                         const type = String(e.event_type || '').toLowerCase();
-                        if (type === 'goal') eventsMap[pid].goals += 1;
+                        if (type === 'goal' || type === 'penalty_goal') eventsMap[pid].goals += 1;
                         else if (type === 'assist') eventsMap[pid].assists += 1;
                         else if (type.includes('yellow')) eventsMap[pid].yellowCards += 1;
                         else if (type.includes('red')) eventsMap[pid].redCards += 1;
@@ -1071,7 +1051,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 });
 
                 const teamsMap: Record<string, string> = {};
-                (teams || standings || []).forEach((t: any) => {
+                result.teams.forEach((t: any) => {
                     const tid = String(t.teamId || t.id || t._id);
                     teamsMap[tid] = t.name || t.teamName || 'Jamoa';
                 });
@@ -1117,13 +1097,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         timestamp: Date.now()
                     }));
                 } catch (e) {}
-            } else {
-                setTopPlayers([]);
             }
         } catch (err) {
-            console.error('Error fetching league players:', err);
+            if (request === playersRequestRef.current) { setPlayersError(true); setTopPlayers([]); }
+            console.error('Error fetching competition players:', err);
         } finally {
-            setIsLoadingPlayers(false);
+            if (request === playersRequestRef.current) setIsLoadingPlayers(false);
         }
     };
 
@@ -1213,6 +1192,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     // Lazy Loading Tab Handler — only fetch if not already loaded
     useEffect(() => {
         if (!currentTournamentId) return;
+        let cancelled = false;
 
         if (activeTab === 'players') {
             // Try loading cached players first
@@ -1220,6 +1200,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 (async () => {
                     try {
                         const raw = await AsyncStorage.getItem(PLAYERS_CACHE_KEY);
+                        if (cancelled) return;
                         if (raw) {
                             const parsed = JSON.parse(raw);
                             const age = Date.now() - (parsed.timestamp || 0);
@@ -1230,7 +1211,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                             }
                         }
                     } catch (e) {}
-                    fetchTournamentPlayers(false, standings);
+                    if (!cancelled) fetchTournamentPlayers(false, standings);
                 })();
             }
         } else if (activeTab === 'matches') {
@@ -1252,7 +1233,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 })();
             }
         }
-    }, [activeTab, currentTournamentId, standings]);
+        return () => { cancelled = true; playersRequestRef.current += 1; };
+    }, [activeTab, currentTournamentId, standings, PLAYERS_CACHE_KEY]);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'Belgilanmagan';
@@ -2030,6 +2012,9 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     </Animated.View>
                 </View>
 
+                {playersError && <TouchableOpacity onPress={() => fetchTournamentPlayers(true, standings)} style={{ padding: 16 }}>
+                    <Text style={{ color: homeColors.textPrimary }}>{t('tournaments.stats_load_failed', "Statistikani yuklab bo‘lmadi. Qayta urinish")}</Text>
+                </TouchableOpacity>}
                 {isLoadingPlayers ? (
                     <PlayerListSkeleton />
                 ) : (
