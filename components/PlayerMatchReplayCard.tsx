@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Platform } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -52,6 +52,7 @@ function SingleReplayPlayer({ replay }: { replay: ReplayEvent }) {
 
   const togglePlay = async () => {
     if (!videoRef.current) return;
+    try {
     if (isPlaying) {
       await videoRef.current.pauseAsync();
       setIsPlaying(false);
@@ -59,13 +60,14 @@ function SingleReplayPlayer({ replay }: { replay: ReplayEvent }) {
       await videoRef.current.playAsync();
       setIsPlaying(true);
     }
+    } catch { setIsPlaying(false); setVideoError(true); setLoading(false); }
   };
 
   return (
     <View style={styles.videoBox}>
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={Colors.primary || '#00FF66'} />
+          <ActivityIndicator size="large" color={Colors.primary || '#E85002'} />
         </View>
       )}
 
@@ -79,6 +81,7 @@ function SingleReplayPlayer({ replay }: { replay: ReplayEvent }) {
         isLooping={true}
         useNativeControls={true}
         onLoad={() => setLoading(false)}
+        onPlaybackStatusUpdate={status => { if (status.isLoaded) setIsPlaying(status.isPlaying); }}
         onError={() => { setLoading(false); setIsPlaying(false); setVideoError(true); }}
       />
 
@@ -138,12 +141,12 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
 
   return (
     <View style={styles.container}>
-      <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+      {Platform.OS === 'ios' && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
 
       {/* Header Info */}
       <View style={styles.topHeaderRow}>
         <View style={styles.leagueBadge}>
-          <Ionicons name="trophy-outline" size={12} color="#00FF66" />
+          <Ionicons name="trophy-outline" size={12} color="#E85002" />
           <Text style={styles.leagueBadgeText}>
             {[league, round].filter(Boolean).join(' • ') || t('replays.match_replay', "O'YIN REPLAYI")}
           </Text>
@@ -157,7 +160,7 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
           </View>
         ) : (
           <View style={styles.singleGoalPill}>
-            <Ionicons name="football" size={11} color="#00FF66" />
+            <Ionicons name="football" size={11} color="#E85002" />
             <Text style={styles.singleGoalPillText}>
               {currentReplay.minute ? `${currentReplay.minute}'-${t('common.minute_short', 'daqiqa')}` : t('stories.goal', 'Gol')}
             </Text>
@@ -258,9 +261,9 @@ export default function PlayerMatchReplayCard({ match, replays, playerName }: Pl
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 20,
+    borderRadius: Platform.OS === 'android' ? 12 : 16,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: '#141414',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 16,
@@ -276,8 +279,8 @@ const styles = StyleSheet.create({
   leagueBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 255, 102, 0.1)',
-    borderColor: 'rgba(0, 255, 102, 0.25)',
+    backgroundColor: 'rgba(232, 80, 2, 0.1)',
+    borderColor: 'rgba(232, 80, 2, 0.25)',
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -285,7 +288,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   leagueBadgeText: {
-    color: '#00FF66',
+    color: '#E85002',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -305,8 +308,8 @@ const styles = StyleSheet.create({
   singleGoalPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 255, 102, 0.12)',
-    borderColor: 'rgba(0, 255, 102, 0.3)',
+    backgroundColor: 'rgba(232, 80, 2, 0.12)',
+    borderColor: 'rgba(232, 80, 2, 0.3)',
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 3.5,
@@ -314,13 +317,14 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   singleGoalPillText: {
-    color: '#00FF66',
+    color: '#E85002',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   tabsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 14,
     paddingBottom: 10,
     gap: 8,
@@ -333,12 +337,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 5,
+    minHeight: 44,
+    alignItems: 'center',
     borderRadius: 8,
     gap: 5,
   },
   goalTabBtnActive: {
-    backgroundColor: '#00FF66',
-    borderColor: '#00FF66',
+    backgroundColor: '#E85002',
+    borderColor: '#E85002',
   },
   goalTabText: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -387,7 +393,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderColor: 'rgba(0, 255, 102, 0.4)',
+    borderColor: 'rgba(232, 80, 2, 0.4)',
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 4,
@@ -396,7 +402,7 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   videoMinuteText: {
-    color: '#00FF66',
+    color: '#E85002',
     fontSize: 11.5,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -440,13 +446,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: 'rgba(0, 255, 102, 0.1)',
-    borderColor: 'rgba(0, 255, 102, 0.3)',
+    backgroundColor: 'rgba(232, 80, 2, 0.1)',
+    borderColor: 'rgba(232, 80, 2, 0.3)',
     borderWidth: 1,
     marginHorizontal: 10,
   },
   scoreText: {
-    color: '#00FF66',
+    color: '#E85002',
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1,

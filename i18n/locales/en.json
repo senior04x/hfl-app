@@ -453,6 +453,10 @@
     "light_mode_sub": "Classic white background and crisp colors"
   },
   "stats": {
+    "match_league": "League",
+    "match_tournament": "Tournament",
+    "no_goal_videos": "No goal videos yet",
+    "goals_short": "goals",
     "title": "Statistics",
     "tab_profile": "PROFILE",
     "tab_card": "CARD",

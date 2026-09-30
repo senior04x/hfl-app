@@ -453,6 +453,10 @@
     "light_mode_sub": "Klassik oq fon va yorqin ranglar"
   },
   "stats": {
+    "match_league": "Liga",
+    "match_tournament": "Turnir",
+    "no_goal_videos": "Gol videolari hali mavjud emas",
+    "goals_short": "gol",
     "title": "Statistika",
     "tab_profile": "PROFIL",
     "tab_card": "KARTA",

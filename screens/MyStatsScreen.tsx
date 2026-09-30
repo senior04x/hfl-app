@@ -35,7 +35,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import SmartImage from '../components/SmartImage';
 import { useAuthStore } from '../store/useAuthStore';
-import PlayerMatchReplayCard from '../components/PlayerMatchReplayCard';
+import PlayerReplayHistory from '../components/PlayerReplayHistory';
 import FifaPlayerCard, { FifaCardSkeleton } from '../components/FifaPlayerCard';
 import PlayerComparisonModal from '../components/PlayerComparisonModal';
 import { aiScoutService, PlayerAiStats } from '../services/aiScoutService';
@@ -1266,14 +1266,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     {replaysLoading ? (
                         <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 20 }} />
                     ) : (
-                        groupedMatches.map((group: any, idx: number) => (
-                            <PlayerMatchReplayCard
-                                key={group.match?.id || idx}
-                                match={group.match}
-                                replays={group.replays}
-                                playerName={playerNameFull}
-                            />
-                        ))
+                        <PlayerReplayHistory groups={groupedMatches} isDark={isDark} playerName={playerNameFull} active={currentTabIndex === 1} />
                     )}
                 </View>
             )}

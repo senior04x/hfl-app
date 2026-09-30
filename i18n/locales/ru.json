@@ -453,6 +453,10 @@
     "light_mode_sub": "Классический белый фон и яркие цвета"
   },
   "stats": {
+    "match_league": "Лига",
+    "match_tournament": "Турнир",
+    "no_goal_videos": "Видео голов пока нет",
+    "goals_short": "гол",
     "title": "Статистика",
     "tab_profile": "ПРОФИЛЬ",
     "tab_card": "КАРТА",

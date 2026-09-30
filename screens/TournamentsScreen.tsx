@@ -90,6 +90,9 @@ const TournamentsHeader = ({
 
     const orgLogo = activeOrg?.logo_url || activeOrg?.logo || activeOrg?.photo_url;
     const currentLeagueLogoSource = getLeagueLogoSource(selectedLeague);
+    const bannerCandidate = selectedLeague?.bg_image || selectedLeague?.export_bg_url || selectedLeague?.banner_url;
+    const bannerUri = typeof bannerCandidate === 'string' && bannerCandidate.startsWith('https://') ? bannerCandidate : null;
+    const [failedBanner, setFailedBanner] = useState<string | null>(null);
 
     const cardSurfaceStyle = {
         backgroundColor: isDark ? homeColors.background : '#FFFFFF',
@@ -180,7 +183,11 @@ const TournamentsHeader = ({
                 activeOpacity={0.85}
             >
                 <View style={styles.leagueCardCenteredContent}>
-                    <View style={[styles.largeLogoWrapper, { backgroundColor: 'transparent', borderWidth: 0 }]}>
+                    <View style={[styles.largeLogoWrapper, { backgroundColor: 'transparent', borderWidth: 0, overflow: 'hidden' }]}>
+                        {bannerUri && failedBanner !== bannerUri && <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                            <Image source={{ uri: bannerUri }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setFailedBanner(bannerUri)} />
+                            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)' }]} />
+                        </View>}
                         {isLeaguesLoading && !selectedLeague ? (
                             <Skeleton width={180} height={80} borderRadius={10} />
                         ) : currentLeagueLogoSource ? (
