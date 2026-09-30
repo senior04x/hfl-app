@@ -402,15 +402,36 @@ export const apiService = {
                 }
                 const { data: rawTeams, error } = await query;
                 if (error) throw error;
-                if (!rawTeams) return [];
+                if (!rawTeams?.length) return [];
 
-            // Fetch finished matches to compute points dynamically
-            const { data: finishedMatches } = await supabase
-                .from('matches')
-                .select('*')
-                .eq('status', 'finished');
-
-            const matchesList = finishedMatches || [];
+            // Keep requests bounded and fetch only matches needed by these teams.
+            const teamIds = [...new Set(rawTeams.map((team: any) => String(team.id)))];
+            const matchesById = new Map<string, any>();
+            const matchPageSize = 500;
+            for (let start = 0; start < teamIds.length; start += 100) {
+                const ids = teamIds.slice(start, start + 100)
+                    .map(id => `"${id.replace(/"/g, '""')}"`).join(',');
+                for (let offset = 0; ; offset += matchPageSize) {
+                    const { data, error: matchesError } = await supabase
+                        .from('matches')
+                        .select('id, home_team_id, away_team_id, home_score, away_score')
+                        .eq('status', 'finished')
+                        .or(`home_team_id.in.(${ids}),away_team_id.in.(${ids})`)
+                        .order('id')
+                        .range(offset, offset + matchPageSize - 1);
+                    if (matchesError) throw matchesError;
+                    for (const match of data || []) matchesById.set(String(match.id), match);
+                    if (!data || data.length < matchPageSize) break;
+                }
+            }
+            const matchesByTeam = new Map<string, any[]>();
+            for (const match of matchesById.values()) {
+                for (const teamId of new Set([String(match.home_team_id), String(match.away_team_id)])) {
+                    const teamMatches = matchesByTeam.get(teamId) || [];
+                    teamMatches.push(match);
+                    matchesByTeam.set(teamId, teamMatches);
+                }
+            }
 
             const teamsWithStats = rawTeams.map((t: any) => {
                 let points = parseInt(t.penalty_points || 0);
@@ -421,7 +442,7 @@ export const apiService = {
                 let gf = 0;
                 let ga = 0;
 
-                matchesList.forEach((m: any) => {
+                (matchesByTeam.get(String(t.id)) || []).forEach((m: any) => {
                     const isHome = String(m.home_team_id) === String(t.id);
                     const isAway = String(m.away_team_id) === String(t.id);
 
