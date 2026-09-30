@@ -18,6 +18,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
+import { calendarCache } from '../services/calendarCache';
+import { useOrganizationStore } from '../store/useOrganizationStore';
 import CustomRefreshControl from '../components/CustomRefreshControl';
 import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
@@ -202,6 +204,9 @@ export default function CalendarScreen({ navigation }: any) {
     const currentLang = i18n.language || 'uz';
     const { handleScroll: handleNavBarScroll } = useNavBarScroll();
     const { user } = useAuthStore();
+    const selectedOrgId = useOrganizationStore(state => state.selectedOrganizationId);
+    const userOrgId = user?.organizationId || user?.organization_id || user?.organization?.id;
+    const calendarOrgId = userOrgId && !isNaN(Number(userOrgId)) ? Number(userOrgId) : selectedOrgId || 1;
     // MyTeamScreen'dagi bilan bir xil qoida: foydalanuvchining o'z jamoasi ID'si
     const userTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
     const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
@@ -210,6 +215,8 @@ export default function CalendarScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const matchRequestRef = useRef(0);
+    const loadedScopeRef = useRef('');
+    const [loadError, setLoadError] = useState(false);
 
     // Date Picker State
     const [isDatePickerVisible, setDatePickerVisible] = useState(false);
@@ -227,7 +234,7 @@ export default function CalendarScreen({ navigation }: any) {
     useEffect(() => {
         fetchMatches();
         return () => { matchRequestRef.current += 1; };
-    }, [startDate, endDate, viewDate, currentLang, selectedTab, userTeamId]);
+    }, [startDate, endDate, viewDate, currentLang, selectedTab, userTeamId, calendarOrgId, user?.id, user?._id]);
 
     const getMatchFieldNum = (m: any): number => {
         if (!m) return 999;
@@ -285,7 +292,7 @@ export default function CalendarScreen({ navigation }: any) {
     const fetchMatches = async () => {
         const requestId = ++matchRequestRef.current;
         try {
-            setLoading(true);
+            setLoadError(false);
             
             // Format dates for local filtering
             const startLimit = new Date(viewDate.getFullYear(), viewDate.getMonth(), startDate);
@@ -298,6 +305,21 @@ export default function CalendarScreen({ navigation }: any) {
             const nextUtcDay = new Date(endLimit.toISOString().slice(0, 10));
             nextUtcDay.setUTCDate(nextUtcDay.getUTCDate() + 1);
             const dateBefore = nextUtcDay.toISOString().slice(0, 10);
+            const scope = JSON.stringify([user?.id || user?._id || 'guest', calendarOrgId,
+                selectedTab, userTeamId || '', startLimit.toISOString(), endLimit.toISOString(), currentLang]);
+            if (loadedScopeRef.current !== scope) {
+                loadedScopeRef.current = scope;
+                setCalendarData([]);
+                setDisplayData([]);
+                setLoading(true);
+                const cached = await calendarCache.read(scope);
+                if (requestId !== matchRequestRef.current) return;
+                if (cached !== null) {
+                    setCalendarData(cached);
+                    setDisplayData(cached);
+                    setLoading(false);
+                }
+            }
             const data: any[] = [];
             const pageSize = 200;
             if (selectedTab !== 'my' || userTeamId) {
@@ -374,8 +396,10 @@ export default function CalendarScreen({ navigation }: any) {
 
                 setCalendarData(formatted);
                 setDisplayData(formatted);
+                void calendarCache.write(scope, formatted);
             }
         } catch (error) {
+            if (requestId === matchRequestRef.current) setLoadError(true);
             console.error('Error fetching calendar matches:', error);
         } finally {
             if (requestId === matchRequestRef.current) {
@@ -616,6 +640,25 @@ export default function CalendarScreen({ navigation }: any) {
                 </View>
 
                 {/* Matches List */}
+                {loadError && (
+                    <View style={{ marginHorizontal: 16, marginBottom: 10, padding: 12,
+                        backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                        borderRadius: Platform.OS === 'android' ? 12 : 16,
+                        flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ flex: 1, color: homeColors.textSecondary, fontSize: 12 }}>
+                            {displayData.length > 0
+                                ? (currentLang === 'ru' ? 'Не удалось обновить. Показаны сохранённые игры.' : currentLang === 'en' ? 'Update failed. Showing saved matches.' : 'Yangilab bo‘lmadi. Saqlangan o‘yinlar ko‘rsatilmoqda.')
+                                : (currentLang === 'ru' ? 'Не удалось загрузить игры.' : currentLang === 'en' ? 'Could not load matches.' : 'O‘yinlarni yuklab bo‘lmadi.')}
+                        </Text>
+                        <TouchableOpacity onPress={onRefresh} disabled={refreshing}
+                            accessibilityRole="button"
+                            style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}>
+                            <Text style={{ color: homeColors.accent, fontWeight: '700', fontSize: 12 }}>
+                                {currentLang === 'ru' ? 'Повторить' : currentLang === 'en' ? 'Retry' : 'Qayta urinish'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
                 <FlatList
                     style={styles.listContainer}
                     data={displayData}
@@ -633,7 +676,7 @@ export default function CalendarScreen({ navigation }: any) {
                     ListEmptyComponent={
                         loading ? (
                             <CalendarSkeletonLoader isDark={isDark} />
-                        ) : (
+                        ) : loadError ? null : (
                             <View style={{ padding: 40, alignItems: 'center' }}>
                                 <Ionicons name="calendar-outline" size={48} color={homeColors.textSecondary} style={{ marginBottom: 12, opacity: 0.5 }} />
                                 <Text style={{ color: homeColors.textSecondary, fontSize: 14, fontWeight: '600' }}>{t('common.no_data')}</Text>
