@@ -45,6 +45,7 @@ import { getLocalizedPosition } from '../utils/localizationUtils';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { SlideButton } from '../components/SlideButton';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import CustomDatePickerModal from '../components/CustomDatePickerModal';
 import { isProfileUpdateForPlayer } from '../utils/profileUpdateApplication';
 
@@ -1507,7 +1508,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                 transparent={true}
                 onRequestClose={() => setShowProfileUpdateModal(false)}
             >
-                <View style={[styles.editModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+                <GestureHandlerRootView style={[styles.editModalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
                     <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                         style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
@@ -1523,7 +1524,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                             </View>
 
                             {/* Scrollable Form Body */}
-                            <PagerContentScrollView
+                            <ScrollView
                                 style={{ maxHeight: 460 }}
                                 contentContainerStyle={{ paddingBottom: 12 }}
                                 showsVerticalScrollIndicator={false}
@@ -1872,7 +1873,8 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                     </Text>
                                 </View>
 
-                                {/* Slide To Send Button inside Scrollable Form */}
+                            </ScrollView>
+                                {/* Fixed footer keeps the horizontal gesture outside the form scroll. */}
                                 <View style={{ marginTop: 12, marginBottom: 4, alignItems: 'center', width: '100%' }}>
                                     <SlideButton
                                         title={t('common.slide_to_send', 'Arizani yuborish uchun suring')}
@@ -1880,6 +1882,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         successTitle={t('common.success', 'Muvaffaqiyatli!')}
                                         onSwipeSuccess={handleSubmitProfileUpdate}
                                         hapticsEnabled={Platform.OS === 'ios'}
+                                        allowTap={false}
                                         loading={submittingUpdate}
                                         status={updateSubmitStatus}
                                         disabled={submittingUpdate}
@@ -1887,7 +1890,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         showHelperText={false}
                                     />
                                 </View>
-                            </PagerContentScrollView>
+
                         </View>
                     </KeyboardAvoidingView>
 
@@ -1902,7 +1905,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                             setIsDatePickerVisible(false);
                         }}
                     />
-                </View>
+                </GestureHandlerRootView>
             </Modal>
 
             {/* PENDING APPLICATION WARNING MODAL */}

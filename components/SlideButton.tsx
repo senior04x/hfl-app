@@ -47,6 +47,7 @@ export interface SlideButtonProps {
     onSwipeSuccess: () => void | Promise<void>;
     disabled?: boolean;
     hapticsEnabled?: boolean;
+    allowTap?: boolean;
     loading?: boolean;
     status?: SlideButtonStatus;
     onReset?: () => void;
@@ -63,6 +64,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
     onSwipeSuccess,
     disabled = false,
     hapticsEnabled = true,
+    allowTap = true,
     loading = false,
     status = 'idle',
     onReset,
@@ -259,7 +261,9 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                         <Animated.View style={[styles.labelWrapper, labelStyle]}>
                             <TouchableOpacity
                                 style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
-                                onPress={triggerSwipeAction}
+                                onPress={allowTap ? triggerSwipeAction : undefined}
+                                disabled={!allowTap}
+                                accessible={allowTap}
                                 activeOpacity={0.8}
                             >
                                 <Text style={[styles.labelText, { color: isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.75)' }]} numberOfLines={1}>
@@ -278,7 +282,9 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                                             borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)',
                                         }
                                     ]}
-                                    onPress={triggerSwipeAction}
+                                    onPress={allowTap ? triggerSwipeAction : undefined}
+                                disabled={!allowTap}
+                                accessible={allowTap}
                                     activeOpacity={0.9}
                                 >
                                     <View style={styles.iconCenterWrapper} pointerEvents="none">
