@@ -46,6 +46,7 @@ export interface SlideButtonProps {
     compact?: boolean;
     onSwipeSuccess: () => void | Promise<void>;
     disabled?: boolean;
+    hapticsEnabled?: boolean;
     loading?: boolean;
     status?: SlideButtonStatus;
     onReset?: () => void;
@@ -61,6 +62,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
     compact = false,
     onSwipeSuccess,
     disabled = false,
+    hapticsEnabled = true,
     loading = false,
     status = 'idle',
     onReset,
@@ -83,6 +85,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
     const trackWidthAnim = useSharedValue(TRACK_WIDTH);
 
     const triggerHaptics = (type: 'light' | 'medium' | 'success' | 'error') => {
+        if (!hapticsEnabled) return;
         try {
             if (type === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

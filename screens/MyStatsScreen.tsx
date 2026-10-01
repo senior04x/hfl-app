@@ -436,7 +436,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
     const handleTabPress = async (index: number) => {
         if (index === currentTabIndexRef.current) return;
         try {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (Platform.OS === 'ios') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         } catch (e) {}
         isPagerScrolling.current = true;
         currentTabIndexRef.current = index;
@@ -464,7 +464,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
         if (!url || openingInstagram) return;
         try {
             setOpeningInstagram(true);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
             const canOpen = await Linking.canOpenURL(url);
             if (canOpen) {
                 await Linking.openURL(url);
@@ -531,7 +531,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
         if (checkingPendingUpdate) return;
         try {
             setCheckingPendingUpdate(true);
-            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
+            try { if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
 
             const user = useAuthStore.getState().user;
             const playerIdStr = String(targetPlayerId || player?.id || player?._id || user?.id || user?.playerId || '');
@@ -571,7 +571,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
             // If active pending application exists -> show pending modal
             if (pendingAppFound) {
                 setCheckingPendingUpdate(false);
-                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
+                try { if (Platform.OS === 'ios') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
                 setShowPendingAppModal(true);
                 return;
             }
@@ -596,7 +596,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                     setCooldownRemainingTime(timeStr.trim());
                     setCheckingPendingUpdate(false);
-                    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
+                    try { if (Platform.OS === 'ios') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); } catch (e) {}
                     setShowCooldownModal(true);
                     return;
                 }
@@ -1325,7 +1325,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                 <TouchableOpacity
                                     style={[styles.iconBtn, cardSurface]}
                                     onPress={() => {
-                                        Haptics.selectionAsync().catch(() => {});
+                                        if (Platform.OS === 'ios') Haptics.selectionAsync().catch(() => {});
                                         setShowComparisonModal(true);
                                     }}
                                 >
@@ -1538,27 +1538,27 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         </View>
                                     </TouchableOpacity>
                                     <Text style={{ color: homeColors.textSecondary, fontSize: 11.5, marginTop: 6, fontWeight: '600' }}>
-                                        {pickerLoading ? 'Rasm yuklanmoqda...' : 'Rasmni o\'zgartirish'}
+                                        {pickerLoading ? t('profile.photo_uploading') : t('profile.change_photo')}
                                     </Text>
                                 </View>
 
                                 <View style={styles.formRow}>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Ism *</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.first_name')} *</Text>
                                         <TextInput
                                             style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                             value={updateForm.firstName}
-                                            placeholder="Ismingiz"
+                                            placeholder={t('profile.first_name_placeholder')}
                                             placeholderTextColor={homeColors.textSecondary}
                                             onChangeText={(v) => setUpdateForm(p => ({ ...p, firstName: v }))}
                                         />
                                     </View>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Familiya *</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.last_name')} *</Text>
                                         <TextInput
                                             style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                             value={updateForm.lastName}
-                                            placeholder="Familiyangiz"
+                                            placeholder={t('profile.last_name_placeholder')}
                                             placeholderTextColor={homeColors.textSecondary}
                                             onChangeText={(v) => setUpdateForm(p => ({ ...p, lastName: v }))}
                                         />
@@ -1567,17 +1567,17 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                                 <View style={styles.formRow}>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Otasining ismi</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.father_name')}</Text>
                                         <TextInput
                                             style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                             value={updateForm.fatherName}
-                                            placeholder="Sharifingiz"
+                                            placeholder={t('profile.father_name_placeholder')}
                                             placeholderTextColor={homeColors.textSecondary}
                                             onChangeText={(v) => setUpdateForm(p => ({ ...p, fatherName: v }))}
                                         />
                                     </View>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Telefon raqam *</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.phone_number')} *</Text>
                                         <View style={[
                                             styles.modalInput,
                                             {
@@ -1626,17 +1626,17 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                                 {/* 4 Positions Select (2 explicit rows, zero overlap) */}
                                 <View style={styles.formGroup}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pozitsiya (Amplua)</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.position')}</Text>
                                     <View style={{ gap: 6, marginTop: 4 }}>
                                         <View style={{ flexDirection: 'row', gap: 6 }}>
                                             {['Darvozabon', 'Himoyachi'].map((pos) => {
                                                 const isSel = updateForm.position === pos;
                                                 return (
                                                     <TouchableOpacity
-                                                        key={pos}
+                                                        key={getLocalizedPosition(pos, t)}
                                                         activeOpacity={0.7}
                                                         onPress={() => {
-                                                            try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                                            try { if (Platform.OS === 'ios') Haptics.selectionAsync().catch(() => {}); } catch (e) {}
                                                             setUpdateForm(p => ({ ...p, position: pos }));
                                                         }}
                                                         style={[
@@ -1656,7 +1656,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                                                 fontWeight: isSel ? '800' : '600'
                                                             }
                                                         ]}>
-                                                            {pos}
+                                                            {getLocalizedPosition(pos, t)}
                                                         </Text>
                                                     </TouchableOpacity>
                                                 );
@@ -1667,10 +1667,10 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                                 const isSel = updateForm.position === pos;
                                                 return (
                                                     <TouchableOpacity
-                                                        key={pos}
+                                                        key={getLocalizedPosition(pos, t)}
                                                         activeOpacity={0.7}
                                                         onPress={() => {
-                                                            try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
+                                                            try { if (Platform.OS === 'ios') Haptics.selectionAsync().catch(() => {}); } catch (e) {}
                                                             setUpdateForm(p => ({ ...p, position: pos }));
                                                         }}
                                                         style={[
@@ -1690,7 +1690,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                                                 fontWeight: isSel ? '800' : '600'
                                                             }
                                                         ]}>
-                                                            {pos}
+                                                            {getLocalizedPosition(pos, t)}
                                                         </Text>
                                                     </TouchableOpacity>
                                                 );
@@ -1701,7 +1701,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                                 <View style={styles.formRow}>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Forma (#)</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.jersey_number')}</Text>
                                         <TextInput
                                             style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                             value={updateForm.playerNumber}
@@ -1712,7 +1712,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         />
                                     </View>
                                     <View style={[styles.formGroup, { flex: 1.2 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{"Tug'ilgan sana"}</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.birth_date')}</Text>
                                         <TouchableOpacity
                                             activeOpacity={0.7}
                                             onPress={() => setIsDatePickerVisible(true)}
@@ -1729,7 +1729,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                             ]}
                                         >
                                             <Text style={{ color: updateForm.birthDate ? homeColors.textPrimary : homeColors.textSecondary, fontSize: 13.5, fontWeight: '600' }}>
-                                                {updateForm.birthDate || "Sanani tanlang"}
+                                                {updateForm.birthDate || t('profile.select_date')}
                                             </Text>
                                             <Ionicons name="calendar-outline" size={17} color={homeColors.textPrimary} />
                                         </TouchableOpacity>
@@ -1738,7 +1738,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                                 <View style={styles.formRow}>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{"Bo'yi (sm)"}</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.height')}</Text>
                                         <TextInput
                                             style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                             value={updateForm.height}
@@ -1749,7 +1749,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         />
                                     </View>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Vazni (kg)</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.weight')}</Text>
                                         <TextInput
                                             style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                             value={updateForm.weight}
@@ -1763,7 +1763,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                                 {/* Passport Series & Number (Close together + Auto-focus) */}
                                 <View style={styles.formGroup}>
-                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Pasport seriya va raqami</Text>
+                                    <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.passport_series_number')}</Text>
                                     <View style={{ flexDirection: 'row', gap: 6 }}>
                                         <TextInput
                                             style={[
@@ -1819,17 +1819,17 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
                                 <View style={styles.formRow}>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Millati / Fuqaroligi</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.citizenship')}</Text>
                                         <TextInput
                                             style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                             value={updateForm.citizenship}
-                                            placeholder="O'zbekiston"
+                                            placeholder={t('profile.citizenship_placeholder')}
                                             placeholderTextColor={homeColors.textSecondary}
                                             onChangeText={(v) => setUpdateForm(p => ({ ...p, citizenship: v }))}
                                         />
                                     </View>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
-                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>Instagram Username</Text>
+                                        <Text style={[styles.inputLabel, { color: homeColors.textSecondary }]}>{t('profile.instagram_username')}</Text>
                                         <TextInput
                                             style={[styles.modalInput, { color: homeColors.textPrimary, borderColor: homeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                             value={updateForm.instagramUsername}
@@ -1879,6 +1879,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                                         loadingTitle={t('common.loading', 'Yuborilmoqda...')}
                                         successTitle={t('common.success', 'Muvaffaqiyatli!')}
                                         onSwipeSuccess={handleSubmitProfileUpdate}
+                                        hapticsEnabled={Platform.OS === 'ios'}
                                         loading={submittingUpdate}
                                         status={updateSubmitStatus}
                                         disabled={submittingUpdate}
@@ -2000,7 +2001,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                         <TouchableOpacity
                             activeOpacity={0.8}
                             onPress={() => {
-                                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
+                                try { if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
                                 setShowPendingAppModal(false);
                             }}
                             style={{
@@ -2126,7 +2127,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                         <TouchableOpacity
                             activeOpacity={0.8}
                             onPress={() => {
-                                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
+                                try { if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
                                 setShowCooldownModal(false);
                             }}
                             style={{

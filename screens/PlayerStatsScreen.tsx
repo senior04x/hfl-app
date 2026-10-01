@@ -315,7 +315,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
         if (!url || openingInstagram) return;
         try {
             setOpeningInstagram(true);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
             const canOpen = await Linking.canOpenURL(url);
             if (canOpen) {
                 await Linking.openURL(url);
@@ -459,7 +459,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const handleTabPress = async (index: number) => {
         if (index === currentTabIndexRef.current) return;
         try {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (Platform.OS === 'ios') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         } catch (e) {}
         isPagerScrolling.current = true;
         currentTabIndexRef.current = index;
@@ -934,7 +934,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                                 <TouchableOpacity
                                     style={[styles.iconBtn, cardSurface]}
                                     onPress={() => {
-                                        Haptics.selectionAsync().catch(() => {});
+                                        if (Platform.OS === 'ios') Haptics.selectionAsync().catch(() => {});
                                         setShowComparisonModal(true);
                                     }}
                                 >
