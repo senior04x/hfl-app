@@ -117,7 +117,8 @@
     "bot_modal_sub": "raqamingizga 4 xonali tasdiqlash kodini olish uchun Telegram botimizga o'ting.",
     "bot_modal_notice": "Botda \"📱 Telefon raqamni yuborish\" tugmasini bosing.",
     "enter_code": "Kodni kiritish",
-    "phone_not_found_desc": "raqami bo'yicha hech qanday profil yoki ariza topilmadi."
+    "phone_not_found_desc": "raqami bo'yicha hech qanday profil yoki ariza topilmadi.",
+    "storage_failed": "Loginni qurilmada saqlab bo‘lmadi. Qurilma xotirasini tekshirib, qayta urinib ko‘ring."
   },
   "home": {
     "welcome": "Xush kelibsiz",

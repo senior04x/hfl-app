@@ -3,6 +3,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { clearTransferLoginStorage } from '../services/transferLoginStorage';
 
+let loginRevision = 0;
+let storageQueue: Promise<unknown> = Promise.resolve();
+const authStorage = {
+    getItem: async (key: string) => { await storageQueue; return AsyncStorage.getItem(key); },
+    setItem: (key: string, value: string) => {
+        const write = storageQueue.then(() => AsyncStorage.setItem(key, value));
+        storageQueue = write.catch(() => undefined);
+        return write;
+    },
+    removeItem: (key: string) => {
+        const remove = storageQueue.then(() => AsyncStorage.removeItem(key));
+        storageQueue = remove.catch(() => undefined);
+        return remove;
+    },
+};
+
 interface AuthState {
     isGuest: boolean;
     isAuthenticated: boolean;
@@ -11,7 +27,7 @@ interface AuthState {
     unreadCount: number;
     isChatMuted: boolean;
     setGuest: (isGuest: boolean) => void;
-    setAuth: (user: any, accounts?: any[]) => void;
+    setAuth: (user: any, accounts?: any[]) => Promise<void>;
     setUserAccounts: (accounts: any[]) => void;
     updateUser: (partialUser: any) => void;
     logout: () => void;
@@ -22,26 +38,24 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             isGuest: false,
             isAuthenticated: false,
             user: null,
             userAccounts: [],
             unreadCount: 0,
             isChatMuted: false,
-            setGuest: (isGuest) => { void clearTransferLoginStorage().catch(() => undefined); set({ isGuest, isAuthenticated: false, user: null, userAccounts: [], unreadCount: 0, isChatMuted: false }); },
-            setAuth: (user, accounts) => set((state) => {
-                let mergedAccounts = accounts && accounts.length > 0 ? accounts : state.userAccounts;
-                if (!mergedAccounts || mergedAccounts.length === 0) {
-                    mergedAccounts = user ? [user] : [];
-                }
-                return {
-                    user,
-                    isAuthenticated: true,
-                    isGuest: false,
-                    userAccounts: mergedAccounts,
-                };
-            }),
+            setGuest: (isGuest) => { loginRevision++; void clearTransferLoginStorage().catch(() => undefined); set({ isGuest, isAuthenticated: false, user: null, userAccounts: [], unreadCount: 0, isChatMuted: false }); },
+            setAuth: async (user, accounts) => {
+                const revision = ++loginRevision;
+                const state = get();
+                const mergedAccounts = accounts?.length ? accounts : state.userAccounts.length ? state.userAccounts : user ? [user] : [];
+                const next = { ...state, user, userAccounts: mergedAccounts, isAuthenticated: true, isGuest: false };
+                // Do not show an authenticated screen until the login is durable.
+                await authStorage.setItem('amatora-auth-storage', JSON.stringify({ state: next, version: 0 }));
+                if (revision !== loginRevision) return;
+                set({ user, userAccounts: mergedAccounts, isAuthenticated: true, isGuest: false });
+            },
             setUserAccounts: (accounts) => set({ userAccounts: accounts }),
             updateUser: (partialUser) => set((state) => {
                 if (!state.user) return state;
@@ -59,7 +73,7 @@ export const useAuthStore = create<AuthState>()(
                     userAccounts: updatedAccounts,
                 };
             }),
-            logout: () => { void clearTransferLoginStorage().catch(() => undefined); set({ user: null, userAccounts: [], isAuthenticated: false, isGuest: false, unreadCount: 0, isChatMuted: false }); },
+            logout: () => { loginRevision++; void clearTransferLoginStorage().catch(() => undefined); set({ user: null, userAccounts: [], isAuthenticated: false, isGuest: false, unreadCount: 0, isChatMuted: false }); },
             incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
             resetUnreadCount: () => set({ unreadCount: 0 }),
             toggleChatMute: () => set((state) => ({ isChatMuted: !state.isChatMuted })),
@@ -67,7 +81,7 @@ export const useAuthStore = create<AuthState>()(
         {
             name: 'amatora-auth-storage',
             skipHydration: true,
-            storage: createJSONStorage(() => AsyncStorage),
+            storage: createJSONStorage(() => authStorage),
         }
     )
 );

@@ -327,7 +327,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
         }
     };
 
-    const handleSwitchAccount = (acc: any) => {
+    const handleSwitchAccount = async (acc: any) => {
         try {
             if (Platform.OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
         } catch (e) {}
@@ -342,11 +342,15 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
         const currentAccounts = useAuthStore.getState().userAccounts;
         const finalAccounts = currentAccounts && currentAccounts.length > 0 ? currentAccounts : accountOptions;
 
-        setAuth({
-            ...acc,
-            organizationId: Number(orgId),
-            organization_id: Number(orgId),
-        }, finalAccounts);
+        try {
+            await setAuth({
+                ...acc,
+                organizationId: Number(orgId),
+                organization_id: Number(orgId),
+            }, finalAccounts);
+        } catch {
+            return;
+        }
         
         closeSwitcherModal();
     };

@@ -220,7 +220,7 @@ export default function WelcomeScreen({ navigation, route }: any) {
         }
     };
 
-    const performLogin = (acc: any, accountsList?: any[]) => {
+    const performLogin = async (acc: any, accountsList?: any[]) => {
         try {
             clearApiCache();
         } catch (e) {}
@@ -231,7 +231,12 @@ export default function WelcomeScreen({ navigation, route }: any) {
             ? accountsList 
             : (accountOptions.length > 0 ? accountOptions : [acc]);
             
-        setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) }, finalAccounts);
+        try {
+            await setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) }, finalAccounts);
+        } catch {
+            Alert.alert(t('common.error'), t('auth.storage_failed'));
+            return;
+        }
         setShowAccountModal(false);
         setShowBotModal(false);
         if (isTransferReentry && navigation.canGoBack()) navigation.goBack();
