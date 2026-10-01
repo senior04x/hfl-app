@@ -1360,6 +1360,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                 <ReplayVideoCard
                                     key={videoKey}
                                     id={videoKey}
+                                    posterUri={ev.replay_thumbnail_url || ev.thumbnail_url || ev.poster_url}
                                     videoUrl={ev.replay_video_url || ev.video_url || ev.replay_url}
                                     minute={ev.minute}
                                     teamName={currentTeamName}
@@ -1385,6 +1386,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                                 <ReplayVideoCard
                                     key={storageKey}
                                     id={storageKey}
+                                    posterUri={clip.thumbnail_url || clip.poster_url}
                                     videoUrl={clip.publicUrl}
                                     scorerName="Qo'shimcha video"
                                     eventType="goal"

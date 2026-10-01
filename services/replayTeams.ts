@@ -1,3 +1,4 @@
+import { loadMatchCompetitionMetadata } from './matchCompetitionMetadata';
 import { supabase } from './supabase';
 
 export async function enrichReplayTeams(events: any[]): Promise<any[]> {
@@ -8,7 +9,9 @@ export async function enrichReplayTeams(events: any[]): Promise<any[]> {
         if (error) throw error;
         (data || []).forEach(team => teams.set(String(team.id), team));
     }
-    return events.map(event => ({ ...event, match: { ...event.match,
+    const matches = [...new Map(events.filter(event => event.match).map(event => [String(event.match.id), event.match])).values()];
+    const competitions = await loadMatchCompetitionMetadata(matches).catch(() => new Map<string, any>());
+    return events.map(event => ({ ...event, match: { ...event.match, ...competitions.get(String(event.match?.id)),
         home_team: teams.get(String(event.match?.home_team_id)) || event.match?.home_team,
         away_team: teams.get(String(event.match?.away_team_id)) || event.match?.away_team,
     } }));
