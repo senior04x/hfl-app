@@ -818,6 +818,9 @@
     "error_404": "Request not found.",
     "error_409": "The status changed or a decision is already recorded. Refresh the list.",
     "error_429": "Too many attempts. Wait and try again.",
-    "error_500": "The service is temporarily unavailable. Try again later."
+    "error_500": "The service is temporarily unavailable. Try again later.",
+    "session_required": "Sign in again",
+    "session_description": "Transfers use the phone verification from sign-in. After signing in, no separate transfer code is needed.",
+    "sign_in_again": "Sign in"
   }
 }

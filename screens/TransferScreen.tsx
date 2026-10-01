@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import SmartImage from '../components/SmartImage';
-import { apiService } from '../services/apiService';
+import { restoreTransferLoginSession, revokeTransferLoginSession } from '../services/transferLoginStorage';
 import { AppTransfer, TransferActor, TransferApiError, TransferDecision, TransferDirection, TransferSession,
     clearTransferSession, getTransferSession, transferAppService } from '../services/transferAppService';
 
@@ -20,9 +20,8 @@ export default function TransferScreen({ navigation, route }: any) {
     const tr = (key: string) => t(`transfer_app.${key}`);
     const actor: TransferActor = user?.role === 'player' ? 'player' : 'captain';
     const subjectId = String(actor === 'captain' ? user?.teamId || user?.team_id || user?.id || user?._id || '' : user?.id || user?._id || '');
-    const phone = String(user?.phone || user?.phoneNumber || user?.phone_number || user?.tel || user?.captain_phone || '');
     const [session, setSession] = useState<TransferSession | null>(() => getTransferSession(actor, subjectId));
-    const [code, setCode] = useState('');
+    const [restoringSession, setRestoringSession] = useState(true);
     const [direction, setDirection] = useState<TransferDirection>('all');
     const [items, setItems] = useState<AppTransfer[]>([]);
     const [cursor, setCursor] = useState<string | null>(null);
@@ -39,7 +38,6 @@ export default function TransferScreen({ navigation, route }: any) {
     const [candidateLoading, setCandidateLoading] = useState(false);
     const [selected, setSelected] = useState<Candidate | null>(null);
     const [reason, setReason] = useState('');
-    const [cooldown, setCooldown] = useState(0);
     const [focusedId, setFocusedId] = useState<string | undefined>(route?.params?.transferId);
     const generation = useRef(0);
     const listAbort = useRef<AbortController | null>(null);
@@ -54,7 +52,7 @@ export default function TransferScreen({ navigation, route }: any) {
     const fail = useCallback((e: unknown) => {
         if (!isCurrentAccount()) return;
         const status = e instanceof TransferApiError ? e.status : 0;
-        if (status === 401 && session) { clearTransferSession(session); setSession(null); setCode(''); }
+        if (status === 401 && session) { clearTransferSession(session); void revokeTransferLoginSession(session).catch(() => undefined); setSession(null); }
         setError(t(`transfer_app.error_${[0,400,401,403,404,409,429].includes(status) ? status : 500}`));
     }, [session, t, identity]);
 
@@ -65,16 +63,18 @@ export default function TransferScreen({ navigation, route }: any) {
     useEffect(() => {
         generation.current++; listAbort.current?.abort();
         setSession(getTransferSession(actor, subjectId)); setItems([]); setCursor(null); setError(''); setNotice('');
-        setNewRequest(false); setSelected(null); setCode(''); setWindowOpen(false);
+        setNewRequest(false); setSelected(null); setWindowOpen(false);
         setCandidates([]); setCandidateCursor(null); setQuery(''); setReason('');
-        setWriteUncertain(false);
+        setWriteUncertain(false); setRestoringSession(true);
+        let active = true;
+        restoreTransferLoginSession(actor, subjectId).then(value => {
+            if (active && isCurrentAccount()) setSession(value);
+        }).catch(() => {
+            if (active && isCurrentAccount()) setSession(null);
+        }).finally(() => { if (active && isCurrentAccount()) setRestoringSession(false); });
+        return () => { active = false; };
     }, [actor, subjectId]);
     useEffect(() => { setFocusedId(route?.params?.transferId); }, [route?.params?.transferId]);
-    useEffect(() => {
-        if (!cooldown) return;
-        const timer = setTimeout(() => setCooldown(value => Math.max(0, value - 1)), 1000);
-        return () => clearTimeout(timer);
-    }, [cooldown]);
 
     const load = useCallback(async (after: string | null = null) => {
         if (!session || session.subjectId !== subjectId || session.actor !== actor) return;
@@ -179,22 +179,10 @@ export default function TransferScreen({ navigation, route }: any) {
         </View>
         {error ? <View style={styles.message}><Text style={{ color: '#EF4444' }}>{error}</Text>{session && button(t('common.retry'), () => void load(), loading || busy)}</View> : null}
         {notice ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.textSecondary }]}>{notice}</Text> : null}
-        {isGuest || !subjectId ? <Text style={[styles.message, { color: colors.textSecondary }]}>{tr('sign_in')}</Text> : !session ? <View style={styles.content}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>{tr('verify_title')}</Text>
-            <Text style={{ color: colors.textSecondary, marginVertical: 12 }}>{tr('verify_description')}</Text>
-            <TextInput value={code} onChangeText={value => setCode(value.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={4}
-                placeholder={tr('code')} placeholderTextColor={colors.textSecondary} style={inputStyle} accessibilityLabel={tr('code')} />
-            {button(cooldown ? `${tr('send_code')} · ${cooldown}` : tr('send_code'), () => void run(async () => {
-                if (!phone) throw new TransferApiError(400);
-                const data = await apiService.requestOTP(phone);
-                if (!data.success) throw new TransferApiError(400);
-                if (isCurrentAccount()) { setCooldown(60); setNotice(tr('code_sent')); }
-            }), busy || cooldown > 0 || !phone)}
-            {button(tr('verify'), () => void run(async () => {
-                const verified = await transferAppService.verify(actor, subjectId, phone, code);
-                if (isCurrentAccount()) { setSession(verified); setCode(''); }
-            }), busy || code.length !== 4, true)}
-            {busy && <ActivityIndicator color={colors.accent} />}
+        {isGuest || !subjectId ? <Text style={[styles.message, { color: colors.textSecondary }]}>{tr('sign_in')}</Text> : restoringSession ? <ActivityIndicator style={styles.message} color={colors.accent} /> : !session ? <View style={styles.content}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>{tr('session_required')}</Text>
+            <Text style={{ color: colors.textSecondary, marginVertical: 12 }}>{tr('session_description')}</Text>
+            {button(tr('sign_in_again'), () => navigation.navigate('Welcome'), false, true)}
         </View> : newRequest ? <FlatList data={candidates} keyExtractor={item => item.id} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}
             ListHeaderComponent={<View>
                 {button(t('common.back'), () => { setNewRequest(false); setSelected(null); setReason(''); }, busy)}

@@ -818,6 +818,9 @@
     "error_404": "Ariza topilmadi.",
     "error_409": "Ariza holati o‘zgargan yoki qaror allaqachon saqlangan. Ro‘yxatni yangilang.",
     "error_429": "Urinishlar ko‘paydi. Biroz kutib qayta urinib ko‘ring.",
-    "error_500": "Xizmat hozir ishlamayapti. Birozdan keyin qayta urinib ko‘ring."
+    "error_500": "Xizmat hozir ishlamayapti. Birozdan keyin qayta urinib ko‘ring.",
+    "session_required": "Tizimga qayta kiring",
+    "session_description": "Transfer uchun login paytidagi telefon tasdig‘i kerak. Qayta kirganingizdan so‘ng transferda alohida kod so‘ralmaydi.",
+    "sign_in_again": "Tizimga kirish"
   }
 }

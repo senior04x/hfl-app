@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { clearTransferSessions, installTransferSession } from './transferAppService';
+import { clearTransferSessions, clearTransferSession, getTransferSession, installTransferSession, TransferActor, TransferSession } from './transferAppService';
 
 const INDEX_KEY = 'amatora.transfer.login.index.v1';
 const keyFor = (actor: string, id: string) => `amatora.transfer.login.${actor}.${id}`;
@@ -47,4 +47,26 @@ export function saveTransferLoginSessions(input: unknown): Promise<void> {
             throw error;
         }
     });
+}
+
+export function restoreTransferLoginSession(actor: TransferActor, subjectId: string): Promise<TransferSession | null> {
+    return serial(async () => {
+        const cached = getTransferSession(actor, subjectId);
+        if (cached) return cached;
+        if (!/^[0-9a-f-]{36}$/i.test(subjectId)) return null;
+        const key = keyFor(actor, subjectId);
+        const raw = await SecureStore.getItemAsync(key);
+        if (!raw) return null;
+        try {
+            const value = JSON.parse(raw);
+            if (value.actor !== actor || value.subjectId !== subjectId) return null;
+            const session = installTransferSession(value);
+            if (!session) await SecureStore.deleteItemAsync(key);
+            return session;
+        } catch { await SecureStore.deleteItemAsync(key); return null; }
+    });
+}
+export function revokeTransferLoginSession(session: TransferSession): Promise<void> {
+    clearTransferSession(session);
+    return serial(() => SecureStore.deleteItemAsync(keyFor(session.actor, session.subjectId)));
 }
