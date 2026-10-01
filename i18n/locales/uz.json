@@ -821,6 +821,9 @@
     "error_500": "Xizmat hozir ishlamayapti. Birozdan keyin qayta urinib ko‘ring.",
     "session_required": "Tizimga qayta kiring",
     "session_description": "Transfer uchun login paytidagi telefon tasdig‘i kerak. Qayta kirganingizdan so‘ng transferda alohida kod so‘ralmaydi.",
-    "sign_in_again": "Tizimga kirish"
+    "sign_in_again": "Tizimga kirish",
+    "closed_title": "Transfer oynasi yopiq",
+    "closed_description": "Tashkilot yangi transfer arizalarini vaqtincha yopgan. O‘yinchi olish transfer oynasi ochilganda mumkin bo‘ladi. Mavjud arizalarni ko‘rishingiz mumkin.",
+    "understood": "Tushunarli"
   }
 }

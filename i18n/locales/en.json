@@ -821,6 +821,9 @@
     "error_500": "The service is temporarily unavailable. Try again later.",
     "session_required": "Sign in again",
     "session_description": "Transfers use the phone verification from sign-in. After signing in, no separate transfer code is needed.",
-    "sign_in_again": "Sign in"
+    "sign_in_again": "Sign in",
+    "closed_title": "Transfer window closed",
+    "closed_description": "The organization has temporarily closed new transfer requests. You can recruit a player when the transfer window opens. Existing requests remain available to view.",
+    "understood": "Got it"
   }
 }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, ActivityIndicator, Alert, Platform, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TextInput, Pressable, ActivityIndicator, Alert, Modal, Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,6 +35,8 @@ export default function TransferScreen({ navigation, route }: any) {
     const [writeUncertain, setWriteUncertain] = useState(false);
     const [newRequest, setNewRequest] = useState(false);
     const [windowOpen, setWindowOpen] = useState(false);
+    const [windowKnown, setWindowKnown] = useState(false);
+    const [showWindowClosed, setShowWindowClosed] = useState(false);
     const [query, setQuery] = useState('');
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [candidateCursor, setCandidateCursor] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export default function TransferScreen({ navigation, route }: any) {
     useEffect(() => {
         generation.current++; listAbort.current?.abort();
         setSession(getTransferSession(actor, subjectId)); setItems([]); setCursor(null); setError(''); setNotice('');
-        setNewRequest(false); setSelected(null); setWindowOpen(false);
+        setNewRequest(false); setSelected(null); setWindowOpen(false); setWindowKnown(false); setShowWindowClosed(false);
         setCandidates([]); setCandidateCursor(null); setQuery(''); setReason('');
         setWriteUncertain(false); setLoading(false); setCandidateLoading(false); setRestoringSession(true);
         let active = true;
@@ -90,7 +92,7 @@ export default function TransferScreen({ navigation, route }: any) {
             setItems(previous => after ? [...previous, ...data.items.filter(item => !previous.some(existing => existing.id === item.id))] : data.items);
             setCursor(data.next_cursor);
             if (!after) setWriteUncertain(false);
-            if (actor === 'captain') setWindowOpen(data.transfer_window_open === true);
+            if (actor === 'captain') { setWindowOpen(data.transfer_window_open === true); setWindowKnown(typeof data.transfer_window_open === 'boolean'); }
         } catch (e) { if (epoch === generation.current && !controller.signal.aborted) fail(e); }
         finally { if (isCurrentAccount() && epoch === generation.current) setLoading(false); }
     }, [session, direction, focusedId, fail, restoringSession, actor, subjectId]);
@@ -216,8 +218,11 @@ export default function TransferScreen({ navigation, route }: any) {
                 ListHeaderComponent={<View>
                     {focusedId && button(tr('all_requests'), () => setFocusedId(undefined))}
                     {actor === 'captain' && <>
-                        <Text style={{ color: colors.textSecondary, marginBottom: 10 }}>{tr(windowOpen ? 'window_open' : 'window_closed')}</Text>
-                        {button(tr('new_request'), () => { setDirection('incoming'); setFocusedId(undefined); setNewRequest(true); setError(''); }, !windowOpen || busy || writeUncertain, true)}
+                        {windowKnown && <Text style={{ color: colors.textSecondary, marginBottom: 10 }}>{tr(windowOpen ? 'window_open' : 'window_closed')}</Text>}
+                        {button(tr('new_request'), () => {
+                            if (!windowOpen) { setShowWindowClosed(true); return; }
+                            setDirection('incoming'); setFocusedId(undefined); setNewRequest(true); setError('');
+                        }, !windowKnown || busy || writeUncertain, windowOpen)}
                         <View style={[styles.row, { marginVertical: 14 }]}>{(['all','incoming','outgoing'] as const).map(value => <Pressable key={value}
                             onPress={() => { setDirection(value); setFocusedId(undefined); }} style={[styles.tab, { borderBottomColor: direction === value ? colors.accent : 'transparent' }]}>
                             <Text style={{ color: direction === value ? colors.accent : colors.textSecondary }}>{tr(value)}</Text></Pressable>)}</View>
@@ -225,9 +230,27 @@ export default function TransferScreen({ navigation, route }: any) {
                 </View>}
                 ListEmptyComponent={!loading && !error ? <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 30 }}>{tr('empty')}</Text> : null}
                 ListFooterComponent={loading ? <ActivityIndicator color={colors.accent} /> : cursor ? button(t('common.show_more'), () => void load(cursor), busy) : null} />}
+        <Modal visible={showWindowClosed} transparent animationType="fade" onRequestClose={() => setShowWindowClosed(false)}>
+            <View style={styles.modalOverlay}>
+                <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setShowWindowClosed(false)} />
+                <View accessibilityViewIsModal style={[styles.modalCard, surface]}>
+                    <View style={[styles.modalIcon, { backgroundColor: isDark ? 'rgba(232,80,2,0.14)' : 'rgba(232,80,2,0.08)' }]}>
+                        <Ionicons name="lock-closed-outline" size={28} color={colors.accent} />
+                    </View>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{tr('closed_title')}</Text>
+                    <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{tr('closed_description')}</Text>
+                    {button(tr('understood'), () => setShowWindowClosed(false), false, true)}
+                </View>
+            </View>
+        </Modal>
     </SafeAreaView>;
 }
 const styles = StyleSheet.create({
+    modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.65)' },
+    modalCard: { width: '100%', maxWidth: 400, padding: 24, borderWidth: 1, borderRadius: Platform.OS === 'android' ? 12 : 20 },
+    modalIcon: { width: 60, height: 60, borderRadius: 30, alignSelf: 'center', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+    modalTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 12 },
+    modalDescription: { fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 20 },
     container: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: 1 },
     back: { width: 44, height: 52, justifyContent: 'center' }, heading: { fontSize: 20, fontWeight: '700' },
     content: { padding: 16, gap: 12, paddingBottom: 40 }, message: { padding: 16, gap: 10 }, flex: { flex: 1 },
