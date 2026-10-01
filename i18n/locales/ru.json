@@ -832,5 +832,14 @@
     "accept": "Принять",
     "player_details": "Информация об игроке",
     "shirt_number": "Номер игрока"
+  },
+  "ratingPrompt": {
+    "title": "Как вам AMATORA?",
+    "description": "Оцените свой опыт. Ваш отзыв поможет улучшить приложение.",
+    "face": "Настроение на {{count}} звёзд",
+    "star": "{{count}} звёзд",
+    "store": "Оценить в Google Play",
+    "later": "Позже",
+    "error": "Не удалось открыть Google Play. Попробуйте ещё раз."
   }
 }

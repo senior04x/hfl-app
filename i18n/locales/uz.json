@@ -832,5 +832,14 @@
     "accept": "Qabul qilish",
     "player_details": "Futbolchi ma’lumotlari",
     "shirt_number": "Forma raqami"
+  },
+  "ratingPrompt": {
+    "title": "AMATORA sizga yoqdimi?",
+    "description": "Tajribangizni baholang. Fikringiz ilovani yaxshilashga yordam beradi.",
+    "face": "{{count}} yulduzli kayfiyat",
+    "star": "{{count}} yulduz",
+    "store": "Google Play’da baholash",
+    "later": "Keyinroq",
+    "error": "Google Play ochilmadi. Qayta urinib ko‘ring."
   }
 }

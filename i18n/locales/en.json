@@ -832,5 +832,14 @@
     "accept": "Accept",
     "player_details": "Player details",
     "shirt_number": "Shirt number"
+  },
+  "ratingPrompt": {
+    "title": "How is AMATORA?",
+    "description": "Rate your experience. Your feedback helps us improve the app.",
+    "face": "{{count}} star expression",
+    "star": "{{count}} stars",
+    "store": "Rate on Google Play",
+    "later": "Later",
+    "error": "Could not open Google Play. Please try again."
   }
 }
