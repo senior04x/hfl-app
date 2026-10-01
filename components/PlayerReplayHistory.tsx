@@ -18,15 +18,15 @@ export default function PlayerReplayHistory({ groups, isDark, playerName, active
             const date = new Date(group.match.match_date || group.match.date);
             const dateLabel = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' });
             return <View key={id}>
-                <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: opened === id }} onPress={() => setOpened(opened === id ? null : id)} style={{ minHeight: 64, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 0.5, borderTopColor: colors.border }}>
-                    <Ionicons name="play-circle-outline" size={28} color={colors.accent} />
+                <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: opened === id }} onPress={() => setOpened(opened === id ? null : id)} style={{ minHeight: 64, paddingHorizontal: 12, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 0.5, borderTopColor: colors.border }}>
+                    <Ionicons name="play-circle-outline" size={24} color={colors.accent} />
                     <View style={{ flex: 1 }}><ReplayMatchHeader match={group.match} color={colors.textPrimary} /><Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4, textAlign: 'center' }}>{dateLabel} · {group.replays.length} {t('stats.goals_short', 'gol')}</Text></View>
                     <Ionicons name={opened === id ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
                 {active && opened === id && <PlayerMatchReplayCard match={group.match} replays={group.replays} playerName={playerName} ownPlayerId={ownPlayerId} />}
             </View>;
         })}
-        {!sorted.length && <Text style={{ color: colors.textSecondary, padding: 14, fontSize: 12 }}>{t('stats.no_goal_videos', 'Gol videolari hali mavjud emas')}</Text>}
+        {!sorted.length && <Text style={{ color: colors.textSecondary, paddingHorizontal: 12, paddingVertical: 14, fontSize: 12 }}>{t('stats.no_goal_videos', 'Gol videolari hali mavjud emas')}</Text>}
         {sorted.length > limit && <TouchableOpacity accessibilityRole="button" onPress={() => setLimit(value => value + 8)} style={{ minHeight: 48, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: colors.accent, fontWeight: '700' }}>{t('common.show_more', 'Ko‘proq ko‘rsatish')}</Text></TouchableOpacity>}
     </View>;
 }

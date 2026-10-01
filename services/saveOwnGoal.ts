@@ -1,3 +1,4 @@
+import { resolveAndroidReplay } from './androidReplaySource';
 import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useAuthStore } from '../store/useAuthStore';
@@ -26,7 +27,7 @@ export async function saveOwnGoal(playerId: string, uri: string): Promise<void> 
         if (!permission.granted) throw new Error('permission');
         if (!fileSystem.cacheDirectory) throw new Error('failed');
         file = `${fileSystem.cacheDirectory}amatora-goal-${Date.now()}.mp4`;
-        const result = await fileSystem.downloadAsync(uri, file);
+        const result = await fileSystem.downloadAsync(Platform.OS === 'android' ? await resolveAndroidReplay(uri) : uri, file);
         if (result.status < 200 || result.status >= 300) throw new Error('failed');
         if (!canSaveOwnGoal(playerId)) throw new Error('not_owner');
         await media.saveToLibraryAsync(result.uri);

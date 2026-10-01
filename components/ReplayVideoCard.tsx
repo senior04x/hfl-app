@@ -14,14 +14,14 @@ export default function ReplayVideoCard({ id, visible = true, posterUri, videoUr
     const colors = getHomeScreenColors(isDark);
     const cardId = id || videoUrl;
     return <View style={{ width: '100%', marginVertical: 6, borderRadius: Platform.OS === 'android' ? 12 : 16, overflow: 'hidden', backgroundColor: isDark ? '#141414' : '#FFFFFF', borderWidth: 1, borderColor: colors.border }}>
-        <View style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text style={{ color: colors.accent, fontWeight: '800', fontSize: 12 }}>{minute != null ? minute + '′' : t('replays.match_replay', 'Replay')}</Text>
-            <View style={{ flex: 1 }} />
+            
             {teamLogo && <SmartImage uri={teamLogo} style={{ width: 22, height: 22 }} contentFit="contain" />}
-            <Text numberOfLines={1} style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 11, maxWidth: '65%' }}>{formatMatchTeamName(teamName)}</Text>
+            <Text numberOfLines={1} style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 11, flex: 1, textAlign: 'right' }}>{formatMatchTeamName(teamName)}</Text>
         </View>
         <ReplayPlayer visible={visible} posterUri={posterUri} uri={videoUrl} enabled={activePlayingId === cardId} autoplay onActivate={() => onPlay?.(cardId)} onPause={() => onPause?.(cardId)} />
-        <View style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <SmartImage uri={scorerPhoto || teamLogo} style={{ width: 30, height: 30, borderRadius: 15 }} fallbackIcon="person-outline" fallbackIconSize={18} />
             <View style={{ flex: 1 }}><Text numberOfLines={1} style={{ color: scorerName ? colors.accent : colors.textPrimary, fontWeight: '700', fontSize: 12 }}>{scorerName || teamName || t('replays.team_goal', 'Jamoa goli')}</Text>
                 {assistantName && <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 11, marginTop: 3 }}>{t('replays.assist', 'Assist')} · {assistantName}</Text>}

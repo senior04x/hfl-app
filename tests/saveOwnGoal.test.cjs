@@ -11,6 +11,7 @@ function load(options = {}) {
     const out = {};
     const code = ts.transpileModule(fs.readFileSync('services/saveOwnGoal.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
     new Function('require', 'exports', code)(name => {
+        if (name === './androidReplaySource') return { resolveAndroidReplay: async uri => uri };
         if (name === 'react-native') return { Platform: { OS: 'android' } };
         if (name === 'expo-modules-core') return { requireOptionalNativeModule: () => options.native === false ? null : {} };
         if (name === '../store/useAuthStore') return { useAuthStore: { getState: () => state } };
