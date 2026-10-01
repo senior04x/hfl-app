@@ -33,7 +33,7 @@ export function saveTransferLoginSessions(input: unknown): Promise<void> {
         const keys: string[] = [];
         try {
             for (const value of input) {
-                const session = installTransferSession({ ...value, expiresAt: Date.parse(value?.expiresAt) });
+                const session = installTransferSession({ ...value, expiresAt: typeof value?.expiresAt === 'number' ? value.expiresAt : Date.parse(value?.expiresAt) });
                 if (!session) continue;
                 const key = keyFor(session.actor, session.subjectId);
                 if (!keys.includes(key)) keys.push(key);

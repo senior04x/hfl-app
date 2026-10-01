@@ -37,3 +37,7 @@ test('expired saved credentials are discarded on restoration',async()=>{
  const key=[...values.keys()].find(k=>k.includes('.player.'));values.set(key,JSON.stringify({...item,expiresAt:Date.now()-1}));
  assert.equal(await out.restoreTransferLoginSession('player',item.subjectId),null);assert.equal(values.has(key),false);
 });
+
+test('backend numeric expiry is accepted',async()=>{
+ const {out,cache}=setup();await out.saveTransferLoginSessions([{...item,expiresAt:Date.now()+60000}]);assert.equal(cache.size,1);
+});
