@@ -58,12 +58,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         socket.on('connect_error', (error) => {
-            console.error('🔌 Socket.IO connection error (Likely JWT Auth Failure):', error.message);
-            // Token expiry or invalid auth handling
+            setIsConnected(false);
+            // A chat transport failure is not proof that the app login is invalid.
+            // Protected APIs retain their own authorization/session checks.
             if (error.message.includes('Authentication') || error.message.includes('token') || error.message.includes('jwt')) {
-                console.warn('🔒 Force logging out due to auth failure');
-                useAuthStore.getState().logout();
+                socket.disconnect();
             }
+
         });
 
         // Global unread listener

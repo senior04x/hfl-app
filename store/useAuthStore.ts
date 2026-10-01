@@ -66,6 +66,7 @@ export const useAuthStore = create<AuthState>()(
         }),
         {
             name: 'amatora-auth-storage',
+            skipHydration: true,
             storage: createJSONStorage(() => AsyncStorage),
         }
     )

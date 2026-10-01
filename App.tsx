@@ -8,7 +8,7 @@ if (typeof global !== 'undefined' && (global as any).ErrorUtils) {
 
 import 'expo-dev-client';
 import React from 'react';
-import { StyleSheet, Platform, Text, Linking } from 'react-native';
+import { StyleSheet, Platform, Text, Linking, View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
@@ -70,11 +70,19 @@ export const navigationRef = createNavigationContainerRef();
 
 function App() {
     const { isAuthenticated, isGuest, user } = useAuthStore();
+    const [authRestored, setAuthRestored] = React.useState(false);
+    React.useEffect(() => {
+        let disposed = false;
+        Promise.resolve(useAuthStore.persist.rehydrate()).finally(() => {
+            if (!disposed) setAuthRestored(true);
+        });
+        return () => { disposed = true; };
+    }, []);
     const [isSplashVisible, setIsSplashVisible] = React.useState(Platform.OS !== 'web');
     const pendingTransferLink = React.useRef<string | null>(null);
     const canOpenTransferLink = React.useRef(false);
     canOpenTransferLink.current = isAuthenticated && !isGuest;
-    React.useEffect(() => { if (!isAuthenticated) clearTransferSessions(); }, [isAuthenticated]);
+    React.useEffect(() => { if (authRestored && !isAuthenticated) clearTransferSessions(); }, [authRestored, isAuthenticated]);
     const flushTransferLink = React.useCallback(() => {
         const transferId = pendingTransferLink.current;
         if (!transferId || !canOpenTransferLink.current || !navigationRef.isReady()) return;
@@ -108,7 +116,7 @@ function App() {
     }, []);
 
     React.useEffect(() => {
-        if (Platform.OS === 'web') return;
+        if (!authRestored || Platform.OS === 'web') return;
 
         const setupNotifications = async () => {
             try {
@@ -187,7 +195,7 @@ function App() {
         return () => {
             responseListener.remove();
         };
-    }, [isAuthenticated, user]);
+    }, [authRestored, isAuthenticated, user]);
 
     if (isSplashVisible) {
         return (
@@ -197,6 +205,10 @@ function App() {
                 }} 
             />
         );
+    }
+
+    if (!authRestored) {
+        return <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator color={Colors.primary} /></View>;
     }
 
     return (
