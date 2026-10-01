@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
 
-// Temporary visual QA mode: disable before the Play Store release.
-const RATING_TEST_MODE = true;
+// Normal cadence: third authenticated visit, then respect dismissal cooldown.
+const RATING_TEST_MODE = false;
 const EMOJIS = ['😞', '🙁', '😐', '🙂', '😄'];
 const KEY = '@amatora_rating_prompt_v1';
 const MONTH = 30 * 24 * 60 * 60 * 1000;
