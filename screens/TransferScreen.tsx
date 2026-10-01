@@ -37,6 +37,7 @@ export default function TransferScreen({ navigation, route }: any) {
     const [windowOpen, setWindowOpen] = useState(false);
     const [windowKnown, setWindowKnown] = useState(false);
     const [showWindowClosed, setShowWindowClosed] = useState(false);
+    const [pendingDecision, setPendingDecision] = useState<{ item: AppTransfer; decision: TransferDecision } | null>(null);
     const [query, setQuery] = useState('');
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [candidateCursor, setCandidateCursor] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export default function TransferScreen({ navigation, route }: any) {
     useEffect(() => {
         generation.current++; listAbort.current?.abort();
         setSession(getTransferSession(actor, subjectId)); setItems([]); setCursor(null); setError(''); setNotice('');
-        setNewRequest(false); setSelected(null); setWindowOpen(false); setWindowKnown(false); setShowWindowClosed(false);
+        setNewRequest(false); setSelected(null); setWindowOpen(false); setWindowKnown(false); setShowWindowClosed(false); setPendingDecision(null);
         setCandidates([]); setCandidateCursor(null); setQuery(''); setReason('');
         setWriteUncertain(false); setLoading(false); setCandidateLoading(false); setRestoringSession(true);
         let active = true;
@@ -127,15 +128,18 @@ export default function TransferScreen({ navigation, route }: any) {
         finally { operation.current = false; if (mounted.current) setBusy(false); }
     };
     const decide = (item: AppTransfer, decision: TransferDecision) => {
-        Alert.alert(tr(decision === 'approved' ? 'approve' : 'reject'), tr('decision_confirm'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: tr('confirm'), style: decision === 'rejected' ? 'destructive' : 'default', onPress: () => void run(async () => {
-                if (!session) return;
-                await transferAppService.decide(session, item, decision);
-                if (!isCurrentAccount()) return;
-                setNotice(tr('decision_saved')); await load();
-            }, true) },
-        ]);
+        if (busy || writeUncertain || !session) return;
+        setPendingDecision({ item, decision });
+    };
+    const submitDecision = () => {
+        if (!pendingDecision || !session || busy || writeUncertain) return;
+        const { item, decision } = pendingDecision;
+        void run(async () => {
+            await transferAppService.decide(session, item, decision);
+            if (!isCurrentAccount()) return;
+            setPendingDecision(null);
+            setNotice(tr('decision_saved')); await load();
+        }, true);
     };
     const button = (label: string, action: () => void, disabled = false, accent = false) => <Pressable
         accessibilityRole="button" disabled={disabled} onPress={action}
@@ -230,6 +234,25 @@ export default function TransferScreen({ navigation, route }: any) {
                 </View>}
                 ListEmptyComponent={!loading && !error ? <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 30 }}>{tr('empty')}</Text> : null}
                 ListFooterComponent={loading ? <ActivityIndicator color={colors.accent} /> : cursor ? button(t('common.show_more'), () => void load(cursor), busy) : null} />}
+        <Modal visible={pendingDecision !== null} transparent animationType="fade" onRequestClose={() => { if (!busy) setPendingDecision(null); }}>
+            <View style={styles.modalOverlay}>
+                <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={t('common.cancel')} disabled={busy} onPress={() => setPendingDecision(null)} />
+                <View accessibilityViewIsModal style={[styles.modalCard, surface]}>
+                    <View style={[styles.modalIcon, { backgroundColor: isDark ? 'rgba(232,80,2,0.14)' : 'rgba(232,80,2,0.08)' }]}>
+                        <Ionicons name={pendingDecision?.decision === 'approved' ? 'checkmark-circle-outline' : 'close-circle-outline'} size={28} color={colors.accent} />
+                    </View>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{tr(pendingDecision?.decision === 'approved' ? 'accept' : 'reject')}</Text>
+                    <Text style={[styles.modalDescription, { color: colors.textPrimary }]}>{pendingDecision?.item.player_name}</Text>
+                    <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{tr('decision_confirm')}</Text>
+                    {error ? <Text accessibilityLiveRegion="polite" style={{ color: '#EF4444', marginBottom: 12 }}>{error}</Text> : null}
+                    <View style={styles.row}>
+                        <View style={styles.flex}>{button(t('common.cancel'), () => setPendingDecision(null), busy)}</View>
+                        <View style={styles.flex}>{button(tr(pendingDecision?.decision === 'approved' ? 'accept' : 'reject'), submitDecision, busy || writeUncertain, true)}</View>
+                    </View>
+                    {busy && <ActivityIndicator color={colors.accent} style={{ marginTop: 12 }} />}
+                </View>
+            </View>
+        </Modal>
         <Modal visible={showWindowClosed} transparent animationType="fade" onRequestClose={() => setShowWindowClosed(false)}>
             <View style={styles.modalOverlay}>
                 <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setShowWindowClosed(false)} />
