@@ -6,7 +6,6 @@ import {
     TouchableOpacity,
     ScrollView,
     ActivityIndicator,
-    SafeAreaView,
     RefreshControl,
     Modal,
     Animated,
@@ -15,6 +14,7 @@ import {
     PanResponder,
     StatusBar
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -35,10 +35,6 @@ export default function ApplicationsScreen({ navigation, route }: any) {
     const { t, i18n } = useTranslation();
     const currentLang = i18n?.language || 'uz';
 
-    const [appTab, setAppTab] = useState<'transfers' | 'profile'>(
-        route?.params?.initialTab === 'transfers' ? 'transfers' : 'profile'
-    );
-    const [userTransfers, setUserTransfers] = useState<any[]>([]);
     const [userProfileApps, setUserProfileApps] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -47,10 +43,6 @@ export default function ApplicationsScreen({ navigation, route }: any) {
     // Detail Modal State
     const [selectedApp, setSelectedApp] = useState<any>(null);
     const [selectedAppType, setSelectedAppType] = useState<'transfer' | 'profile'>('profile');
-
-    useEffect(() => {
-        if (route?.params?.initialTab === 'transfers') setAppTab('transfers');
-    }, [route?.params?.initialTab, route?.params?.transferId]);
 
     // Interactive Swipe to Back Animation
     const swipeBackAnim = useRef(new Animated.Value(0)).current;
@@ -137,12 +129,6 @@ export default function ApplicationsScreen({ navigation, route }: any) {
             const targetPlayerId = String(user?.id || user?._id || user?.playerId || '');
             const rawPhone = String(user?.phone || user?.phoneNumber || user?.phone_number || user?.tel || '').trim();
             const cleanPhone = rawPhone.replace(/\D/g, '');
-
-            // 1. Fetch transfers
-            if (targetPlayerId) {
-                const transfers = await apiService.getPlayerTransfers(targetPlayerId).catch(() => []);
-                setUserTransfers(transfers || []);
-            }
 
             // 2. Fetch applications directly from supabase with complete relations
             const { data: allApps, error: appErr } = await supabase
@@ -290,7 +276,7 @@ export default function ApplicationsScreen({ navigation, route }: any) {
             ]}
             {...(Platform.OS === 'ios' ? swipeBackPanResponder.panHandlers : {})}
         >
-            <SafeAreaView style={{ flex: 1, backgroundColor: homeColors.background }}>
+            <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: homeColors.background }}>
                 <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
                 {/* Top Header */}
@@ -316,89 +302,6 @@ export default function ApplicationsScreen({ navigation, route }: any) {
                     <View style={{ width: 40 }} />
                 </View>
 
-                {/* 2-Tab Segmented Selector */}
-                <View style={styles.tabContainer}>
-                    <View style={[styles.tabSelectorBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', borderColor: homeColors.border }]}>
-                        <TouchableOpacity
-                            style={[
-                                styles.tabBtn,
-                                appTab === 'profile' && {
-                                    backgroundColor: BRAND_ORANGE,
-                                    shadowColor: '#000000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.15,
-                                    shadowRadius: 4,
-                                    elevation: 2,
-                                }
-                            ]}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                                try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
-                                setAppTab('profile');
-                            }}
-                        >
-                            <Ionicons
-                                name="person"
-                                size={14}
-                                color={appTab === 'profile' ? '#FFFFFF' : homeColors.textSecondary}
-                                style={{ marginRight: 6 }}
-                            />
-                            <Text
-                                style={[
-                                    styles.tabBtnText,
-                                    {
-                                        color: appTab === 'profile'
-                                            ? '#FFFFFF'
-                                            : homeColors.textSecondary,
-                                        fontWeight: appTab === 'profile' ? '800' : '600'
-                                    }
-                                ]}
-                            >
-                                {t('applications.profile_tab', 'Profil arizalari')} ({userProfileApps.length})
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.tabBtn,
-                                appTab === 'transfers' && {
-                                    backgroundColor: BRAND_ORANGE,
-                                    shadowColor: '#000000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.15,
-                                    shadowRadius: 4,
-                                    elevation: 2,
-                                }
-                            ]}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                                try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
-                                setAppTab('transfers');
-                            }}
-                        >
-                            <Ionicons
-                                name="swap-horizontal"
-                                size={15}
-                                color={appTab === 'transfers' ? '#FFFFFF' : homeColors.textSecondary}
-                                style={{ marginRight: 6 }}
-                            />
-                            <Text
-                                style={[
-                                    styles.tabBtnText,
-                                    {
-                                        color: appTab === 'transfers'
-                                            ? '#FFFFFF'
-                                            : homeColors.textSecondary,
-                                        fontWeight: appTab === 'transfers' ? '800' : '600'
-                                    }
-                                ]}
-                            >
-                                {t('applications.transfers_tab', 'Transferlar')} ({userTransfers.length})
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
                 {/* Content List */}
                 {loading && !refreshing ? (
                     <View style={styles.loadingWrapper}>
@@ -422,7 +325,7 @@ export default function ApplicationsScreen({ navigation, route }: any) {
                             />
                         }
                     >
-                        {appTab === 'profile' ? (
+                        {(
                             userProfileApps.length === 0 ? (
                                 <View style={[styles.emptyBox, cardSurface]}>
                                     <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 107, 0, 0.08)' }]}>
@@ -524,82 +427,6 @@ export default function ApplicationsScreen({ navigation, route }: any) {
                                         </TouchableOpacity>
                                     );
                                 })
-                            )
-                        ) : (
-                            userTransfers.length === 0 ? (
-                                <View style={[styles.emptyBox, cardSurface]}>
-                                    <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 107, 0, 0.08)' }]}>
-                                        <Ionicons name="swap-horizontal-outline" size={40} color={BRAND_ORANGE} />
-                                    </View>
-                                    <Text style={[styles.emptyTitleText, { color: homeColors.textPrimary }]}>
-                                        {t('applications.transfer_apps_empty', 'Transfer arizalari topilmadi')}
-                                    </Text>
-                                    <Text style={[styles.emptySubText, { color: homeColors.textSecondary }]}>
-                                        {t('applications.transfer_apps_empty_sub', "Sizda hozircha jamoalararo o'tish arizalari mavjud emas.")}
-                                    </Text>
-                                </View>
-                            ) : (
-                                userTransfers.map((item: any, idx: number) => (
-                                    <TouchableOpacity
-                                        key={item.id || idx}
-                                        activeOpacity={0.82}
-                                        style={[styles.applicationCard, cardSurface]}
-                                        onPress={() => {
-                                            try { Haptics.selectionAsync().catch(() => {}); } catch (e) {}
-                                            setSelectedApp(item);
-                                            setSelectedAppType('transfer');
-                                        }}
-                                    >
-                                        <View style={styles.cardHeaderRow}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
-                                                <View style={[styles.appIconWrapper, { backgroundColor: isDark ? 'rgba(255, 107, 0, 0.15)' : 'rgba(255, 107, 0, 0.1)' }]}>
-                                                    <Ionicons name="swap-horizontal" size={18} color={BRAND_ORANGE} />
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={[styles.appTypeSubtitle, { color: homeColors.textSecondary }]}>
-                                                        {t('nav.transfers', 'Transfer')}
-                                                    </Text>
-                                                    <View style={styles.transferRoute}>
-                                                        <Text style={[styles.appNameTitle, styles.transferTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                            {item.old_team_name || 'Eski jamoa'}
-                                                        </Text>
-                                                        <Ionicons name="arrow-forward" size={14} color={homeColors.textSecondary} style={styles.transferRouteArrow} />
-                                                        <Text style={[styles.appNameTitle, styles.transferTeamName, { color: homeColors.textPrimary }]} numberOfLines={1}>
-                                                            {item.new_team_name || 'Yangi jamoa'}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                            {renderStatusBadge(item.status)}
-                                        </View>
-
-                                        {item.reason ? (
-                                            <View style={[styles.transferReasonChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderColor: homeColors.border }]}>
-                                                <Text style={[styles.reasonLabelText, { color: homeColors.textSecondary }]}>
-                                                    {t('applications.reason', "O'tish sababi")}:
-                                                </Text>
-                                                <Text style={[styles.reasonContentText, { color: homeColors.textPrimary }]} numberOfLines={2}>
-                                                    "{item.reason}"
-                                                </Text>
-                                            </View>
-                                        ) : null}
-
-                                        <View style={[styles.cardFooterRow, { borderTopColor: homeColors.border }]}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <Ionicons name="calendar-outline" size={13} color={homeColors.textSecondary} style={{ marginRight: 5 }} />
-                                                <Text style={[styles.dateText, { color: homeColors.textSecondary }]}>
-                                                    {formatDate(item.created_at)}
-                                                </Text>
-                                            </View>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Text style={[styles.detailsLinkText, { color: BRAND_ORANGE }]}>
-                                                    {t('common.details', 'Batafsil')}
-                                                </Text>
-                                                <Ionicons name="chevron-forward" size={13} color={BRAND_ORANGE} />
-                                            </View>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))
                             )
                         )}
                     </ScrollView>
