@@ -26,7 +26,7 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
   const storage = useRef({ visits: 0, next: 0, done: false });
 
   useEffect(() => {
-    if (!enabled || Platform.OS !== 'android') return;
+    if (!enabled || (Platform.OS !== 'android' && !(RATING_TEST_MODE && Platform.OS === 'ios'))) return;
     let disposed = false;
     const hide = AppState.addEventListener('change', state => {
       if (state !== 'active') setVisible(false);
@@ -96,7 +96,7 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
           <Text style={[styles.description, { color: colors.textMuted }]}>{t('ratingPrompt.description')}</Text>
           <View style={styles.stars}>{[1, 2, 3, 4, 5].map(value => <Pressable key={value} accessibilityRole="button" accessibilityLabel={t('ratingPrompt.star', { count: value })} accessibilityState={{ selected: value === rating }} onPress={() => setRating(value)} style={styles.star}><Ionicons name={value <= rating ? 'star' : 'star-outline'} size={34} color="#E85002"/></Pressable>)}</View>
           {error && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{t('ratingPrompt.error')}</Text>}
-          <Pressable accessibilityRole="button" disabled={opening} onPress={() => { void openStore(); }} style={[styles.button, { opacity: opening ? 0.6 : 1 }]}><Text style={styles.buttonText}>{t('ratingPrompt.store')}</Text></Pressable>
+          {Platform.OS === 'android' && <Pressable accessibilityRole="button" disabled={opening} onPress={() => { void openStore(); }} style={[styles.button, { opacity: opening ? 0.6 : 1 }]}><Text style={styles.buttonText}>{t('ratingPrompt.store')}</Text></Pressable>}
           <Pressable accessibilityRole="button" onPress={() => { void dismiss(); }} style={styles.later}><Text style={{ color: colors.textMuted }}>{t('ratingPrompt.later')}</Text></Pressable>
         </ScrollView>
       </View>
