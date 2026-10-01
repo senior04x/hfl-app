@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, ActivityIndicator, Alert, Modal, Platform, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TextInput, Pressable, ActivityIndicator, Modal, Platform, StyleSheet, ScrollView, KeyboardAvoidingView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,13 +8,16 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import SmartImage from '../components/SmartImage';
+import { SlideButton } from '../components/SlideButton';
+import { getLocalizedPosition } from '../utils/localizationUtils';
 import { restoreTransferLoginSession, revokeTransferLoginSession } from '../services/transferLoginStorage';
 import { AppTransfer, TransferActor, TransferApiError, TransferDecision, TransferDirection, TransferSession,
     clearTransferSession, getTransferSession, transferAppService } from '../services/transferAppService';
 
-type Candidate = { id: string; first_name: string; last_name: string; team_name: string; photo_url?: string; has_pending?: boolean };
+type Candidate = { id: string; first_name: string; last_name: string; team_name: string; photo_url?: string; player_number?: number | string; position?: string; team_logo?: string; has_pending?: boolean };
 export default function TransferScreen({ navigation, route }: any) {
     const { user, isGuest } = useAuthStore();
+    const { height: windowHeight } = useWindowDimensions();
     const { isDark } = useThemeStore();
     const colors = getHomeScreenColors(isDark);
     const { t, i18n } = useTranslation();
@@ -192,26 +195,13 @@ export default function TransferScreen({ navigation, route }: any) {
             <Text style={[styles.title, { color: colors.textPrimary }]}>{tr('session_required')}</Text>
             <Text style={{ color: colors.textSecondary, marginVertical: 12 }}>{tr('session_description')}</Text>
             {button(tr('sign_in_again'), () => navigation.navigate('Welcome', { transferReentry: true, phone: user?.phone || user?.phoneNumber || user?.phone_number || user?.tel || user?.captain_phone || '' }), false, true)}
-        </View> : newRequest ? <FlatList data={candidates} keyExtractor={item => item.id} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}
+        </View> : newRequest ? <FlatList data={candidates} keyExtractor={item => item.id} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} scrollEnabled={!selected}
             ListHeaderComponent={<View>
                 {button(t('common.back'), () => { setNewRequest(false); setSelected(null); setReason(''); }, busy)}
                 <Text style={[styles.title, { color: colors.textPrimary, marginVertical: 12 }]}>{tr('new_request')}</Text>
                 <TextInput value={query} onChangeText={setQuery} placeholder={tr('search_player')} placeholderTextColor={colors.textSecondary} style={inputStyle} maxLength={80} />
-                {selected && <View style={[styles.card, surface]}>
-                    <Text style={[styles.title, { color: colors.textPrimary }]}>{selected.first_name} {selected.last_name}</Text>
-                    <Text style={{ color: colors.textSecondary }}>{selected.team_name}</Text>
-                    <TextInput value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={tr('reason')}
-                        placeholderTextColor={colors.textSecondary} style={[inputStyle, { minHeight: 80, marginVertical: 12 }]} />
-                    {button(tr('send_request'), () => Alert.alert(tr('new_request'), tr('request_confirm'), [
-                        { text: t('common.cancel'), style: 'cancel' }, { text: tr('confirm'), onPress: () => void run(async () => {
-                            await transferAppService.request(session, selected.id, reason);
-                            if (!isCurrentAccount()) return;
-                            setNewRequest(false); setSelected(null); setReason(''); setNotice(tr('request_sent')); await load();
-                        }, true) },
-                    ]), busy || writeUncertain || !reason.trim() || !windowOpen, true)}
-                </View>}
             </View>}
-            renderItem={({ item }) => <Pressable disabled={busy || item.has_pending} onPress={() => setSelected(item)} style={[styles.card, surface, { opacity: item.has_pending ? 0.5 : 1 }]}>
+            renderItem={({ item }) => <Pressable disabled={busy || item.has_pending} onPress={() => { setReason(''); setError(''); setSelected(item); }} style={[styles.card, surface, { opacity: item.has_pending ? 0.5 : 1 }]}>
                 <Text style={[styles.title, { color: colors.textPrimary }]}>{item.first_name} {item.last_name}</Text>
                 <Text style={{ color: colors.textSecondary }}>{item.team_name}{item.has_pending ? ` · ${tr('existing_request')}` : ''}</Text>
             </Pressable>}
@@ -234,6 +224,41 @@ export default function TransferScreen({ navigation, route }: any) {
                 </View>}
                 ListEmptyComponent={!loading && !error ? <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 30 }}>{tr('empty')}</Text> : null}
                 ListFooterComponent={loading ? <ActivityIndicator color={colors.accent} /> : cursor ? button(t('common.show_more'), () => void load(cursor), busy) : null} />}
+        <Modal visible={selected !== null && newRequest} transparent animationType="fade" onRequestClose={() => { if (!busy) setSelected(null); }}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+                <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={t('common.close')} disabled={busy} onPress={() => setSelected(null)} />
+                <View accessibilityViewIsModal style={[styles.modalCard, surface, { maxHeight: Math.max(240, windowHeight - 100) }]}>
+                    <View style={[styles.row, { marginBottom: 16 }]}>
+                        <Text style={[styles.title, styles.flex, { color: colors.textPrimary }]}>{tr('player_details')}</Text>
+                        <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} disabled={busy} onPress={() => setSelected(null)} style={{ padding: 10 }}>
+                            <Ionicons name="close" size={24} color={colors.textPrimary} />
+                        </Pressable>
+                    </View>
+                    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
+                        <SmartImage uri={selected?.photo_url} style={styles.playerPhoto} contentFit="cover" fallbackIcon="person-outline" />
+                        <Text style={[styles.modalTitle, { color: colors.textPrimary, marginTop: 16 }]}>{selected?.first_name} {selected?.last_name}</Text>
+                        <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{tr('shirt_number')}: {selected?.player_number ?? '—'}</Text>
+                        <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{selected?.position ? getLocalizedPosition(selected.position, t) : '—'}</Text>
+                        <View style={[styles.row, { justifyContent: 'center', marginBottom: 20 }]}>
+                            {selected?.team_logo && <SmartImage uri={selected.team_logo} style={styles.teamLogo} contentFit="contain" fallbackIcon="shield-outline" />}
+                            <Text style={{ color: colors.textPrimary, flexShrink: 1 }}>{selected?.team_name}</Text>
+                        </View>
+                        <TextInput value={reason} onChangeText={setReason} editable={!busy} multiline maxLength={1000} placeholder={tr('reason')}
+                            placeholderTextColor={colors.textSecondary} style={[inputStyle, { minHeight: 80 }]} />
+                        {error ? <Text accessibilityLiveRegion="polite" style={{ color: '#EF4444' }}>{error}</Text> : null}
+                    </ScrollView>
+                    <SlideButton key={selected?.id} compact title={t('common.slide_to_send')} loading={busy} status={busy ? 'loading' : error ? 'error' : 'idle'}
+                        disabled={busy || writeUncertain || !reason.trim() || !windowOpen || !session}
+                        onReset={() => setError('')}
+                        onSwipeSuccess={() => run(async () => {
+                            if (!session || !selected || !windowOpen) return;
+                            await transferAppService.request(session, selected.id, reason);
+                            if (!isCurrentAccount()) return;
+                            setNewRequest(false); setSelected(null); setReason(''); setNotice(tr('request_sent')); await load();
+                        }, true)} />
+                </View>
+            </KeyboardAvoidingView>
+        </Modal>
         <Modal visible={pendingDecision !== null} transparent animationType="fade" onRequestClose={() => { if (!busy) setPendingDecision(null); }}>
             <View style={styles.modalOverlay}>
                 <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={t('common.cancel')} disabled={busy} onPress={() => setPendingDecision(null)} />
@@ -269,6 +294,7 @@ export default function TransferScreen({ navigation, route }: any) {
     </SafeAreaView>;
 }
 const styles = StyleSheet.create({
+    playerPhoto: { width: 96, height: 96, borderRadius: 16, alignSelf: 'center' },
     modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.65)' },
     modalCard: { width: '100%', maxWidth: 400, padding: 24, borderWidth: 1, borderRadius: Platform.OS === 'android' ? 12 : 20 },
     modalIcon: { width: 60, height: 60, borderRadius: 30, alignSelf: 'center', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },

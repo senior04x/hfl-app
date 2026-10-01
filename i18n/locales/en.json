@@ -825,6 +825,8 @@
     "closed_title": "Transfer window closed",
     "closed_description": "The organization has temporarily closed new transfer requests. You can recruit a player when the transfer window opens. Existing requests remain available to view.",
     "understood": "Got it",
-    "accept": "Accept"
+    "accept": "Accept",
+    "player_details": "Player details",
+    "shirt_number": "Shirt number"
   }
 }
