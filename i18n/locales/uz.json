@@ -118,7 +118,8 @@
     "bot_modal_notice": "Botda \"📱 Telefon raqamni yuborish\" tugmasini bosing.",
     "enter_code": "Kodni kiritish",
     "phone_not_found_desc": "raqami bo'yicha hech qanday profil yoki ariza topilmadi.",
-    "storage_failed": "Loginni qurilmada saqlab bo‘lmadi. Qurilma xotirasini tekshirib, qayta urinib ko‘ring."
+    "storage_failed": "Loginni qurilmada saqlab bo‘lmadi. Quyidagi kodni qo‘llab-quvvatlash xizmatiga yuboring.",
+    "storage_diagnostic": "Diagnostika kodi: {{code}}"
   },
   "home": {
     "welcome": "Xush kelibsiz",

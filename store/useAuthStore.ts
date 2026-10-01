@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { AuthStorageFailure, authStorageDiagnostic } from '../utils/authStorageDiagnostic';
 import { clearTransferLoginStorage } from '../services/transferLoginStorage';
 
 let loginRevision = 0;
@@ -52,7 +53,11 @@ export const useAuthStore = create<AuthState>()(
                 const mergedAccounts = accounts?.length ? accounts : state.userAccounts.length ? state.userAccounts : user ? [user] : [];
                 const next = { ...state, user, userAccounts: mergedAccounts, isAuthenticated: true, isGuest: false };
                 // Do not show an authenticated screen until the login is durable.
-                await authStorage.setItem('amatora-auth-storage', JSON.stringify({ state: next, version: 0 }));
+                let payload: string;
+                try { payload = JSON.stringify({ state: next, version: 0 }); }
+                catch (error) { throw new AuthStorageFailure(authStorageDiagnostic(error, 'serialize')); }
+                try { await authStorage.setItem('amatora-auth-storage', payload); }
+                catch (error) { throw new AuthStorageFailure(authStorageDiagnostic(error)); }
                 if (revision !== loginRevision) return;
                 set({ user, userAccounts: mergedAccounts, isAuthenticated: true, isGuest: false });
             },

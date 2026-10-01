@@ -1,3 +1,4 @@
+import { safeAuthStorageCode } from '../utils/authStorageDiagnostic';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -233,8 +234,8 @@ export default function WelcomeScreen({ navigation, route }: any) {
             
         try {
             await setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) }, finalAccounts);
-        } catch {
-            Alert.alert(t('common.error'), t('auth.storage_failed'));
+        } catch (error) {
+            Alert.alert(t('common.error'), t('auth.storage_failed') + '\n\n' + t('auth.storage_diagnostic', { code: safeAuthStorageCode(error) }));
             return;
         }
         setShowAccountModal(false);

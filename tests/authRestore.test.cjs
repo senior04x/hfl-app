@@ -2,11 +2,16 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
+function diagnostic() {
+  const out = {};
+  new Function('exports', ts.transpileModule(fs.readFileSync('utils/authStorageDiagnostic.ts','utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText)(out);
+  return out;
+}
 function load(values, customStorage) {
   const storage = { getItem: async k => values.get(k) || null, setItem: async (k,v) => { values.set(k,v); }, removeItem: async k => { values.delete(k); } };
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync('store/useAuthStore.ts','utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
-  new Function('require','exports',code)(name => name === '@react-native-async-storage/async-storage' ? (customStorage || storage) : name === '../services/transferLoginStorage' ? { clearTransferLoginStorage: async () => {} } : require(name), exports);
+  new Function('require','exports',code)(name => name === '@react-native-async-storage/async-storage' ? (customStorage || storage) : name === '../services/transferLoginStorage' ? { clearTransferLoginStorage: async () => {} } : name === '../utils/authStorageDiagnostic' ? diagnostic() : require(name), exports);
   return exports.useAuthStore;
 }
 test('cold restart restores the selected account and logout stays logged out', async () => {
@@ -43,7 +48,15 @@ test('a slow login write finishes before authenticated navigation is enabled', a
 });
 test('failed storage does not claim a successful login', async () => {
   const store = load(new Map(), { getItem: async () => null, setItem: async () => { throw Error('disk full'); }, removeItem: async () => {} });
-  await assert.rejects(store.getState().setAuth({ id: 'unsaved' }), /disk full/);
+  await assert.rejects(store.getState().setAuth({ id: 'unsaved' }), /AUTH-DISK-FULL/);
   assert.equal(store.getState().isAuthenticated, false);
   assert.equal(store.getState().user, null);
+});
+
+test('diagnostic codes never disclose native error contents', () => {
+ const d = diagnostic();
+ assert.equal(d.authStorageDiagnostic(new Error('SQLite database is locked: secret')), 'AUTH-DB-LOCKED');
+ assert.equal(d.authStorageDiagnostic(new Error('secret phone token')), 'AUTH-WRITE-UNKNOWN');
+ assert.equal(d.safeAuthStorageCode(new Error('secret phone token')), 'AUTH-WRITE-UNKNOWN');
+ assert.equal(d.authStorageDiagnostic(new Error('circular secret'), 'serialize'), 'AUTH-SERIALIZE');
 });

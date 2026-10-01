@@ -118,7 +118,8 @@
     "bot_modal_notice": "In the bot, tap the \"📱 Send phone number\" button.",
     "enter_code": "Enter code",
     "phone_not_found_desc": "no profile or application found for this number.",
-    "storage_failed": "Could not save your login on this device. Check available storage and try again."
+    "storage_failed": "Could not save your login on this device. Send the code below to support.",
+    "storage_diagnostic": "Diagnostic code: {{code}}"
   },
   "home": {
     "welcome": "Welcome",
