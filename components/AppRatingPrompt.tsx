@@ -25,7 +25,6 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
   useEffect(() => {
     if (!enabled || Platform.OS !== 'android') return;
     let disposed = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const hide = AppState.addEventListener('change', state => { if (state !== 'active') setVisible(false); });
     void AccessibilityInfo.isReduceMotionEnabled().then(value => { reduced.current = value; }).catch(() => {});
     void (async () => {
@@ -36,10 +35,10 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
         storage.current = { visits: (Number(saved.visits) || 0) + 1, next: Number(saved.next) || 0, done: saved.done === true };
         await AsyncStorage.setItem(KEY, JSON.stringify(storage.current));
         if (disposed || storage.current.done || storage.current.visits < 3 || Date.now() < storage.current.next) return;
-        timer = setTimeout(() => { if (!disposed && AppState.currentState === 'active') setVisible(true); }, 180000);
+        if (AppState.currentState === 'active') setVisible(true);
       } catch { /* A persistence failure must not produce repeated prompts. */ }
     })();
-    return () => { disposed = true; if (timer) clearTimeout(timer); hide.remove(); setVisible(false); };
+    return () => { disposed = true; hide.remove(); setVisible(false); };
   }, [enabled]);
 
   useEffect(() => {
