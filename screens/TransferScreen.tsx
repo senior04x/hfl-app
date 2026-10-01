@@ -68,7 +68,7 @@ export default function TransferScreen({ navigation, route }: any) {
         setSession(getTransferSession(actor, subjectId)); setItems([]); setCursor(null); setError(''); setNotice('');
         setNewRequest(false); setSelected(null); setWindowOpen(false);
         setCandidates([]); setCandidateCursor(null); setQuery(''); setReason('');
-        setWriteUncertain(false); setRestoringSession(true);
+        setWriteUncertain(false); setLoading(false); setCandidateLoading(false); setRestoringSession(true);
         let active = true;
         restoreTransferLoginSession(actor, subjectId).then(value => {
             if (active && isCurrentAccount()) setSession(value);
@@ -80,7 +80,7 @@ export default function TransferScreen({ navigation, route }: any) {
     useEffect(() => { setFocusedId(route?.params?.transferId); }, [route?.params?.transferId]);
 
     const load = useCallback(async (after: string | null = null) => {
-        if (!session || session.subjectId !== subjectId || session.actor !== actor) return;
+        if (restoringSession || !session || session.subjectId !== subjectId || session.actor !== actor) return;
         const epoch = ++generation.current;
         listAbort.current?.abort(); const controller = new AbortController(); listAbort.current = controller;
         setLoading(true); setError('');
@@ -93,7 +93,7 @@ export default function TransferScreen({ navigation, route }: any) {
             if (actor === 'captain') setWindowOpen(data.transfer_window_open === true);
         } catch (e) { if (epoch === generation.current && !controller.signal.aborted) fail(e); }
         finally { if (isCurrentAccount() && epoch === generation.current) setLoading(false); }
-    }, [session, direction, focusedId, fail]);
+    }, [session, direction, focusedId, fail, restoringSession, actor, subjectId]);
     useEffect(() => { void load(); return () => { generation.current++; listAbort.current?.abort(); }; }, [load]);
 
     const findPlayers = useCallback(async (after: string | null, signal?: AbortSignal) => {
