@@ -6,7 +6,7 @@ export interface TransferConsent { party: TransferParty; decision: TransferDecis
 export interface AppTransfer {
     id: string; player_id: string; player_name: string; player_photo?: string; old_team_name: string; new_team_name: string;
     old_team_logo?: string; new_team_logo?: string; reason: string; created_at: string;
-    status: 'pending' | TransferDecision; actor_party: TransferParty; consents: TransferConsent[];
+    cancelled?: boolean; can_cancel?: boolean; status: 'pending' | TransferDecision; actor_party: TransferParty; consents: TransferConsent[];
 }
 export interface TransferSession { token: string; expiresAt: number; actor: TransferActor; subjectId: string }
 export class TransferApiError extends Error {
@@ -84,6 +84,9 @@ export const transferAppService = {
     },
     async captainPage(session: TransferSession, action: 'context' | 'players', query = '', after?: string | null, signal?: AbortSignal) {
         return post('team-transfer-page', { action, query, after: after ?? null, team_id: session.subjectId }, session.token, signal);
+    },
+    async cancel(session: TransferSession, transfer: AppTransfer) {
+        return post('cancel-transfer-app', { transfer_id: transfer.id }, session.token);
     },
     async decide(session: TransferSession, transfer: AppTransfer, decision: TransferDecision) {
         return post('transfer-consent', { transfer_id: transfer.id, party: transfer.actor_party, decision }, session.token);

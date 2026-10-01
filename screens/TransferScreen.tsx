@@ -40,7 +40,7 @@ export default function TransferScreen({ navigation, route }: any) {
     const [windowOpen, setWindowOpen] = useState(false);
     const [windowKnown, setWindowKnown] = useState(false);
     const [showWindowClosed, setShowWindowClosed] = useState(false);
-    const [pendingDecision, setPendingDecision] = useState<{ item: AppTransfer; decision: TransferDecision } | null>(null);
+    const [pendingDecision, setPendingDecision] = useState<{ item: AppTransfer; decision: TransferDecision | 'cancel' } | null>(null);
     const [query, setQuery] = useState('');
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [candidateCursor, setCandidateCursor] = useState<string | null>(null);
@@ -130,7 +130,7 @@ export default function TransferScreen({ navigation, route }: any) {
         }
         finally { operation.current = false; if (mounted.current) setBusy(false); }
     };
-    const decide = (item: AppTransfer, decision: TransferDecision) => {
+    const decide = (item: AppTransfer, decision: TransferDecision | 'cancel') => {
         if (busy || writeUncertain || !session) return;
         setPendingDecision({ item, decision });
     };
@@ -138,10 +138,11 @@ export default function TransferScreen({ navigation, route }: any) {
         if (!pendingDecision || !session || busy || writeUncertain) return;
         const { item, decision } = pendingDecision;
         void run(async () => {
-            await transferAppService.decide(session, item, decision);
+            if (decision === 'cancel') await transferAppService.cancel(session, item);
+            else await transferAppService.decide(session, item, decision);
             if (!isCurrentAccount()) return;
             setPendingDecision(null);
-            setNotice(tr('decision_saved')); await load();
+            setNotice(tr(decision === 'cancel' ? 'cancel_saved' : 'decision_saved')); await load();
         }, true);
     };
     const button = (label: string, action: () => void, disabled = false, accent = false) => <Pressable
@@ -159,7 +160,7 @@ export default function TransferScreen({ navigation, route }: any) {
                 <SmartImage uri={item.player_photo} style={styles.avatar} contentFit="cover" fallbackIcon="person-outline" />
                 <View style={styles.flex}><Text style={[styles.title, { color: colors.textPrimary }]}>{item.player_name}</Text>
                     <Text style={{ color: colors.textSecondary }}>{new Date(item.created_at).toLocaleDateString(i18n.language)}</Text></View>
-                <Text style={{ color: item.status === 'rejected' ? '#EF4444' : colors.accent, fontSize: 12, fontWeight: '700' }}>{tr(`status_${item.status}`)}</Text>
+                <Text style={{ color: item.status === 'rejected' ? '#EF4444' : colors.accent, fontSize: 12, fontWeight: '700' }}>{tr(item.cancelled ? 'status_cancelled' : `status_${item.status}`)}</Text>
             </View>
             <View style={[styles.row, { marginVertical: 14 }]}>
                 <SmartImage uri={item.old_team_logo} style={styles.teamLogo} contentFit="contain" fallbackIcon="shield-outline" />
@@ -177,6 +178,7 @@ export default function TransferScreen({ navigation, route }: any) {
                 </View>;
             })}
             {item.status === 'pending' && <Text style={{ color: colors.textSecondary, marginTop: 10 }}>{tr(rejected ? 'party_rejected' : allApproved ? 'awaiting_admin' : 'awaiting_parties')}</Text>}
+            {item.status === 'pending' && item.can_cancel && <View style={{ marginTop: 14 }}>{button(tr('cancel_request'), () => decide(item, 'cancel'), busy || writeUncertain)}</View>}
             {item.status === 'pending' && !ownDecision && !rejected && <View style={[styles.row, { marginTop: 14 }]}>
                 <View style={styles.flex}>{button(tr('reject'), () => decide(item, 'rejected'), busy || writeUncertain)}</View>
                 <View style={styles.flex}>{button(tr('approve'), () => decide(item, 'approved'), busy || writeUncertain, true)}</View>
@@ -274,13 +276,13 @@ export default function TransferScreen({ navigation, route }: any) {
                     <View style={[styles.modalIcon, { backgroundColor: isDark ? 'rgba(232,80,2,0.14)' : 'rgba(232,80,2,0.08)' }]}>
                         <Ionicons name={pendingDecision?.decision === 'approved' ? 'checkmark-circle-outline' : 'close-circle-outline'} size={28} color={colors.accent} />
                     </View>
-                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{tr(pendingDecision?.decision === 'approved' ? 'accept' : 'reject')}</Text>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{tr(pendingDecision?.decision === 'cancel' ? 'cancel_request' : pendingDecision?.decision === 'approved' ? 'accept' : 'reject')}</Text>
                     <Text style={[styles.modalDescription, { color: colors.textPrimary }]}>{pendingDecision?.item.player_name}</Text>
-                    <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{tr('decision_confirm')}</Text>
+                    <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{tr(pendingDecision?.decision === 'cancel' ? 'cancel_confirm' : 'decision_confirm')}</Text>
                     {error ? <Text accessibilityLiveRegion="polite" style={{ color: '#EF4444', marginBottom: 12 }}>{error}</Text> : null}
                     <View style={styles.row}>
                         <View style={styles.flex}>{button(t('common.cancel'), () => setPendingDecision(null), busy)}</View>
-                        <View style={styles.flex}>{button(tr(pendingDecision?.decision === 'approved' ? 'accept' : 'reject'), submitDecision, busy || writeUncertain, true)}</View>
+                        <View style={styles.flex}>{button(tr(pendingDecision?.decision === 'cancel' ? 'cancel_request' : pendingDecision?.decision === 'approved' ? 'accept' : 'reject'), submitDecision, busy || writeUncertain, true)}</View>
                     </View>
                     {busy && <ActivityIndicator color={colors.accent} style={{ marginTop: 12 }} />}
                 </View>

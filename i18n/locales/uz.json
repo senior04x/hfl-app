@@ -774,6 +774,10 @@
     "matches_in_range": "Tanlangan sanadagi o'yinlar"
   },
   "transfer_app": {
+    "cancel_request": "Transferni bekor qilish",
+    "cancel_confirm": "Transfer arizasini bekor qilasizmi? Futbolchi hozirgi jamoasida qoladi.",
+    "cancel_saved": "Transfer arizasi bekor qilindi",
+    "status_cancelled": "Bekor qilingan",
     "title": "Transferlar",
     "verify_title": "Telefonni tasdiqlash",
     "verify_description": "Transfer qarorlarini boshqarish uchun Telegram botdagi kod bilan telefoningizni tasdiqlang.",

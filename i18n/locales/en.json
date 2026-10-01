@@ -774,6 +774,10 @@
     "matches_in_range": "Matches in selected range"
   },
   "transfer_app": {
+    "cancel_request": "Cancel transfer",
+    "cancel_confirm": "Cancel this transfer request? The player will remain with their current team.",
+    "cancel_saved": "Transfer request cancelled",
+    "status_cancelled": "Cancelled",
     "title": "Transfers",
     "verify_title": "Verify your phone",
     "verify_description": "Verify your phone with a Telegram bot code to manage transfer decisions.",
