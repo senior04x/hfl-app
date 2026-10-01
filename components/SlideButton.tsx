@@ -9,7 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -120,6 +120,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
 
     // Gesture Handler Definition
     const panGesture = Gesture.Pan()
+        .enabled(!disabled && !completed && !loading)
         .activeOffsetX([-3, 3])
         .failOffsetY([-30, 30])
         .shouldCancelWhenOutside(false)
@@ -228,7 +229,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
                     : '';
 
     return (
-        <View style={styles.wrapper}>
+        <GestureHandlerRootView style={styles.wrapper}>
             <Animated.View
                 style={[
                     styles.track,
@@ -327,7 +328,7 @@ export const SlideButton: React.FC<SlideButtonProps> = ({
             {!completed && !disabled && showHelperText && (
                 <Text style={[styles.helperText, { color: homeColors.textSecondary }]}>{effectiveHelperText}</Text>
             )}
-        </View>
+        </GestureHandlerRootView>
     );
 };
 
