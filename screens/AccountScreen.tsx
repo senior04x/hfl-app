@@ -64,9 +64,9 @@ export default function AccountScreen({ navigation }: any) {
     useEffect(() => {
         let active = true;
         let generation = 0;
+        setTransferWindowOpen(false);
         const refresh = async () => {
             const epoch = ++generation;
-            setTransferWindowOpen(false);
             if (isGuest || !user || !['player', 'manager'].includes(user.role)) return;
             try {
                 let orgId = transferOrgId;
@@ -570,11 +570,6 @@ export default function AccountScreen({ navigation }: any) {
                                             icon="paper-plane-outline"
                                             title={t('profile.applications', 'Arizalar')}
                                             onPress={() => navigation.navigate('Applications')}
-                                        />
-                                        <SettingRow
-                                            icon="swap-horizontal-outline"
-                                            title={t('profile.transfer_requests', 'Transfer so\'rovlari')}
-                                            onPress={() => navigation.navigate('Applications', { initialTab: 'transfers' })}
                                         />
                                     </>
                                 )}
