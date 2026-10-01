@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, AppState, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
@@ -70,21 +70,18 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
     catch { setError(true); }
     finally { setOpening(false); }
   };
-  const smile = (face - 3) * 13;
-  const eyeHeight = 7 - Math.max(0, face - 3) * 1.8;
+  const smile = (face - 3) * 9;
+  const joy = Math.max(0, face - 3) / 2;
+  const browLift = 2 + joy * 3;
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { void dismiss(); }} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <ScrollView contentContainerStyle={styles.content} bounces={false}>
-          <Svg width={150} height={150} viewBox="0 0 160 160" accessibilityLabel={t('ratingPrompt.face', { count: rating || 3 })}>
-            <Defs><RadialGradient id="ratingFace" cx="35%" cy="25%" r="80%"><Stop offset="0" stopColor="#FFAB70"/><Stop offset="0.6" stopColor="#E85002"/><Stop offset="1" stopColor="#B83D00"/></RadialGradient></Defs>
-            <Ellipse cx={80} cy={145} rx={43} ry={6} fill="#000" opacity={0.14}/>
-            <Circle cx={80} cy={75} r={61} fill="url(#ratingFace)"/>
-            <Path d="M 36 53 Q 46 26 70 24" stroke="#FFF" strokeWidth={5} opacity={0.22} fill="none" strokeLinecap="round"/>
-            <Ellipse cx={58} cy={65} rx={5} ry={eyeHeight} fill="#231107"/>
-            <Ellipse cx={102} cy={65} rx={5} ry={eyeHeight} fill="#231107"/>
-            <Path d={`M 46 ${48 + (3 - face) * 2} Q 58 ${46 - (3 - face) * 3} 67 48 M 93 48 Q 102 ${46 - (3 - face) * 3} 114 ${48 + (3 - face) * 2}`} stroke="#231107" strokeWidth={3} fill="none" strokeLinecap="round"/>
-            <Path d={`M 52 98 Q 80 ${98 + smile} 108 98`} stroke="#231107" strokeWidth={5} fill="none" strokeLinecap="round"/>
+          <Svg width={80} height={80} viewBox="0 0 120 120" accessibilityLabel={t('ratingPrompt.face', { count: rating || 3 })}>
+            <Path d="M 29 19 Q 60 10 91 19 Q 105 24 105 43 L 105 77 Q 105 97 88 102 Q 60 110 32 102 Q 15 97 15 77 L 15 43 Q 15 24 29 19 Z" stroke="#E85002" strokeWidth={2.5} opacity={0.28} fill="none"/>
+            <Path d={`M 31 40 Q 40 ${40 - browLift} 49 40 M 71 40 Q 80 ${40 - browLift} 89 40`} stroke="#E85002" strokeWidth={3} fill="none" strokeLinecap="round"/>
+            <Path d={`M 33 ${54 + joy * 2} Q 40 ${66 - joy * 21} 47 ${54 + joy * 2} M 73 ${54 + joy * 2} Q 80 ${66 - joy * 21} 87 ${54 + joy * 2}`} stroke="#E85002" strokeWidth={3.5} fill="none" strokeLinecap="round"/>
+            <Path d={`M 37 80 Q 60 ${80 + smile} 83 80`} stroke="#E85002" strokeWidth={4} fill="none" strokeLinecap="round"/>
           </Svg>
           <Text style={[styles.title, { color: colors.text }]}>{t('ratingPrompt.title')}</Text>
           <Text style={[styles.description, { color: colors.textMuted }]}>{t('ratingPrompt.description')}</Text>
