@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
 
+// Temporary visual QA mode: disable before the Play Store release.
+const RATING_TEST_MODE = true;
+const EMOJIS = ['😞', '🙁', '😐', '🙂', '😄'];
 const KEY = '@amatora_rating_prompt_v1';
 const MONTH = 30 * 24 * 60 * 60 * 1000;
 const STORE = 'https://play.google.com/store/apps/details?id=com.amatora.mobile';
@@ -16,18 +18,23 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
   const [visible, setVisible] = useState(false);
   const [rating, setRating] = useState(0);
   const [face, setFace] = useState(3);
+  const emojiScale = useRef(new Animated.Value(1)).current;
+  const emojiOpacity = useRef(new Animated.Value(1)).current;
   const [error, setError] = useState(false);
   const [opening, setOpening] = useState(false);
-  const faceRef = useRef(3);
   const reduced = useRef(false);
   const storage = useRef({ visits: 0, next: 0, done: false });
 
   useEffect(() => {
     if (!enabled || Platform.OS !== 'android') return;
     let disposed = false;
-    const hide = AppState.addEventListener('change', state => { if (state !== 'active') setVisible(false); });
+    const hide = AppState.addEventListener('change', state => {
+      if (state !== 'active') setVisible(false);
+      else if (RATING_TEST_MODE && !disposed) setVisible(true);
+    });
     void AccessibilityInfo.isReduceMotionEnabled().then(value => { reduced.current = value; }).catch(() => {});
-    void (async () => {
+    if (RATING_TEST_MODE) setVisible(true);
+    else void (async () => {
       try {
         const raw = await AsyncStorage.getItem(KEY);
         const saved = raw ? JSON.parse(raw) : {};
@@ -43,22 +50,30 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
 
   useEffect(() => {
     const target = rating || 3;
-    if (reduced.current) { faceRef.current = target; setFace(target); return; }
-    const from = faceRef.current;
-    const start = Date.now();
-    let frame = 0;
-    const animate = () => {
-      const progress = Math.min(1, (Date.now() - start) / 280);
-      const value = from + (target - from) * (1 - Math.pow(1 - progress, 3));
-      faceRef.current = value;
-      setFace(value);
-      if (progress < 1) frame = requestAnimationFrame(animate);
-    };
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [rating]);
+    emojiScale.stopAnimation();
+    emojiOpacity.stopAnimation();
+    if (reduced.current) {
+      setFace(target); emojiScale.setValue(1); emojiOpacity.setValue(1); return;
+    }
+    const exit = Animated.parallel([
+      Animated.timing(emojiScale, { toValue: 0.8, duration: 100, useNativeDriver: true }),
+      Animated.timing(emojiOpacity, { toValue: 0, duration: 100, useNativeDriver: true }),
+    ]);
+    let enter: Animated.CompositeAnimation | undefined;
+    exit.start(({ finished }) => {
+      if (!finished) return;
+      setFace(target);
+      enter = Animated.parallel([
+        Animated.spring(emojiScale, { toValue: 1, damping: 14, stiffness: 180, mass: 0.7, useNativeDriver: true }),
+        Animated.timing(emojiOpacity, { toValue: 1, duration: 140, useNativeDriver: true }),
+      ]);
+      enter.start();
+    });
+    return () => { exit.stop(); enter?.stop(); };
+  }, [rating, emojiScale, emojiOpacity]);
 
   const dismiss = async (done = false) => {
+    if (RATING_TEST_MODE) { setVisible(false); return; }
     storage.current = { ...storage.current, next: Date.now() + MONTH, done };
     setVisible(false);
     try { await AsyncStorage.setItem(KEY, JSON.stringify(storage.current)); } catch {}
@@ -70,19 +85,13 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
     catch { setError(true); }
     finally { setOpening(false); }
   };
-  const smile = (face - 3) * 9;
-  const joy = Math.max(0, face - 3) / 2;
-  const browLift = 2 + joy * 3;
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { void dismiss(); }} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <ScrollView contentContainerStyle={styles.content} bounces={false}>
-          <Svg width={80} height={80} viewBox="0 0 120 120" accessibilityLabel={t('ratingPrompt.face', { count: rating || 3 })}>
-            <Path d="M 29 19 Q 60 10 91 19 Q 105 24 105 43 L 105 77 Q 105 97 88 102 Q 60 110 32 102 Q 15 97 15 77 L 15 43 Q 15 24 29 19 Z" stroke="#E85002" strokeWidth={2.5} opacity={0.28} fill="none"/>
-            <Path d={`M 31 40 Q 40 ${40 - browLift} 49 40 M 71 40 Q 80 ${40 - browLift} 89 40`} stroke="#E85002" strokeWidth={3} fill="none" strokeLinecap="round"/>
-            <Path d={`M 33 ${54 + joy * 2} Q 40 ${66 - joy * 21} 47 ${54 + joy * 2} M 73 ${54 + joy * 2} Q 80 ${66 - joy * 21} 87 ${54 + joy * 2}`} stroke="#E85002" strokeWidth={3.5} fill="none" strokeLinecap="round"/>
-            <Path d={`M 37 80 Q 60 ${80 + smile} 83 80`} stroke="#E85002" strokeWidth={4} fill="none" strokeLinecap="round"/>
-          </Svg>
+          <Animated.View style={{ opacity: emojiOpacity, transform: [{ scale: emojiScale }] }}>
+            <Text accessibilityLabel={t('ratingPrompt.face', { count: face })} style={styles.emoji}>{EMOJIS[face - 1]}</Text>
+          </Animated.View>
           <Text style={[styles.title, { color: colors.text }]}>{t('ratingPrompt.title')}</Text>
           <Text style={[styles.description, { color: colors.textMuted }]}>{t('ratingPrompt.description')}</Text>
           <View style={styles.stars}>{[1, 2, 3, 4, 5].map(value => <Pressable key={value} accessibilityRole="button" accessibilityLabel={t('ratingPrompt.star', { count: value })} accessibilityState={{ selected: value === rating }} onPress={() => setRating(value)} style={styles.star}><Ionicons name={value <= rating ? 'star' : 'star-outline'} size={34} color="#E85002"/></Pressable>)}</View>
@@ -99,6 +108,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   card: { width: '100%', maxWidth: 380, maxHeight: '85%', borderRadius: Platform.OS === 'android' ? 12 : 20, borderWidth: 1 },
   content: { padding: 24, alignItems: 'center', gap: 16 },
+  emoji: { fontSize: 64, lineHeight: 84, textAlign: 'center', paddingHorizontal: 8 },
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
   description: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   stars: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap' },
