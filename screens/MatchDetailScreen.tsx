@@ -1276,7 +1276,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
         // Additional storage replay clips from storage bucket replays/<org_id>/<match_id>/
         const extraStorageClips = (match?.storageReplays || []).filter((s: any) => 
-            !replayEvents.some((ev: any) => (ev.replay_video_url || '').includes(s.name))
+            !/\.android\.mp4$/i.test(String(s.name || '')) &&
+            !replayEvents.some((ev: any) => (ev.replay_video_url || ev.video_url || ev.replay_url || '').includes(s.name))
         );
 
         const hasAnyReplays = replayEvents.length > 0 || extraStorageClips.length > 0;
