@@ -1324,7 +1324,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                 {/* 1. YouTube Online Stream */}
                 {videoUrl && (
                     <View style={{ width: '100%', alignItems: 'center', marginBottom: hasAnyReplays ? 20 : 0 }}>
-                        {isYoutube ? <YoutubePlayerCard videoUrl={videoUrl} /> : <ReplayPlayer uri={videoUrl} enabled={activePlayingVideoId === 'full-match'} autoplay onActivate={() => setActivePlayingVideoId('full-match')} onPause={() => setActivePlayingVideoId(null)} />}
+                        {isYoutube ? <YoutubePlayerCard videoUrl={videoUrl} /> : <ReplayPlayer visible={activeTab === 'media'} uri={videoUrl} enabled={activePlayingVideoId === 'full-match'} autoplay onActivate={() => setActivePlayingVideoId('full-match')} onPause={() => setActivePlayingVideoId(null)} />}
                         <TouchableOpacity
                             style={styles.openYtLinkBtn}
                             activeOpacity={0.8}
@@ -1358,7 +1358,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                             const videoKey = ev.id || `replay_event_${idx}`;
 
                             return (
-                                <ReplayVideoCard
+                                <ReplayVideoCard visible={activeTab === 'media'}
                                     key={videoKey}
                                     id={videoKey}
                                     posterUri={ev.replay_thumbnail_url || ev.thumbnail_url || ev.poster_url}
@@ -1384,7 +1384,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
                         {extraStorageClips.map((clip: any, idx: number) => {
                             const storageKey = clip.id || `storage_${idx}`;
                             return (
-                                <ReplayVideoCard
+                                <ReplayVideoCard visible={activeTab === 'media'}
                                     key={storageKey}
                                     id={storageKey}
                                     posterUri={clip.thumbnail_url || clip.poster_url}
