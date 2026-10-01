@@ -46,6 +46,7 @@ import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { SlideButton } from '../components/SlideButton';
 import CustomDatePickerModal from '../components/CustomDatePickerModal';
+import { isProfileUpdateForPlayer } from '../utils/profileUpdateApplication';
 
 const { width } = Dimensions.get('window');
 
@@ -533,8 +534,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
             try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); } catch (e) {}
 
             const user = useAuthStore.getState().user;
-            const targetPhone = String(player?.phone || user?.phone || updateForm?.phone || '').trim();
-            const cleanTargetPhone = targetPhone.replace(/\D/g, '');
             const playerIdStr = String(targetPlayerId || player?.id || player?._id || user?.id || user?.playerId || '');
 
             // 1. Query applications to check for pending and latest approved/rejected requests
@@ -545,22 +544,14 @@ export default function MyStatsScreen({ route, navigation }: any) {
             try {
                 const { data: allUserApps, error: fetchErr } = await supabase
                     .from('applications')
-                    .select('id, comment, status, phone, first_name, last_name, created_at')
+                    .select('id, comment, status, created_at')
+                    .like('comment', `%[PROFILE_UPDATE]%${playerIdStr.replace(/[%_\\]/g, '\\$&')}%`)
                     .order('created_at', { ascending: false })
                     .limit(100);
 
                 if (!fetchErr && allUserApps && allUserApps.length > 0) {
                     for (const app of allUserApps) {
-                        const comment = String(app.comment || '');
-                        if (!comment.includes('[PROFILE_UPDATE]')) continue;
-
-                        const cleanAppPhone = String(app.phone || '').replace(/\D/g, '');
-                        const matchesPhone = cleanTargetPhone && cleanAppPhone && (
-                            cleanAppPhone.endsWith(cleanTargetPhone) || cleanTargetPhone.endsWith(cleanAppPhone)
-                        );
-                        const matchesId = playerIdStr && comment.includes(playerIdStr);
-
-                        if (matchesPhone || matchesId) {
+                        if (isProfileUpdateForPlayer(app.comment, playerIdStr)) {
                             const status = String(app.status || '').toLowerCase().trim();
                             if (status === 'pending' || status === 'kutilmoqda') {
                                 pendingAppFound = true;
