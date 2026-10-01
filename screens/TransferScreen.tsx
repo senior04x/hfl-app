@@ -14,7 +14,7 @@ import { restoreTransferLoginSession, revokeTransferLoginSession } from '../serv
 import { AppTransfer, TransferActor, TransferApiError, TransferDecision, TransferDirection, TransferSession,
     clearTransferSession, getTransferSession, transferAppService } from '../services/transferAppService';
 
-type Candidate = { id: string; first_name: string; last_name: string; team_name: string; photo_url?: string; player_number?: number | string; position?: string; team_logo?: string; has_pending?: boolean };
+type Candidate = { id: string; first_name: string; last_name: string; team_name: string; photo_url?: string; player_number?: number | string; position?: string; team_logo?: string; birth_date?: string; citizenship?: string; height?: string; weight?: string; has_pending?: boolean };
 export default function TransferScreen({ navigation, route }: any) {
     const { user, isGuest } = useAuthStore();
     const { height: windowHeight } = useWindowDimensions();
@@ -243,6 +243,14 @@ export default function TransferScreen({ navigation, route }: any) {
                             {selected?.team_logo && <SmartImage uri={selected.team_logo} style={styles.teamLogo} contentFit="contain" fallbackIcon="shield-outline" />}
                             <Text style={{ color: colors.textPrimary, flexShrink: 1 }}>{selected?.team_name}</Text>
                         </View>
+                        {(['birth_date', 'citizenship', 'height', 'weight'] as const).map(field => {
+                            const value = selected?.[field];
+                            if (!value) return null;
+                            return <View key={field} style={[styles.row, { paddingVertical: 6 }]}>
+                                <Text style={[styles.flex, { color: colors.textSecondary }]}>{t(`profile.${field}`)}</Text>
+                                <Text style={{ color: colors.textPrimary, flexShrink: 1 }}>{value}</Text>
+                            </View>;
+                        })}
                         <TextInput value={reason} onChangeText={setReason} editable={!busy} multiline maxLength={1000} placeholder={tr('reason')}
                             placeholderTextColor={colors.textSecondary} style={[inputStyle, { minHeight: 80 }]} />
                         {error ? <Text accessibilityLiveRegion="polite" style={{ color: '#EF4444' }}>{error}</Text> : null}
