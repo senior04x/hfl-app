@@ -2187,7 +2187,7 @@ export const apiService = {
                 body: JSON.stringify({ phone }),
             });
             const data = await res.json();
-            return data;
+            return { ...data, httpStatus: res.status };
         } catch (error: any) {
             console.error('requestOTP error:', error);
             return { success: false, reason: "Server bilan bog'lanishda xatolik yuz berdi." };

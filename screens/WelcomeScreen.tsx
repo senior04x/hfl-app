@@ -279,9 +279,11 @@ const formatPhoneInput = (val: string) => {
                 } else {
                     setShowBotModal(true);
                 }
-            } else {
+            } else if (res.code === 'PROFILE_NOT_FOUND' && res.httpStatus === 404) {
                 setNotFoundMessage(res.reason || 'Ushbu telefon raqamiga tegishli ariza yoki jamoa topilmadi.');
                 setShowNotFoundModal(true);
+            } else {
+                Alert.alert(t('common.error'), res.reason || t('common.retry'));
             }
         } catch (error: any) {
             console.error('Phone login error:', error);
