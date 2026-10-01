@@ -124,7 +124,8 @@ const ShimmerLogo = ({ visible }: { visible: boolean }) => {
 // Qo'llanma: OTP_MASTER_KOD_QOLLANMA.md (repo root)
 export const MASTER_OTP_CODE: string | null = '7777';
 
-export default function WelcomeScreen({ navigation }: any) {
+export default function WelcomeScreen({ navigation, route }: any) {
+    const isTransferReentry = route?.params?.transferReentry === true;
     const { t, i18n } = useTranslation();
     const setAuth = useAuthStore((state) => state.setAuth);
     const setGuest = useAuthStore((state) => state.setGuest);
@@ -132,9 +133,9 @@ export default function WelcomeScreen({ navigation }: any) {
     const homeColors = getHomeScreenColors(isDark);
     
     // Login Auth States
-    const [isLoginMode, setIsLoginMode] = useState(false);
+    const [isLoginMode, setIsLoginMode] = useState(isTransferReentry);
     const [loginStep, setLoginStep] = useState<'phone' | 'otp'>('phone');
-    const [phone, setPhone] = useState('');
+    const [phone, setPhone] = useState(() => isTransferReentry ? String(route?.params?.phone || '').replace(/\D/g, '').slice(-9) : '');
     const [otpCode, setOtpCode] = useState('');
 
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
@@ -233,6 +234,7 @@ export default function WelcomeScreen({ navigation }: any) {
         setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) }, finalAccounts);
         setShowAccountModal(false);
         setShowBotModal(false);
+        if (isTransferReentry && navigation.canGoBack()) navigation.goBack();
 
         // Qurilma xotirasiga telefon raqamiga bog'langan barcha akkauntlarni saqlash
         const phone = acc?.phone || acc?.phoneNumber || acc?.phone_number;
@@ -320,7 +322,7 @@ const formatPhoneInput = (val: string) => {
 
             // 🔑 Master OTP kod (faqat test uchun) — real Telegram tasdiqlashni chetlab o'tib,
             // shu telefon raqamiga tegishli akkauntlarni backend orqali topadi va kirgizadi.
-            if (MASTER_OTP_CODE && inputCode === MASTER_OTP_CODE) {
+            if (!isTransferReentry && MASTER_OTP_CODE && inputCode === MASTER_OTP_CODE) {
                 const masterRes = await apiService.findAccountsByPhone(fullPhone);
                 if (masterRes.success) {
                     const accList = masterRes.accounts || (masterRes.user ? [masterRes.user] : []);

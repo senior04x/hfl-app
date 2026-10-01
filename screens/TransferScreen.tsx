@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, FlatList, TextInput, Pressable, ActivityIndicator, Alert, Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -22,6 +23,8 @@ export default function TransferScreen({ navigation, route }: any) {
     const subjectId = String(actor === 'captain' ? user?.teamId || user?.team_id || user?.id || user?._id || '' : user?.id || user?._id || '');
     const [session, setSession] = useState<TransferSession | null>(() => getTransferSession(actor, subjectId));
     const [restoringSession, setRestoringSession] = useState(true);
+    const [focusEpoch, setFocusEpoch] = useState(0);
+    useFocusEffect(useCallback(() => { setFocusEpoch(value => value + 1); }, []));
     const [direction, setDirection] = useState<TransferDirection>('all');
     const [items, setItems] = useState<AppTransfer[]>([]);
     const [cursor, setCursor] = useState<string | null>(null);
@@ -73,7 +76,7 @@ export default function TransferScreen({ navigation, route }: any) {
             if (active && isCurrentAccount()) setSession(null);
         }).finally(() => { if (active && isCurrentAccount()) setRestoringSession(false); });
         return () => { active = false; };
-    }, [actor, subjectId]);
+    }, [actor, subjectId, focusEpoch]);
     useEffect(() => { setFocusedId(route?.params?.transferId); }, [route?.params?.transferId]);
 
     const load = useCallback(async (after: string | null = null) => {
@@ -182,7 +185,7 @@ export default function TransferScreen({ navigation, route }: any) {
         {isGuest || !subjectId ? <Text style={[styles.message, { color: colors.textSecondary }]}>{tr('sign_in')}</Text> : restoringSession ? <ActivityIndicator style={styles.message} color={colors.accent} /> : !session ? <View style={styles.content}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>{tr('session_required')}</Text>
             <Text style={{ color: colors.textSecondary, marginVertical: 12 }}>{tr('session_description')}</Text>
-            {button(tr('sign_in_again'), () => navigation.navigate('Welcome'), false, true)}
+            {button(tr('sign_in_again'), () => navigation.navigate('Welcome', { transferReentry: true, phone: user?.phone || user?.phoneNumber || user?.phone_number || user?.tel || user?.captain_phone || '' }), false, true)}
         </View> : newRequest ? <FlatList data={candidates} keyExtractor={item => item.id} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}
             ListHeaderComponent={<View>
                 {button(t('common.back'), () => { setNewRequest(false); setSelected(null); setReason(''); }, busy)}
