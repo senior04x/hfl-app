@@ -178,7 +178,12 @@
     "goal_scorer": "GOL MUALLIFI",
     "assistant": "ASSISTENT (UZATMALAR)",
     "unknown_player": "NOMA'LUM FUTBOLCHI",
-    "minute_goal_upper": "{{minute}}-DAQIQADA GOL"
+    "minute_goal_upper": "{{minute}}-DAQIQADA GOL",
+    "save_goal": "Golni galereyaga saqlash",
+    "save_success": "Gol galereyaga saqlandi",
+    "save_permission": "Saqlash uchun galereyaga ruxsat bering.",
+    "save_unavailable": "Galereyaga saqlash uchun ilovaning yangi versiyasini o‘rnating.",
+    "save_failed": "Video saqlanmadi. Internet va bo‘sh joyni tekshirib, qayta urinib ko‘ring."
   },
   "news": {
     "title": "YANGILIKLAR",

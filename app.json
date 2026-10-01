@@ -88,7 +88,8 @@
       "expo-web-browser",
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      "expo-localization"
+      "expo-localization",
+      ["expo-media-library", { "savePhotosPermission": "Save your goal videos to your gallery.", "granularPermissions": [] }]
     ],
     "experiments": {},
     "extra": {

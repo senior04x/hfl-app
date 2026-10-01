@@ -1260,7 +1260,7 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     {replaysLoading ? (
                         <ActivityIndicator color={homeColors.textPrimary} style={{ marginVertical: 20 }} />
                     ) : (
-                        <PlayerReplayHistory groups={groupedMatches} isDark={isDark} playerName={playerNameFull} active={currentTabIndex === 1} />
+                        <PlayerReplayHistory ownPlayerId={user?.role === 'player' && String(user.id || user._id) === String(targetPlayerId) ? String(targetPlayerId) : undefined} groups={groupedMatches} isDark={isDark} playerName={playerNameFull} active={currentTabIndex === 1} />
                     )}
                 </View>
             )}

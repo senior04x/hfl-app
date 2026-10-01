@@ -178,7 +178,12 @@
     "goal_scorer": "GOAL SCORER",
     "assistant": "ASSIST (PASS)",
     "unknown_player": "UNKNOWN PLAYER",
-    "minute_goal_upper": "GOAL AT {{minute}}'"
+    "minute_goal_upper": "GOAL AT {{minute}}'",
+    "save_goal": "Save goal to gallery",
+    "save_success": "Goal saved to gallery",
+    "save_permission": "Allow saving to your gallery.",
+    "save_unavailable": "Install the new app version to save to your gallery.",
+    "save_failed": "Could not save the video. Check your connection and free storage, then try again."
   },
   "news": {
     "title": "NEWS",
