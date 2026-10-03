@@ -10,7 +10,7 @@ export interface AppTransfer {
 }
 export interface TransferSession { token: string; expiresAt: number; actor: TransferActor; subjectId: string }
 export class TransferApiError extends Error {
-    constructor(public status: number) { super('Transfer request failed'); }
+    constructor(public status: number, public code?: string) { super('Transfer request failed'); }
 }
 const endpoint = 'https://xzzyhfyazwohdqqbjiiy.supabase.co/functions/v1/';
 
@@ -47,7 +47,8 @@ async function post(name: string, body: Record<string, unknown>, token?: string,
             body: JSON.stringify(body), signal: controller.signal,
         });
         const data = await response.json();
-        if (!response.ok) throw new TransferApiError(response.status);
+        if (!response.ok) throw new TransferApiError(response.status,
+            data?.code === 'TEAM_TRANSFER_PAYMENT_REQUIRED' ? data.code : undefined);
         return data;
     } catch (error) {
         if (error instanceof TransferApiError) throw error;
