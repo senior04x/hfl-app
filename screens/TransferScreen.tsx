@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, ActivityIndicator, Modal, Platform, StyleSheet, ScrollView, KeyboardAvoidingView, useWindowDimensions } from 'react-native';
+import { View, Text, FlatList, TextInput, Pressable, ActivityIndicator, Modal, Platform, StyleSheet, ScrollView, KeyboardAvoidingView, useWindowDimensions, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -40,6 +40,10 @@ export default function TransferScreen({ navigation, route }: any) {
     const [windowOpen, setWindowOpen] = useState(false);
     const [windowKnown, setWindowKnown] = useState(false);
     const [showWindowClosed, setShowWindowClosed] = useState(false);
+    const [paymentBlocked, setPaymentBlocked] = useState(false);
+    const [contactPhone, setContactPhone] = useState('');
+    const dialPhone = contactPhone.replace(/[\s().-]/g, '');
+    const canCall = /^\+?[0-9]{7,15}$/.test(dialPhone);
     const [pendingDecision, setPendingDecision] = useState<{ item: AppTransfer; decision: TransferDecision | 'cancel' } | null>(null);
     const [query, setQuery] = useState('');
     const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -61,6 +65,9 @@ export default function TransferScreen({ navigation, route }: any) {
     const fail = useCallback((e: unknown) => {
         if (!isCurrentAccount()) return;
         const status = e instanceof TransferApiError ? e.status : 0;
+        if (status === 403 && e instanceof TransferApiError && e.code === 'TEAM_TRANSFER_PAYMENT_REQUIRED') {
+            setSelected(null); setPaymentBlocked(true); setShowWindowClosed(true); return;
+        }
         if (status === 401 && session) { clearTransferSession(session); void revokeTransferLoginSession(session).catch(() => undefined); setSession(null); }
         setError(t(`transfer_app.error_${[0,400,401,403,404,409,429].includes(status) ? status : 500}`));
     }, [session, t, identity]);
@@ -73,6 +80,7 @@ export default function TransferScreen({ navigation, route }: any) {
         generation.current++; listAbort.current?.abort();
         setSession(getTransferSession(actor, subjectId)); setItems([]); setCursor(null); setError(''); setNotice('');
         setNewRequest(false); setSelected(null); setWindowOpen(false); setWindowKnown(false); setShowWindowClosed(false); setPendingDecision(null);
+        setPaymentBlocked(false); setContactPhone('');
         setCandidates([]); setCandidateCursor(null); setQuery(''); setReason('');
         setWriteUncertain(false); setLoading(false); setCandidateLoading(false); setRestoringSession(true);
         let active = true;
@@ -213,10 +221,16 @@ export default function TransferScreen({ navigation, route }: any) {
                     {focusedId && button(tr('all_requests'), () => setFocusedId(undefined))}
                     {actor === 'captain' && <>
                         {windowKnown && <Text style={{ color: colors.textSecondary, marginBottom: 10 }}>{tr(windowOpen ? 'window_open' : 'window_closed')}</Text>}
-                        {button(tr('new_request'), () => {
-                            if (!windowOpen) { setShowWindowClosed(true); return; }
+                        {button(tr('new_request'), () => void run(async () => {
+                            if (!session) return;
+                            const access = await transferAppService.captainPage(session, 'context');
+                            if (!isCurrentAccount()) return;
+                            setContactPhone(typeof access.organization_contact_phone === 'string' ? access.organization_contact_phone : '');
+                            setWindowOpen(access.transfer_window_open === true);
+                            setPaymentBlocked(access.transfer_window_open === true && access.team_transfer_allowed === false);
+                            if (access.transfer_window_open !== true || access.team_transfer_allowed === false) { setShowWindowClosed(true); return; }
                             setDirection('incoming'); setFocusedId(undefined); setNewRequest(true); setError('');
-                        }, !windowKnown || busy || writeUncertain, windowOpen)}
+                        }), !windowKnown || busy || writeUncertain, windowOpen)}
                         <View style={[styles.row, { marginVertical: 14 }]}>{(['all','incoming','outgoing'] as const).map(value => <Pressable key={value}
                             onPress={() => { setDirection(value); setFocusedId(undefined); }} style={[styles.tab, { borderBottomColor: direction === value ? colors.accent : 'transparent' }]}>
                             <Text style={{ color: direction === value ? colors.accent : colors.textSecondary }}>{tr(value)}</Text></Pressable>)}</View>
@@ -293,8 +307,12 @@ export default function TransferScreen({ navigation, route }: any) {
                     <View style={[styles.modalIcon, { backgroundColor: isDark ? 'rgba(232,80,2,0.14)' : 'rgba(232,80,2,0.08)' }]}>
                         <Ionicons name="lock-closed-outline" size={28} color={colors.accent} />
                     </View>
-                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{tr('closed_title')}</Text>
-                    <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{tr('closed_description')}</Text>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{tr(paymentBlocked ? 'payment_title' : 'closed_title')}</Text>
+                    <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{tr(paymentBlocked ? 'payment_description' : 'closed_description')}</Text>
+                    {paymentBlocked && <Text style={[styles.modalDescription, { color: colors.textPrimary }]}>{contactPhone || tr('contact_unavailable')}</Text>}
+                    {paymentBlocked && canCall && button(tr('call_organization'), () => {
+                        void Linking.openURL(`tel:${dialPhone}`).catch(() => { if (isCurrentAccount()) setError(tr('call_failed')); });
+                    }, false, true)}
                     {button(tr('understood'), () => setShowWindowClosed(false), false, true)}
                 </View>
             </View>
