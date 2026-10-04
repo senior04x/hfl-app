@@ -1,5 +1,8 @@
 export type TransferActor = 'player' | 'captain';
-export type TransferParty = 'player' | 'old_team' | 'new_team';
+export type TransferTeamParty = 'old_team' | 'new_team';
+// Player remains readable for historical responses and read-only actor identity.
+export type TransferParty = 'player' | TransferTeamParty;
+export const TRANSFER_TEAM_PARTIES: readonly TransferTeamParty[] = ['old_team', 'new_team'];
 export type TransferDirection = 'all' | 'incoming' | 'outgoing';
 export type TransferDecision = 'approved' | 'rejected';
 export interface TransferConsent { party: TransferParty; decision: TransferDecision; decided_at: string }
@@ -9,6 +12,14 @@ export interface AppTransfer {
     cancelled?: boolean; can_cancel?: boolean; status: 'pending' | TransferDecision; actor_party: TransferParty; consents: TransferConsent[];
 }
 export interface TransferSession { token: string; expiresAt: number; actor: TransferActor; subjectId: string }
+export function getTransferConsentState(transfer: AppTransfer, actor: TransferActor) {
+    const teamConsents = transfer.consents.filter(consent => consent.party !== 'player');
+    const allApproved = TRANSFER_TEAM_PARTIES.every(party => teamConsents.some(consent => consent.party === party && consent.decision === 'approved'));
+    const rejected = teamConsents.some(consent => consent.decision === 'rejected');
+    const canDecide = actor === 'captain' && TRANSFER_TEAM_PARTIES.some(party => party === transfer.actor_party)
+        && transfer.status === 'pending' && !rejected && !teamConsents.some(consent => consent.party === transfer.actor_party);
+    return { allApproved, rejected, canDecide };
+}
 export class TransferApiError extends Error {
     constructor(public status: number) { super('Transfer request failed'); }
 }
@@ -89,6 +100,7 @@ export const transferAppService = {
         return post('cancel-transfer-app', { transfer_id: transfer.id }, session.token);
     },
     async decide(session: TransferSession, transfer: AppTransfer, decision: TransferDecision) {
+        if (!getTransferConsentState(transfer, session.actor).canDecide) throw new TransferApiError(403);
         return post('transfer-consent', { transfer_id: transfer.id, party: transfer.actor_party, decision }, session.token);
     },
     async request(session: TransferSession, playerId: string, reason: string) {

@@ -12,6 +12,41 @@ function load() {
 const id = '12345678-1234-1234-1234-123456789abc';
 const token = 'a'.repeat(64);
 const success = body => ({ ok: true, status: 200, json: async () => body });
+
+test('team readiness ignores historical player decisions and requires both teams', () => {
+    const api = load();
+    const transfer = { id, status:'pending', actor_party:'old_team', consents:[{party:'player',decision:'rejected'}] };
+    assert.deepEqual(api.getTransferConsentState(transfer,'captain'), {allApproved:false,rejected:false,canDecide:true});
+    transfer.consents.push({party:'new_team',decision:'approved'},{party:'old_team',decision:'approved'});
+    assert.deepEqual(api.getTransferConsentState(transfer,'captain'), {allApproved:true,rejected:false,canDecide:false});
+    transfer.consents[2].decision='rejected';
+    assert.deepEqual(api.getTransferConsentState(transfer,'captain'), {allApproved:false,rejected:true,canDecide:false});
+});
+
+test('player viewers and decided or rejected requests cannot send consent writes', async t => {
+    const api = load();
+    const fetch = t.mock.method(global,'fetch',async()=>assert.fail('Unauthorized write'));
+    const session={actor:'captain',subjectId:id,token,expiresAt:Date.now()+60000};
+    const transfer={id,status:'pending',actor_party:'old_team',consents:[]};
+    for (const [actor, change] of [
+        ['player',{}], ['captain',{actor_party:'player'}], ['captain',{status:'approved'}],
+        ['captain',{status:'rejected'}], ['captain',{consents:[{party:'old_team',decision:'approved'}]}],
+        ['captain',{consents:[{party:'new_team',decision:'rejected'}]}]
+    ]) await assert.rejects(api.transferAppService.decide({...session,actor},{...transfer,...change},'approved'),error=>error.status===403);
+    assert.equal(fetch.mock.callCount(),0);
+});
+
+test('historical player rejection does not block a team decision and remains readable', async t => {
+    const api = load(); const calls=[];
+    const transfer={id,status:'pending',actor_party:'old_team',consents:[{party:'player',decision:'rejected'}]};
+    t.mock.method(global,'fetch',async(url,options)=>{calls.push(JSON.parse(options.body));return success({success:true});});
+    await api.transferAppService.decide({actor:'captain',token},transfer,'approved');
+    assert.deepEqual(calls[0],{transfer_id:id,party:'old_team',decision:'approved'});
+    global.fetch=async()=>success({items:[{...transfer,actor_party:'player'}],next_cursor:null});
+    const page=await api.transferAppService.page({actor:'player',token},'all');
+    assert.equal(page.items[0].consents[0].decision,'rejected');
+    assert.equal(api.getTransferConsentState(page.items[0],'player').canDecide,false);
+});
 test('verified sessions stay scoped to an actor and account and can be cleared', async t => {
     const api = load();
     t.mock.method(global, 'fetch', async () => success({ sessionToken: token, playerId: id, expiresAt: new Date(Date.now()+60000).toISOString() }));
@@ -33,7 +68,7 @@ test('transfer writes use the opaque bearer and do not send actor subject IDs', 
     t.mock.method(global,'fetch',async (url,options) => { calls.push({url,options}); return success({success:true}); });
     const session={actor:'captain',subjectId:id,token,expiresAt:Date.now()+60000};
     await api.transferAppService.request(session,id,'  Recruit  ');
-    await api.transferAppService.decide(session,{id,actor_party:'old_team'},'approved');
+    await api.transferAppService.decide(session,{id,status:'pending',consents:[],actor_party:'old_team'},'approved');
     assert.match(calls[0].url,/request-transfer-app$/);
     assert.deepEqual(JSON.parse(calls[0].options.body),{player_id:id,reason:'Recruit'});
     assert.equal(calls[1].options.headers.Authorization,`Bearer ${token}`);
@@ -41,11 +76,11 @@ test('transfer writes use the opaque bearer and do not send actor subject IDs', 
 });
 test('network loss remains an unknown result; conflicting decisions remain 409',async t => {
     const api=load();
-    const session={actor:'player',subjectId:id,token,expiresAt:Date.now()+60000};
+    const session={actor:'captain',subjectId:id,token,expiresAt:Date.now()+60000};
     t.mock.method(global,'fetch',async () => { throw Error('private details'); });
-    await assert.rejects(api.transferAppService.decide(session,{id,actor_party:'player'},'approved'),error => error.status===0 && !error.message.includes('private'));
+    await assert.rejects(api.transferAppService.decide(session,{id,status:'pending',consents:[],actor_party:'old_team'},'approved'),error => error.status===0 && !error.message.includes('private'));
     global.fetch=async () => ({ok:false,status:409,json:async()=>({error:'decision already exists'})});
-    await assert.rejects(api.transferAppService.decide(session,{id,actor_party:'player'},'rejected'),error => error.status===409);
+    await assert.rejects(api.transferAppService.decide(session,{id,status:'pending',consents:[],actor_party:'old_team'},'rejected'),error => error.status===409);
 });
 test('aborted reads never send a request',async t => {
     const api=load();const controller=new AbortController();controller.abort();

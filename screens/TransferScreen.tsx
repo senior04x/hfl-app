@@ -12,7 +12,7 @@ import { SlideButton } from '../components/SlideButton';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 import { restoreTransferLoginSession, revokeTransferLoginSession } from '../services/transferLoginStorage';
 import { AppTransfer, TransferActor, TransferApiError, TransferDecision, TransferDirection, TransferSession,
-    clearTransferSession, getTransferSession, transferAppService } from '../services/transferAppService';
+    clearTransferSession, getTransferSession, getTransferConsentState, TRANSFER_TEAM_PARTIES, transferAppService } from '../services/transferAppService';
 
 type Candidate = { id: string; first_name: string; last_name: string; team_name: string; photo_url?: string; player_number?: number | string; position?: string; team_logo?: string; birth_date?: string; citizenship?: string; height?: string; weight?: string; has_pending?: boolean };
 export default function TransferScreen({ navigation, route }: any) {
@@ -152,9 +152,7 @@ export default function TransferScreen({ navigation, route }: any) {
     </Pressable>;
     const inputStyle = [styles.input, surface, { color: colors.textPrimary }];
     const renderTransfer = ({ item }: { item: AppTransfer }) => {
-        const ownDecision = item.consents.find(consent => consent.party === item.actor_party);
-        const allApproved = ['player','old_team','new_team'].every(party => item.consents.some(consent => consent.party === party && consent.decision === 'approved'));
-        const rejected = item.consents.some(consent => consent.decision === 'rejected');
+        const { allApproved, rejected, canDecide } = getTransferConsentState(item, actor);
         return <View style={[styles.card, surface]}>
             <View style={styles.row}>
                 <SmartImage uri={item.player_photo} style={styles.avatar} contentFit="cover" fallbackIcon="person-outline" />
@@ -170,7 +168,7 @@ export default function TransferScreen({ navigation, route }: any) {
                 <SmartImage uri={item.new_team_logo} style={styles.teamLogo} contentFit="contain" fallbackIcon="shield-outline" />
             </View>
             <Text style={{ color: colors.textSecondary, marginBottom: 12 }}>{item.reason}</Text>
-            {(['player','old_team','new_team'] as const).map(party => {
+            {TRANSFER_TEAM_PARTIES.map(party => {
                 const consent = item.consents.find(value => value.party === party);
                 return <View key={party} style={[styles.row, { paddingVertical: 5 }]}>
                     <Text style={[styles.flex, { color: colors.textSecondary }]}>{tr(`party_${party}`)}</Text>
@@ -178,8 +176,8 @@ export default function TransferScreen({ navigation, route }: any) {
                 </View>;
             })}
             {item.status === 'pending' && <Text style={{ color: colors.textSecondary, marginTop: 10 }}>{tr(rejected ? 'party_rejected' : allApproved ? 'awaiting_admin' : 'awaiting_parties')}</Text>}
-            {item.status === 'pending' && item.can_cancel && <View style={{ marginTop: 14 }}>{button(tr('cancel_request'), () => decide(item, 'cancel'), busy || writeUncertain)}</View>}
-            {item.status === 'pending' && !ownDecision && !rejected && <View style={[styles.row, { marginTop: 14 }]}>
+            {actor === 'captain' && item.status === 'pending' && item.can_cancel && <View style={{ marginTop: 14 }}>{button(tr('cancel_request'), () => decide(item, 'cancel'), busy || writeUncertain)}</View>}
+            {canDecide && <View style={[styles.row, { marginTop: 14 }]}>
                 <View style={styles.flex}>{button(tr('reject'), () => decide(item, 'rejected'), busy || writeUncertain)}</View>
                 <View style={styles.flex}>{button(tr('approve'), () => decide(item, 'approved'), busy || writeUncertain, true)}</View>
             </View>}
