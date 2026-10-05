@@ -1649,13 +1649,13 @@ export const apiService = {
             filteredTeams.forEach((t: any) => { teamsMap[t.id] = t; });
 
             // 2. Fetch players in these teams
-            let playersQuery = supabase.from('applications').select('*');
+            let playersQuery = supabase.from('applications').select('*').eq('status', 'approved').or('is_archived.is.null,is_archived.eq.false');
             if (teamIds.length > 0) {
                 playersQuery = playersQuery.in('team_id', teamIds);
             }
             const { data: players } = await playersQuery;
             if (!players || players.length === 0) {
-                const { data: fallbackPlayers } = await supabase.from('applications').select('*').limit(5);
+                const { data: fallbackPlayers } = await supabase.from('applications').select('*').eq('status', 'approved').or('is_archived.is.null,is_archived.eq.false').in('team_id', teamIds).limit(5);
                 return (fallbackPlayers || []).slice(0, 5);
             }
 
@@ -1753,7 +1753,7 @@ export const apiService = {
             // 2. Fetch matches, teams, players
             let matchesQuery = supabase.from('matches').select('home_team_id, away_team_id, league, round, tour, organization_id');
             let teamsQuery = supabase.from('teams').select('*');
-            let playersQuery = supabase.from('applications').select('*');
+            let playersQuery = supabase.from('applications').select('*').eq('status', 'approved').or('is_archived.is.null,is_archived.eq.false');
 
             if (!isGuest) {
                 if (collabLeagueNames && collabLeagueNames.length > 0) {
@@ -1805,6 +1805,7 @@ export const apiService = {
             events.forEach(e => {
                 if (!e.player_id) return;
                 const player = playersMap[e.player_id];
+                if (!player) return;
                 const team = teamsMap[e.team_id || player?.team_id];
                 const lKey = String(team?.league || '').toLowerCase().trim();
                 if (!lKey) return;

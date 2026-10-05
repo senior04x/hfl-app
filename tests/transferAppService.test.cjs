@@ -13,6 +13,22 @@ const id = '12345678-1234-1234-1234-123456789abc';
 const token = 'a'.repeat(64);
 const success = body => ({ ok: true, status: 200, json: async () => body });
 
+test('roster controls use captain credentials and never send a delete request', async t => {
+    const api = load(), calls = [];
+    t.mock.method(global, 'fetch', async (url, options) => {
+        calls.push({url, options}); return success({success:true});
+    });
+    const session = {actor:'captain',subjectId:id,token};
+    await assert.rejects(api.transferAppService.roster({...session,actor:'player'},'archive',id), e => e.status === 403);
+    assert.equal(calls.length,0);
+    await api.transferAppService.roster(session,'archive',id);
+    assert.equal(calls[0].options.method,'POST');
+    assert.equal(calls[0].options.headers.Authorization,`Bearer ${token}`);
+    assert.deepEqual(JSON.parse(calls[0].options.body),{team_id:id,action:'archive',player_id:id});
+    await api.transferAppService.roster(session,'number',id,17);
+    assert.equal(JSON.parse(calls[1].options.body).number,17);
+});
+
 test('team readiness ignores historical player decisions and requires both teams', () => {
     const api = load();
     const transfer = { id, status:'pending', actor_party:'old_team', consents:[{party:'player',decision:'rejected'}] };

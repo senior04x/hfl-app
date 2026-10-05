@@ -67,6 +67,10 @@ async function post(name: string, body: Record<string, unknown>, token?: string,
     } finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
 }
 export const transferAppService = {
+    async roster(session: TransferSession, action: 'context' | 'archive' | 'number', playerId?: string, number?: number) {
+        if (session.actor !== 'captain') throw new TransferApiError(403);
+        return post('captain-roster', {team_id: session.subjectId, action, player_id: playerId ?? null, number}, session.token);
+    },
     async verify(actor: TransferActor, subjectId: string, phone: string, code: string): Promise<TransferSession> {
         const data = await post(actor === 'captain' ? 'verify-otp' : 'verify-transfer-player',
             { phone, code, ...(actor === 'captain' ? { team_id: subjectId } : { player_id: subjectId }) });

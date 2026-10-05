@@ -19,13 +19,15 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import SmartImage from './SmartImage';
-import { apiService, supabase } from '../services/apiService';
+import { apiService, supabase, clearApiCache } from '../services/apiService';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { getLocalizedPosition } from '../utils/localizationUtils';
 import { formatUzPhone, cleanPhoneForDb } from '../utils/stringUtils';
 import Skeleton from './Skeleton';
 import Colors from '../constants/Colors';
+import { transferAppService, TransferApiError } from '../services/transferAppService';
+import { restoreTransferLoginSession } from '../services/transferLoginStorage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -116,6 +118,31 @@ export default function EditTeamModal({
     // Players state
     const [players, setPlayers] = useState<any[]>([]);
     const [playerSearch, setPlayerSearch] = useState('');
+    const [rosterWindowOpen, setRosterWindowOpen] = useState(false);
+    const [rosterBusy, setRosterBusy] = useState<string | null>(null);
+    const rosterLock = useRef(false);
+    const [numberDrafts, setNumberDrafts] = useState<Record<string, string>>({});
+    const updateRoster = async (player: any, action: 'archive' | 'number') => {
+        if (rosterLock.current || !rosterWindowOpen) return;
+        const id = String(player.id || player._id);
+        const raw = numberDrafts[id] ?? String(player.number ?? '');
+        if (action === 'number' && (!/^[1-9][0-9]?$/.test(raw))) {
+            showToast(t('teams.number_invalid', 'Raqam 1–99 oralig‘ida bo‘lsin'), 'error'); return;
+        }
+        rosterLock.current = true; setRosterBusy(id);
+        try {
+            const session = await restoreTransferLoginSession('captain', String(teamId));
+            if (!session) throw new Error('Session required');
+            await transferAppService.roster(session, action, id, action === 'number' ? Number(raw) : undefined);
+            clearApiCache();
+            setNumberDrafts({}); await loadTeamAndPlayers(); onSaved?.();
+            showToast(t('common.saved', 'Saqlandi'));
+        } catch (error) {
+            showToast(t('teams.roster_failed', 'Saqlanmadi. Raqam band bo‘lishi, sessiya yoki transfer oynasi yopilgan bo‘lishi mumkin.'), 'error');
+            if (!(error instanceof TransferApiError) || error.status === 401 || error.status === 403) setRosterWindowOpen(false);
+        } finally { rosterLock.current = false; setRosterBusy(null); }
+    };
+
     const [editingPlayerId, setEditingPlayerId] = useState<string | number | null>(null);
     const [uploadingPlayerId, setUploadingPlayerId] = useState<string | number | null>(null);
     const [savingPhonePlayerId, setSavingPhonePlayerId] = useState<string | number | null>(null);
@@ -130,9 +157,16 @@ export default function EditTeamModal({
     const loadTeamAndPlayers = async () => {
         try {
             setLoading(true);
+            setRosterWindowOpen(false);
+            const rosterSession = await restoreTransferLoginSession('captain', String(teamId));
+            if (rosterSession) {
+                try { const context = await transferAppService.roster(rosterSession, 'context');
+                    setRosterWindowOpen(context.transfer_window_open === true);
+                } catch { /* Fail closed; existing profile editing still loads. */ }
+            }
             const [tRes, pRes] = await Promise.all([
                 supabase.from('teams').select('*').eq('id', teamId).single(),
-                supabase.from('applications').select('*').eq('team_id', teamId).eq('status', 'approved'),
+                supabase.from('applications').select('*').eq('team_id', teamId).eq('status', 'approved').or('is_archived.is.null,is_archived.eq.false'),
             ]);
 
             if (tRes.data) {
@@ -641,8 +675,8 @@ export default function EditTeamModal({
                                             const isSavingThis = savingPhonePlayerId === pId;
 
                                             return (
+                                                <View key={pId}>
                                                 <PlayerEditCard
-                                                    key={pId}
                                                     player={player}
                                                     isEditing={isEditingThis}
                                                     isUploading={isUploadingThis}
@@ -654,6 +688,27 @@ export default function EditTeamModal({
                                                     onToggleEdit={() => setEditingPlayerId(isEditingThis ? null : pId)}
                                                     onSavePhone={(newPhone) => handleSavePlayerPhone(player, newPhone)}
                                                 />
+                                                <View style={{flexDirection:'row',alignItems:'center',gap:8,padding:10,backgroundColor:homeColors.surface,borderRadius:12,marginBottom:12}}>
+                                                    <TextInput value={numberDrafts[String(pId)] ?? String(player.number ?? '')}
+                                                        onChangeText={value => setNumberDrafts(old => ({...old,[String(pId)]:value.replace(/\D/g,'').slice(0,2)}))}
+                                                        keyboardType="number-pad" maxLength={2} editable={rosterWindowOpen && !rosterBusy}
+                                                        accessibilityLabel={t('teams.jersey_number','Forma raqami')}
+                                                        style={{width:48,minHeight:44,color:homeColors.textPrimary,borderWidth:1,borderColor:homeColors.border,borderRadius:8,textAlign:'center'}} />
+                                                    <TouchableOpacity disabled={!rosterWindowOpen || !!rosterBusy} onPress={() => updateRoster(player,'number')}
+                                                        style={{minHeight:44,justifyContent:'center',paddingHorizontal:8,opacity:rosterWindowOpen && !rosterBusy ? 1 : 0.4}}>
+                                                        <Text style={{color:'#E85002'}}>{t('teams.save_number','Raqamni saqlash')}</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity disabled={!rosterWindowOpen || !!rosterBusy}
+                                                        onPress={() => Alert.alert(t('teams.archive_player','Futbolchini arxivlash'),t('teams.archive_hint','Futbolchi faol ro‘yxatlardan yashiriladi. Tarixi saqlanadi.'),[
+                                                            {text:t('common.cancel','Bekor qilish'),style:'cancel'},
+                                                            {text:t('common.delete','O‘chirish'),style:'destructive',onPress:()=>updateRoster(player,'archive')}])}
+                                                        accessibilityRole="button" accessibilityLabel={t('teams.archive_player','Futbolchini arxivlash')}
+                                                        style={{marginLeft:'auto',minHeight:44,minWidth:44,alignItems:'center',justifyContent:'center',opacity:rosterWindowOpen && !rosterBusy ? 1 : 0.4}}>
+                                                        {rosterBusy===String(pId) ? <ActivityIndicator color="#E85002"/> : <Ionicons name="trash-outline" size={22} color="#EF4444"/>}
+                                                    </TouchableOpacity>
+                                                </View>
+                                                {!rosterWindowOpen && <Text style={{color:homeColors.textSecondary,fontSize:11,marginBottom:12}}>{t('teams.roster_locked','Amallar uchun sardor sifatida kirish va transfer oynasi ochiq bo‘lishi kerak.')}</Text>}
+                                                </View>
                                             );
                                         })
                                     )}

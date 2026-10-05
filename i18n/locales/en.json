@@ -283,6 +283,13 @@
     "away_short": "AWAY"
   },
   "teams": {
+    "number_invalid": "Choose a number from 1 to 99",
+    "roster_failed": "Unable to save. The number may be taken or the transfer window closed.",
+    "jersey_number": "Jersey number",
+    "save_number": "Save number",
+    "archive_player": "Archive player",
+    "archive_hint": "The player will be hidden from active lists. History and statistics are preserved.",
+    "roster_locked": "Sign in as captain. Actions require an open transfer window.",
     "title": "Teams",
     "my_team": "My Team",
     "team_profile": "Team Profile",

@@ -283,6 +283,13 @@
     "away_short": "MEH"
   },
   "teams": {
+    "number_invalid": "Raqam 1–99 oralig‘ida bo‘lsin",
+    "roster_failed": "Saqlanmadi. Raqam band yoki transfer oynasi yopilgan bo‘lishi mumkin.",
+    "jersey_number": "Forma raqami",
+    "save_number": "Raqamni saqlash",
+    "archive_player": "Futbolchini arxivlash",
+    "archive_hint": "Futbolchi faol ro‘yxatlardan yashiriladi. Tarixi va statistikasi saqlanadi.",
+    "roster_locked": "Amallar uchun sardor sifatida kirish va transfer oynasi ochiq bo‘lishi kerak.",
     "title": "Jamoalar",
     "my_team": "Mening jamoam",
     "team_profile": "Jamoa profili",
