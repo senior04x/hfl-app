@@ -788,6 +788,8 @@
     "matches_in_range": "Tanlangan sanadagi o'yinlar"
   },
   "transfer_app": {
+    "free_agent": "Erkin agent",
+    "not_required": "Talab qilinmaydi",
     "cancel_request": "Transferni bekor qilish",
     "cancel_confirm": "Transfer arizasini bekor qilasizmi? Futbolchi hozirgi jamoasida qoladi.",
     "cancel_saved": "Transfer arizasi bekor qilindi",
@@ -805,10 +807,10 @@
     "outgoing": "Chiquvchi",
     "new_request": "O‘yinchi olish",
     "search_player": "Futbolchini qidirish",
-    "reason": "Transfer sababini yozing",
+    "reason": "O‘tish sababi (ixtiyoriy)",
     "send_request": "Ariza yuborish",
     "request_confirm": "Tanlangan futbolchini jamoangizga olish uchun ariza yuborilsinmi?",
-    "request_sent": "Ariza yuborildi — yangi jamoa roziligi qayd etildi. Eski jamoa roziligidan keyin yakuniy qarorni admin beradi.",
+    "request_sent": "Ariza yuborildi — yangi jamoa roziligi qayd etildi. Yakuniy qarorni admin beradi.",
     "existing_request": "Kutilayotgan ariza bor",
     "no_players": "Futbolchi topilmadi",
     "empty": "Transfer arizalari yo‘q",

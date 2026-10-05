@@ -9,14 +9,15 @@ export interface TransferConsent { party: TransferParty; decision: TransferDecis
 export interface AppTransfer {
     id: string; player_id: string; player_name: string; player_photo?: string; old_team_name: string; new_team_name: string;
     old_team_logo?: string; new_team_logo?: string; reason: string; created_at: string;
-    cancelled?: boolean; can_cancel?: boolean; status: 'pending' | TransferDecision; actor_party: TransferParty; consents: TransferConsent[];
+    old_team_consent_required?: boolean; cancelled?: boolean; can_cancel?: boolean; status: 'pending' | TransferDecision; actor_party: TransferParty; consents: TransferConsent[];
 }
 export interface TransferSession { token: string; expiresAt: number; actor: TransferActor; subjectId: string }
 export function getTransferConsentState(transfer: AppTransfer, actor: TransferActor) {
-    const teamConsents = transfer.consents.filter(consent => consent.party !== 'player');
-    const allApproved = TRANSFER_TEAM_PARTIES.every(party => teamConsents.some(consent => consent.party === party && consent.decision === 'approved'));
+    const requiredParties = transfer.old_team_consent_required === false ? ['new_team'] : TRANSFER_TEAM_PARTIES;
+    const teamConsents = transfer.consents.filter(consent => requiredParties.includes(consent.party as TransferTeamParty));
+    const allApproved = requiredParties.every(party => teamConsents.some(consent => consent.party === party && consent.decision === 'approved'));
     const rejected = teamConsents.some(consent => consent.decision === 'rejected');
-    const canDecide = actor === 'captain' && TRANSFER_TEAM_PARTIES.some(party => party === transfer.actor_party)
+    const canDecide = actor === 'captain' && requiredParties.some(party => party === transfer.actor_party)
         && transfer.status === 'pending' && !rejected && !teamConsents.some(consent => consent.party === transfer.actor_party);
     return { allApproved, rejected, canDecide };
 }

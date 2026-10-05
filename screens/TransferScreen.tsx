@@ -14,7 +14,7 @@ import { restoreTransferLoginSession, revokeTransferLoginSession } from '../serv
 import { AppTransfer, TransferActor, TransferApiError, TransferDecision, TransferDirection, TransferSession,
     clearTransferSession, getTransferSession, getTransferConsentState, TRANSFER_TEAM_PARTIES, transferAppService } from '../services/transferAppService';
 
-type Candidate = { id: string; first_name: string; last_name: string; team_name: string; photo_url?: string; player_number?: number | string; position?: string; team_logo?: string; birth_date?: string; citizenship?: string; height?: string; weight?: string; has_pending?: boolean };
+type Candidate = { id: string; first_name: string; last_name: string; team_name: string; photo_url?: string; player_number?: number | string; position?: string; team_logo?: string; birth_date?: string; citizenship?: string; height?: string; weight?: string; has_pending?: boolean; is_archived?: boolean };
 export default function TransferScreen({ navigation, route }: any) {
     const { user, isGuest } = useAuthStore();
     const { height: windowHeight } = useWindowDimensions();
@@ -180,7 +180,7 @@ export default function TransferScreen({ navigation, route }: any) {
                 const consent = item.consents.find(value => value.party === party);
                 return <View key={party} style={[styles.row, { paddingVertical: 5 }]}>
                     <Text style={[styles.flex, { color: colors.textSecondary }]}>{tr(`party_${party}`)}</Text>
-                    <Text style={{ color: consent?.decision === 'rejected' ? '#EF4444' : consent ? colors.accent : colors.textSecondary }}>{tr(`status_${consent?.decision || 'pending'}`)}</Text>
+                    <Text style={{ color: party === 'old_team' && item.old_team_consent_required === false ? colors.accent : consent?.decision === 'rejected' ? '#EF4444' : consent ? colors.accent : colors.textSecondary }}>{party === 'old_team' && item.old_team_consent_required === false ? tr('not_required') : tr(`status_${consent?.decision || 'pending'}`)}</Text>
                 </View>;
             })}
             {item.status === 'pending' && <Text style={{ color: colors.textSecondary, marginTop: 10 }}>{tr(rejected ? 'party_rejected' : allApproved ? 'awaiting_admin' : 'awaiting_parties')}</Text>}
@@ -211,7 +211,7 @@ export default function TransferScreen({ navigation, route }: any) {
             </View>}
             renderItem={({ item }) => <Pressable disabled={busy || item.has_pending} onPress={() => { setReason(''); setError(''); setSelected(item); }} style={[styles.card, surface, { opacity: item.has_pending ? 0.5 : 1 }]}>
                 <Text style={[styles.title, { color: colors.textPrimary }]}>{item.first_name} {item.last_name}</Text>
-                <Text style={{ color: colors.textSecondary }}>{item.team_name}{item.has_pending ? ` · ${tr('existing_request')}` : ''}</Text>
+                <Text style={{ color: colors.textSecondary }}>{item.is_archived ? tr('free_agent') : item.team_name}{item.has_pending ? ` · ${tr('existing_request')}` : ''}</Text>
             </Pressable>}
             ListEmptyComponent={!candidateLoading ? <Text style={{ color: colors.textSecondary }}>{tr('no_players')}</Text> : null}
             ListFooterComponent={candidateLoading ? <ActivityIndicator color={colors.accent} /> : candidateCursor ? button(t('common.show_more'), () => void findPlayers(candidateCursor), busy) : null} /> : <FlatList
@@ -255,7 +255,7 @@ export default function TransferScreen({ navigation, route }: any) {
                         <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>{selected?.position ? getLocalizedPosition(selected.position, t) : '—'}</Text>
                         <View style={[styles.row, { justifyContent: 'center', marginBottom: 20 }]}>
                             {selected?.team_logo && <SmartImage uri={selected.team_logo} style={styles.teamLogo} contentFit="contain" fallbackIcon="shield-outline" />}
-                            <Text style={{ color: colors.textPrimary, flexShrink: 1 }}>{selected?.team_name}</Text>
+                            <Text style={{ color: colors.textPrimary, flexShrink: 1 }}>{selected?.is_archived ? tr('free_agent') : selected?.team_name}</Text>
                         </View>
                         {(['birth_date', 'citizenship', 'height', 'weight'] as const).map(field => {
                             const value = selected?.[field];
@@ -270,7 +270,7 @@ export default function TransferScreen({ navigation, route }: any) {
                         {error ? <Text accessibilityLiveRegion="polite" style={{ color: '#EF4444' }}>{error}</Text> : null}
                     </ScrollView>
                     <SlideButton key={selected?.id} compact title={t('common.slide_to_send')} loading={busy} status={busy ? 'loading' : error ? 'error' : 'idle'}
-                        disabled={busy || writeUncertain || !reason.trim() || !windowOpen || !session}
+                        disabled={busy || writeUncertain || !windowOpen || !session}
                         onReset={() => setError('')}
                         onSwipeSuccess={() => run(async () => {
                             if (!session || !selected || !windowOpen) return;

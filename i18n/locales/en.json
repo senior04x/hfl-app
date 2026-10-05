@@ -788,6 +788,8 @@
     "matches_in_range": "Matches in selected range"
   },
   "transfer_app": {
+    "free_agent": "Free agent",
+    "not_required": "Not required",
     "cancel_request": "Cancel transfer",
     "cancel_confirm": "Cancel this transfer request? The player will remain with their current team.",
     "cancel_saved": "Transfer request cancelled",
@@ -805,10 +807,10 @@
     "outgoing": "Outgoing",
     "new_request": "Recruit a player",
     "search_player": "Search players",
-    "reason": "Enter the transfer reason",
+    "reason": "Transfer reason (optional)",
     "send_request": "Send request",
     "request_confirm": "Send a request to recruit the selected player to your team?",
-    "request_sent": "Request sent — the receiving team's consent was recorded. After the previous team agrees, the administrator makes the final decision.",
+    "request_sent": "Request sent. Receiving team consent recorded. The admin makes the final decision.",
     "existing_request": "A request is already pending",
     "no_players": "No players found",
     "empty": "No transfer requests",

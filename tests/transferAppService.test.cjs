@@ -13,6 +13,13 @@ const id = '12345678-1234-1234-1234-123456789abc';
 const token = 'a'.repeat(64);
 const success = body => ({ ok: true, status: 200, json: async () => body });
 
+test('free agent needs only the new team; old team cannot veto or decide', () => {
+    const api = load();
+    const transfer = {id,status:'pending',old_team_consent_required:false,actor_party:'old_team',consents:[{party:'old_team',decision:'rejected'},{party:'new_team',decision:'approved'}]};
+    assert.deepEqual(api.getTransferConsentState(transfer,'captain'),{allApproved:true,rejected:false,canDecide:false});
+    assert.equal(api.getTransferConsentState({...transfer,old_team_consent_required:true},'captain').rejected,true);
+});
+
 test('roster controls use captain credentials and never send a delete request', async t => {
     const api = load(), calls = [];
     t.mock.method(global, 'fetch', async (url, options) => {
