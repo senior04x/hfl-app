@@ -2,6 +2,7 @@ import { enrichReplayTeams } from '../services/replayTeams';
 import { PagerScrollView, PagerContentScrollView } from '../components/PlatformPager';
 import PlayerCompetitionHistory, { PlayerCareerGoals } from '../components/PlayerCompetitionHistory';
 import { getPlayerHistory } from '../services/playerHistory';
+import { useTransferCareerHistory } from '../services/useTransferCareerHistory';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -308,7 +309,8 @@ export default function MyStatsScreen({ route, navigation }: any) {
     const targetPlayerId = route?.params?.playerId || initialPlayer?.id || initialPlayer?._id || user?.id || user?._id;
     const [loading, setLoading] = useState(!initialPlayer);
     const [player, setPlayer] = useState<any>(initialPlayer ? extractPlayerData(initialPlayer) : null);
-    const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
+    const transferHistory = useTransferCareerHistory(String(targetPlayerId));
+    const playerTransfers = transferHistory.items;
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
     const [matchesError, setMatchesError] = useState('');
@@ -853,12 +855,11 @@ export default function MyStatsScreen({ route, navigation }: any) {
 
     const fetchPlayer = async (bypassCache = false) => {
         try {
-            if (bypassCache) clearApiCache('player_' + targetPlayerId);
+            if (bypassCache) { clearApiCache('player_' + targetPlayerId); void transferHistory.reload(); }
             if (!player) setLoading(true);
-            const [playerData, statsData, transfersData] = await Promise.all([
+            const [playerData, statsData] = await Promise.all([
                 apiService.getPlayerById(targetPlayerId),
                 apiService.getPlayerStats(targetPlayerId).catch(() => null),
-                apiService.getPlayerTransfers(targetPlayerId).catch(() => [])
             ]);
 
             if (playerData) {
@@ -885,9 +886,6 @@ export default function MyStatsScreen({ route, navigation }: any) {
                     lastName: freshLastName,
                     last_name: freshLastName,
                 });
-            }
-            if (transfersData) {
-                setPlayerTransfers(transfersData);
             }
         } catch (error) {
             console.error('Error fetching my player stats:', error);
@@ -1250,6 +1248,10 @@ export default function MyStatsScreen({ route, navigation }: any) {
             </View>
 
             {/* PLAYER'S REPLAY HIGHLIGHTS FEED (ONLY RENDER IF REPLAYS EXIST OR LOADING) */}
+            {(transferHistory.cursor || transferHistory.error || transferHistory.loading) && <TouchableOpacity
+                disabled={transferHistory.loading} onPress={() => void transferHistory.more()} style={{ padding: 16, minHeight: 44 }}>
+                <Text style={{ color: homeColors.textPrimary, textAlign: 'center' }}>{transferHistory.loading ? t('common.loading') : transferHistory.error ? t('common.retry') : t('common.show_more')}</Text>
+            </TouchableOpacity>}
             {(replaysLoading || groupedMatches.length > 0) && (
                 <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14 }]}>
                     <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>

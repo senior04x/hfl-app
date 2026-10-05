@@ -62,7 +62,6 @@ export default function AccountScreen({ navigation }: any) {
     const [storyPickerVisible, setStoryPickerVisible] = useState(false);
     const [ownActiveReplayIds, setOwnActiveReplayIds] = useState<any[]>([]);
 
-    const [userTransfers, setUserTransfers] = useState<any[]>([]);
     const [userProfileApps, setUserProfileApps] = useState<any[]>([]);
     const [appsLoading, setAppsLoading] = useState(false);
 
@@ -115,11 +114,6 @@ export default function AccountScreen({ navigation }: any) {
     const loadUserApplications = async () => {
         try {
             setAppsLoading(true);
-            const targetPlayerId = user?.id || user?._id;
-            if (targetPlayerId) {
-                const transfers = await apiService.getPlayerTransfers(targetPlayerId);
-                setUserTransfers(transfers || []);
-            }
 
             const userPhone = user?.phone || user?.phoneNumber || user?.phone_number || user?.tel;
             if (userPhone) {
@@ -274,7 +268,6 @@ export default function AccountScreen({ navigation }: any) {
     }
 
     const currentLangItem = SUPPORTED_LANGUAGES.find(l => l.code === i18n.language);
-    const totalAppsCount = userTransfers.length + userProfileApps.length;
 
     const handleProfileCardPress = () => {
         if (isPlayer) {

@@ -2,6 +2,7 @@ import { enrichReplayTeams } from '../services/replayTeams';
 import { PagerScrollView, PagerContentScrollView } from '../components/PlatformPager';
 import PlayerCompetitionHistory, { PlayerCareerGoals } from '../components/PlayerCompetitionHistory';
 import { getPlayerHistory } from '../services/playerHistory';
+import { useTransferCareerHistory } from '../services/useTransferCareerHistory';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -295,7 +296,8 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const playerId = route.params?.playerId || initialPlayer?.id || initialPlayer?._id;
     const [loading, setLoading] = useState(!initialPlayer);
     const [player, setPlayer] = useState<any>(initialPlayer ? extractPlayerData(initialPlayer) : null);
-    const [playerTransfers, setPlayerTransfers] = useState<any[]>([]);
+    const transferHistory = useTransferCareerHistory(String(playerId));
+    const playerTransfers = transferHistory.items;
     const [matches, setMatches] = useState<any[]>([]);
     const [matchesLoading, setMatchesLoading] = useState(false);
     const [matchesError, setMatchesError] = useState('');
@@ -486,10 +488,9 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const fetchPlayer = async () => {
         try {
             setLoading(true);
-            const [playerData, statsData, transfersData] = await Promise.all([
+            const [playerData, statsData] = await Promise.all([
                 apiService.getPlayerById(playerId),
                 apiService.getPlayerStats(playerId).catch(() => null),
-                apiService.getPlayerTransfers(playerId).catch(() => [])
             ]);
 
             if (playerData) {
@@ -504,9 +505,6 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
                 setAiStats(evaluatedAi);
                 setPlayer(parsed);
             }
-            if (transfersData) {
-                setPlayerTransfers(transfersData);
-            }
         } catch (error) {
             console.error('Error fetching player stats:', error);
         } finally {
@@ -517,7 +515,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
     const onRefresh = async () => {
         clearApiCache('player_' + playerId);
         clearApiCache('player_stats_' + playerId);
-        clearApiCache('player_transfers_' + playerId);
+        void transferHistory.reload();
         setReplayRefreshKey(value => value + 1);
         setRefreshing(true);
         try {
@@ -870,6 +868,10 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             </View>
 
             {/* PLAYER'S REPLAY HIGHLIGHTS FEED (ONLY RENDER IF REPLAYS EXIST OR LOADING) */}
+            {(transferHistory.cursor || transferHistory.error || transferHistory.loading) && <TouchableOpacity
+                disabled={transferHistory.loading} onPress={() => void transferHistory.more()} style={{ padding: 16, minHeight: 44 }}>
+                <Text style={{ color: homeColors.textPrimary, textAlign: 'center' }}>{transferHistory.loading ? t('common.loading') : transferHistory.error ? t('common.retry') : t('common.show_more')}</Text>
+            </TouchableOpacity>}
             {(replaysLoading || groupedMatches.length > 0) && (
                 <View style={[styles.infoSectionCard, cardSurface, { marginTop: 14 }]}>
                     <View style={[styles.sectionCardHeader, { borderBottomColor: homeColors.border }]}>

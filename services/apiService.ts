@@ -6,6 +6,7 @@ import { useJuniorStore } from '../store/useJuniorStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { resolveMatchAssist } from './matchEventAssist';
 import { loadMatchCompetitionMetadata } from './matchCompetitionMetadata';
+import { loadTransferCareer } from './publicTransferHistory';
 
 export { supabase };
 
@@ -764,15 +765,9 @@ export const apiService = {
     // Players can only view requests involving their application.
     getPlayerTransfers: async (playerId: string | number) => {
         try {
-            const { data, error } = await supabase
-                .from('transfers')
-                .select('*')
-                .eq('player_id', playerId)
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            return data || [];
+            return (await loadTransferCareer(String(playerId))).items;
         } catch (err) {
-            console.error('getPlayerTransfers error:', err);
+            console.error('Transfer career history unavailable');
             return [];
         }
     },
