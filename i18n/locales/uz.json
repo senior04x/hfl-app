@@ -286,6 +286,9 @@
     "away_short": "MEH"
   },
   "teams": {
+    "transfer_edit_closed_title": "Ma’lumotlarni tahrirlash yopilgan",
+    "transfer_edit_closed": "Tashkilotingiz ma’lumotlarni o‘zgartirishni yopgan. Transfer ochilganda o‘yinchi ma’lumotlarini tahrirlashingiz va o‘yinchini o‘chirishingiz mumkin.",
+
     "number_invalid": "Raqam 1–99 oralig‘ida bo‘lsin",
     "roster_failed": "Saqlanmadi. Raqam band yoki transfer oynasi yopilgan bo‘lishi mumkin.",
     "jersey_number": "Forma raqami",

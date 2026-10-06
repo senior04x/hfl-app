@@ -10,6 +10,7 @@ const RATING_TEST_MODE = false;
 const EMOJIS = ['😞', '🙁', '😐', '🙂', '😄'];
 const KEY = '@amatora_rating_prompt_v1';
 const MONTH = 30 * 24 * 60 * 60 * 1000;
+let countedLaunch = false;
 const STORE = 'https://play.google.com/store/apps/details?id=com.amatora.mobile';
 
 export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
@@ -26,26 +27,25 @@ export default function AppRatingPrompt({ enabled }: { enabled: boolean }) {
   const storage = useRef({ visits: 0, next: 0, done: false });
 
   useEffect(() => {
-    if (!enabled || (Platform.OS !== 'android' && !(RATING_TEST_MODE && Platform.OS === 'ios'))) return;
-    let disposed = false;
-    const hide = AppState.addEventListener('change', state => {
-      if (state !== 'active') setVisible(false);
-      else if (RATING_TEST_MODE && !disposed) setVisible(true);
+    if (!enabled || Platform.OS !== 'android') return;
+    let disposed=false; let ready=false; let due=false; let backgroundAt=0;
+    const showIfDue=()=>{if(!disposed&&ready&&due&&!storage.current.done&&Date.now()>=storage.current.next&&AppState.currentState==='active'){setVisible(true);}};
+    let queue=Promise.resolve();
+    const visit=(increment=true)=>{queue=queue.then(async()=>{try {
+      const raw=await AsyncStorage.getItem(KEY);const saved=raw?JSON.parse(raw):{};
+      if(disposed)return;
+      storage.current={visits:(Number(saved.visits)||0)+(increment?1:0),next:Number(saved.next)||0,done:saved.done===true};
+      await AsyncStorage.setItem(KEY,JSON.stringify(storage.current));
+      ready=true;due=!storage.current.done&&storage.current.visits>=3&&Date.now()>=storage.current.next;
+      showIfDue();
+    }catch{}});};
+    const sub=AppState.addEventListener('change',state=>{
+      if(state!=='active'){backgroundAt=backgroundAt||Date.now();setVisible(false);}
+      else {if(backgroundAt&&Date.now()-backgroundAt>=30000)visit();backgroundAt=0;showIfDue();}
     });
-    void AccessibilityInfo.isReduceMotionEnabled().then(value => { reduced.current = value; }).catch(() => {});
-    if (RATING_TEST_MODE) setVisible(true);
-    else void (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(KEY);
-        const saved = raw ? JSON.parse(raw) : {};
-        if (disposed) return;
-        storage.current = { visits: (Number(saved.visits) || 0) + 1, next: Number(saved.next) || 0, done: saved.done === true };
-        await AsyncStorage.setItem(KEY, JSON.stringify(storage.current));
-        if (disposed || storage.current.done || storage.current.visits < 3 || Date.now() < storage.current.next) return;
-        if (AppState.currentState === 'active') setVisible(true);
-      } catch { /* A persistence failure must not produce repeated prompts. */ }
-    })();
-    return () => { disposed = true; hide.remove(); setVisible(false); };
+    void AccessibilityInfo.isReduceMotionEnabled().then(value=>{reduced.current=value;}).catch(()=>{});
+    visit(!countedLaunch);countedLaunch=true;
+    return()=>{disposed=true;sub.remove();setVisible(false);};
   }, [enabled]);
 
   useEffect(() => {

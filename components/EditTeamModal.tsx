@@ -15,6 +15,7 @@ import {
     Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Swipeable } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -121,11 +122,19 @@ export default function EditTeamModal({
     const [rosterWindowOpen, setRosterWindowOpen] = useState(false);
     const [rosterBusy, setRosterBusy] = useState<string | null>(null);
     const rosterLock = useRef(false);
-    const [numberDrafts, setNumberDrafts] = useState<Record<string, string>>({});
+    const swipeRefs = useRef<Record<string, Swipeable | null>>({});
+    const [notice, setNotice] = useState<{ type: 'locked' | 'delete'; player?: any } | null>(null);
+    const canEdit = () => { if (!rosterWindowOpen) { setNotice({ type: 'locked' }); return false; } return true; };
+    const saveProfile = async (action: 'team_edit' | 'player_edit', data: Record<string,string>, playerId?: string) => {
+        const session = await restoreTransferLoginSession('captain', String(teamId));
+        if (!session) throw new Error('Session required');
+        try { return await transferAppService.editProfile(session, action, data, playerId); }
+        catch (error) { if (error instanceof TransferApiError && error.status === 403) { setRosterWindowOpen(false); setEditingPlayerId(null); setNotice({ type: 'locked' }); } throw error; }
+    };
     const updateRoster = async (player: any, action: 'archive' | 'number') => {
         if (rosterLock.current || !rosterWindowOpen) return;
         const id = String(player.id || player._id);
-        const raw = numberDrafts[id] ?? String(player.number ?? '');
+        const raw = String(player.number ?? '');
         if (action === 'number' && (!/^[1-9][0-9]?$/.test(raw))) {
             showToast(t('teams.number_invalid', 'Raqam 1–99 oralig‘ida bo‘lsin'), 'error'); return;
         }
@@ -135,7 +144,7 @@ export default function EditTeamModal({
             if (!session) throw new Error('Session required');
             await transferAppService.roster(session, action, id, action === 'number' ? Number(raw) : undefined);
             clearApiCache();
-            setNumberDrafts({}); await loadTeamAndPlayers(); onSaved?.();
+            await loadTeamAndPlayers(); onSaved?.();
             showToast(t('common.saved', 'Saqlandi'));
         } catch (error) {
             showToast(t('teams.roster_failed', 'Saqlanmadi. Raqam band bo‘lishi, sessiya yoki transfer oynasi yopilgan bo‘lishi mumkin.'), 'error');
@@ -165,8 +174,8 @@ export default function EditTeamModal({
                 } catch { /* Fail closed; existing profile editing still loads. */ }
             }
             const [tRes, pRes] = await Promise.all([
-                supabase.from('teams').select('*').eq('id', teamId).single(),
-                supabase.from('applications').select('*').eq('team_id', teamId).eq('status', 'approved').or('is_archived.is.null,is_archived.eq.false'),
+                supabase.from('teams').select('id,name,logo_url,captain_name,captain_phone,coach_name,coach_phone,president_name,president_phone').eq('id', teamId).single(),
+                supabase.from('applications').select('id,first_name,last_name,photo_url,phone,position,player_number,team_id,status').eq('team_id', teamId).eq('status', 'approved').or('is_archived.is.null,is_archived.eq.false'),
             ]);
 
             if (tRes.data) {
@@ -209,6 +218,7 @@ export default function EditTeamModal({
 
     // Pick and upload team logo
     const handlePickLogo = async () => {
+        if (!canEdit()) return;
         try {
             const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permission.granted) {
@@ -248,6 +258,7 @@ export default function EditTeamModal({
 
     // Save Team Info
     const handleSaveTeam = async () => {
+        if (!canEdit()) return;
         try {
             setSaving(true);
             const updates = {
@@ -260,7 +271,7 @@ export default function EditTeamModal({
                 president_name: presidentName.trim(),
             };
 
-            const result = await apiService.updateTeam(String(teamId), updates);
+            const result = await saveProfile('team_edit', updates);
             if (result && result.error) {
                 throw new Error(result.error);
             }
@@ -281,6 +292,7 @@ export default function EditTeamModal({
 
     // Pick and upload player photo
     const handlePickPlayerPhoto = async (playerId: string | number) => {
+        if (!canEdit()) return;
         try {
             const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permission.granted) {
@@ -305,11 +317,11 @@ export default function EditTeamModal({
                 const uploadRes = await apiService.uploadPhoto(localUri);
                 if (uploadRes && uploadRes.url) {
                     const newPhotoUrl = uploadRes.url;
+                    await saveProfile('player_edit', { photo_url: newPhotoUrl }, String(playerId));
                     setPlayers(prev =>
                         prev.map(p => (String(p.id || p._id) === String(playerId) ? { ...p, photo: newPhotoUrl, photo_url: newPhotoUrl } : p))
                     );
 
-                    await apiService.updatePlayerInfo(playerId, { photo_url: newPhotoUrl });
                     showToast(t('teams.photo_updated_success', 'Rasm muvaffaqiyatli yuklandi.'), 'success');
                 }
             }
@@ -322,17 +334,19 @@ export default function EditTeamModal({
     };
 
     // Save individual player phone
-    const handleSavePlayerPhone = async (player: any, newPhone: string) => {
+    const handleSavePlayerPhone = async (player: any, newPhone: string, newNumber: string) => {
+        if (!canEdit()) return;
+        if (!/^[1-9][0-9]?$/.test(newNumber)) { showToast(t('teams.number_invalid'), 'error'); return; }
         const pId = player.id || player._id;
         try {
             setSavingPhonePlayerId(pId);
-            const res = await apiService.updatePlayerInfo(pId, { phone: newPhone.trim() });
+            const res = await saveProfile('player_edit', { phone: newPhone.trim(), player_number: newNumber }, String(pId));
             if (res && res.error) {
                 throw new Error(res.error);
             }
 
             setPlayers(prev =>
-                prev.map(p => (String(p.id || p._id) === String(pId) ? { ...p, phone: newPhone.trim() } : p))
+                prev.map(p => (String(p.id || p._id) === String(pId) ? { ...p, phone: newPhone.trim(), number: newNumber, player_number: newNumber } : p))
             );
             setEditingPlayerId(null);
 
@@ -563,14 +577,14 @@ export default function EditTeamModal({
                                             <Text style={[styles.fieldLabel, { color: homeColors.textPrimary }]}>
                                                 {t('teams.captain', 'Sardor')}
                                             </Text>
-                                            <TextInput
+                                            <TextInput editable={rosterWindowOpen && !saving}
                                                 value={captainName}
                                                 onChangeText={setCaptainName}
                                                 placeholder={t('teams.captain_name_placeholder', 'Sardor F.I.SH.')}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border }]}
                                             />
-                                            <TextInput
+                                            <TextInput editable={rosterWindowOpen && !saving}
                                                 value={captainPhone}
                                                 onChangeText={(text) => setCaptainPhone(formatUzPhone(text))}
                                                 placeholder="+998 90 123 45 67"
@@ -585,14 +599,14 @@ export default function EditTeamModal({
                                             <Text style={[styles.fieldLabel, { color: homeColors.textPrimary }]}>
                                                 {t('teams.coach', 'Murabbiy')}
                                             </Text>
-                                            <TextInput
+                                            <TextInput editable={rosterWindowOpen && !saving}
                                                 value={coachName}
                                                 onChangeText={setCoachName}
                                                 placeholder={t('teams.coach_name_placeholder', 'Murabbiy F.I.SH.')}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border }]}
                                             />
-                                            <TextInput
+                                            <TextInput editable={rosterWindowOpen && !saving}
                                                 value={coachPhone}
                                                 onChangeText={(text) => setCoachPhone(formatUzPhone(text))}
                                                 placeholder="+998 90 123 45 67"
@@ -607,14 +621,14 @@ export default function EditTeamModal({
                                             <Text style={[styles.fieldLabel, { color: homeColors.textPrimary }]}>
                                                 {t('teams.president', 'Prezident / Rahbar')}
                                             </Text>
-                                            <TextInput
+                                            <TextInput editable={rosterWindowOpen && !saving}
                                                 value={presidentName}
                                                 onChangeText={setPresidentName}
                                                 placeholder={t('teams.president_name_placeholder', 'Rahbar F.I.SH.')}
                                                 placeholderTextColor={homeColors.textSecondary}
                                                 style={[styles.input, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border }]}
                                             />
-                                            <TextInput
+                                            <TextInput editable={rosterWindowOpen && !saving}
                                                 value={presidentPhone}
                                                 onChangeText={(text) => setPresidentPhone(formatUzPhone(text))}
                                                 placeholder="+998 90 123 45 67"
@@ -647,7 +661,7 @@ export default function EditTeamModal({
                                 <View style={{ gap: 12 }}>
                                     <View style={[styles.searchBox, cardSurface]}>
                                         <Ionicons name="search" size={18} color={homeColors.textSecondary} />
-                                        <TextInput
+                                        <TextInput editable={rosterWindowOpen && !saving}
                                             value={playerSearch}
                                             onChangeText={setPlayerSearch}
                                             placeholder={t('teams.search_player_placeholder', 'O\'yinchini qidirish...')}
@@ -675,7 +689,8 @@ export default function EditTeamModal({
                                             const isSavingThis = savingPhonePlayerId === pId;
 
                                             return (
-                                                <View key={pId}>
+                                                <Swipeable key={pId} ref={ref=>{swipeRefs.current[String(pId)]=ref;}} overshootRight={false} onSwipeableOpen={() => { if (!rosterWindowOpen) { swipeRefs.current[String(pId)]?.close();setNotice({ type: 'locked' }); } }}
+                                                    renderRightActions={() => <TouchableOpacity onPress={() => { if (canEdit()) setNotice({ type: 'delete', player }); }} style={{backgroundColor:'#B91C1C',width:80,alignItems:'center',justifyContent:'center',borderRadius:12,marginBottom:12}}><Ionicons name="trash-outline" size={24} color="#FFFFFF"/><Text style={{color:'#FFFFFF',marginTop:6}}>{t('common.delete','O‘chirish')}</Text></TouchableOpacity>}>
                                                 <PlayerEditCard
                                                     player={player}
                                                     isEditing={isEditingThis}
@@ -685,30 +700,10 @@ export default function EditTeamModal({
                                                     isDark={isDark}
                                                     t={t}
                                                     onPickPhoto={() => handlePickPlayerPhoto(pId)}
-                                                    onToggleEdit={() => setEditingPlayerId(isEditingThis ? null : pId)}
-                                                    onSavePhone={(newPhone) => handleSavePlayerPhone(player, newPhone)}
+                                                    onToggleEdit={() => { if (isEditingThis || canEdit()) setEditingPlayerId(isEditingThis ? null : pId); }}
+                                                    onSavePhone={(newPhone, newNumber) => handleSavePlayerPhone(player, newPhone, newNumber)}
                                                 />
-                                                <View style={{flexDirection:'row',alignItems:'center',gap:8,padding:10,backgroundColor:homeColors.surface,borderRadius:12,marginBottom:12}}>
-                                                    <TextInput value={numberDrafts[String(pId)] ?? String(player.number ?? '')}
-                                                        onChangeText={value => setNumberDrafts(old => ({...old,[String(pId)]:value.replace(/\D/g,'').slice(0,2)}))}
-                                                        keyboardType="number-pad" maxLength={2} editable={rosterWindowOpen && !rosterBusy}
-                                                        accessibilityLabel={t('teams.jersey_number','Forma raqami')}
-                                                        style={{width:48,minHeight:44,color:homeColors.textPrimary,borderWidth:1,borderColor:homeColors.border,borderRadius:8,textAlign:'center'}} />
-                                                    <TouchableOpacity disabled={!rosterWindowOpen || !!rosterBusy} onPress={() => updateRoster(player,'number')}
-                                                        style={{minHeight:44,justifyContent:'center',paddingHorizontal:8,opacity:rosterWindowOpen && !rosterBusy ? 1 : 0.4}}>
-                                                        <Text style={{color:'#E85002'}}>{t('teams.save_number','Raqamni saqlash')}</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity disabled={!rosterWindowOpen || !!rosterBusy}
-                                                        onPress={() => Alert.alert(t('teams.archive_player','Futbolchini arxivlash'),t('teams.archive_hint','Futbolchi faol ro‘yxatlardan yashiriladi. Tarixi saqlanadi.'),[
-                                                            {text:t('common.cancel','Bekor qilish'),style:'cancel'},
-                                                            {text:t('common.delete','O‘chirish'),style:'destructive',onPress:()=>updateRoster(player,'archive')}])}
-                                                        accessibilityRole="button" accessibilityLabel={t('teams.archive_player','Futbolchini arxivlash')}
-                                                        style={{marginLeft:'auto',minHeight:44,minWidth:44,alignItems:'center',justifyContent:'center',opacity:rosterWindowOpen && !rosterBusy ? 1 : 0.4}}>
-                                                        {rosterBusy===String(pId) ? <ActivityIndicator color="#E85002"/> : <Ionicons name="trash-outline" size={22} color="#EF4444"/>}
-                                                    </TouchableOpacity>
-                                                </View>
-                                                {!rosterWindowOpen && <Text style={{color:homeColors.textSecondary,fontSize:11,marginBottom:12}}>{t('teams.roster_locked','Amallar uchun sardor sifatida kirish va transfer oynasi ochiq bo‘lishi kerak.')}</Text>}
-                                                </View>
+                                                </Swipeable>
                                             );
                                         })
                                     )}
@@ -718,6 +713,15 @@ export default function EditTeamModal({
                     )}
                 </View>
             </KeyboardAvoidingView>
+            <Modal visible={!!notice} transparent animationType="fade" onRequestClose={() => setNotice(null)}>
+                <View style={{flex:1,backgroundColor:'rgba(0,0,0,0.7)',justifyContent:'center',padding:24}}><View style={{backgroundColor:homeColors.surface,borderRadius:Platform.OS==='android'?12:20,padding:24,borderWidth:1,borderColor:homeColors.border}}>
+                    <Ionicons name={notice?.type==='delete'?'trash-outline':'lock-closed-outline'} size={32} color={homeColors.accent}/>
+                    <Text style={{color:homeColors.textPrimary,fontSize:20,fontWeight:'700',marginVertical:16}}>{notice?.type==='delete'?t('teams.archive_player'):t('teams.transfer_edit_closed_title','Ma’lumotlarni tahrirlash yopilgan')}</Text>
+                    <Text style={{color:homeColors.textSecondary,lineHeight:22,marginBottom:24}}>{notice?.type==='delete'?t('teams.archive_hint'):t('teams.transfer_edit_closed','Tashkilotingiz ma’lumotlarni o‘zgartirishni yopgan. Transfer ochilganda o‘yinchi ma’lumotlarini tahrirlashingiz va o‘yinchini o‘chirishingiz mumkin.')}</Text>
+                    {notice?.type==='delete'&&<TouchableOpacity onPress={()=>setNotice(null)} style={{padding:12,alignItems:'center'}}><Text style={{color:homeColors.textSecondary}}>{t('common.cancel')}</Text></TouchableOpacity>}
+                    <TouchableOpacity style={{backgroundColor:homeColors.accent,padding:14,borderRadius:8,alignItems:'center'}} onPress={()=>{const value=notice;setNotice(null);if(value?.type==='delete')void updateRoster(value.player,'archive');}}><Text style={{color:'#FFFFFF',fontWeight:'700'}}>{notice?.type==='delete'?t('common.delete'):t('common.ok','Tushunarli')}</Text></TouchableOpacity>
+                </View></View>
+            </Modal>
         </Modal>
     );
 }
@@ -833,13 +837,15 @@ function PlayerEditCard({
     t: any;
     onPickPhoto: () => void;
     onToggleEdit: () => void;
-    onSavePhone: (phone: string) => void;
+    onSavePhone: (phone: string, number: string) => void;
 }) {
+    const [numberText, setNumberText] = useState(String(player.number || player.player_number || ''));
     const [phoneText, setPhoneText] = useState(formatUzPhone(player.phone || player.phoneNumber || ''));
 
     useEffect(() => {
         setPhoneText(formatUzPhone(player.phone || player.phoneNumber || ''));
-    }, [player.phone, player.phoneNumber]);
+        setNumberText(String(player.number || player.player_number || ''));
+    }, [isEditing, player.phone, player.phoneNumber, player.number, player.player_number]);
 
     const fullName = `${player.firstName || player.first_name || ''} ${player.lastName || player.last_name || ''}`.trim() || t('teams.player_fallback', 'O\'yinchi');
     const localizedPos = getLocalizedPosition(player.position, t);
@@ -849,7 +855,7 @@ function PlayerEditCard({
         <View style={[styles.playerCard, { backgroundColor: homeColors.surface, borderColor: homeColors.border, borderWidth: 1 }]}>
             <View style={styles.playerCardHeader}>
                 <TouchableOpacity
-                    onPress={onPickPhoto}
+                    onPress={onToggleEdit}
                     disabled={isUploading}
                     style={styles.playerAvatarContainer}
                 >
@@ -902,7 +908,12 @@ function PlayerEditCard({
             </View>
 
             {isEditing && (
-                <View style={[styles.phoneEditRow, { borderTopColor: homeColors.border }]}>
+                <Modal visible transparent animationType="fade" onRequestClose={onToggleEdit}><KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1,backgroundColor:'rgba(0,0,0,0.7)',justifyContent:'center',padding:24}}><View style={{backgroundColor:homeColors.surface,borderRadius:12,padding:24,gap:16}}>
+                    <TouchableOpacity onPress={onPickPhoto} disabled={isUploading || isSavingPhone} style={{alignItems:'center'}}><SmartImage uri={player.photo || player.photo_url} style={{width:72,height:72,borderRadius:36}} contentFit="cover" fallbackIcon="person"/><Text style={{color:homeColors.accent,marginTop:8}}>{t('profile.change_avatar','Rasmni almashtirish')}</Text></TouchableOpacity>
+                    <Text style={{fontSize:18,fontWeight:'700',color:homeColors.textPrimary}}>{fullName}</Text>
+                    <Text style={{color:homeColors.textSecondary}}>{t('teams.jersey_number','Forma raqami')}</Text>
+                    <TextInput value={numberText} onChangeText={v=>setNumberText(v.replace(/\D/g,'').slice(0,2))} keyboardType="number-pad" maxLength={2} style={[styles.phoneInput,{color:homeColors.textPrimary,borderColor:homeColors.border}]} />
+                    <Text style={{color:homeColors.textSecondary}}>{t('profile.phone_number','Telefon raqami')}</Text>
                     <TextInput
                         value={phoneText}
                         onChangeText={(text) => setPhoneText(formatUzPhone(text))}
@@ -916,7 +927,7 @@ function PlayerEditCard({
                         ]}
                     />
                     <TouchableOpacity
-                        onPress={() => onSavePhone(cleanPhoneForDb(phoneText))}
+                        onPress={() => onSavePhone(cleanPhoneForDb(phoneText), numberText)}
                         disabled={isSavingPhone}
                         style={[
                             styles.savePhoneBtn,
@@ -936,7 +947,8 @@ function PlayerEditCard({
                             </>
                         )}
                     </TouchableOpacity>
-                </View>
+                    <TouchableOpacity disabled={isSavingPhone} onPress={onToggleEdit} style={{padding:10,alignItems:'center'}}><Text style={{color:homeColors.textSecondary}}>{t('common.cancel')}</Text></TouchableOpacity>
+                </View></KeyboardAvoidingView></Modal>
             )}
         </View>
     );

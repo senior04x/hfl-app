@@ -286,6 +286,9 @@
     "away_short": "AWAY"
   },
   "teams": {
+    "transfer_edit_closed_title": "Editing is closed",
+    "transfer_edit_closed": "Your organization has closed data editing. You can edit player information and remove players when the transfer window opens.",
+
     "number_invalid": "Choose a number from 1 to 99",
     "roster_failed": "Unable to save. The number may be taken or the transfer window closed.",
     "jersey_number": "Jersey number",
