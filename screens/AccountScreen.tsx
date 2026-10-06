@@ -83,7 +83,7 @@ export default function AccountScreen({ navigation }: any) {
     };
 
     useEffect(() => {
-        if (!isGuest) {
+        if (!isGuest && ['player', 'manager'].includes(user?.role)) {
             if (user?.id) {
                 loadDetailedData();
                 loadUserApplications();
@@ -255,6 +255,8 @@ export default function AccountScreen({ navigation }: any) {
     } else if (isManager) {
         const rawName = (detailedData?.name || detailedData?.team_name || user?.teamName || user?.name || detailedData?.firstName || user?.firstName || 'Jamoa').trim();
         displayName = rawName || t('profile.team', 'Jamoa');
+    } else if (user?.role === 'user') {
+        displayName = user.name || t('profile.user', 'Foydalanuvchi');
     }
     displayName = displayName.replace(/\(sardor\)/gi, '').replace(/\(menejer\)/gi, '').trim();
 
@@ -265,6 +267,8 @@ export default function AccountScreen({ navigation }: any) {
         displaySubtitle = getLocalizedPosition(detailedData?.position || user?.position, t);
     } else if (isManager) {
         displaySubtitle = (detailedData?.league || user?.league || t('profile.captain', 'Sardor'));
+    } else if (user?.role === 'user') {
+        displaySubtitle = t('profile.personal_account', 'Shaxsiy akkaunt');
     }
 
     const currentLangItem = SUPPORTED_LANGUAGES.find(l => l.code === i18n.language);
@@ -518,6 +522,8 @@ export default function AccountScreen({ navigation }: any) {
                                     }
                                 ]}
                             >
+                                {user?.role === 'user' && <SettingRow icon="football-outline" title={t('profile.become_player', 'Futbolchi sifatida ro‘yxatdan o‘tish')}
+                                    onPress={handleApplyToLeaguePress} isLast />}
                                 {!isGuest && ['player', 'manager'].includes(user?.role) && <SettingRow icon="swap-horizontal-outline" title={t('transfer_app.title')}
                                     onPress={() => navigation.navigate('Transfers')} />}
                                 {isPlayer && (

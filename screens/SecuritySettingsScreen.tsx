@@ -24,6 +24,7 @@ import { getLocalizedErrorMessage } from '../utils/errorParser';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import AppNavbar from '../components/AppNavbar';
+import { deletePersonalAccount } from '../services/personalAuthService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -181,7 +182,7 @@ export default function SecuritySettingsScreen({ navigation }: any) {
             const targetId = user?._id || user?.id;
             const targetPhone = user?.phone || user?.phoneNumber || user?.phone_number;
 
-            const res = await apiService.deleteAccount(targetId, targetPhone);
+            const res = user?.appUserId ? await deletePersonalAccount() : await apiService.deleteAccount(targetId, targetPhone);
             setIsDeleting(false);
             setShowDeleteModal(false);
 

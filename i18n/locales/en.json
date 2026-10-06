@@ -79,6 +79,9 @@
     "transfers": "Transfers"
   },
   "auth": {
+    "telegram_login": "Sign in with Telegram",
+    "profile_conflict": "Some profiles with this number are linked to another account. You can sign in to your personal account.",
+    "organization_missing": "Your profile organization could not be identified. Please try again.",
     "login": "LOGIN",
     "logout": "LOGOUT",
     "register": "REGISTER",
@@ -373,6 +376,8 @@
     "player": "Player"
   },
   "profile": {
+    "personal_account": "Personal account",
+    "become_player": "Register as a player",
     "title": "Profile",
     "account": "ACCOUNT",
     "login_prompt": "SIGN IN",

@@ -5,6 +5,8 @@ import { AuthStorageFailure, authStorageDiagnostic } from '../utils/authStorageD
 import { clearTransferLoginStorage } from '../services/transferLoginStorage';
 
 let loginRevision = 0;
+let personalLogout: () => Promise<void> = async () => {};
+export function registerPersonalLogout(cleanup: () => Promise<void>) { personalLogout = cleanup; }
 let storageQueue: Promise<unknown> = Promise.resolve();
 const authStorage = {
     getItem: async (key: string) => { await storageQueue; return AsyncStorage.getItem(key); },
@@ -78,7 +80,7 @@ export const useAuthStore = create<AuthState>()(
                     userAccounts: updatedAccounts,
                 };
             }),
-            logout: () => { loginRevision++; void clearTransferLoginStorage().catch(() => undefined); set({ user: null, userAccounts: [], isAuthenticated: false, isGuest: false, unreadCount: 0, isChatMuted: false }); },
+            logout: () => { loginRevision++; void personalLogout().catch(() => undefined); void clearTransferLoginStorage().catch(() => undefined); set({ user: null, userAccounts: [], isAuthenticated: false, isGuest: false, unreadCount: 0, isChatMuted: false }); },
             incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
             resetUnreadCount: () => set({ unreadCount: 0 }),
             toggleChatMute: () => set((state) => ({ isChatMuted: !state.isChatMuted })),

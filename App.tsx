@@ -45,6 +45,7 @@ import SystemSettingsScreen from './screens/SystemSettingsScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
 import { notificationService } from './services/notificationService';
+import { restorePersonalSession, resumePersonalLogin, startPersonalSessionLifecycle } from './services/personalAuthService';
 
 import * as SplashScreenExpo from 'expo-splash-screen';
 import SplashScreen from './screens/SplashScreen';
@@ -73,11 +74,15 @@ function App() {
     const [authRestored, setAuthRestored] = React.useState(false);
     React.useEffect(() => {
         let disposed = false;
-        Promise.resolve(useAuthStore.persist.rehydrate()).finally(() => {
+        Promise.resolve(useAuthStore.persist.rehydrate()).then(async () => {
+            await resumePersonalLogin(await Linking.getInitialURL());
+            await restorePersonalSession();
+        }).finally(() => {
             if (!disposed) setAuthRestored(true);
         });
         return () => { disposed = true; };
     }, []);
+    React.useEffect(startPersonalSessionLifecycle, []);
     const [isSplashVisible, setIsSplashVisible] = React.useState(Platform.OS !== 'web');
     const pendingTransferLink = React.useRef<string | null>(null);
     const canOpenTransferLink = React.useRef(false);
@@ -102,6 +107,7 @@ function App() {
         };
         const subscription = Linking.addEventListener('url', ({ url }) => {
             receivedLiveLink = true;
+            void resumePersonalLogin(url);
             acceptLink(url);
         });
         Linking.getInitialURL().then(url => {
@@ -116,7 +122,7 @@ function App() {
     }, []);
 
     React.useEffect(() => {
-        if (!authRestored || Platform.OS === 'web') return;
+        if (!authRestored || Platform.OS === 'web' || user?.role === 'user') return;
 
         const setupNotifications = async () => {
             try {

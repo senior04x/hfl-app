@@ -123,13 +123,14 @@ const ShimmerLogo = ({ visible }: { visible: boolean }) => {
 
 // 🔑 Master OTP kod (faqat test/debug uchun) — production build'dan oldin albatta null qiling!
 // Qo'llanma: OTP_MASTER_KOD_QOLLANMA.md (repo root)
-export const MASTER_OTP_CODE: string | null = '7777';
+export const MASTER_OTP_CODE: string | null = null;
+
+import { loginWithTelegram, personalLoginMessage, PersonalLoginError } from '../services/personalAuthService';
 
 export default function WelcomeScreen({ navigation, route }: any) {
     const isTransferReentry = route?.params?.transferReentry === true;
     const { t, i18n } = useTranslation();
     const setAuth = useAuthStore((state) => state.setAuth);
-    const setGuest = useAuthStore((state) => state.setGuest);
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
     
@@ -225,15 +226,20 @@ export default function WelcomeScreen({ navigation, route }: any) {
         try {
             clearApiCache();
         } catch (e) {}
-        const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || acc.organizations?.id || 1;
-        useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
+        const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || acc.organizations?.id || null;
+        if (acc.role !== 'user' && (!orgId || !Number.isSafeInteger(Number(orgId)) || Number(orgId) <= 0)) {
+            Alert.alert(t('common.error'), t('auth.organization_missing', 'Profil tashkiloti aniqlanmadi. Qayta urinib ko‘ring.'));
+            return;
+        }
+        // The organization store is a public-content filter, not an authority.
+        if (orgId) useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
         
         const finalAccounts = (accountsList && accountsList.length > 0) 
             ? accountsList 
             : (accountOptions.length > 0 ? accountOptions : [acc]);
             
         try {
-            await setAuth({ ...acc, organizationId: Number(orgId), organization_id: Number(orgId) }, finalAccounts);
+            await setAuth({ ...acc, organizationId: orgId ? Number(orgId) : null, organization_id: orgId ? Number(orgId) : null }, finalAccounts);
         } catch (error) {
             Alert.alert(t('common.error'), t('auth.storage_failed') + '\n\n' + t('auth.storage_diagnostic', { code: safeAuthStorageCode(error) }));
             return;
@@ -244,7 +250,7 @@ export default function WelcomeScreen({ navigation, route }: any) {
 
         // Qurilma xotirasiga telefon raqamiga bog'langan barcha akkauntlarni saqlash
         const phone = acc?.phone || acc?.phoneNumber || acc?.phone_number;
-        if (phone) {
+        if (phone && !acc.appUserId) {
             const fullPhone = `+998${phone.replace(/\D/g, '').slice(-9)}`;
             apiService.findAccountsByPhone(fullPhone)
                 .then((res: any) => {
@@ -436,8 +442,20 @@ const formatPhoneInput = (val: string) => {
         }
     };
 
-    const handleGuestLogin = () => {
-        setGuest(true);
+    const handleTelegramLogin = async () => {
+        if (loading) return;
+        setLoading(true);
+        try {
+            const result = await loginWithTelegram();
+            if (!result) return;
+            if (result.profileConflict) Alert.alert(t('common.notice', 'Eslatma'), t('auth.profile_conflict', 'Bu raqamdagi ayrim profillar boshqa akkauntga bog‘langan. Shaxsiy akkauntingiz orqali kirishingiz mumkin.'));
+            setAccountOptions(result.accounts);
+            const sports = result.accounts.filter((account: any) => account.role !== 'user');
+            if (sports.length > 1) setShowAccountModal(true);
+            else await performLogin(sports[0] || result.user, result.accounts);
+        } catch (error) {
+            Alert.alert(t('common.error'), personalLoginMessage(error instanceof PersonalLoginError ? error.code : 'LOGIN_UNAVAILABLE', i18n.language));
+        } finally { setLoading(false); }
     };
 
     return (
@@ -660,9 +678,10 @@ const formatPhoneInput = (val: string) => {
                                     {/* Centered Divider Line | */}
                                     <Text style={{ color: 'rgba(255, 255, 255, 0.35)', fontSize: 13, fontWeight: '300', marginHorizontal: 2 }}>|</Text>
 
-                                    {/* Guest Mode Button (oddiy kulrang, iconsiz - Right side) */}
+                                    {/* Every Telegram visitor receives a permanent personal account. */}
                                     <TouchableOpacity
-                                        onPress={handleGuestLogin}
+                                        onPress={handleTelegramLogin}
+                                        disabled={loading}
                                         activeOpacity={0.7}
                                         style={{
                                             flex: 1,
@@ -673,8 +692,9 @@ const formatPhoneInput = (val: string) => {
                                             paddingLeft: 14,
                                         }}
                                     >
-                                        <Text style={styles.bottomSecondaryText}>
-                                            {t('auth.guest_mode', "Mehmon bo'lib kirish")}
+                                        {loading ? <ActivityIndicator size="small" color="#E85002" style={{ marginRight: 6 }} /> : <Ionicons name="paper-plane-outline" size={16} color="#E85002" style={{ marginRight: 6 }} />}
+                                        <Text style={[styles.bottomSecondaryText, { color: '#FFFFFF' }]}>
+                                            {t('auth.telegram_login', 'Telegram orqali kirish')}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>

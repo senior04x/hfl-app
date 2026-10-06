@@ -79,6 +79,9 @@
     "transfers": "Transferlar"
   },
   "auth": {
+    "telegram_login": "Telegram orqali kirish",
+    "profile_conflict": "Bu raqamdagi ayrim profillar boshqa akkauntga bog‘langan. Shaxsiy akkauntingiz orqali kirishingiz mumkin.",
+    "organization_missing": "Profil tashkiloti aniqlanmadi. Qayta urinib ko‘ring.",
     "login": "KIRISH",
     "logout": "CHIQISH",
     "register": "RO'YXATDAN O'TISH",
@@ -373,6 +376,8 @@
     "player": "O'yinchi"
   },
   "profile": {
+    "personal_account": "Shaxsiy akkaunt",
+    "become_player": "Futbolchi sifatida ro‘yxatdan o‘tish",
     "title": "Profil",
     "account": "HISOB",
     "login_prompt": "TIZIMGA KIRING",

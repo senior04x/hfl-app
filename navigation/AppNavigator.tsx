@@ -34,6 +34,7 @@ import TournamentsScreen from '../screens/TournamentsScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import NewsScreen from '../screens/NewsScreen';
 import AccountScreen from '../screens/AccountScreen';
+import { refreshPersonalAccounts } from '../services/personalAuthService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_ANDROID = Platform.OS === 'android';
@@ -312,7 +313,14 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
 
         // 2. Orqa fonda (jimjit, spinner ko'rsatmasdan) yangi akkauntlarni tekshirib yangilaydi
         const phone = user?.phone || user?.phoneNumber || user?.phone_number;
-        if (phone) {
+        if (user?.appUserId) {
+            refreshPersonalAccounts().then(res => {
+                if (useAuthStore.getState().user?.appUserId !== user.appUserId) return;
+                const accounts = deduplicateAccountsList(res.accounts);
+                setAccountOptions(accounts);
+                useAuthStore.getState().setUserAccounts(accounts);
+            }).catch(() => {});
+        } else if (phone) {
             const fullPhone = `+998${phone.replace(/\D/g, '').slice(-9)}`;
             apiService.findAccountsByPhone(fullPhone)
                 .then((res: any) => {
@@ -336,8 +344,9 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
             clearApiCache();
         } catch (e) {}
 
-        const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || acc.organizations?.id || 1;
-        useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
+        const orgId = acc.organization_id || acc.organizationId || acc.team?.organization_id || acc.organizations?.id || null;
+        if (acc.role !== 'user' && (!orgId || !Number.isSafeInteger(Number(orgId)) || Number(orgId) <= 0)) return;
+        if (orgId) useOrganizationStore.getState().setSelectedOrganizationId(Number(orgId));
         
         const currentAccounts = useAuthStore.getState().userAccounts;
         const finalAccounts = currentAccounts && currentAccounts.length > 0 ? currentAccounts : accountOptions;
@@ -345,8 +354,8 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
         try {
             await setAuth({
                 ...acc,
-                organizationId: Number(orgId),
-                organization_id: Number(orgId),
+                organizationId: orgId ? Number(orgId) : null,
+                organization_id: orgId ? Number(orgId) : null,
             }, finalAccounts);
         } catch {
             return;

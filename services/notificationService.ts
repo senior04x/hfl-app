@@ -44,6 +44,10 @@ export const notificationService = {
    * @param userId The ID of the currently logged-in user (optional)
    */
   registerForPushNotificationsAsync: async (userId?: string) => {
+    // Ordinary accounts do not belong to an organization/team. Do not enroll
+    // them through the legacy organization-bound push registration endpoint.
+    const personalUser = require('../store/useAuthStore').useAuthStore.getState().user;
+    if (personalUser?.appUserId && personalUser.role === 'user') return null;
     if (!Device.isDevice) {
       return null;
     }
