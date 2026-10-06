@@ -8,7 +8,7 @@ if (typeof global !== 'undefined' && (global as any).ErrorUtils) {
 
 import 'expo-dev-client';
 import React from 'react';
-import { StyleSheet, Platform, Text, Linking, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, Platform, Text, Linking, View, ActivityIndicator, Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
@@ -45,7 +45,7 @@ import SystemSettingsScreen from './screens/SystemSettingsScreen';
 import Colors from './constants/Colors';
 import { SocketProvider } from './context/SocketContext';
 import { notificationService } from './services/notificationService';
-import { restorePersonalSession, resumePersonalLogin, startPersonalSessionLifecycle } from './services/personalAuthService';
+import { restorePersonalSession, resumePersonalLogin, startPersonalSessionLifecycle, personalLoginMessage, PersonalLoginError } from './services/personalAuthService';
 
 import * as SplashScreenExpo from 'expo-splash-screen';
 import SplashScreen from './screens/SplashScreen';
@@ -64,7 +64,7 @@ if (Platform.OS !== 'web') {
 
 import NotificationsScreen from './screens/NotificationsScreen';
 import './i18n';
-import { initI18n } from './i18n';
+import i18n, { initI18n } from './i18n';
 
 const Stack = createStackNavigator();
 export const navigationRef = createNavigationContainerRef();
@@ -75,7 +75,8 @@ function App() {
     React.useEffect(() => {
         let disposed = false;
         Promise.resolve(useAuthStore.persist.rehydrate()).then(async () => {
-            await resumePersonalLogin(await Linking.getInitialURL());
+            try { await resumePersonalLogin(await Linking.getInitialURL()); }
+            catch (error) { Alert.alert('Telegram', personalLoginMessage(error instanceof PersonalLoginError ? error.code : 'LOGIN_UNAVAILABLE', i18n.language)); }
             await restorePersonalSession();
         }).finally(() => {
             if (!disposed) setAuthRestored(true);
@@ -107,7 +108,7 @@ function App() {
         };
         const subscription = Linking.addEventListener('url', ({ url }) => {
             receivedLiveLink = true;
-            void resumePersonalLogin(url);
+            void resumePersonalLogin(url).catch(error => Alert.alert('Telegram', personalLoginMessage(error instanceof PersonalLoginError ? error.code : 'LOGIN_UNAVAILABLE', i18n.language)));
             acceptLink(url);
         });
         Linking.getInitialURL().then(url => {

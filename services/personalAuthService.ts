@@ -16,6 +16,12 @@ export const personalAuthClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, 
 });
 WebBrowser.maybeCompleteAuthSession();
 let busy = false;
+let captureBrowserCallback: ((url: string) => void) | null = null;
+function isPersonalCallback(url: string | null): url is string {
+ if (!url) return false;
+ try { const parsed = new URL(url); return `${parsed.protocol}//${parsed.host}${parsed.pathname}` === PERSONAL_RETURN_URL; }
+ catch { return false; }
+}
 let authRevision = 0;
 const VERIFIER_KEY = 'amatora-personal-auth-v1-code-verifier';
 const PENDING_KEY = 'telegram-pending';
@@ -35,6 +41,11 @@ export class PersonalLoginError extends Error {
  constructor(public code: string) { super(code); }
 }
 export function personalLoginMessage(code: string, language: string): string {
+ const diagnostics: Record<string, string> = { PROVIDER_CALLBACK_FAILED: 'TG01', SESSION_EXCHANGE_FAILED: 'TG02', PROFILE_UNAVAILABLE: 'TG03', INVALID_CALLBACK: 'TG04', PROVIDER_DENIED: 'TG05' };
+ if (diagnostics[code]) {
+  const text = language.startsWith('ru') ? 'Не удалось завершить вход через Telegram. Повторите попытку.' : language.startsWith('en') ? 'Unable to complete Telegram login. Please try again.' : 'Telegram orqali kirishni yakunlab bo‘lmadi. Qayta urinib ko‘ring.';
+  return `${text} (${diagnostics[code]})`;
+ }
  const ru = language.startsWith('ru');
  if (language.startsWith('en')) {
   if (code === 'LOGIN_NOT_CONFIGURED') return 'Telegram login is being configured. Please use phone login for now.';
@@ -78,36 +89,59 @@ export async function loginWithTelegram(): Promise<any | null> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(start.verifier) || new URL(start.url).origin !== SUPABASE_URL) throw new PersonalLoginError('LOGIN_UNAVAILABLE');
   await personalSessionStorage.setItem(VERIFIER_KEY, JSON.stringify(start.verifier));
   await personalSessionStorage.setItem(PENDING_KEY, String(Date.now()));
+  let receivedUrl: string | null = null;
+  let notifyCallback: (() => void) | undefined;
+  const callbackArrived = new Promise<void>(resolve => { notifyCallback = resolve; });
+  captureBrowserCallback = url => { receivedUrl = url; notifyCallback?.(); };
   const result = await WebBrowser.openAuthSessionAsync(start.url, PERSONAL_RETURN_URL);
-  if (result.type !== 'success') {
-   await personalSessionStorage.removeItem(PENDING_KEY);
-   await personalSessionStorage.removeItem(VERIFIER_KEY);
+  // Android can report dismissal before delivering the deep link.
+  if (result.type !== 'success' && !receivedUrl && Platform.OS === 'android') {
+   let timer: ReturnType<typeof setTimeout> | undefined;
+   await Promise.race([callbackArrived, new Promise<void>(resolve => { timer = setTimeout(resolve, 1500); })]);
+   if (timer) clearTimeout(timer);
+  }
+  const callbackUrl = result.type === 'success' ? result.url : receivedUrl;
+  if (!callbackUrl) {
+   // A delayed Android link can still finish this intent before its ten-minute expiry.
+   if (Platform.OS !== 'android' || result.type !== 'dismiss') {
+    await personalSessionStorage.removeItem(PENDING_KEY);
+    await personalSessionStorage.removeItem(VERIFIER_KEY);
+   }
    return null;
   }
-  const profile = await completePersonalCallback(result.url);
+  const profile = await completePersonalCallback(callbackUrl);
   if (current !== authRevision) throw new PersonalLoginError('LOGIN_UNAVAILABLE');
   return profile;
  } catch (error) {
   // An incomplete login must not leave a new privileged session behind.
   if (!useAuthStore.getState().user?.appUserId) await personalAuthClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
   throw error instanceof PersonalLoginError ? error : new PersonalLoginError('LOGIN_UNAVAILABLE');
- } finally { busy = false; }
+ } finally { captureBrowserCallback = null; busy = false; }
 }
 async function completePersonalCallback(url: string) {
  const callback = new URL(url);
  if (`${callback.protocol}//${callback.host}${callback.pathname}` !== PERSONAL_RETURN_URL) throw new PersonalLoginError('INVALID_CALLBACK');
  const startedAt = Number(await personalSessionStorage.getItem(PENDING_KEY));
  if (!startedAt || Date.now() - startedAt > 10 * 60 * 1000 || startedAt > Date.now() + 30000) throw new PersonalLoginError('INVALID_CALLBACK');
+ const fragment = new URLSearchParams(callback.hash.replace(/^#/, ''));
+ if (callback.searchParams.has('error') || fragment.has('error')) {
+  const errorCode = callback.searchParams.get('error_code') || fragment.get('error_code');
+  await personalSessionStorage.removeItem(PENDING_KEY);
+  await personalSessionStorage.removeItem(VERIFIER_KEY);
+  throw new PersonalLoginError(errorCode === 'access_denied' ? 'PROVIDER_DENIED' : 'PROVIDER_CALLBACK_FAILED');
+ }
  const code = callback.searchParams.get('code');
- if (!code || callback.searchParams.has('error')) throw new PersonalLoginError('INVALID_CALLBACK');
+ if (!code) throw new PersonalLoginError('INVALID_CALLBACK');
  // Consume local intent first; Supabase also consumes the authorization code.
  await personalSessionStorage.removeItem(PENDING_KEY);
  const exchange = await personalAuthClient.auth.exchangeCodeForSession(code);
- if (exchange.error || !exchange.data.session) throw new PersonalLoginError('LOGIN_UNAVAILABLE');
+ if (exchange.error || !exchange.data.session) throw new PersonalLoginError('SESSION_EXCHANGE_FAILED');
  return refreshPersonalAccounts();
 }
 export async function resumePersonalLogin(url: string | null): Promise<boolean> {
- if (!url || busy || !url.startsWith(PERSONAL_RETURN_URL + '?')) return false;
+ if (!isPersonalCallback(url)) return false;
+ if (captureBrowserCallback) { captureBrowserCallback(url); return false; }
+ if (busy || !await personalSessionStorage.getItem(PENDING_KEY)) return false;
  busy = true;
  try {
   const profile = await completePersonalCallback(url);
@@ -116,9 +150,9 @@ export async function resumePersonalLogin(url: string | null): Promise<boolean> 
   if (selected.organization_id) useOrganizationStore.getState().setSelectedOrganizationId(selected.organization_id);
   await useAuthStore.getState().setAuth(selected, profile.accounts);
   return true;
- } catch {
+ } catch (error) {
   if (!useAuthStore.getState().user?.appUserId) await personalAuthClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
-  return false;
+  throw error instanceof PersonalLoginError ? error : new PersonalLoginError('LOGIN_UNAVAILABLE');
  } finally { busy = false; }
 }
 export async function restorePersonalSession(): Promise<void> {

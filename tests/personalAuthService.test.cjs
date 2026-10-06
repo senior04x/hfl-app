@@ -2,12 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
-function load({ result = { type: 'success', url: 'hflsoccerapp://auth/telegram?code=one-use-code' }, configured = true, profileFailure = false } = {}) {
- const values = new Map(); const calls = { exchange: 0, signOut: 0, saved: 0 }; let logout;
+function load({ result = { type: 'success', url: 'hflsoccerapp://auth/telegram?code=one-use-code' }, configured = true, profileFailure = false, openBrowser, exchangeFailure = false } = {}) {
+ const values = new Map(); const calls = { exchange: 0, signOut: 0, saved: 0 }; let logout; let out;
  const state = { user: null, isGuest: false, setAuth: async user => { state.user = user; }, logout: () => { state.user = null; } };
  const storage = { getItem: async k => values.get(k) ?? null, setItem: async (k,v)=>{values.set(k,v);}, removeItem:async k=>{values.delete(k);} };
- const client = { auth: { signOut:async()=>{calls.signOut++;},getSession:async()=>({data:{session:{access_token:'private-token',user:{id:'user-id'}}}}),exchangeCodeForSession:async()=>{calls.exchange++;return {data:{session:{user:{id:'user-id'}}}};} } };
- const imports = { 'react-native': { Platform:{OS:'android'},AppState:{} }, 'expo-web-browser':{ maybeCompleteAuthSession(){},openAuthSessionAsync:async()=>result },
+ const client = { auth: { signOut:async()=>{calls.signOut++;},getSession:async()=>({data:{session:{access_token:'private-token',user:{id:'user-id'}}}}),exchangeCodeForSession:async()=>{calls.exchange++;return exchangeFailure ? {error:{message:'private backend error'},data:{session:null}} : {data:{session:{user:{id:'user-id'}}}};} } };
+ const imports = { 'react-native': { Platform:{OS:'android'},AppState:{} }, 'expo-web-browser':{ maybeCompleteAuthSession(){},openAuthSessionAsync:async()=>openBrowser ? openBrowser(out) : result },
   '@supabase/supabase-js':{createClient:()=>client},'./supabase':{SUPABASE_URL:'https://project.supabase.co',SUPABASE_ANON_KEY:'public-key'},'../constants/ApiConfig':{API_BASE_URL:'https://backend.invalid'},
   './personalSessionStorage':{personalSessionStorage:storage},'../store/useAuthStore':{useAuthStore:{getState:()=>state},registerPersonalLogout:fn=>{logout=fn;}},
   './transferLoginStorage':{saveTransferLoginSessions:async()=>{calls.saved++;}},'../store/useOrganizationStore':{useOrganizationStore:{getState:()=>({setSelectedOrganizationId(){}})}} };
@@ -17,7 +17,7 @@ function load({ result = { type: 'success', url: 'hflsoccerapp://auth/telegram?c
   if(profileFailure) return {ok:false,status:503,json:async()=>({success:false,code:'PROFILE_UNAVAILABLE'})};
   return response({success:true,user:{appUserId:'user-id',id:'user-id',role:'user'},accounts:[{appUserId:'user-id',id:'user-id',role:'user'}],transferSessions:[]});
  };
- const out = {};
+ out = {};
  new Function('require','exports','fetch',ts.transpileModule(fs.readFileSync('services/personalAuthService.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText)(name=>{assert.ok(name in imports,name);return imports[name];},out,fetch);
  return { ...out, values, calls, logout:()=>logout(), state };
 }
@@ -40,4 +40,28 @@ test('profile failure does not leave an authenticated app state or new session',
 });
 test('cold-start callback without matching saved login intent is ignored',async()=>{
  const auth=load();assert.equal(await auth.resumePersonalLogin('hflsoccerapp://auth/telegram?code=unsolicited'),false);assert.equal(auth.calls.exchange,0);assert.equal(auth.state.user,null);
+});
+
+test('Android live callback wins even when browser reports dismissal', async()=>{
+ const auth=load({openBrowser:async api=>{await api.resumePersonalLogin('hflsoccerapp://auth/telegram?code=one-use-code');return {type:'dismiss'};}});
+ const profile=await auth.loginWithTelegram();assert.equal(profile.user.appUserId,'user-id');assert.equal(auth.calls.exchange,1);
+});
+test('Android dismissal before the link keeps PKCE and completes a late callback', async()=>{
+ const auth=load({result:{type:'dismiss'}});assert.equal(await auth.loginWithTelegram(),null);
+ assert.equal(auth.values.has('telegram-pending'),true);assert.equal(auth.values.has('amatora-personal-auth-v1-code-verifier'),true);
+ assert.equal(await auth.resumePersonalLogin('hflsoccerapp://auth/telegram?code=one-use-code'),true);
+ assert.equal(auth.state.user.appUserId,'user-id');assert.equal(auth.calls.exchange,1);
+ assert.equal(await auth.resumePersonalLogin('hflsoccerapp://auth/telegram?code=one-use-code'),false);
+});
+test('provider errors in URL fragments surface safely and clear the intent', async()=>{
+ const auth=load({result:{type:'success',url:'hflsoccerapp://auth/telegram#error=server_error&error_description=private-data'}});
+ await assert.rejects(auth.loginWithTelegram(),e=>e.code==='PROVIDER_CALLBACK_FAILED');
+ assert.equal(auth.calls.exchange,0);assert.equal(auth.values.size,0);assert.ok(!auth.personalLoginMessage('PROVIDER_CALLBACK_FAILED','uz').includes('private-data'));
+});
+test('cold-start provider errors are reported instead of silently returning to welcome', async()=>{
+ const auth=load();auth.values.set('telegram-pending',String(Date.now()));
+ await assert.rejects(auth.resumePersonalLogin('hflsoccerapp://auth/telegram#error=server_error'),e=>e.code==='PROVIDER_CALLBACK_FAILED');assert.equal(auth.calls.exchange,0);
+});
+test('session exchange failures have a separate diagnostic', async()=>{
+ const auth=load({exchangeFailure:true});await assert.rejects(auth.loginWithTelegram(),e=>e.code==='SESSION_EXCHANGE_FAILED');assert.equal(auth.calls.signOut,1);
 });
