@@ -7,7 +7,7 @@ function load({ result = { type: 'success', url: 'hflsoccerapp://auth/telegram?c
  const state = { user: null, isGuest: false, setAuth: async user => { state.user = user; }, logout: () => { state.user = null; } };
  const storage = { getItem: async k => values.get(k) ?? null, setItem: async (k,v)=>{values.set(k,v);}, removeItem:async k=>{values.delete(k);} };
  const client = { auth: { signOut:async()=>{calls.signOut++;},getSession:async()=>({data:{session:{access_token:'private-token',user:{id:'user-id'}}}}),exchangeCodeForSession:async()=>{calls.exchange++;return exchangeFailure ? {error:{message:'private backend error'},data:{session:null}} : {data:{session:{user:{id:'user-id'}}}};} } };
- const imports = { 'react-native': { Platform:{OS:'android'},AppState:{} }, 'expo-web-browser':{ maybeCompleteAuthSession(){},openAuthSessionAsync:async()=>openBrowser ? openBrowser(out) : result },
+ const imports = { 'react-native': { Platform:{OS:'android'},AppState:{} }, 'expo-web-browser':{ maybeCompleteAuthSession(){},openAuthSessionAsync:async(url,redirect,options)=>{calls.browserOptions=options;return openBrowser ? openBrowser(out) : result;} },
   '@supabase/supabase-js':{createClient:()=>client},'./supabase':{SUPABASE_URL:'https://project.supabase.co',SUPABASE_ANON_KEY:'public-key'},'../constants/ApiConfig':{API_BASE_URL:'https://backend.invalid'},
   './personalSessionStorage':{personalSessionStorage:storage},'../store/useAuthStore':{useAuthStore:{getState:()=>state},registerPersonalLogout:fn=>{logout=fn;}},
   './transferLoginStorage':{saveTransferLoginSessions:async()=>{calls.saved++;}},'../store/useOrganizationStore':{useOrganizationStore:{getState:()=>({setSelectedOrganizationId(){}})}} };
@@ -24,6 +24,7 @@ function load({ result = { type: 'success', url: 'hflsoccerapp://auth/telegram?c
 test('successful Telegram callback exchanges code and returns a permanent account without persisting API tokens in profile',async()=>{
  const auth=load();const profile=await auth.loginWithTelegram();
  assert.equal(profile.user.appUserId,'user-id');assert.equal(auth.calls.exchange,1);assert.equal(auth.calls.saved,1);
+ assert.equal(auth.calls.browserOptions.createTask,false);
  assert.equal(auth.values.has('telegram-pending'),false);assert.equal(JSON.stringify(profile).includes('private-token'),false);
 });
 test('cancellation removes pending intent and verifier without exchanging code',async()=>{
@@ -47,7 +48,8 @@ test('Android live callback wins even when browser reports dismissal', async()=>
  const profile=await auth.loginWithTelegram();assert.equal(profile.user.appUserId,'user-id');assert.equal(auth.calls.exchange,1);
 });
 test('Android dismissal before the link keeps PKCE and completes a late callback', async()=>{
- const auth=load({result:{type:'dismiss'}});assert.equal(await auth.loginWithTelegram(),null);
+ const auth=load({result:{type:'dismiss'}});await assert.rejects(auth.loginWithTelegram(),e=>e.code==='CALLBACK_NOT_RECEIVED');
+ assert.equal(auth.calls.signOut,0);
  assert.equal(auth.values.has('telegram-pending'),true);assert.equal(auth.values.has('amatora-personal-auth-v1-code-verifier'),true);
  assert.equal(await auth.resumePersonalLogin('hflsoccerapp://auth/telegram?code=one-use-code'),true);
  assert.equal(auth.state.user.appUserId,'user-id');assert.equal(auth.calls.exchange,1);

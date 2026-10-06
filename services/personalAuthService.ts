@@ -41,7 +41,7 @@ export class PersonalLoginError extends Error {
  constructor(public code: string) { super(code); }
 }
 export function personalLoginMessage(code: string, language: string): string {
- const diagnostics: Record<string, string> = { PROVIDER_CALLBACK_FAILED: 'TG01', SESSION_EXCHANGE_FAILED: 'TG02', PROFILE_UNAVAILABLE: 'TG03', INVALID_CALLBACK: 'TG04', PROVIDER_DENIED: 'TG05' };
+ const diagnostics: Record<string, string> = { PROVIDER_CALLBACK_FAILED: 'TG01', SESSION_EXCHANGE_FAILED: 'TG02', PROFILE_UNAVAILABLE: 'TG03', INVALID_CALLBACK: 'TG04', PROVIDER_DENIED: 'TG05', CALLBACK_NOT_RECEIVED: 'TG06' };
  if (diagnostics[code]) {
   const text = language.startsWith('ru') ? 'Не удалось завершить вход через Telegram. Повторите попытку.' : language.startsWith('en') ? 'Unable to complete Telegram login. Please try again.' : 'Telegram orqali kirishni yakunlab bo‘lmadi. Qayta urinib ko‘ring.';
   return `${text} (${diagnostics[code]})`;
@@ -93,7 +93,10 @@ export async function loginWithTelegram(): Promise<any | null> {
   let notifyCallback: (() => void) | undefined;
   const callbackArrived = new Promise<void>(resolve => { notifyCallback = resolve; });
   captureBrowserCallback = url => { receivedUrl = url; notifyCallback?.(); };
-  const result = await WebBrowser.openAuthSessionAsync(start.url, PERSONAL_RETURN_URL);
+  // Expo's Android default adds NEW_TASK + NO_HISTORY. Opening Telegram can
+  // destroy that browser activity before it returns to Supabase's callback.
+  // Keep the browser in this task so approval can resume the OAuth page.
+  const result = await WebBrowser.openAuthSessionAsync(start.url, PERSONAL_RETURN_URL, { createTask: false });
   // Android can report dismissal before delivering the deep link.
   if (result.type !== 'success' && !receivedUrl && Platform.OS === 'android') {
    let timer: ReturnType<typeof setTimeout> | undefined;
@@ -107,6 +110,7 @@ export async function loginWithTelegram(): Promise<any | null> {
     await personalSessionStorage.removeItem(PENDING_KEY);
     await personalSessionStorage.removeItem(VERIFIER_KEY);
    }
+   if (Platform.OS === 'android' && result.type === 'dismiss') throw new PersonalLoginError('CALLBACK_NOT_RECEIVED');
    return null;
   }
   const profile = await completePersonalCallback(callbackUrl);
@@ -114,7 +118,9 @@ export async function loginWithTelegram(): Promise<any | null> {
   return profile;
  } catch (error) {
   // An incomplete login must not leave a new privileged session behind.
-  if (!useAuthStore.getState().user?.appUserId) await personalAuthClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
+  // No code was exchanged when the browser vanished. Keep PKCE for a late link;
+  // auth.signOut also deletes Supabase's verifier, preventing that recovery.
+  if (!(error instanceof PersonalLoginError && error.code === 'CALLBACK_NOT_RECEIVED') && !useAuthStore.getState().user?.appUserId) await personalAuthClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
   throw error instanceof PersonalLoginError ? error : new PersonalLoginError('LOGIN_UNAVAILABLE');
  } finally { captureBrowserCallback = null; busy = false; }
 }
