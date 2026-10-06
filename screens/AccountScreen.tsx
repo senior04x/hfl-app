@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -35,6 +35,8 @@ import EditTeamModal from '../components/EditTeamModal';
 import PersonalProfileModal from '../components/PersonalProfileModal';
 import RegistrationClosedModal from '../components/RegistrationClosedModal';
 import { useNavBarScroll } from '../context/NavBarScrollContext';
+import { transferAppService } from '../services/transferAppService';
+import { restoreTransferLoginSession } from '../services/transferLoginStorage';
 
 export default function AccountScreen({ navigation }: any) {
     const { isGuest, user, logout, unreadCount, isChatMuted } = useAuthStore();
@@ -51,6 +53,9 @@ export default function AccountScreen({ navigation }: any) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showPersonalProfileModal, setShowPersonalProfileModal] = useState(false);
     const [showEditTeamModal, setShowEditTeamModal] = useState(false);
+    const [teamEditNotice, setTeamEditNotice] = useState<'closed' | 'failed' | null>(null);
+    const [checkingTeamEdit, setCheckingTeamEdit] = useState(false);
+    const teamEditCheckBusy = useRef(false);
     const [showRegClosedModal, setShowRegClosedModal] = useState(false);
     const [closedOrgInfo, setClosedOrgInfo] = useState<{ name: string; contact_phone: string } | null>(null);
     const [isCheckingReg, setIsCheckingReg] = useState(false);
@@ -60,6 +65,37 @@ export default function AccountScreen({ navigation }: any) {
     const [detailedData, setDetailedData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const currentTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
+    const accountEditKey = `${user?.role || ''}:${user?.id || user?._id || ''}:${currentTeamId || ''}`;
+    const latestAccountEditKey = useRef(accountEditKey);
+    latestAccountEditKey.current = accountEditKey;
+
+    useEffect(() => {
+        setShowEditTeamModal(false);
+        setTeamEditNotice(null);
+    }, [accountEditKey]);
+
+    const handleEditTeamPress = async () => {
+        if (!currentTeamId || teamEditCheckBusy.current) return;
+        const requestedTeamId = String(currentTeamId);
+        teamEditCheckBusy.current = true;
+        setCheckingTeamEdit(true);
+        try {
+            const session = await restoreTransferLoginSession('captain', requestedTeamId);
+            if (!session) throw new Error('Session required');
+            const context = await transferAppService.roster(session, 'context');
+            if (latestAccountEditKey.current !== accountEditKey) return;
+            if (context.transfer_window_open === true) {
+                setShowEditTeamModal(true);
+            } else {
+                setTeamEditNotice('closed');
+            }
+        } catch {
+            if (latestAccountEditKey.current === accountEditKey) setTeamEditNotice('failed');
+        } finally {
+            teamEditCheckBusy.current = false;
+            setCheckingTeamEdit(false);
+        }
+    };
 
     const [storyPickerVisible, setStoryPickerVisible] = useState(false);
     const [ownActiveReplayIds, setOwnActiveReplayIds] = useState<any[]>([]);
@@ -558,7 +594,8 @@ export default function AccountScreen({ navigation }: any) {
                                                 <SettingRow
                                                     icon="pencil-outline"
                                                     title={t('profile.edit_team_info', 'Jamoa ma\'lumotlarini tahrirlash')}
-                                                    onPress={() => setShowEditTeamModal(true)}
+                                                    onPress={handleEditTeamPress}
+                                                    isLoading={checkingTeamEdit}
                                                 />
                                             </>
                                         )}
@@ -683,8 +720,35 @@ export default function AccountScreen({ navigation }: any) {
                         teamId={currentTeamId}
                         onClose={() => setShowEditTeamModal(false)}
                         onSaved={loadDetailedData}
+                        onTransferClosed={() => {
+                            if (latestAccountEditKey.current !== accountEditKey) return;
+                            setShowEditTeamModal(false);
+                            setTeamEditNotice('closed');
+                        }}
                     />
                 )}
+
+                <Modal
+                    visible={teamEditNotice !== null}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setTeamEditNotice(null)}
+                >
+                    <View style={styles.logoutModalOverlay}>
+                        <View style={[styles.teamEditNoticeCard, { backgroundColor: homeColors.surface, borderColor: homeColors.border }]}>
+                            <Ionicons name={teamEditNotice === 'closed' ? 'lock-closed-outline' : 'alert-circle-outline'} size={32} color={homeColors.accent} />
+                            <Text style={[styles.teamEditNoticeTitle, { color: homeColors.textPrimary }]}>
+                                {teamEditNotice === 'closed' ? t('teams.transfer_edit_closed_title') : t('common.error', 'Xato')}
+                            </Text>
+                            <Text style={[styles.teamEditNoticeText, { color: homeColors.textSecondary }]}>
+                                {teamEditNotice === 'closed' ? t('teams.transfer_edit_closed') : t('teams.load_error')}
+                            </Text>
+                            <TouchableOpacity style={[styles.teamEditNoticeButton, { backgroundColor: homeColors.accent }]} onPress={() => setTeamEditNotice(null)}>
+                                <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{t('common.ok', 'Tushunarli')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
 
                 {/* Organization Registration Closed Modal */}
                 <RegistrationClosedModal
@@ -1054,6 +1118,29 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 24,
+    },
+    teamEditNoticeCard: {
+        width: '100%',
+        maxWidth: 380,
+        padding: 24,
+        borderWidth: 1,
+        borderRadius: Platform.OS === 'android' ? 12 : 20,
+    },
+    teamEditNoticeTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        marginVertical: 16,
+    },
+    teamEditNoticeText: {
+        fontSize: 14,
+        lineHeight: 22,
+        marginBottom: 24,
+    },
+    teamEditNoticeButton: {
+        minHeight: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: Platform.OS === 'android' ? 8 : 12,
     },
     logoutModalCard: {
         width: '100%',

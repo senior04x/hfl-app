@@ -15,7 +15,7 @@ import {
     Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Swipeable } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +37,7 @@ interface EditTeamModalProps {
     teamId: string | number;
     onClose: () => void;
     onSaved?: () => void;
+    onTransferClosed: () => void;
 }
 
 export default function EditTeamModal({
@@ -44,6 +45,7 @@ export default function EditTeamModal({
     teamId,
     onClose,
     onSaved,
+    onTransferClosed,
 }: EditTeamModalProps) {
     const { t } = useTranslation();
     const { isDark } = useThemeStore();
@@ -123,13 +125,13 @@ export default function EditTeamModal({
     const [rosterBusy, setRosterBusy] = useState<string | null>(null);
     const rosterLock = useRef(false);
     const swipeRefs = useRef<Record<string, Swipeable | null>>({});
-    const [notice, setNotice] = useState<{ type: 'locked' | 'delete'; player?: any } | null>(null);
-    const canEdit = () => { if (!rosterWindowOpen) { setNotice({ type: 'locked' }); return false; } return true; };
+    const [notice, setNotice] = useState<{ type: 'delete'; player: any } | null>(null);
+    const canEdit = () => { if (!rosterWindowOpen) { onTransferClosed(); return false; } return true; };
     const saveProfile = async (action: 'team_edit' | 'player_edit', data: Record<string,string>, playerId?: string) => {
         const session = await restoreTransferLoginSession('captain', String(teamId));
         if (!session) throw new Error('Session required');
         try { return await transferAppService.editProfile(session, action, data, playerId); }
-        catch (error) { if (error instanceof TransferApiError && error.status === 403) { setRosterWindowOpen(false); setEditingPlayerId(null); setNotice({ type: 'locked' }); } throw error; }
+        catch (error) { if (error instanceof TransferApiError && error.status === 403) { setRosterWindowOpen(false); setEditingPlayerId(null); onTransferClosed(); } throw error; }
     };
     const updateRoster = async (player: any, action: 'archive' | 'number') => {
         if (rosterLock.current || !rosterWindowOpen) return;
@@ -149,6 +151,7 @@ export default function EditTeamModal({
         } catch (error) {
             showToast(t('teams.roster_failed', 'Saqlanmadi. Raqam band bo‘lishi, sessiya yoki transfer oynasi yopilgan bo‘lishi mumkin.'), 'error');
             if (!(error instanceof TransferApiError) || error.status === 401 || error.status === 403) setRosterWindowOpen(false);
+            if (error instanceof TransferApiError && error.status === 403) onTransferClosed();
         } finally { rosterLock.current = false; setRosterBusy(null); }
     };
 
@@ -159,6 +162,8 @@ export default function EditTeamModal({
     // Initial load
     useEffect(() => {
         if (visible && teamId) {
+            setEditingPlayerId(null);
+            setNotice(null);
             loadTeamAndPlayers();
         }
     }, [visible, teamId]);
@@ -168,11 +173,13 @@ export default function EditTeamModal({
             setLoading(true);
             setRosterWindowOpen(false);
             const rosterSession = await restoreTransferLoginSession('captain', String(teamId));
-            if (rosterSession) {
-                try { const context = await transferAppService.roster(rosterSession, 'context');
-                    setRosterWindowOpen(context.transfer_window_open === true);
-                } catch { /* Fail closed; existing profile editing still loads. */ }
+            if (!rosterSession) throw new Error('Session required');
+            const context = await transferAppService.roster(rosterSession, 'context');
+            if (context.transfer_window_open !== true) {
+                onTransferClosed();
+                return;
             }
+            setRosterWindowOpen(true);
             const [tRes, pRes] = await Promise.all([
                 supabase.from('teams').select('id,name,logo_url,captain_name,captain_phone,coach_name,coach_phone,president_name,president_phone').eq('id', teamId).single(),
                 supabase.from('applications').select('id,first_name,last_name,photo_url,phone,position,player_number,team_id,status').eq('team_id', teamId).eq('status', 'approved').or('is_archived.is.null,is_archived.eq.false'),
@@ -383,6 +390,7 @@ export default function EditTeamModal({
             transparent={true}
             onRequestClose={onClose}
         >
+            <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={styles.modalOverlay}
@@ -501,6 +509,7 @@ export default function EditTeamModal({
                     ) : (
                         <ScrollView
                             showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
                             contentContainerStyle={styles.scrollBody}
                         >
                             {activeTab === 'team' ? (
@@ -689,8 +698,17 @@ export default function EditTeamModal({
                                             const isSavingThis = savingPhonePlayerId === pId;
 
                                             return (
-                                                <Swipeable key={pId} ref={ref=>{swipeRefs.current[String(pId)]=ref;}} overshootRight={false} onSwipeableOpen={() => { if (!rosterWindowOpen) { swipeRefs.current[String(pId)]?.close();setNotice({ type: 'locked' }); } }}
-                                                    renderRightActions={() => <TouchableOpacity onPress={() => { if (canEdit()) setNotice({ type: 'delete', player }); }} style={{backgroundColor:'#B91C1C',width:80,alignItems:'center',justifyContent:'center',borderRadius:12,marginBottom:12}}><Ionicons name="trash-outline" size={24} color="#FFFFFF"/><Text style={{color:'#FFFFFF',marginTop:6}}>{t('common.delete','O‘chirish')}</Text></TouchableOpacity>}>
+                                                <Swipeable key={pId} ref={ref=>{swipeRefs.current[String(pId)]=ref;}}
+                                                    enabled={!isEditingThis && !isUploadingThis && !isSavingThis && !rosterBusy}
+                                                    containerStyle={{ marginBottom: 12 }}
+                                                    overshootRight={false}
+                                                    onSwipeableWillOpen={() => {
+                                                        Object.entries(swipeRefs.current).forEach(([id, ref]) => {
+                                                            if (id !== String(pId)) ref?.close();
+                                                        });
+                                                    }}
+                                                    onSwipeableOpen={() => { if (!rosterWindowOpen) { swipeRefs.current[String(pId)]?.close();onTransferClosed(); } }}
+                                                    renderRightActions={() => <TouchableOpacity onPress={() => { if (canEdit()) { swipeRefs.current[String(pId)]?.close();setNotice({ type: 'delete', player }); } }} style={{backgroundColor:'#B91C1C',width:80,alignItems:'center',justifyContent:'center',borderRadius:12}}><Ionicons name="trash-outline" size={24} color="#FFFFFF"/><Text style={{color:'#FFFFFF',marginTop:6}}>{t('common.delete','O‘chirish')}</Text></TouchableOpacity>}>
                                                 <PlayerEditCard
                                                     player={player}
                                                     isEditing={isEditingThis}
@@ -699,8 +717,8 @@ export default function EditTeamModal({
                                                     homeColors={homeColors}
                                                     isDark={isDark}
                                                     t={t}
-                                                    onPickPhoto={() => handlePickPlayerPhoto(pId)}
-                                                    onToggleEdit={() => { if (isEditingThis || canEdit()) setEditingPlayerId(isEditingThis ? null : pId); }}
+                                                    onPickPhoto={() => { swipeRefs.current[String(pId)]?.close();void handlePickPlayerPhoto(pId); }}
+                                                    onToggleEdit={() => { swipeRefs.current[String(pId)]?.close();if (isEditingThis || canEdit()) setEditingPlayerId(isEditingThis ? null : pId); }}
                                                     onSavePhone={(newPhone, newNumber) => handleSavePlayerPhone(player, newPhone, newNumber)}
                                                 />
                                                 </Swipeable>
@@ -713,13 +731,14 @@ export default function EditTeamModal({
                     )}
                 </View>
             </KeyboardAvoidingView>
+            </GestureHandlerRootView>
             <Modal visible={!!notice} transparent animationType="fade" onRequestClose={() => setNotice(null)}>
                 <View style={{flex:1,backgroundColor:'rgba(0,0,0,0.7)',justifyContent:'center',padding:24}}><View style={{backgroundColor:homeColors.surface,borderRadius:Platform.OS==='android'?12:20,padding:24,borderWidth:1,borderColor:homeColors.border}}>
-                    <Ionicons name={notice?.type==='delete'?'trash-outline':'lock-closed-outline'} size={32} color={homeColors.accent}/>
-                    <Text style={{color:homeColors.textPrimary,fontSize:20,fontWeight:'700',marginVertical:16}}>{notice?.type==='delete'?t('teams.archive_player'):t('teams.transfer_edit_closed_title','Ma’lumotlarni tahrirlash yopilgan')}</Text>
-                    <Text style={{color:homeColors.textSecondary,lineHeight:22,marginBottom:24}}>{notice?.type==='delete'?t('teams.archive_hint'):t('teams.transfer_edit_closed','Tashkilotingiz ma’lumotlarni o‘zgartirishni yopgan. Transfer ochilganda o‘yinchi ma’lumotlarini tahrirlashingiz va o‘yinchini o‘chirishingiz mumkin.')}</Text>
-                    {notice?.type==='delete'&&<TouchableOpacity onPress={()=>setNotice(null)} style={{padding:12,alignItems:'center'}}><Text style={{color:homeColors.textSecondary}}>{t('common.cancel')}</Text></TouchableOpacity>}
-                    <TouchableOpacity style={{backgroundColor:homeColors.accent,padding:14,borderRadius:8,alignItems:'center'}} onPress={()=>{const value=notice;setNotice(null);if(value?.type==='delete')void updateRoster(value.player,'archive');}}><Text style={{color:'#FFFFFF',fontWeight:'700'}}>{notice?.type==='delete'?t('common.delete'):t('common.ok','Tushunarli')}</Text></TouchableOpacity>
+                    <Ionicons name="trash-outline" size={32} color={homeColors.accent}/>
+                    <Text style={{color:homeColors.textPrimary,fontSize:20,fontWeight:'700',marginVertical:16}}>{t('teams.archive_player')}</Text>
+                    <Text style={{color:homeColors.textSecondary,lineHeight:22,marginBottom:24}}>{t('teams.archive_hint')}</Text>
+                    <TouchableOpacity onPress={()=>setNotice(null)} style={{padding:12,alignItems:'center'}}><Text style={{color:homeColors.textSecondary}}>{t('common.cancel')}</Text></TouchableOpacity>
+                    <TouchableOpacity style={{backgroundColor:homeColors.accent,padding:14,borderRadius:8,alignItems:'center'}} onPress={()=>{const value=notice;setNotice(null);if(value)void updateRoster(value.player,'archive');}}><Text style={{color:'#FFFFFF',fontWeight:'700'}}>{t('common.delete')}</Text></TouchableOpacity>
                 </View></View>
             </Modal>
         </Modal>
@@ -855,8 +874,8 @@ function PlayerEditCard({
         <View style={[styles.playerCard, { backgroundColor: homeColors.surface, borderColor: homeColors.border, borderWidth: 1 }]}>
             <View style={styles.playerCardHeader}>
                 <TouchableOpacity
-                    onPress={onToggleEdit}
-                    disabled={isUploading}
+                    onPress={onPickPhoto}
+                    disabled={isUploading || isSavingPhone}
                     style={styles.playerAvatarContainer}
                 >
                     <SmartImage
@@ -897,6 +916,7 @@ function PlayerEditCard({
 
                 <TouchableOpacity
                     onPress={onToggleEdit}
+                    disabled={isSavingPhone || isUploading}
                     style={[styles.editPhoneBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}
                 >
                     <Ionicons
@@ -908,15 +928,14 @@ function PlayerEditCard({
             </View>
 
             {isEditing && (
-                <Modal visible transparent animationType="fade" onRequestClose={onToggleEdit}><KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1,backgroundColor:'rgba(0,0,0,0.7)',justifyContent:'center',padding:24}}><View style={{backgroundColor:homeColors.surface,borderRadius:12,padding:24,gap:16}}>
-                    <TouchableOpacity onPress={onPickPhoto} disabled={isUploading || isSavingPhone} style={{alignItems:'center'}}><SmartImage uri={player.photo || player.photo_url} style={{width:72,height:72,borderRadius:36}} contentFit="cover" fallbackIcon="person"/><Text style={{color:homeColors.accent,marginTop:8}}>{t('profile.change_avatar','Rasmni almashtirish')}</Text></TouchableOpacity>
-                    <Text style={{fontSize:18,fontWeight:'700',color:homeColors.textPrimary}}>{fullName}</Text>
-                    <Text style={{color:homeColors.textSecondary}}>{t('teams.jersey_number','Forma raqami')}</Text>
-                    <TextInput value={numberText} onChangeText={v=>setNumberText(v.replace(/\D/g,'').slice(0,2))} keyboardType="number-pad" maxLength={2} style={[styles.phoneInput,{color:homeColors.textPrimary,borderColor:homeColors.border}]} />
-                    <Text style={{color:homeColors.textSecondary}}>{t('profile.phone_number','Telefon raqami')}</Text>
+                <View style={[styles.playerEditFields, { borderColor: homeColors.border }]}>
+                    <View style={styles.playerEditInputs}>
+                    <View style={{ flex: 1, gap: 6 }}>
+                    <Text style={[styles.playerEditLabel, { color: homeColors.textSecondary }]}>{t('profile.phone_number','Telefon raqami')}</Text>
                     <TextInput
                         value={phoneText}
                         onChangeText={(text) => setPhoneText(formatUzPhone(text))}
+                        editable={!isSavingPhone}
                         placeholder="+998 90 123 45 67"
                         keyboardType="phone-pad"
                         maxLength={17}
@@ -926,6 +945,21 @@ function PlayerEditCard({
                             { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border }
                         ]}
                     />
+                    </View>
+                    <View style={{ width: 80, gap: 6 }}>
+                        <Text style={[styles.playerEditLabel, { color: homeColors.textSecondary }]}>{t('teams.jersey_number','Forma raqami')}</Text>
+                        <TextInput
+                            value={numberText}
+                            onChangeText={v=>setNumberText(v.replace(/\D/g,'').slice(0,2))}
+                            editable={!isSavingPhone}
+                            keyboardType="number-pad"
+                            maxLength={2}
+                            style={[styles.phoneInput, { backgroundColor: isDark ? '#141414' : '#FFFFFF', color: homeColors.textPrimary, borderColor: homeColors.border, textAlign: 'center' }]}
+                        />
+                    </View>
+                    </View>
+                    <View style={styles.playerEditActions}>
+                    <TouchableOpacity disabled={isSavingPhone} onPress={onToggleEdit} style={styles.cancelPlayerEditBtn}><Text style={{color:homeColors.textSecondary}}>{t('common.cancel')}</Text></TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => onSavePhone(cleanPhoneForDb(phoneText), numberText)}
                         disabled={isSavingPhone}
@@ -947,8 +981,8 @@ function PlayerEditCard({
                             </>
                         )}
                     </TouchableOpacity>
-                    <TouchableOpacity disabled={isSavingPhone} onPress={onToggleEdit} style={{padding:10,alignItems:'center'}}><Text style={{color:homeColors.textSecondary}}>{t('common.cancel')}</Text></TouchableOpacity>
-                </View></KeyboardAvoidingView></Modal>
+                    </View>
+                </View>
             )}
         </View>
     );
@@ -1155,7 +1189,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
     playerCard: {
-        borderRadius: 14,
+        borderRadius: Platform.OS === 'android' ? 12 : 16,
         padding: 12,
         overflow: 'hidden',
     },
@@ -1215,17 +1249,33 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    phoneEditRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginTop: 10,
-        paddingTop: 10,
+    playerEditFields: {
+        gap: 12,
+        marginTop: 12,
+        paddingTop: 12,
         borderTopWidth: 1,
     },
+    playerEditInputs: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        gap: 8,
+    },
+    playerEditLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    playerEditActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 8,
+    },
+    cancelPlayerEditBtn: {
+        minHeight: 44,
+        paddingHorizontal: 12,
+        justifyContent: 'center',
+    },
     phoneInput: {
-        flex: 1,
-        height: 38,
+        height: 44,
         borderRadius: 8,
         paddingHorizontal: 10,
         fontSize: 13,
@@ -1235,7 +1285,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        height: 38,
+        height: 44,
         paddingHorizontal: 12,
         borderRadius: 8,
     },
