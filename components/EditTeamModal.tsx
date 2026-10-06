@@ -11,6 +11,7 @@ import {
     Alert,
     Dimensions,
     KeyboardAvoidingView,
+    Keyboard,
     Platform,
     Animated,
 } from 'react-native';
@@ -30,7 +31,7 @@ import Colors from '../constants/Colors';
 import { transferAppService, TransferApiError } from '../services/transferAppService';
 import { restoreTransferLoginSession } from '../services/transferLoginStorage';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface EditTeamModalProps {
     visible: boolean;
@@ -50,6 +51,20 @@ export default function EditTeamModal({
     const { t } = useTranslation();
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
+    const scrollRef = useRef<ScrollView>(null);
+    const revealFocusedInput = () => {
+        const input = TextInput.State.currentlyFocusedInput();
+        if (input) scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(input, 24, true);
+    };
+    useEffect(() => {
+        if (!visible) return;
+        let frame = 0;
+        const subscription = Keyboard.addListener('keyboardDidShow', () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(revealFocusedInput);
+        });
+        return () => { subscription.remove(); cancelAnimationFrame(frame); };
+    }, [visible]);
 
     const [activeTab, setActiveTab] = useState<'team' | 'players'>('team');
     const [loading, setLoading] = useState(true);
@@ -392,7 +407,7 @@ export default function EditTeamModal({
         >
             <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.modalOverlay}
             >
                 <View style={[styles.modalCard, { backgroundColor: homeColors.background, borderColor: homeColors.border }]}>
@@ -508,6 +523,10 @@ export default function EditTeamModal({
                         />
                     ) : (
                         <ScrollView
+                            ref={scrollRef}
+                            style={{ flexShrink: 1 }}
+                            onFocus={revealFocusedInput}
+                            onLayout={revealFocusedInput}
                             showsVerticalScrollIndicator={false}
                             keyboardShouldPersistTaps="handled"
                             contentContainerStyle={styles.scrollBody}
@@ -995,7 +1014,8 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalCard: {
-        maxHeight: height * 0.88,
+        maxHeight: '88%',
+        flexShrink: 1,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         borderWidth: 1,
