@@ -640,15 +640,18 @@ const formatPhoneInput = (val: string) => {
                                     <Text style={styles.mainButtonText}>{t('auth.login')}</Text>
                                 </TouchableOpacity>
 
-                                {/* Register Button */}
+                                {/* Full-width Telegram entry below the main login button. */}
                                 <TouchableOpacity
-                                    style={styles.guestButton}
-                                    onPress={handleRegisterPress}
+                                    style={[styles.guestButton, { flexDirection: 'row', justifyContent: 'center', width: '100%' }]}
+                                    onPress={handleTelegramLogin}
+                                    disabled={loading}
+                                    activeOpacity={0.7}
                                 >
-                                    <Text style={styles.guestButtonText}>{t('auth.register')}</Text>
+                                    {loading ? <ActivityIndicator size="small" color={BRAND_ORANGE} style={{ marginRight: 8 }} /> : <Ionicons name="paper-plane-outline" size={18} color={BRAND_ORANGE} style={{ marginRight: 8 }} />}
+                                    <Text style={[styles.bottomSecondaryText, { color: '#FFFFFF', flexShrink: 1, textAlign: 'center' }]}>{t('auth.telegram_login', 'Telegram orqali kirish')}</Text>
                                 </TouchableOpacity>
 
-                                {/* Bottom Row: Language + Guest (in register button style with centered | divider) */}
+                                {/* Bottom row: language and registration. */}
                                 <View style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
@@ -678,10 +681,9 @@ const formatPhoneInput = (val: string) => {
                                     {/* Centered Divider Line | */}
                                     <Text style={{ color: 'rgba(255, 255, 255, 0.35)', fontSize: 13, fontWeight: '300', marginHorizontal: 2 }}>|</Text>
 
-                                    {/* Every Telegram visitor receives a permanent personal account. */}
+                                    {/* Registration remains available beside the language selector. */}
                                     <TouchableOpacity
-                                        onPress={handleTelegramLogin}
-                                        disabled={loading}
+                                        onPress={handleRegisterPress}
                                         activeOpacity={0.7}
                                         style={{
                                             flex: 1,
@@ -692,9 +694,8 @@ const formatPhoneInput = (val: string) => {
                                             paddingLeft: 14,
                                         }}
                                     >
-                                        {loading ? <ActivityIndicator size="small" color="#E85002" style={{ marginRight: 6 }} /> : <Ionicons name="paper-plane-outline" size={16} color="#E85002" style={{ marginRight: 6 }} />}
-                                        <Text style={[styles.bottomSecondaryText, { color: '#FFFFFF' }]}>
-                                            {t('auth.telegram_login', 'Telegram orqali kirish')}
+                                        <Text style={[styles.guestButtonText, { flexShrink: 1 }]}>
+                                            {t('auth.register')}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
