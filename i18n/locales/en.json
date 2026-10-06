@@ -376,6 +376,15 @@
     "player": "Player"
   },
   "profile": {
+    "edit_personal": "Edit profile",
+    "change_avatar": "Change photo",
+    "full_name": "Full name",
+    "bio": "About you",
+    "show_phone": "Show my phone number on my profile",
+    "photo_permission": "Allow access to your photo library.",
+    "photo_limit": "Choose a JPG, PNG or WebP up to 3 MB.",
+    "save_error": "Unable to save your profile. Check the details and try again.",
+
     "personal_account": "Personal account",
     "become_player": "Register as a player",
     "title": "Profile",

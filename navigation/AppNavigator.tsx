@@ -521,7 +521,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                                 <ScrollView style={{ maxHeight: 320, marginTop: 8 }} showsVerticalScrollIndicator={false}>
                                     {accountOptions.map((acc, idx) => {
                                         const isCurrent = (acc.id === user?.id || acc._id === user?._id) && (acc.organizationId === user?.organizationId || acc.organization_id === user?.organization_id);
-                                        const orgName = acc.orgName || acc.organizations?.name || 'Amatora Liga';
+                                        const orgName = acc.role === 'user' ? t('profile.personal_account', 'Shaxsiy akkaunt') : acc.orgName || acc.organizations?.name || 'Amatora Liga';
                                         const avatarUri = acc.photo || acc.photo_url || acc.avatar || acc.logo || acc.logo_url;
 
                                         return (

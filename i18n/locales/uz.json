@@ -376,6 +376,15 @@
     "player": "O'yinchi"
   },
   "profile": {
+    "edit_personal": "Profilni tahrirlash",
+    "change_avatar": "Rasmni almashtirish",
+    "full_name": "Ism-familiya",
+    "bio": "O‘zingiz haqingizda",
+    "show_phone": "Profilimda telefon raqamimni ko‘rsatish",
+    "photo_permission": "Rasm tanlash uchun galereyaga ruxsat bering.",
+    "photo_limit": "JPG, PNG yoki WebP rasm tanlang (3 MB gacha).",
+    "save_error": "Profilni saqlab bo‘lmadi. Ma’lumotlarni tekshirib, qayta urinib ko‘ring.",
+
     "personal_account": "Shaxsiy akkaunt",
     "become_player": "Futbolchi sifatida ro‘yxatdan o‘tish",
     "title": "Profil",

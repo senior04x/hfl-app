@@ -41,7 +41,7 @@ import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService, clearApiCache, supabase } from '../services/apiService';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Skeleton from '../components/Skeleton';
 import { useTranslation } from 'react-i18next';
@@ -647,11 +647,11 @@ const formatPhoneInput = (val: string) => {
                                     disabled={loading}
                                     activeOpacity={0.7}
                                 >
-                                    {loading ? <ActivityIndicator size="small" color={BRAND_ORANGE} style={{ marginRight: 8 }} /> : <Ionicons name="paper-plane-outline" size={18} color={BRAND_ORANGE} style={{ marginRight: 8 }} />}
+                                    {loading ? <ActivityIndicator size="small" color={BRAND_ORANGE} style={{ marginRight: 8 }} /> : <FontAwesome name="telegram" size={20} color={BRAND_ORANGE} style={{ marginRight: 8 }} />}
                                     <Text style={[styles.bottomSecondaryText, { color: '#FFFFFF', flexShrink: 1, textAlign: 'center' }]}>{t('auth.telegram_login', 'Telegram orqali kirish')}</Text>
                                 </TouchableOpacity>
 
-                                {/* Bottom row: language and registration. */}
+                                {/* Bottom row: language. */}
                                 <View style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
@@ -667,9 +667,8 @@ const formatPhoneInput = (val: string) => {
                                             flex: 1,
                                             flexDirection: 'row',
                                             alignItems: 'center',
-                                            justifyContent: 'flex-end',
+                                            justifyContent: 'center',
                                             paddingVertical: 8,
-                                            paddingRight: 14,
                                         }}
                                     >
                                         <Ionicons name="globe-outline" size={14} color="rgba(255, 255, 255, 0.6)" style={{ marginRight: 6 }} />
@@ -678,26 +677,6 @@ const formatPhoneInput = (val: string) => {
                                         </Text>
                                     </TouchableOpacity>
 
-                                    {/* Centered Divider Line | */}
-                                    <Text style={{ color: 'rgba(255, 255, 255, 0.35)', fontSize: 13, fontWeight: '300', marginHorizontal: 2 }}>|</Text>
-
-                                    {/* Registration remains available beside the language selector. */}
-                                    <TouchableOpacity
-                                        onPress={handleRegisterPress}
-                                        activeOpacity={0.7}
-                                        style={{
-                                            flex: 1,
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            justifyContent: 'flex-start',
-                                            paddingVertical: 8,
-                                            paddingLeft: 14,
-                                        }}
-                                    >
-                                        <Text style={[styles.guestButtonText, { flexShrink: 1 }]}>
-                                            {t('auth.register')}
-                                        </Text>
-                                    </TouchableOpacity>
                                 </View>
                             </>
                         )}

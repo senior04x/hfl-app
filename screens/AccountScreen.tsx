@@ -32,6 +32,7 @@ import { getHomeScreenColors } from '../constants/homeTheme';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
 import AppNavbar from '../components/AppNavbar';
 import EditTeamModal from '../components/EditTeamModal';
+import PersonalProfileModal from '../components/PersonalProfileModal';
 import RegistrationClosedModal from '../components/RegistrationClosedModal';
 import { useNavBarScroll } from '../context/NavBarScrollContext';
 
@@ -48,6 +49,7 @@ export default function AccountScreen({ navigation }: any) {
     const [showLanguageModal, setShowLanguageModal] = useState(false);
     const [showOrgSelectModal, setShowOrgSelectModal] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [showPersonalProfileModal, setShowPersonalProfileModal] = useState(false);
     const [showEditTeamModal, setShowEditTeamModal] = useState(false);
     const [showRegClosedModal, setShowRegClosedModal] = useState(false);
     const [closedOrgInfo, setClosedOrgInfo] = useState<{ name: string; contact_phone: string } | null>(null);
@@ -234,13 +236,13 @@ export default function AccountScreen({ navigation }: any) {
     );
 
     // Profile Display Info Calculation
-    const profileImage = !isGuest ? (
+    const profileImage = !isGuest ? (user?.role === 'user' ? user?.photo : (
         detailedData?.photoUrl || detailedData?.photo_url || detailedData?.photo ||
         detailedData?.logoUrl || detailedData?.logo_url || detailedData?.logo ||
         user?.photoUrl || user?.photo_url || user?.photo ||
         user?.logoUrl || user?.logo_url || user?.logo ||
         user?.avatar || user?.team_logo || user?.teamLogo
-    ) : null;
+    )) : null;
 
     const isPlayer = user?.role === 'player';
     const isManager = user?.role === 'manager';
@@ -429,7 +431,8 @@ export default function AccountScreen({ navigation }: any) {
                                         </View>
                                     </View>
 
-                                    {user?.phone ? (
+                                    {user?.role === 'user' && user?.bio ? <Text numberOfLines={2} style={{ color: homeColors.textSecondary, marginTop: 6 }}>{user.bio}</Text> : null}
+                                    {user?.phone && (user?.role !== 'user' || user?.showPhone === true) ? (
                                         <Text style={[styles.phoneText, { color: homeColors.textSecondary }]}>
                                             {user.phone}
                                         </Text>
@@ -522,6 +525,7 @@ export default function AccountScreen({ navigation }: any) {
                                     }
                                 ]}
                             >
+                                {user?.appUserId && <SettingRow icon="create-outline" title={t('profile.edit_personal', 'Profilni tahrirlash')} onPress={() => setShowPersonalProfileModal(true)} />}
                                 {user?.role === 'user' && <SettingRow icon="football-outline" title={t('profile.become_player', 'Futbolchi sifatida ro‘yxatdan o‘tish')}
                                     onPress={handleApplyToLeaguePress} isLast />}
                                 {!isGuest && ['player', 'manager'].includes(user?.role) && <SettingRow icon="swap-horizontal-outline" title={t('transfer_app.title')}
@@ -692,6 +696,7 @@ export default function AccountScreen({ navigation }: any) {
 
 
 
+                <PersonalProfileModal visible={showPersonalProfileModal} onClose={() => setShowPersonalProfileModal(false)} />
                 {/* Logout Confirmation Modal */}
                 <Modal
                     visible={showLogoutModal}
