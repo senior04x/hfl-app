@@ -6,6 +6,7 @@ import { supabase } from '../services/supabase';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { useTranslation } from 'react-i18next';
+import { useTabSwipe } from '../context/TabSwipeContext';
 
 const { width } = Dimensions.get('window');
 const SLIDE_WIDTH = width - 40;
@@ -34,6 +35,8 @@ const getTeamDetails = (match: any, side: 'home' | 'away') => {
 
 export default function CompetitionTop4Slider({ matches, onSelectCompetition }: { matches: any[]; onSelectCompetition: (competition: Competition) => void }) {
     const { t } = useTranslation();
+    const { setSwipeDisabled } = useTabSwipe();
+    useEffect(() => () => setSwipeDisabled(false), [setSwipeDisabled]);
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -151,6 +154,11 @@ export default function CompetitionTop4Slider({ matches, onSelectCompetition }: 
 
             <ScrollView
                 horizontal
+                nestedScrollEnabled
+                directionalLockEnabled
+                onTouchStart={() => setSwipeDisabled(true)}
+                onTouchEnd={() => setSwipeDisabled(false)}
+                onTouchCancel={() => setSwipeDisabled(false)}
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 decelerationRate="fast"

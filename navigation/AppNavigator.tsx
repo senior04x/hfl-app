@@ -585,6 +585,13 @@ function MainSwipeableTabs({ navigation, route }: any) {
     const scrollViewRef = useRef<ScrollView>(null);
     const [activeIndex, setActiveIndex] = useState(0);
     const activeIndexRef = useRef(0);
+    const [visitedTabs, setVisitedTabs] = useState(() => new Set([0]));
+    const visitedTabsRef = useRef(new Set([0]));
+    const visitTab = useCallback((index: number) => {
+        if (visitedTabsRef.current.has(index)) return;
+        visitedTabsRef.current.add(index);
+        setVisitedTabs(new Set(visitedTabsRef.current));
+    }, []);
     const isManualScrolling = useRef(false);
 
     // Sync external navigation requests (e.g. navigation.navigate('MainTabs', { screen: 'Profil' }))
@@ -608,6 +615,7 @@ function MainSwipeableTabs({ navigation, route }: any) {
         isManualScrolling.current = true;
         activeIndexRef.current = targetIndex;
         setActiveIndex(targetIndex);
+        visitTab(targetIndex);
         resetNavBarShrink();
 
         // 1. Sahifa darhol o'tsin (hech qanday page slayd animatsiyasiz):
@@ -622,7 +630,7 @@ function MainSwipeableTabs({ navigation, route }: any) {
         requestAnimationFrame(() => {
             isManualScrolling.current = false;
         });
-    }, [resetNavBarShrink, scrollX]);
+    }, [resetNavBarShrink, scrollX, visitTab]);
 
     const handleScroll = (e: any) => {
         // Agar tugma bosilgan bo'lsa, ScrollView onScroll hodisasi
@@ -630,6 +638,7 @@ function MainSwipeableTabs({ navigation, route }: any) {
         if (isManualScrolling.current) return;
         const offsetX = e.nativeEvent.contentOffset.x;
         scrollX.setValue(offsetX);
+        visitTab(Math.max(0, Math.min(TABS.length - 1, Math.round(offsetX / SCREEN_WIDTH))));
     };
 
     const handleMomentumScrollEnd = (e: any) => {
@@ -669,16 +678,16 @@ function MainSwipeableTabs({ navigation, route }: any) {
                     <HomeScreen navigation={navigation} route={route} />
                 </View>
                 <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
-                    <TournamentsScreen navigation={navigation} route={route} />
+                    {visitedTabs.has(1) && <TournamentsScreen navigation={navigation} route={route} />}
                 </View>
                 <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
-                    <CalendarScreen navigation={navigation} route={route} />
+                    {visitedTabs.has(2) && <CalendarScreen navigation={navigation} route={route} />}
                 </View>
                 <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
-                    <NewsScreen />
+                    {visitedTabs.has(3) && <NewsScreen />}
                 </View>
                 <View style={{ width: SCREEN_WIDTH, height: '100%' }}>
-                    <AccountScreen navigation={navigation} route={route} />
+                    {visitedTabs.has(4) && <AccountScreen navigation={navigation} route={route} />}
                 </View>
             </Animated.ScrollView>
 

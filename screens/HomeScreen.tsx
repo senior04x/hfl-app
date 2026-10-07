@@ -2,7 +2,7 @@ import LiveMatchBadge from '../components/LiveMatchBadge';
 import { useIsFocused } from '@react-navigation/native';
 import { createHomeStoryRefresh, getHomeMatchEventFilters } from '../services/homeRealtime';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Dimensions, RefreshControl, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, RefreshControl, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -80,6 +80,8 @@ export default function HomeScreen({ navigation }: any) {
     const [storyPickerVisible, setStoryPickerVisible] = useState(false);
     const viewedStoryIdsRef = useRef<string[]>([]);
     const hasCachedDataRef = useRef(false);
+    const loadGeneration = useRef(0);
+    const loadInFlight = useRef(false);
 
     // Refs to eliminate stale closure in realtime listeners
     const matchesRef = useRef<any[]>([]);
@@ -106,8 +108,10 @@ export default function HomeScreen({ navigation }: any) {
      * Returns true if cache is fresh (< 5 mins old) and valid.
      */
     const loadCachedData = async (): Promise<boolean> => {
+        const generation = loadGeneration.current;
         try {
             const cachedRaw = await AsyncStorage.getItem(CACHE_KEY);
+            if (generation !== loadGeneration.current) return false;
             if (cachedRaw) {
                 const cached = JSON.parse(cachedRaw);
                 if (cached) {
@@ -140,15 +144,29 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     useEffect(() => {
+        const generation = ++loadGeneration.current;
+        loadInFlight.current = false;
+        hasCachedDataRef.current = false;
+        viewedStoryIdsRef.current = [];
+        matchesRef.current = [];
+        sliderItemsRef.current = [];
+        setMatches([]);
+        setSliderItems([]);
+        setStoryGroups([]);
+        setNewsItems([]);
+        setLoading(true);
+        setRefreshing(false);
         setUserProfile(null);
         const init = async () => {
             const isFresh = await loadCachedData();
+            if (generation !== loadGeneration.current) return;
             if (!isFresh) {
                 // If cache is missing or stale, fetch in background without skeleton flicker if cache was present
                 loadData(false, hasCachedDataRef.current);
             }
         };
         init();
+        return () => { ++loadGeneration.current; };
     }, [userUniqueKey, userRole, currentOrgId]);
 
     useEffect(() => {
@@ -248,6 +266,11 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     const loadData = async (isRefreshing = false, isSilent = false) => {
+        if (loadInFlight.current) return;
+        loadInFlight.current = true;
+        const generation = loadGeneration.current;
+        const isCurrent = () => generation === loadGeneration.current;
+        let failed = false;
         try {
             if (isRefreshing) {
                 setRefreshing(true);
@@ -257,12 +280,19 @@ export default function HomeScreen({ navigation }: any) {
             
             // Parallelize matches, slider items, user profile, viewed stories, and news fetching
             const [matchesData, sliderData, profileData, viewedIds, fetchedNewsData] = await Promise.all([
-                apiService.getMatches().catch(err => { console.error('Matches fetch err:', err); return []; }),
-                apiService.getSliderItems().catch(err => { console.error('Slider fetch err:', err); return []; }),
-                fetchUserProfileData().catch(err => { console.error('Profile fetch err:', err); return null; }),
+                apiService.getMatches().then(data => {
+                    if (isCurrent()) { setMatches(Array.isArray(data) ? data : []); setLoading(false); }
+                    return data;
+                }).catch(err => { failed = true; console.error('Matches fetch err:', err); return matchesRef.current; }),
+                apiService.getSliderItems().then(data => {
+                    if (isCurrent()) { setSliderItems(Array.isArray(data) ? data.filter((item: any) => item.isActive !== false) : []); setLoading(false); }
+                    return data;
+                }).catch(err => { failed = true; console.error('Slider fetch err:', err); return sliderItemsRef.current; }),
+                fetchUserProfileData().then(data => { if (isCurrent() && data) setUserProfile(data); return data; }).catch(err => { console.error('Profile fetch err:', err); return null; }),
                 storyService.getViewedStoryIds().catch(() => [] as string[]),
-                apiService.getNews(1, 10).catch(err => { console.error('News fetch err:', err); return []; }),
+                apiService.getNews(1, 10).then(data => { if (isCurrent()) setNewsItems(Array.isArray(data) ? data : []); return data; }).catch(err => { failed = true; console.error('News fetch err:', err); return newsItems; }),
             ]);
+            if (!isCurrent()) return;
 
             viewedStoryIdsRef.current = viewedIds || [];
 
@@ -276,11 +306,6 @@ export default function HomeScreen({ navigation }: any) {
             if (sliderData && Array.isArray(sliderData)) {
                 validSlider = sliderData.filter((item: any) => item.isActive !== false);
                 setSliderItems(validSlider);
-                validSlider.forEach((item: any) => {
-                    if (item.bgImage) Image.prefetch(item.bgImage).catch(() => {});
-                    if (item.topPlayer?.photoUrl) Image.prefetch(item.topPlayer.photoUrl).catch(() => {});
-                    if (item.topPlayer?.teamLogo) Image.prefetch(item.topPlayer.teamLogo).catch(() => {});
-                });
             }
 
             // Build 100% real stories strictly scoped to currentOrgId and latest tour
@@ -290,7 +315,8 @@ export default function HomeScreen({ navigation }: any) {
                 viewedStoryIdsRef.current,
                 currentOrgId,
                 ownTeamId
-            );
+            ).catch(error => { failed = true; console.warn('Home stories fetch failed:', error); return storyGroups; });
+            if (!isCurrent()) return;
             setStoryGroups(realStories);
 
             if (profileData) {
@@ -302,7 +328,7 @@ export default function HomeScreen({ navigation }: any) {
             hasCachedDataRef.current = true;
 
             // Save fresh snapshot to AsyncStorage cache
-            await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+            if (!failed) await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
                 matches: fetchedMatches,
                 sliderItems: validSlider,
                 storyGroups: realStories,
@@ -313,8 +339,11 @@ export default function HomeScreen({ navigation }: any) {
         } catch (error) {
             console.error('Error loading home data:', error);
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (isCurrent()) {
+                loadInFlight.current = false;
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     };
 
