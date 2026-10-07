@@ -1,9 +1,10 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, Platform, Image } from 'react-native';
-import { Video, ResizeMode, Audio } from 'expo-av';
+import React, { useEffect, useState } from 'react';
+import { AppState, View, StyleSheet, Image } from 'react-native';
+import { useEventListener } from 'expo';
+import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 
 interface VideoBackgroundProps {
-    source: any;
+    source: VideoSource;
     posterSource?: any;
     posterResizeMode?: 'cover' | 'contain' | 'center' | 'stretch';
     overlayOpacity?: number;
@@ -23,95 +24,39 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({
     style,
     children 
 }) => {
-    const videoRef = useRef<Video>(null);
+    const player = useVideoPlayer(source, player => {
+        player.loop = true;
+        player.muted = true;
+        player.audioMixingMode = 'mixWithOthers';
+        if (AppState.currentState === 'active') player.play();
+    });
     const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
     useEffect(() => {
         setIsVideoLoaded(false);
-    }, [source]);
+    }, [player]);
+
+    useEventListener(player, 'statusChange', ({ status }) => {
+        if (status === 'error') setIsVideoLoaded(false);
+    });
 
     useEffect(() => {
-        const setupAudioAndPlay = async () => {
-            try {
-                if (Platform.OS !== 'web') {
-                    await Audio.setAudioModeAsync({
-                        allowsRecordingIOS: false,
-                        staysActiveInBackground: false,
-                        interruptionModeIOS: 1, // DoNotMix
-                        playsInSilentModeIOS: true,
-                        shouldDuckAndroid: true,
-                        interruptionModeAndroid: 1, // DoNotMix
-                        playThroughEarpieceAndroid: false,
-                    });
-                }
-            } catch (error) {
-                console.log('Audio mode setup error:', error);
-            }
-
-            if (videoRef.current) {
-                try {
-                    await videoRef.current.playAsync();
-                } catch (e) {
-                    console.log('Play async error:', e);
-                }
-            }
-        };
-
-        setupAudioAndPlay();
-
-        // Pause video when app is backgrounded to save CPU and battery
-        const subscription = require('react-native').AppState.addEventListener('change', (nextAppState: string) => {
-            if (nextAppState === 'active') {
-                videoRef.current?.playAsync().catch(() => {});
-            } else {
-                videoRef.current?.pauseAsync().catch(() => {});
-            }
+        const subscription = AppState.addEventListener('change', state => {
+            if (state === 'active') player.play();
+            else player.pause();
         });
-
-        if (Platform.OS === 'android') {
-            const timer = setTimeout(() => {
-                if (videoRef.current) {
-                    videoRef.current.playAsync().catch(() => {});
-                }
-            }, 400);
-            return () => {
-                clearTimeout(timer);
-                subscription.remove();
-            };
-        }
-
-        return () => {
-            subscription.remove();
-        };
-    }, []);
-
+        return () => subscription.remove();
+    }, [player]);
     return (
         <View style={[styles.container, style]}>
 
-            <Video
-                ref={videoRef}
-                source={source}
+            <VideoView
+                player={player}
                 style={StyleSheet.absoluteFill}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={true}
-                isLooping={true}
-                isMuted={true}
-                useNativeControls={false}
-                usePoster={false}
-                onLoad={() => {
-                    if (videoRef.current) {
-                        videoRef.current.playAsync().catch(() => {});
-                    }
-                }}
-                onReadyForDisplay={() => {
-                    setIsVideoLoaded(true);
-                    if (videoRef.current) {
-                        videoRef.current.playAsync().catch(() => {});
-                    }
-                }}
-                onError={() => {
-                    setIsVideoLoaded(false);
-                }}
+                contentFit="cover"
+                surfaceType="textureView"
+                nativeControls={false}
+                onFirstFrameRender={() => setIsVideoLoaded(true)}
             />
             {/* Keep the poster above the native video until a frame is displayed. */}
             {posterSource && !isVideoLoaded && (
