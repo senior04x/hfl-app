@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
         height: '16.66%',
     },
     outerBorder: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         borderWidth: 1.5,
         margin: 5,
         borderRadius: 12,

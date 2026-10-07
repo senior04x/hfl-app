@@ -5,14 +5,8 @@
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#000000"
-    },
     "scheme": "hflsoccerapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.amatora.app",
@@ -20,15 +14,6 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Profil va jamoa logotipini rasmga olish uchun kameradan foydalaniladi.",
         "NSPhotoLibraryUsageDescription": "Profil va jamoa rasmlarini yuklash uchun rasm galereyasiga kirish so'raladi."
-      },
-      "splash": {
-        "image": "./assets/images/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#121212",
-        "dark": {
-          "image": "./assets/images/splash-icon.png",
-          "backgroundColor": "#000000"
-        }
       }
     },
     "android": {
@@ -40,16 +25,6 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png",
         "backgroundColor": "#000000"
       },
-      "splash": {
-        "image": "./assets/images/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#000000",
-        "dark": {
-          "image": "./assets/images/splash-icon.png",
-          "backgroundColor": "#000000"
-        }
-      },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -59,16 +34,12 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "notification": {
-      "icon": "./assets/images/app-icon.png",
-      "color": "#E85002"
-    },
     "plugins": [
       [
         "expo-notifications",
         {
           "icon": "./assets/images/app-icon.png",
-        "color": "#E85002"
+          "color": "#E85002"
         }
       ],
       [
@@ -84,12 +55,21 @@
         }
       ],
       "expo-font",
-      "expo-router",
       "expo-web-browser",
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-localization",
-      ["expo-media-library", { "savePhotosPermission": "Save your goal videos to your gallery.", "granularPermissions": [] }]
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Save your goal videos to your gallery.",
+          "granularPermissions": []
+        }
+      ],
+      "expo-image",
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-video"
     ],
     "experiments": {},
     "extra": {
@@ -97,9 +77,7 @@
         "projectId": "14fddb89-af52-47b3-90ab-f437d786254b"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "sdk57-local-test",
     "updates": {
       "url": "https://u.expo.dev/14fddb89-af52-47b3-90ab-f437d786254b",
       "enabled": true

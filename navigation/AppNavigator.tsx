@@ -476,7 +476,7 @@ function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigation }: 
                 <SafeAreaProvider>
                 <View style={styles.modalOverlay}>
                     <TouchableOpacity
-                        style={StyleSheet.absoluteFillObject}
+                        style={StyleSheet.absoluteFill}
                         activeOpacity={1}
                         onPress={closeSwitcherModal}
                     />

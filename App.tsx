@@ -1,6 +1,6 @@
-if (typeof global !== 'undefined' && (global as any).ErrorUtils) {
-  const defaultHandler = (global as any).ErrorUtils.getGlobalHandler();
-  (global as any).ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+if (typeof globalThis !== 'undefined' && (globalThis as any).ErrorUtils) {
+  const defaultHandler = (globalThis as any).ErrorUtils.getGlobalHandler();
+  (globalThis as any).ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
     console.error('=== EXPLICIT ERROR STACK TRACE ===\n', error, '\nSTACK:\n', error?.stack);
     if (defaultHandler) defaultHandler(error, isFatal);
   });

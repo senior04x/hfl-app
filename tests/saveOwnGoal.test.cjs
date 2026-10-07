@@ -13,9 +13,9 @@ function load(options = {}) {
     new Function('require', 'exports', code)(name => {
         if (name === './androidReplaySource') return { resolveAndroidReplay: async uri => uri };
         if (name === 'react-native') return { Platform: { OS: 'android' } };
-        if (name === 'expo-modules-core') return { requireOptionalNativeModule: () => options.native === false ? null : {} };
+        if (name === 'expo') return { requireOptionalNativeModule: () => options.native === false ? null : {} };
         if (name === '../store/useAuthStore') return { useAuthStore: { getState: () => state } };
-        if (name === 'expo-media-library') return media;
+        if (name === 'expo-media-library/legacy') return media;
         if (name === 'expo-file-system/legacy') return files;
         throw new Error(name);
     }, out);

@@ -47,8 +47,8 @@ function ReplayPickerSkeletonCard({ isDark }: { isDark: boolean }) {
         <View style={[skeletonStyles.line, { width: '40%', backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]} />
       </View>
       <View style={[skeletonStyles.shimmerClip]} pointerEvents="none">
-        <Animated.View style={[StyleSheet.absoluteFillObject, { width: 140, transform: [{ translateX }] }]}>
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.45)' }]} />
+        <Animated.View style={[StyleSheet.absoluteFill, { width: 140, transform: [{ translateX }] }]}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.45)' }]} />
         </Animated.View>
       </View>
     </View>
@@ -108,7 +108,7 @@ function ReplayPreviewThumb({ videoUrl, isDark }: { videoUrl: string; isDark: bo
       {sourceUri && (
         <VideoView
           player={player}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           contentFit="cover"
           surfaceType="textureView"
           nativeControls={false}
@@ -301,7 +301,7 @@ export default function TeamStoryReplayPickerModal({
 
   if (!useNativeModal) {
     return (
-      <View style={[StyleSheet.absoluteFillObject, { zIndex: 9999 }]}>
+      <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
         {content}
       </View>
     );
@@ -417,7 +417,7 @@ const skeletonStyles = StyleSheet.create({
     borderRadius: 5,
   },
   shimmerClip: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     overflow: 'hidden',
   },
   previewBox: {

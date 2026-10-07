@@ -32,7 +32,7 @@ function loadService(teams, matches, matchError = null) {
     } };
     const dependencies = {
         './matchCompetitionMetadata': { loadMatchCompetitionMetadata: async () => new Map() },
-        axios: { default: { create: () => ({ get: async () => { throw new Error('Unexpected fallback'); } }) } },
+        axios: { __esModule: true, default: { create: () => ({ get: async () => { throw new Error('Unexpected fallback'); } }) } },
         './supabase': { supabase },
         '../store/useOrganizationStore': { useOrganizationStore: { getState: () => ({ selectedOrganizationId: 1 }) } },
         '../store/useJuniorStore': { useJuniorStore: { getState: () => ({ isJuniorMode: false }) } },

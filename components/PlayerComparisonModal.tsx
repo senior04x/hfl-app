@@ -916,7 +916,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     searchModalOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: 'rgba(0, 0, 0, 0.75)',
         justifyContent: 'center',
         alignItems: 'center',

@@ -164,7 +164,7 @@ export default function PlayerCardZoomModal({
 
             <View style={styles.modalOverlay}>
                 {/* Frosted Dark Blur Background */}
-                <SmartBlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
+                <SmartBlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
 
                 {/* Header Controls */}
                 <View style={styles.headerBar}>

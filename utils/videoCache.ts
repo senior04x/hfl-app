@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 /**
  * Cache remote video files to local device disk storage to eliminate duplicate egress traffic
@@ -12,11 +12,11 @@ export async function getCachedVideoUri(remoteUri: string): Promise<string> {
     // Extract sanitized file name from URL
     const urlParts = remoteUri.split('/');
     const fileName = urlParts[urlParts.length - 1]?.split('?')[0] || 'cached_replay.mp4';
-    const cacheDir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory || '';
+    const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
     const cacheFileUri = `${cacheDir}video_replays_${fileName}`;
 
     // Check if video file already exists on local disk
-    const fileInfo = await (FileSystem as any).getInfoAsync(cacheFileUri);
+    const fileInfo = await FileSystem.getInfoAsync(cacheFileUri);
     if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
       console.log('⚡ [VIDEO CACHE HIT] Playing from local disk (0 MB Egress):', cacheFileUri);
       return cacheFileUri;
@@ -25,7 +25,7 @@ export async function getCachedVideoUri(remoteUri: string): Promise<string> {
     // Kesh mavjud emas — video ENDI to'liq yuklab bo'lguncha KUTILMAYDI (avval
     // shunday edi va katta videolarda ochilish juda sekin/qotib qoladigan
     // bo'lardi). Buning o'rniga darhol REMOTE manzildan streaming tarzida ijro
-    // etiladi (expo-av o'zi progressiv HTTP buferlashni boshqaradi), keshga
+    // etiladi (expo-video progressiv HTTP buferlashni boshqaradi), keshga
     // yuklab olish esa FON rejimida (await qilinmasdan) davom etadi — keyingi
     // safar shu video 0 MB trafik bilan lokal diskdan ijro etiladi.
     console.log('📥 [VIDEO CACHE MISS] Streaming from remote, caching in background:', remoteUri);

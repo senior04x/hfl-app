@@ -78,7 +78,7 @@ export default function FifaCardBack({ size = 'lg' }: FifaCardBackProps) {
                         >
                             <LinearGradient
                                 colors={['rgba(0, 223, 130, 0.25)', 'rgba(0, 240, 255, 0.1)']}
-                                style={StyleSheet.absoluteFillObject}
+                                style={StyleSheet.absoluteFill}
                             />
                             <Image
                                 source={require('../assets/logo.png')}
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
     },
     geoLines: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         opacity: 0.15,
     },
     geoLine1: {

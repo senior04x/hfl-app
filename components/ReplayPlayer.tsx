@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, AppState, Platform } from 'react-native';
 import { resolveAndroidReplay } from '../services/androidReplaySource';
-import { Video, ResizeMode } from 'expo-av';
+import PlaybackVideo, { type PlaybackVideoHandle } from './PlaybackVideo';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useIsFocused } from '@react-navigation/native';
@@ -26,7 +26,7 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
     const { t } = useTranslation();
     const routeFocused = useIsFocused();
     const focused = routeFocused && visible;
-    const videoRef = useRef<Video>(null);
+    const videoRef = useRef<PlaybackVideoHandle>(null);
     const captureView = useRef<View>(null);
     const [preview, setPreview] = useState({ key: uri, image: previews.get(uri) });
     const [previewAllowed, setPreviewAllowed] = useState(false);
@@ -35,15 +35,11 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
     const firstFrame = useRef(false);
     const frameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [sourceUri, setSourceUri] = useState(Platform.OS === 'android' ? '' : uri);
-    const [implementation, setImplementation] = useState<'ExoPlayer' | 'MediaPlayer'>('ExoPlayer');
-    const fallbackUsed = useRef(false);
     const generation = useRef(0);
     useEffect(() => {
         const current = ++generation.current;
-        fallbackUsed.current = false;
         setPreviewFailed(false);
         setPreview({ key: uri, image: previews.get(uri) });
-        setImplementation('ExoPlayer');
         setSourceUri(Platform.OS === 'android' ? '' : uri);
         if (Platform.OS === 'android') void resolveAndroidReplay(uri.trim()).then(value => {
             if (generation.current === current) setSourceUri(value);
@@ -55,7 +51,7 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
     useEffect(() => { const listener = AppState.addEventListener('change', value => setForeground(value === 'active')); return () => listener.remove(); }, []);
     const [posterFailed, setPosterFailed] = useState(false);
     useEffect(() => {
-        if (!enabled) void videoRef.current?.setPositionAsync(1000).catch(() => {});
+        if (!enabled) videoRef.current?.seek(1);
     }, [enabled]);
     const imageUri = (!posterFailed && posterUri) || (preview.key === uri ? preview.image : undefined);
     const hasPoster = Boolean(imageUri);
@@ -70,7 +66,7 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
     const [failed, setFailed] = useState(false);
     const ready = useRef(false);
     const [failureKind, setFailureKind] = useState<'load_error' | 'format_error' | 'network_error' | 'slow_loading'>('load_error');
-    const playbackKey = sourceUri + ':' + implementation + ':' + attempt + ':' + enabled + ':' + focused + ':' + foreground;
+    const playbackKey = sourceUri + ':' + attempt + ':' + enabled + ':' + focused + ':' + foreground;
     const activePlayer = useRef(playbackKey);
     activePlayer.current = playbackKey;
     const fail = (error: unknown) => {
@@ -78,12 +74,6 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
         if (!enabled && Platform.OS === 'android') { setPreviewFailed(true); setLoading(false); return; }
         ready.current = true;
         const detail = String(error || '').toLowerCase();
-        if (Platform.OS === 'android' && !fallbackUsed.current && /decoder|codec|unsupported|format_supported=no|exoplaybackexception/.test(detail)) {
-            fallbackUsed.current = true;
-            setImplementation('MediaPlayer');
-            setLoading(true); setFailed(false);
-            return;
-        }
         setFailureKind(/decoder|codec|unsupported|format_supported=no/.test(detail) ? 'format_error' : /network|http|connection|source error|unable to connect/.test(detail) ? 'network_error' : 'load_error');
         setLoading(false);
         setFailed(true);
@@ -98,7 +88,7 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
         if (!needsVideo || !foreground || !sourceUri) return;
         const timer = setTimeout(() => { if (!ready.current) { setLoading(false); setFailureKind('slow_loading'); setFailed(true); } }, 45000);
         return () => { clearTimeout(timer); if (frameTimer.current) { clearTimeout(frameTimer.current); frameTimer.current = null; } };
-    }, [uri, sourceUri, implementation, needsVideo, foreground, attempt, enabled]);
+    }, [uri, sourceUri, needsVideo, foreground, attempt, enabled]);
     const startFrameWatchdog = () => {
         if (Platform.OS !== 'android' || firstFrame.current || frameTimer.current) return;
         frameTimer.current = setTimeout(() => {
@@ -111,10 +101,10 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
             if (imageUri === posterUri) setPosterFailed(true);
             else { previews.delete(uri); setPreview({ key: uri, image: undefined }); setPreviewFailed(true); }
         }} />}
-        {foreground && needsVideo && sourceUri && <View ref={captureView} collapsable={false} style={StyleSheet.absoluteFill}><Video ref={videoRef} key={playbackKey} source={{ uri: sourceUri.trim() }} status={{ androidImplementation: implementation }} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.CONTAIN} useNativeControls={enabled} shouldPlay={enabled && autoplay} positionMillis={enabled ? 0 : 1000} isMuted={!enabled} isLooping={false}
+        {foreground && needsVideo && sourceUri && <View ref={captureView} collapsable={false} style={StyleSheet.absoluteFill}><PlaybackVideo ref={videoRef} key={playbackKey} uri={sourceUri.trim()} style={StyleSheet.absoluteFill} controls={enabled} playing={enabled && autoplay} startSeconds={enabled ? 0 : 1} muted={!enabled}
             onLoad={() => { if (activePlayer.current !== playbackKey) return; ready.current = true; setLoading(false); setFailed(false); if (!enabled) startFrameWatchdog(); }}
-            onReadyForDisplay={event => {
-                if (activePlayer.current !== playbackKey || event.naturalSize.width <= 0 || event.naturalSize.height <= 0) return;
+            onFirstFrame={() => {
+                if (activePlayer.current !== playbackKey) return;
                 firstFrame.current = true;
                 if (frameTimer.current) { clearTimeout(frameTimer.current); frameTimer.current = null; }
                 if (Platform.OS !== 'android' || enabled || capturing.current || hasPoster) return;
@@ -129,9 +119,9 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
                 }));
             }}
             onError={fail}
-            onPlaybackStatusUpdate={status => {
+            onStatus={status => {
                 if (activePlayer.current !== playbackKey) return;
-                if (!status.isLoaded) { if (status.error) fail(status.error); return; }
+                if (!status.isLoaded) return;
                 if (status.isPlaying) startFrameWatchdog();
                 if (status.didJustFinish) onPause?.();
             }} /></View>}
@@ -146,4 +136,4 @@ export default function ReplayPlayer({ uri, posterUri, visible = true, enabled =
         </View>}
     </View>;
 }
-const styles = StyleSheet.create({ box: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', overflow: 'hidden' }, cover: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', gap: 8 }, text: { color: '#FFFFFF', fontSize: 12 } });
+const styles = StyleSheet.create({ box: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', overflow: 'hidden' }, cover: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', gap: 8 }, text: { color: '#FFFFFF', fontSize: 12 } });

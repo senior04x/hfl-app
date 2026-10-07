@@ -11,7 +11,7 @@ function loadCache() {
     let now = 1000;
     class Clock extends Date { static now() { return now; } }
     new Function('exports', 'require', 'Date', source)(exports, name =>
-        name === 'axios' ? { default: { create: () => ({}) } } : {}, Clock);
+        name === 'axios' ? { __esModule: true, default: { create: () => ({}) } } : {}, Clock);
     return { ...exports, setTime: value => { now = value; } };
 }
 function deferred() {

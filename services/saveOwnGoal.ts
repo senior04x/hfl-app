@@ -1,6 +1,6 @@
 import { resolveAndroidReplay } from './androidReplaySource';
 import { Platform } from 'react-native';
-import { requireOptionalNativeModule } from 'expo-modules-core';
+import { requireOptionalNativeModule } from 'expo';
 import { useAuthStore } from '../store/useAuthStore';
 
 export type GoalSaveError = 'unavailable' | 'permission' | 'failed' | 'not_owner';
@@ -20,7 +20,7 @@ export async function saveOwnGoal(playerId: string, uri: string): Promise<void> 
     let file: string | undefined;
     let fileSystem: typeof import('expo-file-system/legacy') | undefined;
     try {
-        const media = await import('expo-media-library');
+        const media = await import('expo-media-library/legacy');
         fileSystem = await import('expo-file-system/legacy');
         // Add-only access: no photo/video library browsing permissions.
         const permission = await media.requestPermissionsAsync(true, []);

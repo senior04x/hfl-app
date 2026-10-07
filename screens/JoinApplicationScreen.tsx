@@ -911,7 +911,7 @@ export default function JoinApplicationScreen({ route, navigation }: any) {
             <Animated.View
                 pointerEvents="none"
                 style={[
-                    StyleSheet.absoluteFillObject,
+                    StyleSheet.absoluteFill,
                     {
                         backgroundColor: '#000000',
                         opacity: backdropOpacity,
@@ -2226,7 +2226,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     photoLoadingOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'center',
         alignItems: 'center',

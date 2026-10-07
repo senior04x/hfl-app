@@ -1423,7 +1423,7 @@ function TeamChatScreen({ route, navigation }: any) {
                                     <Animated.View
                                         pointerEvents="none"
                                         style={[
-                                            StyleSheet.absoluteFillObject,
+                                            StyleSheet.absoluteFill,
                                             { backgroundColor: homeColors.accent, opacity: highlightOpacityAnim }
                                         ]}
                                     />
@@ -1542,7 +1542,7 @@ function TeamChatScreen({ route, navigation }: any) {
             <Animated.View
                 pointerEvents="none"
                 style={[
-                    StyleSheet.absoluteFillObject,
+                    StyleSheet.absoluteFill,
                     {
                         backgroundColor: '#000000',
                         opacity: backdropOpacity,

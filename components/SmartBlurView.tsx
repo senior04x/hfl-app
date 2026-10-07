@@ -56,7 +56,7 @@ export const SmartBlurView: React.FC<SmartBlurViewProps> = ({
         <BlurView
           intensity={intensity}
           tint={tint}
-          experimentalBlurMethod="dimezisBlurView"
+          blurMethod="dimezisBlurView"
           style={[StyleSheet.absoluteFill, style]}
           {...props}
         >

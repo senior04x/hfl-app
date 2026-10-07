@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
         transform: [{ rotate: '-20deg' }],
     },
     iconCenterWrapper: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 2,

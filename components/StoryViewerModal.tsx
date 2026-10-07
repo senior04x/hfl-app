@@ -16,7 +16,7 @@ import {
   Alert,
   Share,
 } from 'react-native';
-import { ResizeMode, Video, AVPlaybackStatus } from 'expo-av';
+import PlaybackVideo, { type PlaybackSnapshot, type PlaybackVideoHandle } from './PlaybackVideo';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -83,7 +83,7 @@ export default function StoryViewerModal({
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   // Gestures & Transitions
-  const videoRef = useRef<Video>(null);
+  const videoRef = useRef<PlaybackVideoHandle>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const panY = useRef(new Animated.Value(0)).current;
   const uiOpacity = useRef(new Animated.Value(1)).current;
@@ -333,7 +333,7 @@ export default function StoryViewerModal({
   }, [visible, currentGroupIdx, currentItemIdx, isPaused, isVideo]);
 
   // Handle Video Playback Status: Synchronize timeline smoothly
-  const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+  const handlePlaybackStatusUpdate = (status: PlaybackSnapshot) => {
     const itemKey = `${currentGroupIdx}-${currentItemIdx}`;
     if (activeMediaKeyRef.current !== itemKey) {
       return;
@@ -417,8 +417,7 @@ export default function StoryViewerModal({
 
     if (itemIsVideo && videoRef.current) {
       if (isPausedRef.current) setIsPaused(false);
-      videoRef.current.setPositionAsync(0).catch(() => {});
-      videoRef.current.playAsync().catch(() => {});
+      videoRef.current.restart();
     } else if (item) {
       const duration = item.durationSeconds ? item.durationSeconds * 1000 : STORY_DEFAULT_DURATION;
       animRef.current = Animated.timing(progressAnim, {
@@ -788,36 +787,27 @@ export default function StoryViewerModal({
           {...panResponder.panHandlers}
         >
           {/* VIDEO / VISUAL MEDIA PRESENTATION WITH SILKY SMOOTH CROSSFADE */}
-          <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: mediaFadeAnim }]}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: mediaFadeAnim }]}>
             {hasVideo ? (
               <View style={[styles.mediaContainer, { backgroundColor: isDark ? '#05070A' : '#10141E' }]}>
                 {/* FULL FORMAT UNCLIPPED VIDEO WITH RESIZE MODE CONTAIN */}
-                <Video
+                <PlaybackVideo
                   key={`story_vid_${currentGroupIdx}_${currentItemIdx}_${currentItem?.id || cachedVideoUri}`}
                   ref={videoRef}
-                  source={{ uri: cachedVideoUri! }}
+                  uri={cachedVideoUri!}
                   style={styles.media}
-                  resizeMode={ResizeMode.CONTAIN}
-                  shouldPlay={!isPaused}
-                  isLooping={false}
-                  isMuted={isMuted}
-                  positionMillis={0}
-                  progressUpdateIntervalMillis={50}
-                  onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-                  onLoad={() => {
-                    setMediaLoading(false);
-                    videoRef.current?.setPositionAsync(0).catch(() => {});
-                  }}
-                  onError={() => {
-                    setMediaLoading(false);
-                  }}
+                  playing={!isPaused}
+                  muted={isMuted}
+                  intervalSeconds={0.05}
+                  onStatus={handlePlaybackStatusUpdate}
+                  onError={() => setMediaLoading(false)}
                 />
               </View>
             ) : (
               /* Matchday Stadium Graphic Canvas (When not video) */
               <LinearGradient
                 colors={isDark ? ['#04160E', '#0A2B1C', '#030E09'] : ['#E8F5E9', '#C8E6C9', '#A5D6A7']}
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
               >
                 <View style={styles.fieldPattern}>
                   <View style={[styles.fieldCenterCircle, { borderColor: homeColors.accent }]} />
@@ -874,10 +864,10 @@ export default function StoryViewerModal({
                 turadigan yorug' chiziq ("skelet" effekti). */}
             {mediaLoading && (
               <View style={styles.loadingOverlay} pointerEvents="none">
-                <View style={[StyleSheet.absoluteFillObject, { overflow: 'hidden' }]}>
+                <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
                   <Animated.View
                     style={[
-                      StyleSheet.absoluteFillObject,
+                      StyleSheet.absoluteFill,
                       { width: SHIMMER_BAND_WIDTH, transform: [{ translateX: shimmerTranslateX }] },
                     ]}
                   >
@@ -885,7 +875,7 @@ export default function StoryViewerModal({
                       colors={['transparent', 'rgba(255, 255, 255, 0.22)', 'transparent']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      style={StyleSheet.absoluteFillObject}
+                      style={StyleSheet.absoluteFill}
                     />
                   </Animated.View>
                 </View>
@@ -896,7 +886,7 @@ export default function StoryViewerModal({
           {/* UI OVERLAYS (Fades out when user holds down to pause) */}
           <Animated.View
             style={[
-              StyleSheet.absoluteFillObject,
+              StyleSheet.absoluteFill,
               {
                 opacity: uiOpacity,
                 zIndex: 20,
@@ -950,10 +940,10 @@ export default function StoryViewerModal({
               {/* Progress bar ustidan ham xuddi shu shimmer — video hali
                   yuklanayotganini tepadagi chiziqda ham ko'rsatadi. */}
               {mediaLoading && (
-                <View style={[StyleSheet.absoluteFillObject, { overflow: 'hidden' }]} pointerEvents="none">
+                <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
                   <Animated.View
                     style={[
-                      StyleSheet.absoluteFillObject,
+                      StyleSheet.absoluteFill,
                       { width: SHIMMER_BAND_WIDTH, transform: [{ translateX: shimmerTranslateX }] },
                     ]}
                   >
@@ -961,7 +951,7 @@ export default function StoryViewerModal({
                       colors={['transparent', 'rgba(255, 255, 255, 0.7)', 'transparent']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      style={StyleSheet.absoluteFillObject}
+                      style={StyleSheet.absoluteFill}
                     />
                   </Animated.View>
                 </View>
@@ -1222,7 +1212,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mediaContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1231,13 +1221,13 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 8,
   },
   fieldPattern: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     opacity: 0.25,
     alignItems: 'center',
     justifyContent: 'center',

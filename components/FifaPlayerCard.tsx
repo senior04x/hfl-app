@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     geometricPattern: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         opacity: 0.12,
     },
     geoLine: {

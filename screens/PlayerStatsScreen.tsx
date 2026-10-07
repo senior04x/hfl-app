@@ -903,7 +903,7 @@ const PlayerStatsScreen = ({ route, navigation }: any) => {
             <Animated.View
                 pointerEvents="none"
                 style={[
-                    StyleSheet.absoluteFillObject,
+                    StyleSheet.absoluteFill,
                     {
                         backgroundColor: '#000000',
                         opacity: backdropOpacity,
