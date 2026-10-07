@@ -18,7 +18,6 @@ import PlayerListSkeleton from '../components/PlayerListSkeleton';
 import PlayerComparisonModal from '../components/PlayerComparisonModal';
 import { calculateFifaAttributes } from '../utils/playerCardUtils';
 
-import { Video, ResizeMode } from 'expo-av';
 import VideoBackground from '../components/VideoBackground';
 
 import { getOptimizedImageUrl } from '../utils/imageOptimizer';

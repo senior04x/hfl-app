@@ -10,8 +10,11 @@ import {
   Animated,
   Easing,
   Dimensions,
+  AppState,
+  type GestureResponderEvent,
 } from 'react-native';
-import { ResizeMode, Video } from 'expo-av';
+import { useEvent, useEventListener } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -55,30 +58,44 @@ function ReplayPickerSkeletonCard({ isDark }: { isDark: boolean }) {
 // Har bir replay uchun kichik video preview — foydalanuvchi story sifatida
 // QO'SHISHDAN OLDIN uni haqiqatan ko'rib chiqishi mumkin (tap = play/pause).
 function ReplayPreviewThumb({ videoUrl, isDark }: { videoUrl: string; isDark: boolean }) {
-  const videoRef = useRef<Video>(null);
   const [sourceUri, setSourceUri] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const player = useVideoPlayer(sourceUri, player => {
+    player.loop = true;
+    player.muted = false;
+  });
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'error') player.pause();
+  });
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') player.pause();
+    });
+    return () => subscription.remove();
+  }, [player]);
 
   useEffect(() => {
     let isMounted = true;
+    setSourceUri(null);
     if (videoUrl) {
       getCachedVideoUri(videoUrl).then((cached) => {
         if (isMounted) setSourceUri(cached);
+      }).catch(() => {
+        if (isMounted) setSourceUri(videoUrl);
       });
     }
     return () => { isMounted = false; };
   }, [videoUrl]);
 
-  const togglePlay = async (e: any) => {
-    e?.stopPropagation?.();
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      await videoRef.current.pauseAsync().catch(() => {});
-      setIsPlaying(false);
+  const togglePlay = (e: GestureResponderEvent) => {
+    e.stopPropagation();
+    if (!sourceUri || AppState.currentState !== 'active') return;
+    if (player.playing) {
+      player.pause();
     } else {
-      await videoRef.current.setPositionAsync(0).catch(() => {});
-      await videoRef.current.playAsync().catch(() => {});
-      setIsPlaying(true);
+      player.currentTime = 0;
+      player.play();
     }
   };
 
@@ -89,17 +106,12 @@ function ReplayPreviewThumb({ videoUrl, isDark }: { videoUrl: string; isDark: bo
       style={[skeletonStyles.previewBox, { backgroundColor: isDark ? '#000000' : '#0B0B0C' }]}
     >
       {sourceUri && (
-        <Video
-          ref={videoRef}
-          source={{ uri: sourceUri }}
+        <VideoView
+          player={player}
           style={StyleSheet.absoluteFillObject}
-          resizeMode={ResizeMode.COVER}
-          isMuted={false}
-          isLooping
-          shouldPlay={false}
-          onPlaybackStatusUpdate={(status: any) => {
-            if (status?.isLoaded) setIsPlaying(!!status.isPlaying);
-          }}
+          contentFit="cover"
+          surfaceType="textureView"
+          nativeControls={false}
         />
       )}
       {!isPlaying && (

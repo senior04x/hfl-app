@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, Dimensions } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import VideoBackground from './VideoBackground';
 import { BlurView } from 'expo-blur';
 import Skeleton from './Skeleton';
 
@@ -9,15 +9,11 @@ const { width } = Dimensions.get('window');
 const PlayerProfileSkeleton = () => {
     return (
         <View style={styles.container}>
-            <Video
+            <VideoBackground
                 source={require('../assets/images/welcomeScreenVideo1.mp4')}
                 style={StyleSheet.absoluteFill}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isLooping
-                isMuted
+                overlayOpacity={0.7}
             />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.7)' }]} />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Hero Section */}

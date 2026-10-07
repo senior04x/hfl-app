@@ -25,7 +25,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import SmartImage from '../components/SmartImage';

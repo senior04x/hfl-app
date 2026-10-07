@@ -16,7 +16,6 @@ import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import TableSkeleton from '../components/TableSkeleton';
 import { useSocket } from '../context/SocketContext';
-import { Video, ResizeMode } from 'expo-av';
 import VideoBackground from '../components/VideoBackground';
 import { useTranslation } from 'react-i18next';
 
