@@ -1,4 +1,4 @@
-import * as Notifications from 'expo-notifications';
+import { notifications as Notifications } from './notificationsRuntime';
 import * as Device from 'expo-device';
 import { Platform, Alert } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -8,7 +8,7 @@ import { apiService } from './apiService';
 let activeTeamChatId: string | number | null = null;
 
 // Configure how notifications should be handled when the app is in foreground
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
   handleNotification: async (notification) => {
     const data = notification?.request?.content?.data;
     // If user is currently active inside this specific team chat, suppress foreground banner
@@ -44,6 +44,7 @@ export const notificationService = {
    * @param userId The ID of the currently logged-in user (optional)
    */
   registerForPushNotificationsAsync: async (userId?: string) => {
+    if (!Notifications) return null;
     // Ordinary accounts do not belong to an organization/team. Do not enroll
     // them through the legacy organization-bound push registration endpoint.
     const personalUser = require('../store/useAuthStore').useAuthStore.getState().user;
@@ -133,7 +134,7 @@ export const notificationService = {
    * Sets up notification channels (required for Android)
    */
   setupAndroidChannel: async () => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS === 'android' && Notifications) {
       try {
         await Notifications.setNotificationChannelAsync('default', {
           name: 'default',

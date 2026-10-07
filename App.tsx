@@ -12,7 +12,7 @@ import { StyleSheet, Platform, Text, Linking, View, ActivityIndicator, Alert } f
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
-import * as Notifications from 'expo-notifications';
+import { notifications as Notifications } from './services/notificationsRuntime';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from './store/useAuthStore';
 import { useThemeStore } from './store/useThemeStore';
@@ -123,7 +123,7 @@ function App() {
     }, []);
 
     React.useEffect(() => {
-        if (!authRestored || Platform.OS === 'web' || user?.role === 'user') return;
+        if (!Notifications || !authRestored || Platform.OS === 'web' || user?.role === 'user') return;
 
         const setupNotifications = async () => {
             try {
