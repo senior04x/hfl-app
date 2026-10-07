@@ -367,6 +367,7 @@
     "load_error": "Jamoa ma\\'lumotlarini yuklab bo\\'lmadi.",
     "photo_permission_error": "Galereyadan rasm tanlash uchun ruxsat berishingiz kerak.",
     "photo_upload_error": "Rasmni yuklashda xatolik yuz berdi.",
+    "photo_upload_wait": "Rasm yuklanmoqda. Yuklash va saqlash tugaguncha kuting.",
     "phone_save_error": "Telefon raqamni saqlashda xatolik.",
     "photo_updated_success": "Rasm muvaffaqiyatli yuklandi.",
     "registration_closed_title": "Ro'yxatdan o'tish yopilgan",

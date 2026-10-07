@@ -172,6 +172,14 @@ export default function EditTeamModal({
 
     const [editingPlayerId, setEditingPlayerId] = useState<string | number | null>(null);
     const [uploadingPlayerId, setUploadingPlayerId] = useState<string | number | null>(null);
+    const photoOperationInFlight = useRef(false);
+    const requestClose = () => {
+        if (photoOperationInFlight.current) {
+            showToast(t('teams.photo_upload_wait', 'Rasm yuklanmoqda. Yuklash va saqlash tugaguncha kuting.'), 'error');
+            return;
+        }
+        onClose();
+    };
     const [savingPhonePlayerId, setSavingPhonePlayerId] = useState<string | number | null>(null);
 
     // Initial load
@@ -241,6 +249,8 @@ export default function EditTeamModal({
     // Pick and upload team logo
     const handlePickLogo = async () => {
         if (!canEdit()) return;
+        if (photoOperationInFlight.current) return;
+        photoOperationInFlight.current = true;
         try {
             const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permission.granted) {
@@ -274,6 +284,7 @@ export default function EditTeamModal({
             console.error('Logo upload error:', error);
             showToast(t('teams.photo_upload_error', 'Rasm tanlashda xatolik.'), 'error');
         } finally {
+            photoOperationInFlight.current = false;
             setUploadingLogo(false);
         }
     };
@@ -281,6 +292,7 @@ export default function EditTeamModal({
     // Save Team Info
     const handleSaveTeam = async () => {
         if (!canEdit()) return;
+        if (photoOperationInFlight.current) { requestClose(); return; }
         try {
             setSaving(true);
             const updates = {
@@ -302,7 +314,7 @@ export default function EditTeamModal({
 
             if (onSaved) onSaved();
             setTimeout(() => {
-                onClose();
+                requestClose();
             }, 900);
         } catch (error: any) {
             console.error('Save team error:', error);
@@ -315,6 +327,8 @@ export default function EditTeamModal({
     // Pick and upload player photo
     const handlePickPlayerPhoto = async (playerId: string | number) => {
         if (!canEdit()) return;
+        if (photoOperationInFlight.current) return;
+        photoOperationInFlight.current = true;
         try {
             const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permission.granted) {
@@ -351,6 +365,7 @@ export default function EditTeamModal({
             console.error('Player photo upload error:', error);
             showToast(t('teams.photo_upload_error', 'O\'yinchi rasmini yuklashda xatolik.'), 'error');
         } finally {
+            photoOperationInFlight.current = false;
             setUploadingPlayerId(null);
         }
     };
@@ -403,7 +418,7 @@ export default function EditTeamModal({
             visible={visible}
             animationType="slide"
             transparent={true}
-            onRequestClose={onClose}
+            onRequestClose={requestClose}
         >
             <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardAvoidingView
@@ -454,7 +469,7 @@ export default function EditTeamModal({
                             </Text>
                         </View>
                         <TouchableOpacity
-                            onPress={onClose}
+                            onPress={requestClose}
                             style={[styles.closeBtn, { backgroundColor: homeColors.surface }]}
                         >
                             <Ionicons name="close" size={20} color={homeColors.textPrimary} />
