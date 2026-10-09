@@ -382,16 +382,18 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
             let resolvedTeams = teamsData && teamsData.length > 0 ? teamsData : (mergedTournament?.teams || []);
             let tournamentMatchesDirect: any[] = [];
+            let tournamentMatchesFetched = false;
 
             if (isRealTournament && targetTournamentId) {
                 // Direct tournament matches fetch
-                const { data: tMatches } = await supabase
+                const { data: tMatches, error: tournamentMatchesError } = await supabase
                     .from('matches')
                     .select('*')
                     .eq('tournament_id', targetTournamentId)
                     .order('match_date', { ascending: false });
 
                 tournamentMatchesDirect = tMatches || [];
+                tournamentMatchesFetched = !tournamentMatchesError;
 
                 // Tournament participants must come from its own matches. The league
                 // team list can contain the same teams' older competition data.
@@ -746,18 +748,17 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             let finalLatestMatches: any[] = [];
 
             if (teamIds.length > 0) {
-                const [{ data: pData }, allMatchesData] = await Promise.all([
-                    supabase.from('applications').select('id, is_archived, status').eq('status', 'approved').in('team_id', teamIds),
-                    apiService.getMatches({ tournamentId: currentTournamentId })
+                const [playerCountResult, allMatchesData] = await Promise.all([
+                    supabase.from('applications').select('id', { count: 'exact', head: true })
+                        .eq('status', 'approved').in('team_id', teamIds)
+                        .or('is_archived.is.null,is_archived.eq.false'),
+                    isRealTournament && tournamentMatchesFetched
+                        ? Promise.resolve(tournamentMatchesDirect)
+                        : apiService.getMatches({ tournamentId: currentTournamentId })
                 ]);
 
-                const activePlayers = (pData || []).filter((p: any) => {
-                    const st = String(p.status || '').toLowerCase().trim();
-                    const isArchived = p.is_archived === true || st === 'archived' || st === 'arxivlangan';
-                    return !isArchived && st === 'approved';
-                });
-
-                finalCount = activePlayers.length;
+                if (playerCountResult.error) throw playerCountResult.error;
+                finalCount = playerCountResult.count ?? 0;
                 setTotalPlayersCount(finalCount);
 
                 const teamIdsSet = new Set(teamIds.map(String));
@@ -766,7 +767,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     const teamsMap: Record<string, any> = {};
                     resolvedTeams.forEach((t: any) => { teamsMap[String(t.id)] = t; });
 
-                    const matchesSource = (tournamentMatchesDirect && tournamentMatchesDirect.length > 0)
+                    const matchesSource = tournamentMatchesFetched
                         ? tournamentMatchesDirect
                         : (allMatchesData || []).filter((m: any) => m.tournament_id && String(m.tournament_id) === tournIdStr);
 
@@ -2789,4 +2790,3 @@ const styles = StyleSheet.create({
         marginTop: 1,
     },
 });
-
