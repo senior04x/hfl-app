@@ -1,5 +1,6 @@
 import { PagerFlatList, PagerContentScrollView } from '../components/PlatformPager';
 import { loadCompetitionPlayerStats } from '../services/competitionPlayerStats';
+import { loadCompetitionPlayerPage, createPlayerPageGate } from '../services/competitionPlayerPage';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
@@ -200,6 +201,19 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
     const { user } = useAuthStore();
     const [displayedPlayersCount, setDisplayedPlayersCount] = useState(20);
+    const [serverPlayers, setServerPlayers] = useState(false);
+    const [playersHasMore, setPlayersHasMore] = useState(false);
+    const [isLoadingMorePlayers, setIsLoadingMorePlayers] = useState(false);
+    const [viewerPlayer, setViewerPlayer] = useState<any>(null);
+    const [playersSearch, setPlayersSearch] = useState('');
+    const playerPageGate = useRef(createPlayerPageGate()).current;
+    const nextPlayersOffset = useRef(0);
+    const playersSnapshot = useRef('');
+    const legacyPlayersCache = useRef<{ scope: string; players: any[]; timestamp: number } | null>(null);
+    useEffect(() => {
+        const timer = setTimeout(() => setPlayersSearch(searchQuery.trim().slice(0, 100)), 350);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
     const [displayedToursCount, setDisplayedToursCount] = useState(3);
     const [isUserRowVisible, setIsUserRowVisible] = useState(false);
     const playersListRef = useRef<FlatList>(null);
@@ -218,6 +232,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const CACHE_KEY = `tournament_detail_v3_${dataScope}_${currentTournamentId}`;
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
     const PLAYERS_CACHE_KEY = `tournament_players_v6_${tournamentData?.is_tournament || isTournamentRoute ? 'tournament' : 'league'}_${currentTournamentId}`;
+    const playerTeamIds = [...new Set((standings.length ? standings : teams)
+        .map((tm: any) => String(tm.teamId || tm.id || tm._id)).filter(id => id && id !== 'undefined'))].sort();
+    const playerScopeKey = JSON.stringify([currentTournamentId, Boolean(tournamentData?.is_tournament || isTournamentRoute),
+        tournamentData?.id, tournamentData?.name, playerTeamIds]);
+    const viewerId = String(user?.application_id || user?.id || user?._id || '');
+    const PLAYER_PAGE_CACHE_KEY = `competition_page_v1_${JSON.stringify([playerScopeKey, statFilter, playersSearch, viewerId])}`;
     const MATCHES_CACHE_KEY = `tournament_matches_v3_${dataScope}_${currentTournamentId}`;
 
     useEffect(() => {
@@ -953,6 +973,104 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     }, [currentTournamentId, socket, isConnected]);
 
     // 2. Fetch Players specifically for this tournament's teams
+    const fetchPlayerPage = async (append = false) => {
+        const token = playerPageGate.begin();
+        if (token === null) return;
+        const offset = append ? nextPlayersOffset.current : 0;
+        if (append) setIsLoadingMorePlayers(true); else setIsLoadingPlayers(true);
+        setPlayersError(false);
+        try {
+            const page = await loadCompetitionPlayerPage({
+                tournament: Boolean(tournamentData?.is_tournament || isTournamentRoute),
+                id: toDatabaseId(tournamentData?.id || currentTournamentId), teamIds: playerTeamIds,
+            }, statFilter, playersSearch, offset, viewerId);
+            if (!playerPageGate.current(token)) return;
+            if (page === null) {
+                // Compatibility while the SQL is awaiting deployment; never for real RPC failures.
+                setServerPlayers(false);
+                await fetchTournamentPlayers(true, standings);
+                return;
+            }
+            if (append && page.snapshot !== playersSnapshot.current) {
+                // A goal, transfer or edit changed the ranking; restart rather than mix offsets.
+                playerPageGate.finish(token);
+                await fetchPlayerPage(false);
+                return;
+            }
+            playersSnapshot.current = page.snapshot;
+            setServerPlayers(true);
+            setTopPlayers(previous => append
+                ? [...previous, ...page.players.filter((p: any) => !previous.some(old => String(old.id) === String(p.id)))]
+                : page.players);
+            nextPlayersOffset.current = offset + page.players.length;
+            setPlayersHasMore(page.hasMore);
+            setViewerPlayer(page.viewer);
+            playersLoadedRef.current = true;
+            if (!append) {
+                // Cache a single page, scoped to competition, roster, filter, search and viewer.
+                void AsyncStorage.setItem(PLAYER_PAGE_CACHE_KEY, JSON.stringify({ ...page, timestamp: Date.now() })).catch(() => {});
+            }
+        } catch (error) {
+            if (playerPageGate.current(token)) setPlayersError(true);
+        } finally {
+            if (playerPageGate.current(token)) {
+                setIsLoadingPlayers(false);
+                setIsLoadingMorePlayers(false);
+                playerPageGate.finish(token);
+            }
+        }
+    };
+
+    useEffect(() => {
+        playerPageGate.reset();
+        playersRequestRef.current += 1;
+        playersLoadedRef.current = false;
+        nextPlayersOffset.current = 0;
+        playersSnapshot.current = '';
+        setViewerPlayer(null);
+        setPlayersHasMore(false);
+        setPlayersError(false);
+        setIsLoadingMorePlayers(false);
+        if (activeTab !== 'players' || isLoading || !currentTournamentId) {
+            setTopPlayers([]);
+            setIsLoadingPlayers(false);
+            return;
+        }
+        const legacy = legacyPlayersCache.current;
+        if (legacy?.scope === playerScopeKey && Date.now() - legacy.timestamp < CACHE_TTL) {
+            setTopPlayers(legacy.players);
+            setServerPlayers(false);
+            setIsLoadingPlayers(false);
+            playersLoadedRef.current = true;
+            return;
+        }
+        setTopPlayers([]);
+        let cancelled = false;
+        setIsLoadingPlayers(true);
+        (async () => {
+            try {
+                const raw = await AsyncStorage.getItem(PLAYER_PAGE_CACHE_KEY);
+                if (cancelled) return;
+                const cached = raw ? JSON.parse(raw) : null;
+                if (cached && Array.isArray(cached.players) && cached.players.length <= 20
+                    && typeof cached.hasMore === 'boolean' && typeof cached.snapshot === 'string'
+                    && Date.now() - cached.timestamp < CACHE_TTL) {
+                    setTopPlayers(cached.players);
+                    setViewerPlayer(cached.viewer);
+                    setServerPlayers(true);
+                    setPlayersHasMore(cached.hasMore);
+                    nextPlayersOffset.current = cached.players.length;
+                    playersSnapshot.current = cached.snapshot;
+                    playersLoadedRef.current = true;
+                    setIsLoadingPlayers(false);
+                    return;
+                }
+            } catch (_) {}
+            if (!cancelled) await fetchPlayerPage();
+        })();
+        return () => { cancelled = true; playerPageGate.reset(); playersRequestRef.current += 1; };
+    }, [activeTab, isLoading, PLAYER_PAGE_CACHE_KEY]);
+
     // 2. Fetch Players specifically for this tournament's teams and calculate exact stats
     const fetchTournamentPlayers = async (force = false, teamsList?: any[]) => {
         if (!force && playersLoadedRef.current && topPlayers.length > 0) return;
@@ -1090,6 +1208,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 });
 
                 setTopPlayers(processedPlayers);
+                legacyPlayersCache.current = { scope: playerScopeKey, players: processedPlayers, timestamp: Date.now() };
                 playersLoadedRef.current = true;
                 // Cache players
                 try {
@@ -1195,27 +1314,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         if (!currentTournamentId) return;
         let cancelled = false;
 
-        if (activeTab === 'players') {
-            // Try loading cached players first
-            if (!playersLoadedRef.current) {
-                (async () => {
-                    try {
-                        const raw = await AsyncStorage.getItem(PLAYERS_CACHE_KEY);
-                        if (cancelled) return;
-                        if (raw) {
-                            const parsed = JSON.parse(raw);
-                            const age = Date.now() - (parsed.timestamp || 0);
-                            if (parsed.players && parsed.players.length > 0 && age < CACHE_TTL) {
-                                setTopPlayers(parsed.players);
-                                playersLoadedRef.current = true;
-                                return;
-                            }
-                        }
-                    } catch (e) {}
-                    if (!cancelled) fetchTournamentPlayers(false, standings);
-                })();
-            }
-        } else if (activeTab === 'matches') {
+        if (activeTab === 'matches') {
             if (!matchesLoadedRef.current) {
                 (async () => {
                     try {
@@ -1234,8 +1333,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 })();
             }
         }
-        return () => { cancelled = true; playersRequestRef.current += 1; };
-    }, [activeTab, currentTournamentId, standings, PLAYERS_CACHE_KEY]);
+        return () => { cancelled = true; };
+    }, [activeTab, currentTournamentId, standings]);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'Belgilanmagan';
@@ -1253,7 +1352,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     const getFilteredData = () => {
         const query = searchQuery.toLowerCase().trim();
         
-        let sortedPlayers = [...topPlayers].sort((a, b) => {
+        let sortedPlayers = serverPlayers ? topPlayers : [...topPlayers].sort((a, b) => {
             const valA = a[statFilter] ?? a.stats?.[statFilter] ?? 0;
             const valB = b[statFilter] ?? b.stats?.[statFilter] ?? 0;
             const statisticDifference = Number(valB) - Number(valA);
@@ -1274,7 +1373,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
         return {
             standings: standings.filter(s => s.name?.toLowerCase().includes(query)),
-            topPlayers: sortedPlayers.filter(p => 
+            topPlayers: serverPlayers ? sortedPlayers : sortedPlayers.filter(p =>
                 `${p.firstName} ${p.lastName}`.toLowerCase().includes(query) || 
                 p.teamName?.toLowerCase().includes(query)
             ),
@@ -1439,12 +1538,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     }, [groupedMatchesByTour, displayedToursCount]);
 
     const visiblePlayers = useMemo(() => {
-        return filteredPlayers.slice(0, displayedPlayersCount);
-    }, [filteredPlayers, displayedPlayersCount]);
+        return serverPlayers ? filteredPlayers : filteredPlayers.slice(0, displayedPlayersCount);
+    }, [filteredPlayers, displayedPlayersCount, serverPlayers]);
 
     const userPlayerIndex = useMemo(() => {
         if (!user) return -1;
-        const uId = String(user.id || user._id || user.application_id || '');
+        const uId = String(user.application_id || user.id || user._id || '');
         const uPhone = String(user.phone || '').trim().replace(/[^0-9]/g, '');
         return filteredPlayers.findIndex((p: any) => {
             const pId = String(p.id || p._id || '');
@@ -1457,8 +1556,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         });
     }, [user, filteredPlayers]);
 
-    const userPlayer = userPlayerIndex >= 0 ? filteredPlayers[userPlayerIndex] : null;
-    const userRank = userPlayerIndex >= 0 ? userPlayerIndex + 1 : null;
+    const userPlayer = userPlayerIndex >= 0 ? filteredPlayers[userPlayerIndex] : viewerPlayer;
+    const userRank = serverPlayers ? userPlayer?.rank : (userPlayerIndex >= 0 ? userPlayerIndex + 1 : null);
     const userPlayerIndexRef = useRef(userPlayerIndex);
     userPlayerIndexRef.current = userPlayerIndex;
 
@@ -1478,8 +1577,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     }).current;
 
     const handleScrollToMyRow = useCallback(() => {
+        if (serverPlayers && userPlayerIndex < 0 && userPlayer) {
+            navigation.navigate('PlayerStats', { playerId: userPlayer.id, player: userPlayer });
+            return;
+        }
         if (userPlayerIndex >= 0) {
-            if (userPlayerIndex >= displayedPlayersCount) {
+            if (!serverPlayers && userPlayerIndex >= displayedPlayersCount) {
                 setDisplayedPlayersCount(userPlayerIndex + 10);
                 setTimeout(() => {
                     playersListRef.current?.scrollToIndex({
@@ -1496,7 +1599,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 });
             }
         }
-    }, [userPlayerIndex, displayedPlayersCount]);
+    }, [userPlayerIndex, displayedPlayersCount, serverPlayers, userPlayer, navigation]);
 
     const getDisplaySeason = () => {
         if (tournamentData?.season && tournamentData.season.trim()) return tournamentData.season.trim();
@@ -2013,7 +2116,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     </Animated.View>
                 </View>
 
-                {playersError && <TouchableOpacity onPress={() => fetchTournamentPlayers(true, standings)} style={{ padding: 16 }}>
+                {playersError && <TouchableOpacity onPress={() => fetchPlayerPage(serverPlayers && topPlayers.length > 0)} style={{ padding: 16 }}>
                     <Text style={{ color: homeColors.textPrimary }}>{t('tournaments.stats_load_failed', "Statistikani yuklab bo‘lmadi. Qayta urinish")}</Text>
                 </TouchableOpacity>}
                 {isLoadingPlayers ? (
@@ -2048,13 +2151,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                                     <Text style={[styles.emptyText, { color: homeColors.textSecondary }]}>{t('tournaments.no_data', 'Ma\'lumot topilmadi')}</Text>
                                 </View>
                             }
-                            ListFooterComponent={displayedPlayersCount < filteredPlayers.length ? (
+                            ListFooterComponent={(serverPlayers ? playersHasMore : displayedPlayersCount < filteredPlayers.length) ? (
                                 <TouchableOpacity
                                     style={[styles.loadMoreButton, { backgroundColor: homeColors.accent }]}
-                                    onPress={() => setDisplayedPlayersCount(prev => Math.min(prev + 20, filteredPlayers.length))}
+                                    disabled={isLoadingMorePlayers || playersSearch !== searchQuery.trim().slice(0, 100)}
+                                    onPress={() => serverPlayers ? fetchPlayerPage(true) : setDisplayedPlayersCount(prev => Math.min(prev + 20, filteredPlayers.length))}
                                     activeOpacity={0.8}
                                 >
-                                    <Text style={styles.loadMoreButtonText}>{t('common.load_more', 'KO‘PROQ KO‘RSATISH')}</Text>
+                                    {isLoadingMorePlayers ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.loadMoreButtonText}>{t('common.load_more', 'KO‘PROQ KO‘RSATISH')}</Text>}
                                     <Ionicons name="chevron-down" size={16} color="#FFFFFF" />
                                 </TouchableOpacity>
                             ) : null}
