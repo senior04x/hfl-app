@@ -1,7 +1,6 @@
 import { PagerFlatList, PagerContentScrollView } from '../components/PlatformPager';
 import { loadCompetitionPlayerStats } from '../services/competitionPlayerStats';
 import { loadCompetitionPlayerPage, createPlayerPageGate } from '../services/competitionPlayerPage';
-import { isSpectatorProfile } from '../utils/spectatorProfile';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
@@ -201,9 +200,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     }, []);
 
     const { user } = useAuthStore();
-    const openedOrganizationId = Number(route?.params?.tournament?.organization_id ?? tournamentData?.organization_id);
-    const publicCompetitionOrgId = Number.isSafeInteger(openedOrganizationId) && openedOrganizationId > 0 ? openedOrganizationId : null;
-    const publicMatchScope = isSpectatorProfile(user) ? { publicOrganizationId: publicCompetitionOrgId } : {};
     const [displayedPlayersCount, setDisplayedPlayersCount] = useState(20);
     const [serverPlayers, setServerPlayers] = useState(false);
     const [playersHasMore, setPlayersHasMore] = useState(false);
@@ -302,8 +298,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
             const [t, teamsData] = await Promise.all([
                 apiService.getTournamentById(leagueSearchKey || currentTournamentId).catch(() => null),
-                apiService.getTeams(1, 100, leagueSearchKey,
-                    isSpectatorProfile(user) ? publicCompetitionOrgId ?? undefined : undefined).catch(() => [])
+                apiService.getTeams(1, 100, leagueSearchKey).catch(() => [])
             ]);
 
             const mergedTournament = { ...(navTournament || {}), ...(t || {}) };
@@ -779,7 +774,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                         .or('is_archived.is.null,is_archived.eq.false'),
                     isRealTournament && tournamentMatchesFetched
                         ? Promise.resolve(tournamentMatchesDirect)
-                        : apiService.getMatches({ tournamentId: currentTournamentId, ...publicMatchScope })
+                        : apiService.getMatches({ tournamentId: currentTournamentId })
                 ]);
 
                 if (playerCountResult.error) throw playerCountResult.error;
@@ -1286,7 +1281,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 const targetLgName = String(tournamentData?.name || route?.params?.tournamentName || currentTournamentId).toLowerCase().trim();
                 const targetLgId = tournamentData?.id ? String(tournamentData.id) : null;
 
-                const matchesData = await apiService.getMatches({ tournamentId: currentTournamentId, ...publicMatchScope });
+                const matchesData = await apiService.getMatches({ tournamentId: currentTournamentId });
                 filteredLeagueMatches = (matchesData || []).filter((m: any) => {
                     if (m.tournament_id) return false;
                     const matchLgName = String(m.league || '').toLowerCase().trim();

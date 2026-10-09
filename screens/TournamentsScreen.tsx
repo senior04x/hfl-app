@@ -22,8 +22,6 @@ import { apiService, supabase } from '../services/apiService';
 import Skeleton from '../components/Skeleton';
 import TournamentsSkeleton from '../components/TournamentsSkeleton';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
-import SpectatorTournamentsScreen from './SpectatorTournamentsScreen';
-import { isSpectatorProfile } from '../utils/spectatorProfile';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
@@ -425,12 +423,7 @@ const TournamentsHeader = ({
     );
 };
 
-export default function TournamentsScreen(props: any) {
-    const user = useAuthStore(state => state.user);
-    return isSpectatorProfile(user) ? <SpectatorTournamentsScreen {...props} /> : <MemberTournamentsScreen {...props} />;
-}
-
-function MemberTournamentsScreen({ navigation }: any) {
+export default function TournamentsScreen({ navigation }: any) {
     const { t } = useTranslation();
     const { isGuest } = useAuthStore();
     const { isDark } = useThemeStore();

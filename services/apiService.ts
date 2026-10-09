@@ -7,7 +7,6 @@ import { useAuthStore } from '../store/useAuthStore';
 import { resolveMatchAssist } from './matchEventAssist';
 import { loadMatchCompetitionMetadata } from './matchCompetitionMetadata';
 import { loadTransferCareer } from './publicTransferHistory';
-import { isSpectatorProfile } from '../utils/spectatorProfile';
 
 export { supabase };
 
@@ -405,10 +404,10 @@ export const apiService = {
     },
 
     // Teams (Direct from Supabase 'teams' table with Standings calculation)
-    getTeams: async (page = 1, limit = 100, leagueName?: string, publicOrganizationId?: number) => {
-        const orgId = publicOrganizationId ?? getOrgId();
+    getTeams: async (page = 1, limit = 100, leagueName?: string) => {
+        const orgId = getOrgId();
         const isJunior = getIsJunior();
-        const cacheKey = `teams_${orgId}_${isJunior}_${page}_${limit}_${leagueName || 'all'}_${publicOrganizationId === undefined ? 'member' : 'public'}`;
+        const cacheKey = `teams_${orgId}_${isJunior}_${page}_${limit}_${leagueName || 'all'}`;
         return getCachedData(cacheKey, async () => {
             try {
                 let query = supabase
@@ -418,10 +417,8 @@ export const apiService = {
                     .neq('is_archived', true)
                     .order('name');
                 if (leagueName) {
-                    query = publicOrganizationId === undefined
-                        ? query.ilike('league', `%${leagueName}%`) : query.eq('league', leagueName);
+                    query = query.ilike('league', `%${leagueName}%`);
                 }
-                if (publicOrganizationId !== undefined) query = query.eq('organization_id', publicOrganizationId);
                 const { data: rawTeams, error } = await query;
                 if (error) throw error;
                 if (!rawTeams?.length) return [];
@@ -1006,15 +1003,13 @@ export const apiService = {
     getMatches: async (params?: any) => {
         try {
             const isGuest = useAuthStore.getState().isGuest;
-            const publicBrowse = isSpectatorProfile(useAuthStore.getState().user)
-                && Object.prototype.hasOwnProperty.call(params || {}, 'publicOrganizationId');
-            const orgId = publicBrowse ? params.publicOrganizationId : getOrgId();
-            const collabLeagueNames = !isGuest && !publicBrowse ? await apiService.getOrgCollabLeagues(orgId) : [];
+            const orgId = getOrgId();
+            const collabLeagueNames = !isGuest ? await apiService.getOrgCollabLeagues(orgId) : [];
 
             let query = supabase.from('matches').select('*')
                 .order('match_date', { ascending: false }).order('id', { ascending: false });
 
-            if (!isGuest && (!publicBrowse || orgId !== null)) {
+            if (!isGuest) {
                 if (collabLeagueNames && collabLeagueNames.length > 0) {
                     const escapedNames = collabLeagueNames.map(n => `"${n.replace(/"/g, '""')}"`).join(',');
                     query = query.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
