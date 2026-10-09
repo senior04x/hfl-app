@@ -1,4 +1,5 @@
--- DRAFT ONLY — not applied. TOURNAMENT-001, 2026-10-09.
+-- Applied to AMATORA xzzyhfyazwohdqqbjiiy with explicit user authorization, 2026-10-09.
+-- TOURNAMENT-001. Filename retained for existing links; this is the applied RPC source.
 -- Validate current schema, RLS and EXPLAIN ANALYZE in staging before deployment.
 -- Tournament and league scopes preserve services/competitionPlayerStats.ts semantics.
 -- Native column types are inherited: no assumption about integer/UUID tournament IDs.
