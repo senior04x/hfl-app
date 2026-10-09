@@ -1,18 +1,19 @@
+import SpectatorOrganizationPicker from '../components/SpectatorOrganizationPicker';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
 import { useSpectatorBrowseStore } from '../store/useSpectatorBrowseStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
-import { firstCompetitionCursor, loadSpectatorCompetitions, loadSpectatorOrganizations } from '../services/spectatorBrowseService';
+import { firstCompetitionCursor, loadSpectatorCompetitions } from '../services/spectatorBrowseService';
 
 export default function SpectatorTournamentsScreen({ navigation }: any) {
     const { t } = useTranslation();
     const { isDark } = useThemeStore();
     const colors = getHomeScreenColors(isDark);
-    const { organization, selectOrganization } = useSpectatorBrowseStore();
+    const { organization } = useSpectatorBrowseStore();
     const orgId = organization?.id ?? null;
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -24,15 +25,6 @@ export default function SpectatorTournamentsScreen({ navigation }: any) {
     const busy = useRef(false);
     const retryAppend = useRef(false);
     const [showOrganizations, setShowOrganizations] = useState(false);
-    const [organizations, setOrganizations] = useState<any[]>([]);
-    const [orgLoading, setOrgLoading] = useState(false);
-    const [orgError, setOrgError] = useState(false);
-    const [orgHasMore, setOrgHasMore] = useState(false);
-    const orgCursor = useRef<number | null | false>(null);
-    const orgBusy = useRef(false);
-    const orgRetryAppend = useRef(false);
-    const orgGeneration = useRef(0);
-
     const load = useCallback(async (append = false, refresh = false) => {
         if (busy.current) return;
         busy.current = true;
@@ -57,27 +49,6 @@ export default function SpectatorTournamentsScreen({ navigation }: any) {
         void load();
         return () => { generation.current += 1; busy.current = false; };
     }, [load]);
-
-    const loadOrganizations = useCallback(async (append = false) => {
-        if (orgBusy.current || (append && orgCursor.current === false)) return;
-        orgBusy.current = true;
-        orgRetryAppend.current = append;
-        const token = orgGeneration.current;
-        setOrgLoading(true); setOrgError(false);
-        try {
-            const result = await loadSpectatorOrganizations(append ? (orgCursor.current || null) : null);
-            if (token !== orgGeneration.current) return;
-            setOrganizations(previous => append ? [...previous, ...result.rows] : result.rows);
-            orgCursor.current = result.cursor; setOrgHasMore(result.cursor !== false);
-        } catch (_) { if (token === orgGeneration.current) setOrgError(true); }
-        finally { if (token === orgGeneration.current) { orgBusy.current = false; setOrgLoading(false); } }
-    }, []);
-
-    useEffect(() => {
-        orgGeneration.current += 1; orgBusy.current = false;
-        if (showOrganizations) void loadOrganizations();
-        return () => { orgGeneration.current += 1; orgBusy.current = false; };
-    }, [showOrganizations, loadOrganizations]);
 
     const surface = { backgroundColor: isDark ? '#141414' : '#FFFFFF', borderColor: colors.border };
     const text = { color: colors.textPrimary };
@@ -125,21 +96,7 @@ export default function SpectatorTournamentsScreen({ navigation }: any) {
                 {loading ? <ActivityIndicator style={styles.loader} color={colors.accent} />
                     : hasMore && !error ? button(t('common.load_more', 'Ko‘proq ko‘rsatish'), () => { void load(true); }) : null}
             </View>} />
-        <Modal visible={showOrganizations} transparent animationType="slide" onRequestClose={() => setShowOrganizations(false)}>
-            <View style={styles.overlay}><SafeAreaView style={[styles.sheet, { backgroundColor: colors.background }]}>
-                <View style={styles.sheetHeader}><Text style={[styles.name, text]}>{t('common.select_organization', 'Tashkilotni tanlang')}</Text>
-                    <Pressable accessibilityRole="button" accessibilityLabel={t('common.close', 'Yopish')} style={styles.close} onPress={() => setShowOrganizations(false)}>
-                        <Ionicons name="close" size={24} color={colors.textPrimary} />
-                    </Pressable>
-                </View>
-                {button(allLabel, () => { selectOrganization(null); setShowOrganizations(false); })}
-                <FlatList data={organizations} keyExtractor={item => String(item.id)}
-                    renderItem={({ item }) => button(item.name, () => { selectOrganization({ id: Number(item.id), name: item.name }); setShowOrganizations(false); })}
-                    ListFooterComponent={<View>{orgError && button(t('common.retry', 'Qayta urinish'), () => { void loadOrganizations(orgRetryAppend.current); })}
-                        {orgLoading ? <ActivityIndicator style={styles.loader} color={colors.accent} />
-                            : orgHasMore && !orgError ? button(t('common.load_more', 'Ko‘proq ko‘rsatish'), () => { void loadOrganizations(true); }) : null}</View>} />
-            </SafeAreaView></View>
-        </Modal>
+        <SpectatorOrganizationPicker visible={showOrganizations} onClose={() => setShowOrganizations(false)} />
     </SafeAreaView>;
 }
 

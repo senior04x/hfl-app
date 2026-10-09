@@ -1,4 +1,6 @@
 import LiveMatchBadge from '../components/LiveMatchBadge';
+import SpectatorHomeScreen from './SpectatorHomeScreen';
+import { isSpectatorProfile } from '../utils/spectatorProfile';
 import { useIsFocused } from '@react-navigation/native';
 import { createHomeStoryRefresh, getHomeMatchEventFilters } from '../services/homeRealtime';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
@@ -45,7 +47,12 @@ const HOME_LIVE_PREVIEW_LIMIT = 3;
 const CACHE_KEY_PREFIX = '@amatora_home_cache_v4_org_';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minut
 
-export default function HomeScreen({ navigation }: any) {
+export default function HomeScreen(props: any) {
+    const user = useAuthStore(state => state.user);
+    return isSpectatorProfile(user) ? <SpectatorHomeScreen {...props}/> : <MemberHomeScreen {...props}/>;
+}
+
+function MemberHomeScreen({ navigation }: any) {
     const { t, i18n } = useTranslation();
     const { colors, isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
