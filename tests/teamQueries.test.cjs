@@ -3,14 +3,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 
-function loadService(teams, matches, matchError = null) {
+function loadService(teams, matches, matchError = null, auth = { user: null, isGuest: true }) {
     const calls = [];
     const supabase = { from(table) {
         let ids, start = 0, end = Infinity, columns;
         const filters = [];
         const q = {
             select(value) { columns = value; return q; },
-            in() { return q; }, neq() { return q; }, eq() { return q; },
+            in() { return q; }, neq() { return q; }, eq(k,v) {
+                if (k === 'organization_id' || k === 'league') filters.push(r => r[k] === v);
+                return q;
+            },
             ilike() { return q; }, order() { return q; },
             or(value) {
                 ids = value.includes('.eq.')
@@ -23,20 +26,25 @@ function loadService(teams, matches, matchError = null) {
             range(a, b) { start = a; end = b; return q; },
             then(resolve) {
                 calls.push({ table, ids, start, end, columns });
-                const rows = table === 'teams' ? teams : table === 'sponsors' ? [] : matches.filter(m =>
+                const rows = table === 'teams' ? teams.filter(t=>filters.every(f=>f(t))) : table === 'sponsors' ? [] : matches.filter(m =>
                     (!ids || ids.includes(String(m.home_team_id)) || ids.includes(String(m.away_team_id))) && filters.every(f => f(m)));
                 return Promise.resolve({ data: rows.slice(start, end + 1), error: table === 'matches' ? matchError : null }).then(resolve);
             },
         };
         return q;
     } };
+    const spectator = {};
+    new Function('exports',ts.transpileModule(fs.readFileSync('utils/spectatorProfile.ts','utf8'),{
+        compilerOptions:{module:ts.ModuleKind.CommonJS}
+    }).outputText)(spectator);
     const dependencies = {
+        '../utils/spectatorProfile': spectator,
         './matchCompetitionMetadata': { loadMatchCompetitionMetadata: async () => new Map() },
         axios: { __esModule: true, default: { create: () => ({ get: async () => { throw new Error('Unexpected fallback'); } }) } },
         './supabase': { supabase },
         '../store/useOrganizationStore': { useOrganizationStore: { getState: () => ({ selectedOrganizationId: 1 }) } },
         '../store/useJuniorStore': { useJuniorStore: { getState: () => ({ isJuniorMode: false }) } },
-        '../store/useAuthStore': { useAuthStore: { getState: () => ({ user: null, isGuest: true }) } },
+        '../store/useAuthStore': { useAuthStore: { getState: () => auth } },
     };
     const exports = {};
     const source = ts.transpileModule(fs.readFileSync('services/apiService.ts', 'utf8'), {
@@ -96,4 +104,21 @@ test('failed paged request preserves the error instead of returning an empty or 
     const failure = new Error('Simulated network failure');
     const { service } = loadService([], [], failure);
     await assert.rejects(service.getMatches({ page: 2, pageSize: 200 }), error => error === failure);
+});
+
+test('spectator detail browses the opened organization while member scope stays unchanged', async () => {
+    const matches=[{id:1,organization_id:1},{id:2,organization_id:2}];
+    const spectator=loadService([],matches,null,{user:{role:'user',appUserId:'personal'},isGuest:false});
+    spectator.service.getOrgCollabLeagues=async()=>[];
+    assert.deepEqual((await spectator.service.getMatches({publicOrganizationId:2})).map(m=>m.id),[2]);
+    assert.deepEqual((await spectator.service.getMatches({publicOrganizationId:null})).map(m=>m.id),[1,2]);
+    const member=loadService([],matches,null,{user:{role:'player',organization_id:1},isGuest:false});
+    member.service.getOrgCollabLeagues=async()=>[];
+    assert.deepEqual((await member.service.getMatches({publicOrganizationId:2})).map(m=>m.id),[1]);
+});
+
+test('same-named leagues from different organizations do not mix teams in spectator detail', async () => {
+    const teams=[{id:1,organization_id:1,league:'Super'},{id:2,organization_id:2,league:'Super'}];
+    const {service}=loadService(teams,[]);
+    assert.deepEqual((await service.getTeams(1,100,'Super',2)).map(t=>t.id),[2]);
 });
