@@ -1,3 +1,4 @@
+import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -19,7 +20,6 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { apiService } from '../services/apiService';
 import { calendarCache } from '../services/calendarCache';
-import { useOrganizationStore } from '../store/useOrganizationStore';
 import CustomRefreshControl from '../components/CustomRefreshControl';
 import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
@@ -204,9 +204,7 @@ export default function CalendarScreen({ navigation }: any) {
     const currentLang = i18n.language || 'uz';
     const { handleScroll: handleNavBarScroll } = useNavBarScroll();
     const { user } = useAuthStore();
-    const selectedOrgId = useOrganizationStore(state => state.selectedOrganizationId);
-    const userOrgId = user?.organizationId || user?.organization_id || user?.organization?.id;
-    const calendarOrgId = userOrgId && !isNaN(Number(userOrgId)) ? Number(userOrgId) : selectedOrgId || 1;
+    const calendarOrgId = useContentOrganizationId();
     // MyTeamScreen'dagi bilan bir xil qoida: foydalanuvchining o'z jamoasi ID'si
     const userTeamId = user?.teamId || user?.team_id || (user?.role === 'manager' ? (user?.id || user?._id) : null);
     const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');

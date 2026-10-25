@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
 export async function organizationPage(page = 0) {
+    if (!Number.isSafeInteger(page) || page < 0) throw new Error('Invalid organization page');
     const { data, error } = await supabase.from('organizations')
         .select('id,name,slug,logo_url').order('id').range(page * 20, page * 20 + 20);
     if (error) throw error;
@@ -8,6 +9,9 @@ export async function organizationPage(page = 0) {
 }
 
 export async function organizationCompetitions(orgId: number, page = 0) {
+    if (!Number.isSafeInteger(orgId) || orgId <= 0 || !Number.isSafeInteger(page) || page < 0) {
+        throw new Error('Invalid organization competition scope');
+    }
     const start = page * 20;
     const results = await Promise.all([
         supabase.from('leagues').select('id,name,organization_id,logo_url,is_active', { count: 'exact' })

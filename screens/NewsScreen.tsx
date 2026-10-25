@@ -1,3 +1,4 @@
+import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
@@ -115,6 +116,8 @@ export default function NewsScreen() {
     const navigation = useNavigation<any>();
     const { handleScroll: handleNavBarScroll } = useNavBarScroll();
 
+    const orgId=useContentOrganizationId();
+    const newsRequest=useRef(0);
     const [news, setNews] = useState<News[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -130,23 +133,24 @@ export default function NewsScreen() {
     ];
 
     const fetchNews = async () => {
+        const request=++newsRequest.current;
         try {
             const foundCategory = categories.find(c => c.id === selectedCategory);
             const categoryParam = (!foundCategory || foundCategory.id === 'all') ? undefined : foundCategory.rawKey;
             const data = await apiService.getNews(1, 40, categoryParam); 
-            setNews(data || []);
+            if(request===newsRequest.current) setNews(data || []);
         } catch (error) {
             console.error('Error fetching news:', error);
         } finally {
-            setIsLoading(false);
-            setRefreshing(false);
+            if(request===newsRequest.current) {setIsLoading(false);setRefreshing(false);}
         }
     };
 
     useEffect(() => {
-        setIsLoading(true);
+        setNews([]);setIsLoading(true);
         fetchNews();
-    }, [selectedCategory]);
+        return ()=>{newsRequest.current++;};
+    }, [selectedCategory,orgId]);
 
     const onRefresh = () => {
         setRefreshing(true);

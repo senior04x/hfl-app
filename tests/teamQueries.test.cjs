@@ -30,7 +30,14 @@ function loadService(teams, matches, matchError = null) {
         };
         return q;
     } };
+    const scope={};
+    new Function('exports',ts.transpileModule(fs.readFileSync('utils/contentOrganization.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(scope);
     const dependencies = {
+        '../store/usePublicOrganizationStore': {
+            usePublicOrganizationStore: { getState: () => ({ ownerId: null, selectedOrganization: null }) },
+            publicOrganizationForUser: () => null,
+        },
+        '../utils/contentOrganization':scope,
         './matchCompetitionMetadata': { loadMatchCompetitionMetadata: async () => new Map() },
         axios: { __esModule: true, default: { create: () => ({ get: async () => { throw new Error('Unexpected fallback'); } }) } },
         './supabase': { supabase },

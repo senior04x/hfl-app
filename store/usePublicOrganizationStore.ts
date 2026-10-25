@@ -24,8 +24,11 @@ export const usePublicOrganizationStore = create<State>()(persist((set) => ({
 }), {
     name: 'amatora-public-organization-choice',
     storage: createJSONStorage(() => AsyncStorage),
+    skipHydration: true,
 }));
 
 export function publicOrganizationForUser(state: Pick<State, 'ownerId' | 'selectedOrganization'>, appUserId?: string) {
-    return appUserId && state.ownerId === appUserId ? state.selectedOrganization : null;
+    const choice = state.selectedOrganization;
+    return appUserId && state.ownerId === appUserId && choice && Number.isSafeInteger(choice.id) && choice.id > 0 &&
+        typeof choice.name === 'string' && choice.name.trim() ? choice : null;
 }

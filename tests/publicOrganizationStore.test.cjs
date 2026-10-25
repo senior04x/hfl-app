@@ -35,3 +35,10 @@ test('invalid selection cannot create an implicit organization fallback', () => 
     assert.throws(() => store.getState().select('', { id: 1, name: 'Org' }));
     assert.equal(store.getState().selectedOrganization, null);
 });
+
+test('invalid persisted choices reopen selection rather than mounting content with a fallback', () => {
+    const { publicOrganizationForUser: selected } = load();
+    for (const choice of [null, {id: 0, name: 'Org'}, {id: 12, name: ''}, {id: '12', name: 'Org'}]) {
+        assert.equal(selected({ownerId:'a',selectedOrganization:choice},'a'),null);
+    }
+});

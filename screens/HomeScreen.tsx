@@ -1,3 +1,4 @@
+import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
 import LiveMatchBadge from '../components/LiveMatchBadge';
 import { useIsFocused } from '@react-navigation/native';
 import { createHomeStoryRefresh, getHomeMatchEventFilters } from '../services/homeRealtime';
@@ -14,7 +15,6 @@ import { useSocket } from '../context/SocketContext';
 import HomeSkeleton from '../components/HomeSkeleton';
 import Skeleton from '../components/Skeleton';
 import { useAuthStore } from '../store/useAuthStore';
-import { useOrganizationStore } from '../store/useOrganizationStore';
 import SmartImage from '../components/SmartImage';
 import { BlurView } from 'expo-blur';
 import AnimatedBackground from '../components/AnimatedBackground';
@@ -59,11 +59,10 @@ export default function HomeScreen({ navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const { socket, isConnected } = useSocket();
     const { user, isGuest } = useAuthStore();
-    const selectedOrgId = useOrganizationStore(s => s.selectedOrganizationId);
     const [userProfile, setUserProfile] = useState<any>(null);
 
     // Determine current org ID and user unique identity
-    const currentOrgId = user?.organizationId || user?.organization_id || (user?.organization as any)?.id || selectedOrgId || 1;
+    const currentOrgId = useContentOrganizationId();
     const userUniqueKey = user ? String(user.id || user._id || user.teamId || user.team_id || user.name || 'user') : 'guest';
     const userRole = user?.role || (isGuest ? 'guest' : 'user');
     const CACHE_KEY = `${CACHE_KEY_PREFIX}${currentOrgId}_${userRole}_${userUniqueKey}`;

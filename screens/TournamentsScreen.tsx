@@ -22,6 +22,10 @@ import { apiService, supabase } from '../services/apiService';
 import Skeleton from '../components/Skeleton';
 import TournamentsSkeleton from '../components/TournamentsSkeleton';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
+import { isPublicViewer } from '../utils/contentOrganization';
+import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
+import { publicOrganizationForUser, usePublicOrganizationStore } from '../store/usePublicOrganizationStore';
+import { organizationPage, organizationCompetitions } from '../services/organizationBrowse';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
@@ -67,6 +71,10 @@ const TournamentsHeader = ({
     animationValue,
     leagues,
     handleLeagueSelect,
+    loadMoreOrganizations,
+    organizationsMore,
+    organizationsError,
+    competitionTotal,
     teams,
     totalTeamsCount,
     teamsLoading,
@@ -89,8 +97,8 @@ const TournamentsHeader = ({
     });
 
     const orgLogo = activeOrg?.logo_url || activeOrg?.logo || activeOrg?.photo_url;
-    const currentLeagueLogoSource = getLeagueLogoSource(selectedLeague);
-    const bannerCandidate = selectedLeague?.bg_image || selectedLeague?.export_bg_url || selectedLeague?.banner_url;
+    const currentLeagueLogoSource = getLeagueLogoSource(isGuest ? activeOrg : selectedLeague);
+    const bannerCandidate = isGuest ? null : selectedLeague?.bg_image || selectedLeague?.export_bg_url || selectedLeague?.banner_url;
     const bannerUri = typeof bannerCandidate === 'string' && bannerCandidate.startsWith('https://') ? bannerCandidate : null;
     const [failedBanner, setFailedBanner] = useState<string | null>(null);
     const hasBanner = Boolean(bannerUri && failedBanner !== bannerUri);
@@ -219,7 +227,7 @@ const TournamentsHeader = ({
                     <View style={styles.selectorFooterRow}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 1 }}>
                             <Text style={[styles.selectedLeagueHeading, { color: hasBanner ? '#FFFFFF' : homeColors.textPrimary }]} numberOfLines={1}>
-                                {(selectedLeague?.name || activeOrg?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()}
+                                {((isGuest ? activeOrg?.name : selectedLeague?.name) || activeOrg?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()}
                             </Text>
                             {selectedLeague?.is_tournament && (
                                 <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.4)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
@@ -253,13 +261,13 @@ const TournamentsHeader = ({
             ]}>
                 <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 360 }}>
                     <View style={styles.accordionContent}>
-                        {isLeaguesLoading && (!leagues || leagues.length === 0) ? (
+                        {isLeaguesLoading && (isGuest ? !organizations?.length : !leagues?.length) ? (
                             <View style={{ padding: 16 }}>
                                 <Skeleton width="100%" height={38} borderRadius={8} style={{ marginBottom: 10 }} />
                                 <Skeleton width="100%" height={38} borderRadius={8} style={{ marginBottom: 10 }} />
                                 <Skeleton width="100%" height={38} borderRadius={8} />
                             </View>
-                        ) : (!leagues || leagues.length === 0) ? (
+                        ) : (isGuest ? !organizations?.length : !leagues?.length) ? (
                             <View style={{ padding: 20, alignItems: 'center' }}>
                                 <Ionicons name="alert-circle-outline" size={24} color={homeColors.textSecondary} />
                                 <Text style={{ color: homeColors.textSecondary, fontSize: 13, marginTop: 6 }}>
@@ -267,8 +275,8 @@ const TournamentsHeader = ({
                                 </Text>
                             </View>
                         ) : (
-                            leagues.map((league: any) => {
-                                const isSelected = (selectedLeague?.id === league.id && !!selectedLeague?.is_tournament === !!league.is_tournament);
+                            (isGuest ? organizations : leagues).map((league: any) => {
+                                const isSelected = isGuest ? activeOrg?.id === league.id : (selectedLeague?.id === league.id && !!selectedLeague?.is_tournament === !!league.is_tournament);
                                 const isTourn = !!league.is_tournament;
                                 return (
                                     <TouchableOpacity
@@ -278,7 +286,7 @@ const TournamentsHeader = ({
                                             { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
                                             isSelected && { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)' }
                                         ]}
-                                        onPress={() => handleLeagueSelect(league)}
+                                        onPress={() => isGuest ? handleOrgSelect(league) : handleLeagueSelect(league)}
                                         activeOpacity={0.65}
                                     >
                                         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -290,7 +298,7 @@ const TournamentsHeader = ({
                                                 {league.name?.toUpperCase()}
                                             </Text>
                                             <Text style={{ color: homeColors.textSecondary, fontSize: 11 }}>
-                                                {isTourn ? t('stats.match_tournament', 'Turnir') : t('stats.match_league', 'Liga')}
+                                                {isGuest ? t('common.organization', 'Tashkilot') : isTourn ? t('stats.match_tournament', 'Turnir') : t('stats.match_league', 'Liga')}
                                             </Text>
                                         </View>
                                         {isSelected && (
@@ -300,12 +308,14 @@ const TournamentsHeader = ({
                                 );
                             })
                         )}
+                        {isGuest && organizationsMore && <TouchableOpacity onPress={loadMoreOrganizations} style={styles.accordionItem}><Text style={{color:homeColors.accent}}>Ko‘proq ko‘rsatish</Text></TouchableOpacity>}
+                        {isGuest && organizationsError && <TouchableOpacity onPress={loadMoreOrganizations} style={styles.accordionItem}><Text style={{color:homeColors.accent}}>Tashkilotlarni qayta yuklash</Text></TouchableOpacity>}
                     </View>
                 </ScrollView>
             </Animated.View>
 
             {/* 4. About League Button (Auth Mode only) */}
-            {selectedLeague ? (
+            {!isGuest && selectedLeague ? (
                 <TouchableOpacity
                     style={[
                         styles.aboutLeagueButton,
@@ -347,7 +357,7 @@ const TournamentsHeader = ({
                             <Skeleton width={30} height={16} borderRadius={4} />
                         ) : (
                             <Text style={[styles.statValue, { color: homeColors.textPrimary }]}>
-                                {leagues?.length || 0}
+                                {competitionTotal ?? leagues?.length ?? 0}
                             </Text>
                         )
                     ) : (
@@ -414,7 +424,7 @@ const TournamentsHeader = ({
                     />
                     <Text style={[styles.listHeaderText, { color: homeColors.textPrimary }]}>
                         {isGuest 
-                            ? `${(activeOrg?.name || 'TASHKILOT').toUpperCase()} ${t('tournaments.title', 'LIGA VA TURNIRLARI').toUpperCase()} (${leagues?.length || 0})`
+                            ? `${(activeOrg?.name || 'TASHKILOT').toUpperCase()} ${t('tournaments.title', 'LIGA VA TURNIRLARI').toUpperCase()} (${competitionTotal ?? leagues?.length ?? 0})`
                             : `${(selectedLeague?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()} ${t('teams.title', 'JAMOALARI').toUpperCase()} (${teams?.length || 0})`}
                     </Text>
                 </View>
@@ -425,13 +435,18 @@ const TournamentsHeader = ({
 
 export default function TournamentsScreen({ navigation }: any) {
     const { t } = useTranslation();
-    const { isGuest } = useAuthStore();
+    const { user, isGuest: anonymousGuest } = useAuthStore();
+    const isGuest = isPublicViewer(user, anonymousGuest);
     const { isDark } = useThemeStore();
     const homeColors = getHomeScreenColors(isDark);
     const { handleScroll: handleNavBarScroll } = useNavBarScroll();
 
-    const { organizations, selectedOrganizationId, setSelectedOrganizationId } = useOrganizationStore();
-    const activeOrg = (organizations || []).find((o: any) => o.id === selectedOrganizationId) || organizations?.[0];
+    const { organizations: legacyOrganizations, setSelectedOrganizationId } = useOrganizationStore();
+    const [publicOrganizations, setPublicOrganizations] = useState<any[]>([]);
+    const organizations = isGuest ? publicOrganizations : legacyOrganizations;
+    const selectedOrganizationId = useContentOrganizationId();
+    const personalChoice = usePublicOrganizationStore(state => publicOrganizationForUser(state, user?.appUserId));
+    const activeOrg = (organizations || []).find((o: any) => o.id === selectedOrganizationId) || personalChoice;
 
     const [activeTab, setActiveTab] = useState('league'); // 'league' or 'favorites'
     const [searchQuery, setSearchQuery] = useState('');
@@ -445,6 +460,39 @@ export default function TournamentsScreen({ navigation }: any) {
     const [teamsLoading, setTeamsLoading] = useState(false);
     const [leaguePlayersCount, setLeaguePlayersCount] = useState<number>(0);
     const hasCachedLeaguesRef = useRef(false);
+    const [organizationsMore,setOrganizationsMore] = useState(false);
+    const [organizationsError,setOrganizationsError] = useState(false);
+    const [browseMore,setBrowseMore] = useState(false);
+    const [browseError,setBrowseError] = useState(false);
+    const [competitionTotal,setCompetitionTotal] = useState(0);
+    const browsePage = useRef(0), orgPage = useRef(0), browseGeneration = useRef(0), browseBusy = useRef(false), orgBusy = useRef(false);
+    const loadMoreOrganizations = async (reset = false) => {
+        if(orgBusy.current) return;
+        orgBusy.current=true;
+        setOrganizationsError(false);
+        try {
+            const page=reset?0:orgPage.current+1;
+            const result=await organizationPage(page);
+            setPublicOrganizations(previous => reset ? result.rows : Array.from(new Map([...previous, ...result.rows].map(row => [row.id, row])).values()));
+            orgPage.current=page;setOrganizationsMore(result.more);
+        } catch {setOrganizationsError(true);} finally {orgBusy.current=false;}
+    };
+    useEffect(()=>{if(isGuest) void loadMoreOrganizations(true);},[isGuest]);
+    const loadBrowse = async (append = false) => {
+        if(browseBusy.current) return;
+        browseBusy.current=true;
+        const generation=browseGeneration.current;
+        setIsLeaguesLoading(true);setBrowseError(false);
+        try {
+            const page=append?browsePage.current+1:0;
+            const result=await organizationCompetitions(selectedOrganizationId,page);
+            if(generation!==browseGeneration.current) return;
+            setLeagues(previous=>append?[...previous,...result.rows]:result.rows);
+            setSelectedLeague(null);setTotalTeamsCount(result.teams);setCompetitionTotal(result.total);
+            browsePage.current=page;setBrowseMore(result.more);
+        } catch {if(generation===browseGeneration.current)setBrowseError(true);}
+        finally {if(generation===browseGeneration.current){browseBusy.current=false;setIsLeaguesLoading(false);}}
+    };
 
     const animationValue = useRef(new Animated.Value(0)).current;
 
@@ -698,13 +746,18 @@ export default function TournamentsScreen({ navigation }: any) {
     };
 
     useEffect(() => {
+        if(isGuest) {
+            browseGeneration.current++;browseBusy.current=false;setLeagues([]);setSelectedLeague(null);setBrowseMore(false);
+            void loadBrowse();
+            return ()=>{browseGeneration.current++;browseBusy.current=false;};
+        }
         const init = async () => {
             const targetOrgId = selectedOrganizationId || 1;
             await loadCachedLeagues(targetOrgId);
             fetchLeagues(targetOrgId, hasCachedLeaguesRef.current);
         };
         init();
-    }, [selectedOrganizationId]);
+    }, [selectedOrganizationId,isGuest]);
 
     const sortTeamsByStandingsRank = (arr: any[]) => {
         return [...arr].sort((a: any, b: any) => {
@@ -900,10 +953,10 @@ export default function TournamentsScreen({ navigation }: any) {
     };
 
     useEffect(() => {
-        if (selectedLeague && (leagues?.length || 0) > 0 && !isLeaguesLoading && !hasCachedLeaguesRef.current) {
+        if (!isGuest && selectedLeague && (leagues?.length || 0) > 0 && !isLeaguesLoading && !hasCachedLeaguesRef.current) {
             fetchLeagueTeams(selectedLeague.name || selectedLeague.id || '', selectedLeague);
         }
-    }, [selectedLeague?.id, selectedLeague?.name, selectedLeague?.is_tournament]);
+    }, [selectedLeague?.id, selectedLeague?.name, selectedLeague?.is_tournament,isGuest]);
 
     const handleLeagueSelect = useCallback((league: any) => {
         setIsLeagueSelectorOpen(false);
@@ -1085,9 +1138,12 @@ export default function TournamentsScreen({ navigation }: any) {
 
     const handleOrgSelect = useCallback((org: any) => {
         setIsLeagueSelectorOpen(false);
-        setSelectedOrganizationId(org.id);
-        fetchLeagues(org.id);
-    }, []);
+        if (!anonymousGuest && user?.role === 'user' && user?.appUserId) {
+            usePublicOrganizationStore.getState().select(user.appUserId, { id: org.id, name: org.name, logoUrl: org.logo_url || org.logoUrl });
+        } else {
+            setSelectedOrganizationId(org.id);
+        }
+    }, [anonymousGuest, user?.role, user?.appUserId, setSelectedOrganizationId]);
 
     return (
         <View style={[styles.mainWrapper, { backgroundColor: homeColors.background }]}>
@@ -1126,6 +1182,10 @@ export default function TournamentsScreen({ navigation }: any) {
                                 selectedLeague={selectedLeague}
                                 activeOrg={activeOrg}
                                 organizations={organizations}
+                                organizationsMore={organizationsMore}
+                                organizationsError={organizationsError}
+                                loadMoreOrganizations={()=>loadMoreOrganizations(publicOrganizations.length === 0)}
+                                competitionTotal={isGuest ? competitionTotal : undefined}
                                 handleOrgSelect={handleOrgSelect}
                                 animationValue={animationValue}
                                 leagues={leagues}
@@ -1160,11 +1220,12 @@ export default function TournamentsScreen({ navigation }: any) {
                                 ) : null
                             )
                         }
+                        ListFooterComponent={isGuest && (browseMore || browseError) ? <TouchableOpacity disabled={isLeaguesLoading} onPress={()=>browseError?loadBrowse(false):loadBrowse(true)} style={styles.accordionItem}><Text style={{color:homeColors.accent}}>{browseError?'Qayta urinish':'Ko‘proq ko‘rsatish'}</Text></TouchableOpacity>:null}
                         contentContainerStyle={[styles.list, { paddingBottom: 130 }]}
                         refreshControl={
                             <RefreshControl
                                 refreshing={isGuest ? (isLeaguesLoading && leagues.length > 0) : (teamsLoading && teams.length > 0)}
-                                onRefresh={() => isGuest ? fetchLeagues(selectedOrganizationId, true) : fetchLeagueTeams(selectedLeague?.name || selectedLeague?.id || '')}
+                                onRefresh={() => isGuest ? loadBrowse(false) : fetchLeagueTeams(selectedLeague?.name || selectedLeague?.id || '')}
                                 tintColor={homeColors.accent}
                                 colors={[homeColors.accent]}
                             />

@@ -1,3 +1,5 @@
+import { contentOrganizationId, isPublicViewer } from '../utils/contentOrganization';
+import { publicOrganizationForUser, usePublicOrganizationStore } from '../store/usePublicOrganizationStore';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
@@ -11,14 +13,9 @@ import { loadTransferCareer } from './publicTransferHistory';
 export { supabase };
 
 const getOrgId = () => {
-    const user = useAuthStore.getState().user;
-    if (user) {
-        const uOrgId = user.organizationId || user.organization_id || user.organization?.id;
-        if (uOrgId && !isNaN(Number(uOrgId))) {
-            return Number(uOrgId);
-        }
-    }
-    return useOrganizationStore.getState().selectedOrganizationId || 1;
+    const { user, isGuest } = useAuthStore.getState();
+    const choice = publicOrganizationForUser(usePublicOrganizationStore.getState(), user?.appUserId);
+    return contentOrganizationId(user, useOrganizationStore.getState().selectedOrganizationId, isGuest, choice?.id);
 };
 const getIsJunior = () => useJuniorStore.getState().isJuniorMode;
 
@@ -416,6 +413,7 @@ export const apiService = {
                     .in('status', ['approved', 'partially_approved', 'pending'])
                     .neq('is_archived', true)
                     .order('name');
+                if (isPublicViewer(useAuthStore.getState().user,useAuthStore.getState().isGuest)) query=query.eq('organization_id',orgId);
                 if (leagueName) {
                     query = query.ilike('league', `%${leagueName}%`);
                 }
@@ -1004,12 +1002,12 @@ export const apiService = {
         try {
             const isGuest = useAuthStore.getState().isGuest;
             const orgId = getOrgId();
-            const collabLeagueNames = !isGuest ? await apiService.getOrgCollabLeagues(orgId) : [];
+            const collabLeagueNames = !isPublicViewer(useAuthStore.getState().user,isGuest) ? await apiService.getOrgCollabLeagues(orgId) : [];
 
             let query = supabase.from('matches').select('*')
                 .order('match_date', { ascending: false }).order('id', { ascending: false });
 
-            if (!isGuest) {
+            {
                 if (collabLeagueNames && collabLeagueNames.length > 0) {
                     const escapedNames = collabLeagueNames.map(n => `"${n.replace(/"/g, '""')}"`).join(',');
                     query = query.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
@@ -1697,11 +1695,11 @@ export const apiService = {
         try {
             const isGuest = useAuthStore.getState().isGuest;
             const orgId = getOrgId();
-            const collabLeagueNames = !isGuest ? await apiService.getOrgCollabLeagues(orgId) : [];
+            const collabLeagueNames = !isPublicViewer(useAuthStore.getState().user,isGuest) ? await apiService.getOrgCollabLeagues(orgId) : [];
 
             // 1. Fetch leagues for this organization or all if guest
             let leaguesQuery = supabase.from('leagues').select('*');
-            if (!isGuest) {
+            {
                 leaguesQuery = leaguesQuery.eq('organization_id', orgId);
             }
             const { data: dbLeagues } = await leaguesQuery;
@@ -1755,7 +1753,7 @@ export const apiService = {
             let teamsQuery = supabase.from('teams').select('*');
             let playersQuery = supabase.from('applications').select('*').eq('status', 'approved').or('is_archived.is.null,is_archived.eq.false');
 
-            if (!isGuest) {
+            {
                 if (collabLeagueNames && collabLeagueNames.length > 0) {
                     const escapedNames = collabLeagueNames.map((n: string) => `"${n}"`).join(',');
                     matchesQuery = matchesQuery.or(`organization_id.eq.${orgId},league.in.(${escapedNames})`);
@@ -1844,10 +1842,11 @@ export const apiService = {
 
     // News System (Supabase 'news' table)
     getNews: async (page = 1, limit = 40, category?: string) => {
-        const cacheKey = `news_${page}_${limit}_${category || 'all'}`;
+        const orgId = getOrgId();
+        const cacheKey = `news_${orgId}_${page}_${limit}_${category || 'all'}`;
         return getCachedData(cacheKey, async () => {
             try {
-                let query = supabase.from('news').select('*').order('created_at', { ascending: false });
+                let query = supabase.from('news').select('id,title,category,image_url,content,organization_id,views,created_at').eq('organization_id',orgId).order('created_at', { ascending: false }).range((page-1)*limit,page*limit-1);
                 if (category && category !== 'Barchasi') {
                     query = query.ilike('category', `%${category}%`);
                 }
