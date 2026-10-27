@@ -15,7 +15,8 @@ test('viewer content selection is separate from sports profile organization',()=
     assert.equal(contentOrganizationId(viewer,1,false,20),20);
     assert.equal(contentOrganizationId({role:'player',organizationId:1},20),1);
     assert.equal(contentOrganizationId({role:'manager',organization:{id:11}},20),11);
-    assert.equal(contentOrganizationId(null,20,true),20);
+    assert.throws(()=>contentOrganizationId(null,20,true), /selection required/);
+    assert.equal(contentOrganizationId(null,20,true,30),30);
     assert.equal(isPublicViewer({role:'player',appUserId:'uuid'}),false);
 });
 test('bounded organization and competition pages preserve exact scope and exclude inactive data',async()=>{

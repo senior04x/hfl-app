@@ -34,8 +34,8 @@ function loadService(teams, matches, matchError = null) {
     new Function('exports',ts.transpileModule(fs.readFileSync('utils/contentOrganization.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(scope);
     const dependencies = {
         '../store/usePublicOrganizationStore': {
-            usePublicOrganizationStore: { getState: () => ({ ownerId: null, selectedOrganization: null }) },
-            publicOrganizationForUser: () => null,
+            usePublicOrganizationStore: { getState: () => ({ ownerId: 'public-guest', selectedOrganization: { id: 1, name: 'Test org' } }) },
+            publicOrganizationForUser: (state, ownerId) => state.ownerId === ownerId ? state.selectedOrganization : null,
         },
         '../utils/contentOrganization':scope,
         './matchCompetitionMetadata': { loadMatchCompetitionMetadata: async () => new Map() },

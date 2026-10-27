@@ -1,5 +1,5 @@
-// Backend API base URL - Railway Real Server
-export const API_BASE_URL = 'https://web-production-eaa31.up.railway.app';
+// Production backend API over HTTPS
+export const API_BASE_URL = 'https://api.amatora.uz';
 
 export const AUTH_API = {
   REQUEST_OTP: `${API_BASE_URL}/api/auth/request-otp`,

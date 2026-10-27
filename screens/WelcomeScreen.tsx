@@ -1,4 +1,6 @@
 import { safeAuthStorageCode } from '../utils/authStorageDiagnostic';
+import WelcomeSocialButtons from '../components/WelcomeSocialButtons';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -125,9 +127,12 @@ const ShimmerLogo = ({ visible }: { visible: boolean }) => {
 // Qo'llanma: OTP_MASTER_KOD_QOLLANMA.md (repo root)
 export const MASTER_OTP_CODE: string | null = null;
 
-import { loginWithTelegram, personalLoginMessage, PersonalLoginError } from '../services/personalAuthService';
+import { GOOGLE_LOGIN_ENABLED, loginWithGoogle, loginWithApple, loginWithTelegram, personalLoginMessage, PersonalLoginError } from '../services/personalAuthService';
 
 export default function WelcomeScreen({ navigation, route }: any) {
+    const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+    const requireDevelopmentBuild = () => Alert.alert('Login sinovi',
+        'Expo Go’da dizayn va sahifalarni tekshirish mumkin. Google/Apple login va ilovaga qaytishni tekshirish uchun AMATORA development build kerak.');
     const isTransferReentry = route?.params?.transferReentry === true;
     const { t, i18n } = useTranslation();
     const setAuth = useAuthStore((state) => state.setAuth);
@@ -442,7 +447,32 @@ const formatPhoneInput = (val: string) => {
         }
     };
 
+    const handleGoogleLogin = async () => {
+        if (isExpoGo) { requireDevelopmentBuild(); return; }
+        if (loading) return;
+        setLoading(true);
+        try {
+            const result = await loginWithGoogle();
+            if (result) await performLogin(result.user, result.accounts);
+        } catch (error) {
+            Alert.alert(t('common.error'), personalLoginMessage(error instanceof PersonalLoginError ? error.code : 'GOOGLE_SIGN_IN_FAILED', i18n.language));
+        } finally { setLoading(false); }
+    };
+
+    const handleAppleLogin = async () => {
+        if (isExpoGo) { requireDevelopmentBuild(); return; }
+        if (loading) return;
+        setLoading(true);
+        try {
+            const result = await loginWithApple();
+            if (result) await performLogin(result.user, result.accounts);
+        } catch (error) {
+            Alert.alert(t('common.error'), personalLoginMessage(error instanceof PersonalLoginError ? error.code : 'APPLE_SIGN_IN_FAILED', i18n.language));
+        } finally { setLoading(false); }
+    };
+
     const handleTelegramLogin = async () => {
+        if (isExpoGo) { requireDevelopmentBuild(); return; }
         if (loading) return;
         setLoading(true);
         try {
@@ -640,16 +670,12 @@ const formatPhoneInput = (val: string) => {
                                     <Text style={styles.mainButtonText}>{t('auth.login')}</Text>
                                 </TouchableOpacity>
 
-                                {/* Full-width Telegram entry below the main login button. */}
-                                <TouchableOpacity
-                                    style={[styles.guestButton, { flexDirection: 'row', justifyContent: 'center', width: '100%' }]}
-                                    onPress={handleTelegramLogin}
+                                <WelcomeSocialButtons
                                     disabled={loading}
-                                    activeOpacity={0.7}
-                                >
-                                    {loading ? <ActivityIndicator size="small" color={BRAND_ORANGE} style={{ marginRight: 8 }} /> : <FontAwesome name="telegram" size={20} color={BRAND_ORANGE} style={{ marginRight: 8 }} />}
-                                    <Text style={[styles.bottomSecondaryText, { color: '#FFFFFF', flexShrink: 1, textAlign: 'center' }]}>{t('auth.telegram_login', 'Telegram orqali kirish')}</Text>
-                                </TouchableOpacity>
+                                    onApple={handleAppleLogin}
+                                    onGoogle={GOOGLE_LOGIN_ENABLED || isExpoGo ? handleGoogleLogin : undefined}
+                                    onTelegram={handleTelegramLogin}
+                                />
 
                                 {/* Bottom row: language. */}
                                 <View style={{
@@ -659,12 +685,22 @@ const formatPhoneInput = (val: string) => {
                                     width: '100%',
                                     marginTop: 4,
                                 }}>
+                                    <TouchableOpacity
+                                        accessibilityRole="button"
+                                        accessibilityLabel={t('auth.browse_without_account', 'Akkauntsiz tomosha qilish')}
+                                        onPress={() => useAuthStore.getState().setGuest(true)}
+                                        activeOpacity={0.7}
+                                        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+                                    >
+                                        <Ionicons name="eye-outline" size={21} color="rgba(255, 255, 255, 0.6)" />
+                                    </TouchableOpacity>
+
                                     {/* Language Switcher with globe icon (Left side) */}
                                     <TouchableOpacity
                                         onPress={() => setShowLanguageModal(true)}
                                         activeOpacity={0.7}
                                         style={{
-                                            flex: 1,
+                                            minHeight: 44,
                                             flexDirection: 'row',
                                             alignItems: 'center',
                                             justifyContent: 'center',

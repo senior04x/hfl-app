@@ -1,4 +1,4 @@
-import { contentOrganizationId, isPublicViewer } from '../utils/contentOrganization';
+import { contentOrganizationId, isPublicViewer, publicOrganizationOwner } from '../utils/contentOrganization';
 import { publicOrganizationForUser, usePublicOrganizationStore } from '../store/usePublicOrganizationStore';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,7 +14,7 @@ export { supabase };
 
 const getOrgId = () => {
     const { user, isGuest } = useAuthStore.getState();
-    const choice = publicOrganizationForUser(usePublicOrganizationStore.getState(), user?.appUserId);
+    const choice = publicOrganizationForUser(usePublicOrganizationStore.getState(), publicOrganizationOwner(user, isGuest));
     return contentOrganizationId(user, useOrganizationStore.getState().selectedOrganizationId, isGuest, choice?.id);
 };
 const getIsJunior = () => useJuniorStore.getState().isJuniorMode;

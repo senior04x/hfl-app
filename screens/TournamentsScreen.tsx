@@ -22,7 +22,7 @@ import { apiService, supabase } from '../services/apiService';
 import Skeleton from '../components/Skeleton';
 import TournamentsSkeleton from '../components/TournamentsSkeleton';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
-import { isPublicViewer } from '../utils/contentOrganization';
+import { isPublicViewer, publicOrganizationOwner } from '../utils/contentOrganization';
 import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
 import { publicOrganizationForUser, usePublicOrganizationStore } from '../store/usePublicOrganizationStore';
 import { organizationPage, organizationCompetitions } from '../services/organizationBrowse';
@@ -445,7 +445,7 @@ export default function TournamentsScreen({ navigation }: any) {
     const [publicOrganizations, setPublicOrganizations] = useState<any[]>([]);
     const organizations = isGuest ? publicOrganizations : legacyOrganizations;
     const selectedOrganizationId = useContentOrganizationId();
-    const personalChoice = usePublicOrganizationStore(state => publicOrganizationForUser(state, user?.appUserId));
+    const personalChoice = usePublicOrganizationStore(state => publicOrganizationForUser(state, publicOrganizationOwner(user, anonymousGuest)));
     const activeOrg = (organizations || []).find((o: any) => o.id === selectedOrganizationId) || personalChoice;
 
     const [activeTab, setActiveTab] = useState('league'); // 'league' or 'favorites'
@@ -1138,8 +1138,8 @@ export default function TournamentsScreen({ navigation }: any) {
 
     const handleOrgSelect = useCallback((org: any) => {
         setIsLeagueSelectorOpen(false);
-        if (!anonymousGuest && user?.role === 'user' && user?.appUserId) {
-            usePublicOrganizationStore.getState().select(user.appUserId, { id: org.id, name: org.name, logoUrl: org.logo_url || org.logoUrl });
+        if (isPublicViewer(user, anonymousGuest)) {
+            usePublicOrganizationStore.getState().select(publicOrganizationOwner(user, anonymousGuest)!, { id: org.id, name: org.name, logoUrl: org.logo_url || org.logoUrl });
         } else {
             setSelectedOrganizationId(org.id);
         }

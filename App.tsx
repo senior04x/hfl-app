@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from './store/useAuthStore';
 import { publicOrganizationForUser, usePublicOrganizationStore } from './store/usePublicOrganizationStore';
 import PublicOrganizationPicker from './components/PublicOrganizationPicker';
+import { publicOrganizationOwner } from './utils/contentOrganization';
 import { useThemeStore } from './store/useThemeStore';
 import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from '@react-navigation/stack';
 import AppNavigator from './navigation/AppNavigator';
@@ -74,7 +75,9 @@ export const navigationRef = createNavigationContainerRef();
 function App() {
     const { isAuthenticated, isGuest, user } = useAuthStore();
     const personalViewer = isAuthenticated && !isGuest && user?.role === 'user' && Boolean(user?.appUserId);
-    const publicChoice = usePublicOrganizationStore(state => publicOrganizationForUser(state, user?.appUserId));
+    const publicViewer = personalViewer || isGuest;
+    const choiceOwner = publicOrganizationOwner(user, isGuest);
+    const publicChoice = usePublicOrganizationStore(state => publicOrganizationForUser(state, choiceOwner));
     const [choiceRestored, setChoiceRestored] = React.useState(false);
     React.useEffect(() => {
         let disposed = false;
@@ -226,14 +229,14 @@ function App() {
         );
     }
 
-    if (!authRestored || (personalViewer && !choiceRestored)) {
+    if (!authRestored || (publicViewer && !choiceRestored)) {
         return <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator color={Colors.primary} /></View>;
     }
 
-    if (personalViewer && !publicChoice) {
+    if (publicViewer && !publicChoice) {
         return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider>
             <PublicOrganizationPicker onSelect={organization => {
-                usePublicOrganizationStore.getState().select(user!.appUserId!, organization);
+                usePublicOrganizationStore.getState().select(choiceOwner!, organization);
             }} />
         </SafeAreaProvider></GestureHandlerRootView>;
     }
@@ -241,7 +244,7 @@ function App() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider style={{ backgroundColor: '#000' }}>
-                <SocketProvider key={personalViewer ? `${user?.appUserId}:${publicChoice?.id}` : 'member-or-guest'}>
+                <SocketProvider key={publicViewer ? `${choiceOwner}:${publicChoice?.id}` : 'member'}>
                     <NavigationContainer 
                         ref={navigationRef}
                         onReady={flushTransferLink}
