@@ -15,6 +15,11 @@
         "buildType": "apk"
       }
     },
+    "preview-store": {
+      "channel": "preview",
+      "distribution": "store",
+      "environment": "preview"
+    },
     "production": {
       "channel": "production",
       "autoIncrement": true,
@@ -24,6 +29,11 @@
     }
   },
   "submit": {
+    "preview-store": {
+      "ios": {
+        "ascAppId": "6825692888"
+      }
+    },
     "production": {}
   }
 }
