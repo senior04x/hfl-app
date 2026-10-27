@@ -11,7 +11,6 @@ import {
     TouchableOpacity,
     Pressable,
     Animated,
-    StatusBar,
     Linking,
     Dimensions,
     ActivityIndicator,
@@ -21,6 +20,7 @@ import {
     TextInput,
     PanResponder
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -349,7 +349,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
     if (!activeTeamId || !team) {
         return (
             <SafeAreaView style={[styles.emptyContainer, { backgroundColor: homeColors.background }]}>
-                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+                <StatusBar style={isDark ? 'light' : 'dark'} />
                 <View style={styles.emptyContent}>
                     <Ionicons name="shield-outline" size={64} color={homeColors.textSecondary} />
                     <Text style={[styles.emptyTitle, { color: homeColors.textPrimary }]}>{t('teams.team_not_found')}</Text>
@@ -372,7 +372,7 @@ export default function TeamProfileScreen({ route, navigation }: any) {
 
     return (
         <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+            <StatusBar style={isDark ? 'light' : 'dark'} />
 
             {/* Fading Backdrop Overlay */}
             <Animated.View

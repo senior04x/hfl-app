@@ -376,7 +376,7 @@ export default function MyTeamScreen({ route, navigation }: any) {
 
     return (
         <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
             {/* Fading Backdrop Overlay */}
             <Animated.View

@@ -309,7 +309,7 @@ export default function NewsScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: homeColors.background }}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
             <SafeAreaView style={styles.container} edges={['top']}>
                 <FlatList

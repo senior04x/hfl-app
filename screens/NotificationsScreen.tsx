@@ -310,7 +310,7 @@ export default function NotificationsScreen({ navigation }: any) {
 
     return (
         <View style={[styles.page, { backgroundColor: homeColors.background }]}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={homeColors.background} />
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
             <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
                 {/* Header Bar */}
                 <View style={[styles.header, { borderBottomColor: homeColors.border }]}>

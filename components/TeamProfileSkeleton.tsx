@@ -30,7 +30,7 @@ const TeamProfileSkeleton = () => {
 
     return (
         <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: homeColors.background }]}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
             {/* FIXED HEADER SKELETON */}
             <View style={[styles.headerStickySection, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
                 {/* TOP ROW: orqaga va harakatlar */}

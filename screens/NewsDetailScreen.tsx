@@ -204,7 +204,7 @@ export default function NewsDetailScreen({ route, navigation }: any) {
 
     return (
         <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+            <StatusBar barStyle="light-content" />
 
             {/* Fading Backdrop Overlay */}
             <Animated.View

@@ -16,7 +16,8 @@ import {
     Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -139,7 +140,7 @@ export default function EditTeamModal({
     const [rosterWindowOpen, setRosterWindowOpen] = useState(false);
     const [rosterBusy, setRosterBusy] = useState<string | null>(null);
     const rosterLock = useRef(false);
-    const swipeRefs = useRef<Record<string, Swipeable | null>>({});
+    const swipeRefs = useRef<Record<string, SwipeableMethods | null>>({});
     const [notice, setNotice] = useState<{ type: 'delete'; player: any } | null>(null);
     const canEdit = () => { if (!rosterWindowOpen) { onTransferClosed(); return false; } return true; };
     const saveProfile = async (action: 'team_edit' | 'player_edit', data: Record<string,string>, playerId?: string) => {

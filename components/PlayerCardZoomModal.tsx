@@ -160,7 +160,7 @@ export default function PlayerCardZoomModal({
             statusBarTranslucent
             onRequestClose={handleClose}
         >
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+            <StatusBar barStyle="light-content" />
 
             <View style={styles.modalOverlay}>
                 {/* Frosted Dark Blur Background */}

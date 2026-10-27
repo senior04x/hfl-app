@@ -368,7 +368,7 @@ export default function AccountScreen({ navigation }: any) {
 
     return (
         <View style={{ flex: 1, backgroundColor: homeColors.background }}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* Universal App Navbar */}

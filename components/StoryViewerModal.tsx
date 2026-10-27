@@ -771,7 +771,7 @@ export default function StoryViewerModal({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <View style={{ flex: 1, backgroundColor: '#000000' }}>
         <Animated.View

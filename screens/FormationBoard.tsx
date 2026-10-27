@@ -740,7 +740,7 @@ export default function FormationBoard({ route, navigation }: any) {
     if (loading) {
         return (
             <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
                 <RNAnimated.View
                     style={{
                         flex: 1,
@@ -862,7 +862,7 @@ export default function FormationBoard({ route, navigation }: any) {
 
     return (
         <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
             <RNAnimated.View
                 style={{

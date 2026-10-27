@@ -64,7 +64,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
+            <StatusBar barStyle="light-content" />
 
             <View style={styles.contentWrapper}>
                 {/* Logo - Stays on top and moves left */}

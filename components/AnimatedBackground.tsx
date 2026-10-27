@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, StatusBar } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import VideoBackground from './VideoBackground';
 
 interface AnimatedBackgroundProps {
@@ -15,7 +16,7 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
 }) => {
     return (
         <View style={styles.wrapper}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+            <StatusBar style="light" />
             <VideoBackground 
                 source={require('../assets/images/welcomeScreenVideo1.mp4')} 
                 posterSource={backgroundImage}

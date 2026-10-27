@@ -79,7 +79,7 @@
         "projectId": "14fddb89-af52-47b3-90ab-f437d786254b"
       }
     },
-    "runtimeVersion": "sdk57-local-test",
+    "runtimeVersion": "sdk58-local-test",
     "updates": {
       "url": "https://u.expo.dev/14fddb89-af52-47b3-90ab-f437d786254b",
       "enabled": true

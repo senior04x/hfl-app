@@ -26,7 +26,7 @@ const MatchDetailSkeleton = () => {
 
     return (
         <View style={[styles.root, { backgroundColor: homeColors.background }]}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
             <SafeAreaView style={[styles.container, { backgroundColor: homeColors.background }]} edges={['top']}>
                 {/* Header Container */}
                 <View style={[styles.headerContainer, { backgroundColor: homeColors.background, borderBottomColor: homeColors.border }]}>
