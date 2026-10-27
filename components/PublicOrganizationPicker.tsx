@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '../store/useThemeStore';
 import type { PublicOrganization } from '../store/usePublicOrganizationStore';
 import { organizationPage } from '../services/organizationBrowse';
+import { organizationBrandColorList } from '../utils/organizationBrandColors';
+import { useTranslation } from 'react-i18next';
 
 type Row = Awaited<ReturnType<typeof organizationPage>>['rows'][number];
 
@@ -12,6 +14,7 @@ export default function PublicOrganizationPicker({ onSelect }: {
     onSelect: (organization: PublicOrganization) => void;
 }) {
     const { isDark } = useThemeStore();
+    const { t } = useTranslation();
     const [rows, setRows] = useState<Row[]>([]);
     const [loading, setLoading] = useState(true);
     const [more, setMore] = useState(true);
@@ -58,9 +61,9 @@ export default function PublicOrganizationPicker({ onSelect }: {
     return (
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
             <Text style={styles.brand}>AMATORA</Text>
-            <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Tashkilotni tanlang</Text>
+            <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>{t('organization_picker.title')}</Text>
             <Text style={[styles.subtitle, { color: colors.secondary }]}>
-                Turnirlar, taqvim va yangiliklar tanlangan tashkilot bo‘yicha ko‘rsatiladi. Keyin Turnirlar sahifasidan almashtira olasiz.
+                {t('organization_picker.description')}
             </Text>
             <FlatList
                 data={rows}
@@ -68,7 +71,12 @@ export default function PublicOrganizationPicker({ onSelect }: {
                 initialNumToRender={12}
                 renderItem={({ item }) => (
                     <Pressable accessibilityRole="button" accessibilityLabel={item.name}
-                        onPress={() => onSelect({ id: item.id, name: item.name, logoUrl: item.logo_url || undefined })}
+                        onPress={() => onSelect({
+                            id: item.id,
+                            name: item.name,
+                            logoUrl: item.logo_url || undefined,
+                            brandColors: organizationBrandColorList(item.brand_colors),
+                        })}
                         style={({ pressed }) => [styles.row, { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 }]}>
                         {item.logo_url ? <Image source={{ uri: item.logo_url }} style={styles.logo} /> :
                             <View style={styles.logo}><Text style={styles.initial}>{item.name.slice(0, 1)}</Text></View>}
@@ -76,12 +84,12 @@ export default function PublicOrganizationPicker({ onSelect }: {
                         <Text style={styles.arrow}>›</Text>
                     </Pressable>
                 )}
-                ListEmptyComponent={!loading && !failed ? <Text style={{ color: colors.secondary }}>Hozircha tashkilotlar yo‘q.</Text> : null}
+                ListEmptyComponent={!loading && !failed ? <Text style={{ color: colors.secondary }}>{t('organization_picker.empty')}</Text> : null}
                 ListFooterComponent={<View style={styles.footer}>
                     {loading ? <ActivityIndicator color="#E85002" /> : failed ? <>
-                        <Text style={{ color: colors.secondary }}>Yuklab bo‘lmadi. Internetni tekshiring.</Text>
-                        <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.action}><Text style={styles.actionText}>Qayta urinish</Text></Pressable>
-                    </> : more ? <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.action}><Text style={styles.actionText}>Yana ko‘rsatish</Text></Pressable> : null}
+                        <Text style={{ color: colors.secondary }}>{t('organization_picker.load_error')}</Text>
+                        <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.action}><Text style={styles.actionText}>{t('organization_picker.retry')}</Text></Pressable>
+                    </> : more ? <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.action}><Text style={styles.actionText}>{t('organization_picker.show_more')}</Text></Pressable> : null}
                 </View>}
             />
         </SafeAreaView>

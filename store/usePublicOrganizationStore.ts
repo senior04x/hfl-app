@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type PublicOrganization = { id: number; name: string; logoUrl?: string };
+export type PublicOrganization = { id: number; name: string; logoUrl?: string; brandColors?: string[] };
 type State = {
     ownerId: string | null;
     selectedOrganization: PublicOrganization | null;
@@ -18,7 +18,12 @@ export const usePublicOrganizationStore = create<State>()(persist((set) => ({
         if (!ownerId.trim() || !Number.isSafeInteger(organization.id) || organization.id <= 0 || !organization.name.trim()) {
             throw new Error('Invalid organization selection');
         }
-        set({ ownerId, selectedOrganization: { id: organization.id, name: organization.name, logoUrl: organization.logoUrl } });
+        set({ ownerId, selectedOrganization: {
+            id: organization.id,
+            name: organization.name,
+            logoUrl: organization.logoUrl,
+            brandColors: Array.isArray(organization.brandColors) ? organization.brandColors : undefined,
+        } });
     },
     clear: () => set({ ownerId: null, selectedOrganization: null }),
 }), {

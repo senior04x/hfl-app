@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 export async function organizationPage(page = 0) {
     if (!Number.isSafeInteger(page) || page < 0) throw new Error('Invalid organization page');
     const { data, error } = await supabase.from('organizations')
-        .select('id,name,slug,logo_url').order('id').range(page * 20, page * 20 + 20);
+        .select('id,name,slug,logo_url,brand_colors').order('id').range(page * 20, page * 20 + 20);
     if (error) throw error;
     return { rows: (data || []).slice(0, 20), more: (data || []).length > 20 };
 }

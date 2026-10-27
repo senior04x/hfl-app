@@ -8,6 +8,14 @@
     "retry": "Qayta urinish",
     "error": "Yangilab bo‘lmadi. Internetni tekshirib, qayta urining."
   },
+  "organization_picker": {
+    "title": "Tashkilotni tanlang",
+    "description": "Turnirlar, taqvim va yangiliklar tanlangan tashkilot bo‘yicha ko‘rsatiladi. Keyin Turnirlar sahifasidan almashtira olasiz.",
+    "empty": "Hozircha tashkilotlar yo‘q.",
+    "load_error": "Yuklab bo‘lmadi. Internetni tekshiring.",
+    "retry": "Qayta urinish",
+    "show_more": "Yana ko‘rsatish"
+  },
   "common": {
     "save": "Saqlash",
     "cancel": "Bekor qilish",

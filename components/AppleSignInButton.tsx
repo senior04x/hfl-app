@@ -13,10 +13,8 @@ export default function AppleSignInButton({ onPress, disabled, iconOnly = false 
  if (!apple || !available) return null;
  if (iconOnly) return <TouchableOpacity onPress={onPress} disabled={disabled}
   accessibilityRole="button" accessibilityLabel="Sign in with Apple" accessibilityState={{ disabled }}
-  activeOpacity={0.75} style={{ width: 44, height: 44, opacity: disabled ? 0.5 : 1 }}>
-  <View style={{ width: 44, height: 44, mixBlendMode: 'screen' }}>
-   <Image source={require('../assets/auth/apple-signin-logo-dark.png')} style={{ width: 44, height: 44 }} accessible={false} />
-  </View>
+  activeOpacity={0.75} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.5 : 1 }}>
+  <Image source={require('../assets/auth/apple-signin-glyph.png')} style={{ width: 52, height: 52, transform: [{ translateY: 1 }] }} accessible={false} />
  </TouchableOpacity>;
  const NativeButton = apple.AppleAuthenticationButton;
  return <View pointerEvents={disabled ? 'none' : 'auto'} accessibilityState={{ disabled }}

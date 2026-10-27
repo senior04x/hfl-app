@@ -1,7 +1,9 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
 const isAndroidExpoGo = Platform.OS === 'android' && (
+    isRunningInExpoGo() ||
     Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
     Constants.appOwnership === 'expo' || Constants.appOwnership === 'guest'
 );

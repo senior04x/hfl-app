@@ -8,6 +8,14 @@
     "retry": "Try again",
     "error": "Could not update. Check your connection and try again."
   },
+  "organization_picker": {
+    "title": "Choose an organization",
+    "description": "Tournaments, calendar, and news will show content for your selected organization. You can change it later on the Tournaments page.",
+    "empty": "No organizations yet.",
+    "load_error": "Could not load organizations. Check your internet connection.",
+    "retry": "Try again",
+    "show_more": "Show more"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",

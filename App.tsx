@@ -11,7 +11,7 @@ import React from 'react';
 import { StyleSheet, Platform, Text, Linking, View, ActivityIndicator, Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { notifications as Notifications } from './services/notificationsRuntime';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from './store/useAuthStore';
@@ -74,6 +74,8 @@ export const navigationRef = createNavigationContainerRef();
 
 function App() {
     const { isAuthenticated, isGuest, user } = useAuthStore();
+    const appThemeColors = useThemeStore(state => state.colors);
+    const isDarkTheme = useThemeStore(state => state.isDark);
     const personalViewer = isAuthenticated && !isGuest && user?.role === 'user' && Boolean(user?.appUserId);
     const publicViewer = personalViewer || isGuest;
     const choiceOwner = publicOrganizationOwner(user, isGuest);
@@ -219,7 +221,12 @@ function App() {
         };
     }, [authRestored, isAuthenticated, user]);
 
-    if (isSplashVisible) {
+    const startupDataReady = authRestored && (!publicViewer || choiceRestored);
+
+    // Keep the branded splash visible until both authentication and the
+    // public organization preference are restored; otherwise startup fell
+    // through to a black loading screen after the animation timer completed.
+    if (isSplashVisible || (Platform.OS !== 'web' && !startupDataReady)) {
         return (
             <SplashScreen 
                 onFinish={() => {
@@ -243,20 +250,20 @@ function App() {
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaProvider style={{ backgroundColor: '#000' }}>
+            <SafeAreaProvider style={{ backgroundColor: appThemeColors.background }}>
                 <SocketProvider key={publicViewer ? `${choiceOwner}:${publicChoice?.id}` : 'member'}>
                     <NavigationContainer 
                         ref={navigationRef}
                         onReady={flushTransferLink}
                         key={isAuthenticated ? `auth_user_${(user as any)?._id || (user as any)?.id}` : (isGuest ? 'guest' : 'unauth')}
                         theme={{
-                        ...DarkTheme,
+                        ...(isDarkTheme ? DarkTheme : DefaultTheme),
                         colors: {
-                            ...DarkTheme.colors,
+                            ...(isDarkTheme ? DarkTheme.colors : DefaultTheme.colors),
                             primary: Colors.primary,
-                            background: '#000000',
-                            card: '#000000',
-                            text: Colors.text,
+                            background: appThemeColors.background,
+                            card: appThemeColors.background,
+                            text: appThemeColors.text,
                             border: Colors.border,
                             notification: Colors.danger,
                         }
@@ -265,7 +272,7 @@ function App() {
                             <Stack.Navigator 
                                 screenOptions={{ 
                                     headerShown: false,
-                                    cardStyle: { backgroundColor: '#000000' },
+                                    cardStyle: { backgroundColor: appThemeColors.background },
                                     cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
                                     gestureEnabled: true,
                                     // Reserve Android back navigation for the edge, leaving pagers in the body.

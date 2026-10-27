@@ -1,6 +1,6 @@
 import { safeAuthStorageCode } from '../utils/authStorageDiagnostic';
 import WelcomeSocialButtons from '../components/WelcomeSocialButtons';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -43,7 +43,7 @@ import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { apiService, clearApiCache, supabase } from '../services/apiService';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Skeleton from '../components/Skeleton';
 import { useTranslation } from 'react-i18next';
@@ -130,7 +130,7 @@ export const MASTER_OTP_CODE: string | null = null;
 import { GOOGLE_LOGIN_ENABLED, loginWithGoogle, loginWithApple, loginWithTelegram, personalLoginMessage, PersonalLoginError } from '../services/personalAuthService';
 
 export default function WelcomeScreen({ navigation, route }: any) {
-    const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+    const isExpoGo = isRunningInExpoGo();
     const requireDevelopmentBuild = () => Alert.alert('Login sinovi',
         'Expo Go’da dizayn va sahifalarni tekshirish mumkin. Google/Apple login va ilovaga qaytishni tekshirish uchun AMATORA development build kerak.');
     const isTransferReentry = route?.params?.transferReentry === true;
@@ -673,6 +673,8 @@ const formatPhoneInput = (val: string) => {
                                 <WelcomeSocialButtons
                                     disabled={loading}
                                     onApple={handleAppleLogin}
+                                    onGuest={() => useAuthStore.getState().setGuest(true)}
+                                    guestLabel={t('auth.browse_without_account', 'Akkauntsiz tomosha qilish')}
                                     onGoogle={GOOGLE_LOGIN_ENABLED || isExpoGo ? handleGoogleLogin : undefined}
                                     onTelegram={handleTelegramLogin}
                                 />
@@ -685,15 +687,16 @@ const formatPhoneInput = (val: string) => {
                                     width: '100%',
                                     marginTop: 4,
                                 }}>
-                                    <TouchableOpacity
+                                    {Platform.OS === 'ios' && <TouchableOpacity
                                         accessibilityRole="button"
                                         accessibilityLabel={t('auth.browse_without_account', 'Akkauntsiz tomosha qilish')}
+                                        disabled={loading}
                                         onPress={() => useAuthStore.getState().setGuest(true)}
                                         activeOpacity={0.7}
-                                        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+                                        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: loading ? 0.5 : 1 }}
                                     >
-                                        <Ionicons name="eye-outline" size={21} color="rgba(255, 255, 255, 0.6)" />
-                                    </TouchableOpacity>
+                                        <MaterialCommunityIcons name="account-eye-outline" size={22} color={Colors.primary} />
+                                    </TouchableOpacity>}
 
                                     {/* Language Switcher with globe icon (Left side) */}
                                     <TouchableOpacity

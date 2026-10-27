@@ -12,6 +12,8 @@ function load(platform, environment, ownership) {
     const out = {};
     new Function('require', 'exports', code)(name => {
         if (name === 'react-native') return { Platform: { OS: platform } };
+        if (name === 'expo') return { isRunningInExpoGo: () =>
+            platform === 'android' && (environment === 'storeClient' || ownership === 'expo' || ownership === 'guest') };
         if (name === 'expo-constants') return { __esModule: true,
             default: { executionEnvironment: environment, appOwnership: ownership },
             ExecutionEnvironment: { StoreClient: 'storeClient' } };

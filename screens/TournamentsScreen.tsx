@@ -32,6 +32,8 @@ import AppNavbar from '../components/AppNavbar';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import { useNavBarScroll } from '../context/NavBarScrollContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { organizationBrandColorList, organizationBrandGradient } from '../utils/organizationBrandColors';
 
 const { width } = Dimensions.get('window');
 
@@ -102,11 +104,14 @@ const TournamentsHeader = ({
     const bannerUri = typeof bannerCandidate === 'string' && bannerCandidate.startsWith('https://') ? bannerCandidate : null;
     const [failedBanner, setFailedBanner] = useState<string | null>(null);
     const hasBanner = Boolean(bannerUri && failedBanner !== bannerUri);
+    const organizationGradient = isGuest
+        ? organizationBrandGradient(activeOrg?.brand_colors ?? activeOrg?.brandColors)
+        : null;
 
     const cardSurfaceStyle = {
-        backgroundColor: isDark ? homeColors.background : '#FFFFFF',
+        backgroundColor: organizationGradient ? 'transparent' : (isDark ? homeColors.background : '#FFFFFF'),
         borderWidth: 1,
-        borderColor: homeColors.border,
+        borderColor: organizationGradient ? 'rgba(255,255,255,0.26)' : homeColors.border,
         elevation: isDark ? 0 : 2,
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 2 },
@@ -191,6 +196,13 @@ const TournamentsHeader = ({
                 onPress={toggleLeagueSelector}
                 activeOpacity={0.85}
             >
+                        {organizationGradient && <LinearGradient
+                            colors={organizationGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={StyleSheet.absoluteFill}
+                            pointerEvents="none"
+                        />}
                         {bannerUri && hasBanner && <View pointerEvents="none" style={StyleSheet.absoluteFill}>
                             <Image source={{ uri: bannerUri }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setFailedBanner(bannerUri)} />
                             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.60)' }]} />
@@ -226,7 +238,7 @@ const TournamentsHeader = ({
                     {/* League / Organization Label & Switcher Cue */}
                     <View style={styles.selectorFooterRow}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 1 }}>
-                            <Text style={[styles.selectedLeagueHeading, { color: hasBanner ? '#FFFFFF' : homeColors.textPrimary }]} numberOfLines={1}>
+                            <Text style={[styles.selectedLeagueHeading, { color: (hasBanner || organizationGradient) ? '#FFFFFF' : homeColors.textPrimary }]} numberOfLines={1}>
                                 {((isGuest ? activeOrg?.name : selectedLeague?.name) || activeOrg?.name || (selectedLeague?.is_tournament ? 'TURNIR' : 'LIGA')).toUpperCase()}
                             </Text>
                             {selectedLeague?.is_tournament && (
@@ -238,7 +250,7 @@ const TournamentsHeader = ({
                         <Ionicons
                             name={isLeagueSelectorOpen ? "chevron-up" : "chevron-down"}
                             size={16}
-                            color={hasBanner ? '#FFFFFF' : homeColors.textSecondary}
+                            color={(hasBanner || organizationGradient) ? '#FFFFFF' : homeColors.textSecondary}
                             style={{ marginLeft: 6 }}
                         />
                     </View>
@@ -251,14 +263,21 @@ const TournamentsHeader = ({
                 {
                     maxHeight: accordionHeight,
                     opacity: accordionOpacity,
-                    backgroundColor: isDark ? homeColors.background : '#FFFFFF',
-                    borderColor: homeColors.border,
+                    backgroundColor: organizationGradient ? 'transparent' : (isDark ? homeColors.background : '#FFFFFF'),
+                    borderColor: organizationGradient ? 'rgba(255,255,255,0.26)' : homeColors.border,
                     marginBottom: animationValue.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0, 14]
                     }),
                 }
             ]}>
+                {organizationGradient && <LinearGradient
+                    colors={organizationGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="none"
+                />}
                 <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 360 }}>
                     <View style={styles.accordionContent}>
                         {isLeaguesLoading && (isGuest ? !organizations?.length : !leagues?.length) ? (
@@ -283,8 +302,8 @@ const TournamentsHeader = ({
                                         key={`${isTourn ? 'tourn' : 'league'}-${league.id || league._id}`}
                                         style={[
                                             styles.accordionItem,
-                                            { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
-                                            isSelected && { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)' }
+                                            { borderBottomColor: organizationGradient ? 'rgba(255,255,255,0.16)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') },
+                                            isSelected && { backgroundColor: organizationGradient ? 'rgba(255,255,255,0.14)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)') }
                                         ]}
                                         onPress={() => isGuest ? handleOrgSelect(league) : handleLeagueSelect(league)}
                                         activeOpacity={0.65}
@@ -292,17 +311,17 @@ const TournamentsHeader = ({
                                         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                             <Text style={[
                                                 styles.accordionItemName,
-                                                { color: homeColors.textPrimary, flexShrink: 1 },
+                                                { color: organizationGradient ? '#FFFFFF' : homeColors.textPrimary, flexShrink: 1 },
                                                 isSelected && { fontWeight: '800' }
                                             ]} numberOfLines={1}>
                                                 {league.name?.toUpperCase()}
                                             </Text>
-                                            <Text style={{ color: homeColors.textSecondary, fontSize: 11 }}>
+                                            <Text style={{ color: organizationGradient ? 'rgba(255,255,255,0.78)' : homeColors.textSecondary, fontSize: 11 }}>
                                                 {isGuest ? t('common.organization', 'Tashkilot') : isTourn ? t('stats.match_tournament', 'Turnir') : t('stats.match_league', 'Liga')}
                                             </Text>
                                         </View>
                                         {isSelected && (
-                                            <Ionicons name="checkmark-circle" size={18} color={homeColors.accent} style={{ marginLeft: 8 }} />
+                                            <Ionicons name="checkmark-circle" size={18} color={organizationGradient ? '#FFFFFF' : homeColors.accent} style={{ marginLeft: 8 }} />
                                         )}
                                     </TouchableOpacity>
                                 );
@@ -1139,7 +1158,12 @@ export default function TournamentsScreen({ navigation }: any) {
     const handleOrgSelect = useCallback((org: any) => {
         setIsLeagueSelectorOpen(false);
         if (isPublicViewer(user, anonymousGuest)) {
-            usePublicOrganizationStore.getState().select(publicOrganizationOwner(user, anonymousGuest)!, { id: org.id, name: org.name, logoUrl: org.logo_url || org.logoUrl });
+            usePublicOrganizationStore.getState().select(publicOrganizationOwner(user, anonymousGuest)!, {
+                id: org.id,
+                name: org.name,
+                logoUrl: org.logo_url || org.logoUrl,
+                brandColors: organizationBrandColorList(org.brand_colors ?? org.brandColors),
+            });
         } else {
             setSelectedOrganizationId(org.id);
         }

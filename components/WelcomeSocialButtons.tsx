@@ -1,20 +1,29 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppleSignInButton from './AppleSignInButton';
 import GoogleSignInIcon from './GoogleSignInIcon';
 
 type Props = {
  disabled: boolean;
  onApple: () => void;
+ onGuest: () => void;
+ guestLabel: string;
  onTelegram: () => void;
- // Only display Google once a configured, working sign-in handler is supplied.
+ // Expo Go also receives a handler so the Google icon remains visible for UI preview;
+ // the caller explains that OAuth itself requires a development build.
  onGoogle?: () => void;
 };
 
-export default function WelcomeSocialButtons({ disabled, onApple, onGoogle, onTelegram }: Props) {
+export default function WelcomeSocialButtons({ disabled, onApple, onGuest, guestLabel, onGoogle, onTelegram }: Props) {
  return <View style={styles.row}>
-  <AppleSignInButton iconOnly onPress={onApple} disabled={disabled} />
+  {Platform.OS === 'ios' ? <AppleSignInButton iconOnly onPress={onApple} disabled={disabled} /> :
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel={guestLabel}
+    accessibilityState={{ disabled }} disabled={disabled} onPress={onGuest} activeOpacity={0.75}
+    style={[styles.button, disabled && styles.disabled]}>
+    <MaterialCommunityIcons name="account-eye-outline" size={22} color="#E85002" />
+   </TouchableOpacity>}
   {onGoogle && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Sign in with Google"
    accessibilityState={{ disabled }} disabled={disabled} onPress={onGoogle} activeOpacity={0.75}
    style={[styles.button, disabled && styles.disabled]}>
