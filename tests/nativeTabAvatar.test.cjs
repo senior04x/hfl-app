@@ -47,7 +47,13 @@ async function scenario(unmountBeforeCaptureCompletes, failure) {
         assert.equal(captures.length, 1);
         assert.equal(captures[0].format, 'png');
         assert.equal(captures[0].result, 'tmpfile');
-        assert.equal(captures[0].width, 84);
+        // renderInContext draws the layer at its point size; an 84pt canvas
+        // around a 28pt view leaves 2/3 of each dimension transparent.
+        assert.equal(captures[0].useRenderInContext, true);
+        assert.equal(captures[0].width, undefined);
+        assert.equal(captures[0].height, undefined);
+        assert.equal(circle.props.style.width, 28);
+        assert.equal(circle.props.style.height, 28);
         if (failure === 'capture') {
             await Promise.resolve();
             await Promise.resolve();

@@ -32,7 +32,7 @@ test('profile photos require a valid HTTPS URL and retain existing source fields
     }
 });
 
-function harness(user = null) {
+function harness(user = null, pixelRatio = 3) {
     const state = { focused: true, user, guest: false, refs: [], cursor: 0, navigations: [] };
     const React = {
         createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
@@ -52,7 +52,7 @@ function harness(user = null) {
         react: { __esModule: true, default: React, ...React },
         'react-native': {
             View: 'View', ActivityIndicator: 'Spinner', Animated: { Value: class {} },
-            StyleSheet: { create: value => value },
+            StyleSheet: { create: value => value }, PixelRatio: { get: () => pixelRatio },
         },
         '@react-navigation/native': { useIsFocused: () => state.focused },
         '@react-navigation/bottom-tabs/unstable': { createNativeBottomTabNavigator: () => ({ Navigator: 'NativeNavigator', Screen: 'NativeScreen' }) },
@@ -140,6 +140,17 @@ test('a prepared photo preserves its colors and cannot carry over to another acc
     result = h.render();
     assert.equal(result.avatar, undefined);
     assert.equal(icon(result).type, 'sfSymbol');
+});
+
+test('the native avatar keeps its 28 point size on both 2x and 3x screens', () => {
+    for (const density of [2, 3]) {
+        const h = harness({ id: 'first', photo: 'https://example.com/a.png' }, density);
+        h.avatar.props.onReady('file:///temporary/avatar.png');
+        const icon = h.render().navigator.props.children[0][4].props.options.tabBarIcon({ focused: true });
+        assert.equal(icon.source.width, 28);
+        assert.equal(icon.source.height, 28);
+        assert.equal(icon.source.scale, density);
+    }
 });
 
 test('scroll marker never loads or mounts inside Expo Go or without its native component', () => {

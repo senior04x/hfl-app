@@ -35,7 +35,9 @@ export default function NativeTabAvatar({ uri, onReady }: { uri: string; onReady
                 if (disposed.current || !view.current) return;
                 try {
                     // Await inside try catches both bridge throws and rejected promises.
-                    const image = await captureRef(view, { format: 'png', result: 'tmpfile', width: 84, height: 84, useRenderInContext: true });
+                    // Capture the 28pt view's natural bounds. iOS applies display
+                    // density itself; a larger renderInContext canvas adds padding.
+                    const image = await captureRef(view, { format: 'png', result: 'tmpfile', useRenderInContext: true });
                     if (disposed.current) { releasePhoto(image); return; }
                     file.current = image;
                     callback.current(image);

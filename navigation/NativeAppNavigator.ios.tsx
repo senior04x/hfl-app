@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, PixelRatio, StyleSheet, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { createNativeBottomTabNavigator } from '@react-navigation/bottom-tabs/unstable';
 import { useTranslation } from 'react-i18next';
@@ -75,7 +75,7 @@ function NativeTabs({ navigation, route }: any) {
                     title: t(tab.nameKey, tab.defaultName),
                     tabBarLabel: t(tab.nameKey, tab.defaultName),
                     tabBarIcon: ({ focused }) => tab.name === 'Profil' && photoIcon
-                        ? { type: 'image', source: { uri: photoIcon, width: 28, height: 28, scale: 3 }, tinted: false }
+                        ? { type: 'image', source: { uri: photoIcon, width: 28, height: 28, scale: PixelRatio.get() }, tinted: false }
                         : { type: 'sfSymbol', name: focused ? tab.selectedSymbol : tab.sfSymbol },
                 }}
                 listeners={({ navigation }) => ({
