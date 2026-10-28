@@ -1,4 +1,5 @@
 import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
+import NativeTabScroll from '../components/NativeTabScroll';
 import LiveMatchBadge from '../components/LiveMatchBadge';
 import { useIsFocused } from '@react-navigation/native';
 import { createHomeStoryRefresh, getHomeMatchEventFilters } from '../services/homeRealtime';
@@ -904,6 +905,7 @@ export default function HomeScreen({ navigation }: any) {
     return (
         <View style={{ flex: 1, backgroundColor: homeColors.background }}>
             <SafeAreaView style={styles.container} edges={['top']}>
+                <NativeTabScroll>
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 130 }}
@@ -1269,6 +1271,7 @@ export default function HomeScreen({ navigation }: any) {
                         </>
                     )}
                 </ScrollView>
+                </NativeTabScroll>
 
                 {/* Fullscreen Story Viewer Modal */}
                 <StoryViewerModal

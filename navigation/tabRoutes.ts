@@ -13,13 +13,3 @@ export function resolveAppTab(value: unknown): AppTabName | undefined {
     if (typeof value !== 'string') return undefined;
     return APP_TABS.find(tab => tab.name.toLowerCase() === value.toLowerCase())?.name;
 }
-
-// Keep tab swipes without claiming vertical scrolling, short drags or the edges.
-export function adjacentTabForSwipe(current: AppTabName, dx: number, dy: number, velocityX: number, width: number): AppTabName | undefined {
-    if (![dx, dy, velocityX, width].every(Number.isFinite) || width <= 0) return undefined;
-    if (Math.abs(dx) < 28 || Math.abs(dx) < Math.abs(dy) * 2) return undefined;
-    if (Math.abs(dx) < width * 0.2 && (Math.abs(velocityX) < 0.65 || Math.sign(velocityX) !== Math.sign(dx))) return undefined;
-    const index = APP_TABS.findIndex(tab => tab.name === current);
-    if (index < 0) return undefined;
-    return APP_TABS[index + (dx < 0 ? 1 : -1)]?.name;
-}

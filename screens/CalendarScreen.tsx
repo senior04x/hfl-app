@@ -1,4 +1,5 @@
 import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
+import NativeTabScroll from '../components/NativeTabScroll';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -657,6 +658,7 @@ export default function CalendarScreen({ navigation }: any) {
                         </TouchableOpacity>
                     </View>
                 )}
+                <NativeTabScroll>
                 <FlatList
                     style={styles.listContainer}
                     data={displayData}
@@ -780,6 +782,7 @@ export default function CalendarScreen({ navigation }: any) {
                         );
                     }}
                 />
+                </NativeTabScroll>
 
                 {/* Range Date Picker Modal */}
                 <Modal

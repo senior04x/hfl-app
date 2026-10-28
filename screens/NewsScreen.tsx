@@ -1,4 +1,5 @@
 import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
+import NativeTabScroll from '../components/NativeTabScroll';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
@@ -312,6 +313,7 @@ export default function NewsScreen() {
             <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
             <SafeAreaView style={styles.container} edges={['top']}>
+                <NativeTabScroll>
                 <FlatList
                     data={filteredNews}
                     keyExtractor={(item) => item._id || String(Math.random())}
@@ -361,6 +363,7 @@ export default function NewsScreen() {
                         )
                     }
                 />
+                </NativeTabScroll>
             </SafeAreaView>
         </View>
     );

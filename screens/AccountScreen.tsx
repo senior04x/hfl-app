@@ -31,6 +31,7 @@ import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
 import AppNavbar from '../components/AppNavbar';
+import NativeTabScroll from '../components/NativeTabScroll';
 import EditTeamModal from '../components/EditTeamModal';
 import PersonalProfileModal from '../components/PersonalProfileModal';
 import RegistrationClosedModal from '../components/RegistrationClosedModal';
@@ -392,6 +393,7 @@ export default function AccountScreen({ navigation }: any) {
                     }
                 />
 
+                <NativeTabScroll>
                 <ScrollView
                     style={styles.container}
                     showsVerticalScrollIndicator={false}
@@ -698,6 +700,7 @@ export default function AccountScreen({ navigation }: any) {
                         </Text>
                     </View>
                 </ScrollView>
+                </NativeTabScroll>
 
                 {/* Language Select Modal */}
                 <LanguageSelectModal

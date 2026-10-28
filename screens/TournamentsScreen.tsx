@@ -24,6 +24,7 @@ import TournamentsSkeleton from '../components/TournamentsSkeleton';
 import OrganizationSelectModal from '../components/OrganizationSelectModal';
 import { isPublicViewer, publicOrganizationOwner } from '../utils/contentOrganization';
 import { useContentOrganizationId } from '../hooks/useContentOrganizationId';
+import NativeTabScroll from '../components/NativeTabScroll';
 import { publicOrganizationForUser, usePublicOrganizationStore } from '../store/usePublicOrganizationStore';
 import { organizationPage, organizationCompetitions } from '../services/organizationBrowse';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1185,6 +1186,7 @@ export default function TournamentsScreen({ navigation }: any) {
                 {isLeaguesLoading && leagues.length === 0 ? (
                     <TournamentsSkeleton />
                 ) : (
+                    <NativeTabScroll>
                     <FlatList
                         data={isGuest 
                             ? (isLeaguesLoading ? Array(4).fill({ _isSkeleton: true }) : filteredLeagues)
@@ -1255,6 +1257,7 @@ export default function TournamentsScreen({ navigation }: any) {
                             />
                         }
                     />
+                    </NativeTabScroll>
                 )}
             </SafeAreaView>
 
