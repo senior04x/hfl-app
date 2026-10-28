@@ -169,7 +169,7 @@ test('scroll marker never loads or mounts inside Expo Go or without its native c
             react: { __esModule: true, default: React },
             expo: { isRunningInExpoGo: () => environment.expoGo },
             'react-native': {
-                Platform: { Version: environment.version, isPad: environment.isPad }, StyleSheet: { create: value => value },
+                Platform: { OS: 'ios', Version: environment.version, isPad: environment.isPad }, StyleSheet: { create: value => value },
                 UIManager: { hasViewManagerConfig: name => {
                     nativeQueries++;
                     assert.equal(name, 'RNSScrollViewMarker');
