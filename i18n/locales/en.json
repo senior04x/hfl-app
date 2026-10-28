@@ -296,7 +296,6 @@
   "teams": {
     "transfer_edit_closed_title": "Editing is closed",
     "transfer_edit_closed": "Your organization has closed data editing. You can edit player information and remove players when the transfer window opens.",
-
     "number_invalid": "Choose a number from 1 to 99",
     "roster_failed": "Unable to save. The number may be taken or the transfer window closed.",
     "jersey_number": "Jersey number",
@@ -398,7 +397,6 @@
     "photo_permission": "Allow access to your photo library.",
     "photo_limit": "Choose a JPG, PNG or WebP up to 3 MB.",
     "save_error": "Unable to save your profile. Check the details and try again.",
-
     "personal_account": "Personal account",
     "become_player": "Register as a player",
     "title": "Profile",
@@ -481,13 +479,13 @@
     "privacy_policy": "Privacy Policy",
     "privacy_policy_sub": "Personal data storage and protection",
     "privacy_sec1_title": "1. Collected Data",
-    "privacy_sec1_text": "The AMATORA app collects phone numbers, full names, player photos, positions, and team squad data.",
+    "privacy_sec1_text": "Depending on the login method, we use the account ID, name and available email or phone verified by Telegram, Apple or Google. Profile photos and bios are optional. Player records, chat messages and device identifiers for notifications are used for the relevant app features.",
     "privacy_sec2_title": "2. Use of Data",
     "privacy_sec2_text": "Data is used solely for organizing football leagues, managing schedules and standings, forming player profiles, and sending notifications.",
     "privacy_sec3_title": "3. Third Parties",
     "privacy_sec3_text": "Personal data is never sold or shared with third parties for commercial or advertising purposes.",
     "privacy_sec4_title": "4. Right to Account Deletion",
-    "privacy_sec4_text": "Users may permanently delete their account and all associated data at any time via the 'Delete Account' button in settings.",
+    "privacy_sec4_text": "Profile > Security and documents > Delete account deletes the personal sign-in account, profile, uploaded profile photos and links to sports profiles. Organization-approved team, player and competition history is stored separately and retained. To request correction or removal of those records, contact the organization or gcccc406@gmail.com.",
     "terms_of_use": "Terms of Use",
     "terms_of_use_sub": "League regulations, rules and Fair Play",
     "terms_sec1_title": "1. Registration and Applications",
@@ -504,7 +502,12 @@
     "account_deleted": "Account deleted",
     "account_deleted_sub": "Your account and all personal data have been successfully deleted.",
     "dark_mode_sub": "OLED black background and high contrast",
-    "light_mode_sub": "Classic white background and crisp colors"
+    "light_mode_sub": "Classic white background and crisp colors",
+    "personal_delete_account_sub": "Delete personal sign-in, profile and links",
+    "personal_delete_account_warning": "This cannot be undone. Your personal sign-in account, profile, uploaded profile photos and links to sports profiles will be deleted. Organization-approved player and competition history will remain.",
+    "personal_account_deleted_sub": "Your personal sign-in account, profile, uploaded profile photos and links to sports profiles have been deleted. Organization-approved sports history is retained.",
+    "apple_revoke_instructions": "To also revoke Apple access, open iPhone Settings > your name > Sign in with Apple > AMATORA and remove access. This is not an additional condition for deleting your AMATORA account.",
+    "apple_revoke_guide": "Revoke Apple access"
   },
   "stats": {
     "match_league": "League",

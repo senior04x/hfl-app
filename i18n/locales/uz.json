@@ -296,7 +296,6 @@
   "teams": {
     "transfer_edit_closed_title": "Ma’lumotlarni tahrirlash yopilgan",
     "transfer_edit_closed": "Tashkilotingiz ma’lumotlarni o‘zgartirishni yopgan. Transfer ochilganda o‘yinchi ma’lumotlarini tahrirlashingiz va o‘yinchini o‘chirishingiz mumkin.",
-
     "number_invalid": "Raqam 1–99 oralig‘ida bo‘lsin",
     "roster_failed": "Saqlanmadi. Raqam band yoki transfer oynasi yopilgan bo‘lishi mumkin.",
     "jersey_number": "Forma raqami",
@@ -398,7 +397,6 @@
     "photo_permission": "Rasm tanlash uchun galereyaga ruxsat bering.",
     "photo_limit": "JPG, PNG yoki WebP rasm tanlang (3 MB gacha).",
     "save_error": "Profilni saqlab bo‘lmadi. Ma’lumotlarni tekshirib, qayta urinib ko‘ring.",
-
     "personal_account": "Shaxsiy akkaunt",
     "become_player": "Futbolchi sifatida ro‘yxatdan o‘tish",
     "title": "Profil",
@@ -481,13 +479,13 @@
     "privacy_policy": "Maxfiylik siyosati",
     "privacy_policy_sub": "Shaxsiy ma'lumotlarni saqlash va himoya qilish",
     "privacy_sec1_title": "1. To'planadigan Ma'lumotlar",
-    "privacy_sec1_text": "AMATORA ilovasi foydalanuvchilarning telefon raqami, ism-familiyasi, o'yinchi fotosurati, amplua va jamoa tarkibi ma'lumotlarini to'playdi.",
+    "privacy_sec1_text": "Kirish usuliga qarab Telegram, Apple yoki Google tasdiqlagan hisob ID, ism va mavjud email yoki telefon olinadi. Profil rasmi va bio ixtiyoriy. Futbolchi ma'lumotlari, chat xabarlari hamda bildirishnoma uchun qurilma identifikatorlari tegishli funksiyalarda ishlatiladi.",
     "privacy_sec2_title": "2. Ma'lumotlardan Foydalanish",
     "privacy_sec2_text": "Ma'lumotlar faqat futbol ligasi va turnirlarini tashkil etish, taqvim va jadvallarni yuritish, o'yinchi profillarini shakllantirish hamda hisoblar bo'yicha bildirishnomalar yuborish uchun ishlatiladi.",
     "privacy_sec3_title": "3. Uchinchi Shaxslar",
     "privacy_sec3_text": "Shaxsiy ma'lumotlar hech qanday uchinchi shaxslarga tijoriy yoki reklama maqsadlarida sotilmaydi va tarqatilmaydi.",
     "privacy_sec4_title": "4. Hisobni O'chirish Huquqi",
-    "privacy_sec4_text": "Foydalanuvchi istalgan vaqtda o'z hisobini va unga tegishli barcha ma'lumotlarni 'Sozlamalar va xavfsizlik' bo'limidagi 'Hisobni o'chirish' tugmasi orqali to'liq o'chirib tashlashi mumkin.",
+    "privacy_sec4_text": "Profil > Xavfsizlik va hujjatlar > Hisobni o'chirish orqali shaxsiy login hisobi, profil, yuklangan profil rasmlari va sport profillari bilan bog'lanishlar o'chiriladi. Tashkilot tasdiqlagan jamoa, futbolchi va musobaqa tarixi alohida sport yozuvlari sifatida saqlanadi. Ularni tuzatish yoki o'chirish bo'yicha tashkilotga yoki gcccc406@gmail.com manziliga murojaat qiling.",
     "terms_of_use": "Foydalanish shartlari",
     "terms_of_use_sub": "Liga reglamenti, qoidalar va Fair Play",
     "terms_sec1_title": "1. Ro'yxatdan O'tish va Arizalar",
@@ -504,7 +502,12 @@
     "account_deleted": "Hisob o'chirildi",
     "account_deleted_sub": "Sizning hisobingiz va barcha shaxsiy ma'lumotlaringiz muvaffaqiyatli o'chirildi.",
     "dark_mode_sub": "OLED qora fon va yuqori kontrast",
-    "light_mode_sub": "Klassik oq fon va yorqin ranglar"
+    "light_mode_sub": "Klassik oq fon va yorqin ranglar",
+    "personal_delete_account_sub": "Shaxsiy login, profil va bog'lanishlarni o'chirish",
+    "personal_delete_account_warning": "Bu amal qaytarilmaydi. Shaxsiy login hisobingiz, profilingiz, yuklagan profil rasmlaringiz va sport profillari bilan bog'lanishlar o'chiriladi. Tashkilot tasdiqlagan futbolchi va musobaqa tarixi saqlanadi.",
+    "personal_account_deleted_sub": "Shaxsiy login hisobingiz, profilingiz, yuklangan profil rasmlaringiz va sport profillari bilan bog'lanishlar o'chirildi. Tashkilot tasdiqlagan sport tarixi saqlanadi.",
+    "apple_revoke_instructions": "Apple ruxsatini ham bekor qilish uchun iPhone Sozlamalari > ismingiz > Apple bilan kirish > AMATORA bo'limida ruxsatni o'chiring. Bu AMATORA hisobingizni o'chirish uchun qo'shimcha shart emas.",
+    "apple_revoke_guide": "Apple ruxsatini bekor qilish"
   },
   "stats": {
     "match_league": "Liga",

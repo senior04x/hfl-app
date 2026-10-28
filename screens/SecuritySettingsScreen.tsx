@@ -13,6 +13,7 @@ import {
     PanResponder,
     Animated,
     Platform,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -187,20 +188,29 @@ export default function SecuritySettingsScreen({ navigation }: any) {
             setShowDeleteModal(false);
 
             if (res && res.success) {
+                const personal = Boolean(user?.appUserId);
+                const revokeApple = personal && (res.appleAccessRevocationRequired === true || user?.authProvider === 'apple');
+                const finishDeletion = async () => {
+                    clearApiCache();
+                    await logout();
+                    navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
+                };
                 Alert.alert(
                     t('settings.account_deleted', 'Hisob o\'chirildi'),
-                    t('settings.account_deleted_sub', 'Sizning hisobingiz va barcha shaxsiy ma\'lumotlaringiz muvaffaqiyatli o\'chirildi.'),
+                    t(personal ? 'settings.personal_account_deleted_sub' : 'settings.account_deleted_sub')
+                        + (revokeApple ? '\n\n' + t('settings.apple_revoke_instructions') : ''),
                     [
+                        ...(revokeApple ? [{
+                            text: t('settings.apple_revoke_guide'),
+                            onPress: async () => {
+                                await finishDeletion();
+                                try { await Linking.openURL('https://support.apple.com/en-us/102571'); }
+                                catch { Alert.alert(t('settings.account_deleted'), t('settings.apple_revoke_instructions')); }
+                            },
+                        }] : []),
                         {
                             text: 'OK',
-                            onPress: async () => {
-                                clearApiCache();
-                                await logout();
-                                navigation.reset({
-                                    index: 0,
-                                    routes: [{ name: 'Welcome' }],
-                                });
-                            }
+                            onPress: finishDeletion,
                         }
                     ]
                 );
@@ -309,7 +319,7 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                                         <SettingRow
                                             icon="trash-outline"
                                             title={t('settings.delete_account', 'Hisobni o\'chirish')}
-                                            subtitle={t('settings.delete_account_sub', 'Barcha shaxsiy ma\'lumotlarni butunlay o\'chirish')}
+                                            subtitle={t(user?.appUserId ? 'settings.personal_delete_account_sub' : 'settings.delete_account_sub')}
                                             onPress={() => setShowDeleteModal(true)}
                                             destructive={true}
                                             isLast={true}
@@ -362,7 +372,7 @@ export default function SecuritySettingsScreen({ navigation }: any) {
                             {t('settings.delete_account', 'Hisobni o\'chirish').toUpperCase()}
                         </Text>
                         <Text style={[styles.modalSubtitle, { color: homeColors.textSecondary }]}>
-                            {t('settings.delete_account_modal_warning', 'Ushbu amalni ortga qaytarib bo\'lmaydi! Profilingiz, o\'yinchi statistikangiz, arizalaringiz va barcha shaxsiy ma\'lumotlaringiz butunlay o\'chiriladi.')}
+                            {t(user?.appUserId ? 'settings.personal_delete_account_warning' : 'settings.delete_account_modal_warning')}
                         </Text>
 
                         {isDeleting ? (
