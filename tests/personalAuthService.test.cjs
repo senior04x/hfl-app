@@ -2,22 +2,22 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
-function load({ result = { type: 'success', url: 'hflsoccerapp://auth/telegram?code=one-use-code' }, configured = true, profileFailure = false, openBrowser, exchangeFailure = false, platform = 'android', appleResult = {token:'apple-test-token',nonce:'raw-test-nonce'}, appleProfile, staging = false, googleEnabled = false, googleUrl = "https://project.supabase.co/auth/v1/authorize?provider=google" } = {}) {
+function load({ result = { type: 'success', url: 'hflsoccerapp://auth/telegram?code=one-use-code' }, configured = true, profileFailure = false, openBrowser, exchangeFailure = false, platform = 'android', appleResult = {token:'apple-test-token',nonce:'raw-test-nonce'}, appleProfile, staging = false, googleEnabled = false, pkceFailure = false, profileWriteError = false } = {}) {
  const values = new Map(); const calls = { exchange: 0, signOut: 0, saved: 0 }; let logout; let out;
  const state = { user: null, isGuest: false, setAuth: async user => { state.user = user; }, logout: () => { state.user = null; } };
  const storage = { getItem: async k => values.get(k) ?? null, setItem: async (k,v)=>{values.set(k,v);}, removeItem:async k=>{values.delete(k);} };
  const client = { auth: { signOut:async()=>{calls.signOut++;},getSession:async()=>({data:{session:{access_token:'private-token',user:{id:'user-id'}}}}),exchangeCodeForSession:async()=>{calls.exchange++;return exchangeFailure ? {error:{message:'private backend error'},data:{session:null}} : {data:{session:{user:{id:'user-id'}}}};} } };
  client.auth.signInWithIdToken=async options=>{calls.appleExchange=options;return exchangeFailure?{error:{message:'private error'},data:{session:null}}:{data:{session:{user:{id:'user-id'}}}};};
- client.auth.signInWithOAuth=async options=>{calls.googleOptions=options;return {data:{url:googleUrl}};};
+ client.from=table=>{calls.profileTable=table;return {update:patch=>{calls.profilePatch=patch;calls.profileFilters=[];const query={eq:(...args)=>{calls.profileFilters.push(args);return query;},select:()=>query,maybeSingle:async()=>profileWriteError?{error:{message:'private database error'}}:{data:{id:'user-id',display_name:patch.display_name}}};return query;}};};
  const originalSession=client.auth.getSession;
- client.auth.getSession=async()=>{const result=await originalSession();if(calls.googleOptions)result.data.session.user.identities=[{provider:'google'}];return result;};
- const imports = { '../constants/PersonalAuthEnvironment':{PERSONAL_AUTH_IS_TEST:staging,PERSONAL_AUTH_URL:staging?'https://hgdezpjtdfndepseitfh.supabase.co':'https://project.supabase.co',PERSONAL_AUTH_KEY:'public-key',PERSONAL_AUTH_STORAGE_KEY:staging?'amatora-personal-auth-test-v1':'amatora-personal-auth-v1'}, './nativeAppleAuth':{requestAppleIdentity:async()=>appleResult,NativeAppleLoginError:class extends Error{}}, 'react-native': { Platform:{OS:platform},AppState:{} }, 'expo-web-browser':{ maybeCompleteAuthSession(){},openAuthSessionAsync:async(url,redirect,options)=>{calls.browserOptions=options;return openBrowser ? openBrowser(out) : result;} },
+ client.auth.getSession=async()=>{const result=await originalSession();if(calls.googleStarted)result.data.session.user.identities=[{provider:'google'}];return result;};
+ const imports = { './nativeOAuthPkce':{createNativePkce:async()=>{if(pkceFailure)throw Error('crypto unavailable');return {verifier:'b'.repeat(64),challenge:'c'.repeat(43)};}}, '../constants/PersonalAuthEnvironment':{PERSONAL_AUTH_IS_TEST:staging,PERSONAL_AUTH_URL:staging?'https://hgdezpjtdfndepseitfh.supabase.co':'https://project.supabase.co',PERSONAL_AUTH_KEY:'public-key',PERSONAL_AUTH_STORAGE_KEY:staging?'amatora-personal-auth-test-v1':'amatora-personal-auth-v1'}, './nativeAppleAuth':{requestAppleIdentity:async()=>appleResult,NativeAppleLoginError:class extends Error{}}, 'react-native': { Platform:{OS:platform},AppState:{} }, 'expo-web-browser':{ maybeCompleteAuthSession(){},openAuthSessionAsync:async(url,redirect,options)=>{calls.browserOptions=options;calls.browserUrl=url;calls.googleStarted=new URL(url).searchParams.get('provider')==='google';calls.browserVerifier=values.get((staging?'amatora-personal-auth-test-v1':'amatora-personal-auth-v1')+'-code-verifier');return openBrowser ? openBrowser(out) : result;} },
   '@supabase/supabase-js':{createClient:(url,key,options)=>{calls.client={url,storageKey:options.auth.storageKey};return client;}},'./supabase':{SUPABASE_URL:'https://project.supabase.co',SUPABASE_ANON_KEY:'public-key'},'../constants/ApiConfig':{API_BASE_URL:'https://backend.invalid'},
   './personalSessionStorage':{personalSessionStorage:storage},'../store/useAuthStore':{useAuthStore:{getState:()=>state},registerPersonalLogout:fn=>{logout=fn;}},
   './transferLoginStorage':{saveTransferLoginSessions:async()=>{calls.saved++;}},'../store/useOrganizationStore':{useOrganizationStore:{getState:()=>({setSelectedOrganizationId(){}})}} };
  const response = data => ({ ok:true,status:200,json:async()=>data });
  calls.fetchUrls=[];
- const profile=()=>appleProfile || {success:true,user:{appUserId:'user-id',id:'user-id',role:'user',authProvider:calls.googleOptions?'google':calls.appleExchange?'apple':'telegram'},accounts:[{appUserId:'user-id',id:'user-id',role:'user'}],transferSessions:[]};
+ const profile=()=>appleProfile || {success:true,user:{appUserId:'user-id',id:'user-id',role:'user',authProvider:calls.googleStarted?'google':calls.appleExchange?'apple':'telegram'},accounts:[{appUserId:'user-id',id:'user-id',role:'user'}],transferSessions:[]};
  client.rpc=async name=>{calls.rpc=name;return profileFailure?{error:{code:'42501'}}:{data:profile()};};
  const fetch = async url => {
   calls.fetchUrls.push(url);
@@ -148,13 +148,19 @@ test('failed staging session cleanup preserves the existing app profile',async()
 test('Google uses PKCE browser callback and validates a personal-only provider result',async()=>{
  const auth=load({googleEnabled:true,platform:'ios',result:{type:'success',url:'hflsoccerapp://auth/google?code=one-use'}});
  const profile=await auth.loginWithGoogle();assert.equal(profile.user.authProvider,'google');assert.equal(auth.calls.exchange,1);
- assert.equal(auth.calls.googleOptions.options.skipBrowserRedirect,true);
- assert.equal(auth.calls.googleOptions.options.redirectTo,auth.GOOGLE_RETURN_URL);
+ const authorization=new URL(auth.calls.browserUrl);
+ assert.equal(authorization.origin,'https://project.supabase.co');
+ assert.equal(authorization.searchParams.get('provider'),'google');
+ assert.equal(authorization.searchParams.get('redirect_to'),auth.GOOGLE_RETURN_URL);
+ assert.equal(authorization.searchParams.get('code_challenge_method'),'s256');
+ assert.equal(authorization.searchParams.get('code_challenge'),'c'.repeat(43));
+ assert.equal(auth.calls.browserVerifier,JSON.stringify('b'.repeat(64)));
+ assert.equal(auth.calls.browserUrl.includes('b'.repeat(64)),false);
  assert.equal(auth.values.has('amatora-personal-auth-v1-google-pending'),false);
 });
-test('Google fails closed until explicitly configured and rejects untrusted authorization URLs',async()=>{
+test('Google fails closed until configured and never opens a browser when native PKCE fails',async()=>{
  const disabled=load();await assert.rejects(disabled.loginWithGoogle(),e=>e.code==='GOOGLE_NOT_CONFIGURED');assert.equal(disabled.calls.exchange,0);
- const unsafe=load({googleEnabled:true,googleUrl:'https://attacker.invalid/auth/v1/authorize?provider=google'});
+ const unsafe=load({googleEnabled:true,pkceFailure:true});
  await assert.rejects(unsafe.loginWithGoogle(),e=>e.code==='GOOGLE_SIGN_IN_FAILED');assert.equal(unsafe.calls.exchange,0);
 });
 test('Google cancellation and wrong callback never create an app identity',async()=>{
@@ -164,4 +170,28 @@ test('Google cancellation and wrong callback never create an app identity',async
 test('Google refuses a sports profile and clears the new session',async()=>{
  const auth=load({googleEnabled:true,platform:'ios',result:{type:'success',url:'hflsoccerapp://auth/google?code=one-use'},appleProfile:{success:true,user:{appUserId:'user-id',role:'captain',authProvider:'google'},accounts:[{appUserId:'user-id',role:'captain'}]}});
  await assert.rejects(auth.loginWithGoogle(),e=>e.code==='GOOGLE_SIGN_IN_FAILED');assert.equal(auth.state.user,null);assert.ok(auth.calls.signOut>0);
+});
+
+test('Google provider failure retains a safe diagnostic without exposing callback details',async()=>{
+ const auth=load({googleEnabled:true,platform:'ios',result:{type:'success',url:'hflsoccerapp://auth/google?error=server_error&error_description=private-database-message'}});
+ await assert.rejects(auth.loginWithGoogle(),e=>e.code==='GOOGLE_PROVIDER_CALLBACK_FAILED');
+ assert.equal(auth.calls.exchange,0);assert.equal(auth.values.size,0);
+ assert.match(auth.personalLoginMessage('GOOGLE_PROVIDER_CALLBACK_FAILED','ru'),/GP01/);
+ assert.ok(!auth.personalLoginMessage('GOOGLE_PROVIDER_CALLBACK_FAILED','ru').includes('private'));
+});
+
+const applePersonalProfile=name=>({success:true,user:{id:'user-id',appUserId:'user-id',role:'user',authProvider:'apple',name},
+ accounts:[{id:'user-id',appUserId:'user-id',role:'user',name}]});
+test('first Apple name fills only the owner placeholder and never grants privileges',async()=>{
+ const auth=load({platform:'ios',appleResult:{token:'test-token',nonce:'test-nonce',fullName:'Test Player'},appleProfile:applePersonalProfile('AMATORA foydalanuvchisi')});
+ const profile=await auth.loginWithApple();
+ assert.equal(auth.calls.profileTable,'app_users');assert.deepEqual(auth.calls.profilePatch,{display_name:'Test Player'});
+ assert.deepEqual(auth.calls.profileFilters,[['id','user-id'],['display_name','AMATORA foydalanuvchisi']]);
+ assert.equal(profile.user.name,'Test Player');assert.equal(profile.accounts[0].name,'Test Player');assert.equal(profile.user.role,'user');
+});
+test('Apple does not replace edited names, and optional metadata failure does not break login',async()=>{
+ const edited=load({platform:'ios',appleResult:{token:'test-token',nonce:'test-nonce',fullName:'Provider Name'},appleProfile:applePersonalProfile('Chosen Name')});
+ assert.equal((await edited.loginWithApple()).user.name,'Chosen Name');assert.equal(edited.calls.profilePatch,undefined);
+ const failed=load({platform:'ios',profileWriteError:true,appleResult:{token:'test-token',nonce:'test-nonce',fullName:'Test Player'},appleProfile:applePersonalProfile('AMATORA foydalanuvchisi')});
+ assert.equal((await failed.loginWithApple()).user.name,'AMATORA foydalanuvchisi');assert.equal(failed.calls.signOut,0);
 });

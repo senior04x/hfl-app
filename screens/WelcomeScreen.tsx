@@ -161,6 +161,8 @@ export default function WelcomeScreen({ navigation, route }: any) {
     const [organizationsList, setOrganizationsList] = useState<any[]>([]);
     const [loadingOrgs, setLoadingOrgs] = useState(true);
     const [loading, setLoading] = useState(false);
+    const [loadingProvider, setLoadingProvider] = useState<'apple' | 'google' | 'telegram' | null>(null);
+    const socialLoginInFlight = useRef(false);
     const [resendTimer, setResendTimer] = useState(60);
     const timerRef = useRef<any>(null);
     const endTimeRef = useRef<number>(0);
@@ -449,31 +451,37 @@ const formatPhoneInput = (val: string) => {
 
     const handleGoogleLogin = async () => {
         if (isExpoGo) { requireDevelopmentBuild(); return; }
-        if (loading) return;
+        if (loading || socialLoginInFlight.current) return;
+        socialLoginInFlight.current = true;
+        setLoadingProvider('google');
         setLoading(true);
         try {
             const result = await loginWithGoogle();
             if (result) await performLogin(result.user, result.accounts);
         } catch (error) {
             Alert.alert(t('common.error'), personalLoginMessage(error instanceof PersonalLoginError ? error.code : 'GOOGLE_SIGN_IN_FAILED', i18n.language));
-        } finally { setLoading(false); }
+        } finally { socialLoginInFlight.current = false; setLoadingProvider(null); setLoading(false); }
     };
 
     const handleAppleLogin = async () => {
         if (isExpoGo) { requireDevelopmentBuild(); return; }
-        if (loading) return;
+        if (loading || socialLoginInFlight.current) return;
+        socialLoginInFlight.current = true;
+        setLoadingProvider('apple');
         setLoading(true);
         try {
             const result = await loginWithApple();
             if (result) await performLogin(result.user, result.accounts);
         } catch (error) {
             Alert.alert(t('common.error'), personalLoginMessage(error instanceof PersonalLoginError ? error.code : 'APPLE_SIGN_IN_FAILED', i18n.language));
-        } finally { setLoading(false); }
+        } finally { socialLoginInFlight.current = false; setLoadingProvider(null); setLoading(false); }
     };
 
     const handleTelegramLogin = async () => {
         if (isExpoGo) { requireDevelopmentBuild(); return; }
-        if (loading) return;
+        if (loading || socialLoginInFlight.current) return;
+        socialLoginInFlight.current = true;
+        setLoadingProvider('telegram');
         setLoading(true);
         try {
             const result = await loginWithTelegram();
@@ -485,7 +493,7 @@ const formatPhoneInput = (val: string) => {
             else await performLogin(sports[0] || result.user, result.accounts);
         } catch (error) {
             Alert.alert(t('common.error'), personalLoginMessage(error instanceof PersonalLoginError ? error.code : 'LOGIN_UNAVAILABLE', i18n.language));
-        } finally { setLoading(false); }
+        } finally { socialLoginInFlight.current = false; setLoadingProvider(null); setLoading(false); }
     };
 
     return (
@@ -672,6 +680,7 @@ const formatPhoneInput = (val: string) => {
 
                                 <WelcomeSocialButtons
                                     disabled={loading}
+                                    loadingProvider={loadingProvider}
                                     onApple={handleAppleLogin}
                                     onGuest={() => useAuthStore.getState().setGuest(true)}
                                     guestLabel={t('auth.browse_without_account', 'Akkauntsiz tomosha qilish')}

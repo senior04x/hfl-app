@@ -7,6 +7,7 @@ import GoogleSignInIcon from './GoogleSignInIcon';
 
 type Props = {
  disabled: boolean;
+ loadingProvider?: 'apple' | 'google' | 'telegram' | null;
  onApple: () => void;
  onGuest: () => void;
  guestLabel: string;
@@ -16,23 +17,23 @@ type Props = {
  onGoogle?: () => void;
 };
 
-export default function WelcomeSocialButtons({ disabled, onApple, onGuest, guestLabel, onGoogle, onTelegram }: Props) {
+export default function WelcomeSocialButtons({ disabled, loadingProvider = null, onApple, onGuest, guestLabel, onGoogle, onTelegram }: Props) {
  return <View style={styles.row}>
-  {Platform.OS === 'ios' ? <AppleSignInButton iconOnly onPress={onApple} disabled={disabled} /> :
+  {Platform.OS === 'ios' ? <AppleSignInButton iconOnly onPress={onApple} disabled={disabled} loading={loadingProvider === 'apple'} /> :
    <TouchableOpacity accessibilityRole="button" accessibilityLabel={guestLabel}
     accessibilityState={{ disabled }} disabled={disabled} onPress={onGuest} activeOpacity={0.75}
     style={[styles.button, disabled && styles.disabled]}>
     <MaterialCommunityIcons name="account-eye-outline" size={22} color="#E85002" />
    </TouchableOpacity>}
   {onGoogle && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Sign in with Google"
-   accessibilityState={{ disabled }} disabled={disabled} onPress={onGoogle} activeOpacity={0.75}
-   style={[styles.button, disabled && styles.disabled]}>
-   <GoogleSignInIcon />
+   accessibilityState={{ disabled, busy: loadingProvider === 'google' }} disabled={disabled} onPress={onGoogle} activeOpacity={0.75}
+   style={[styles.button, disabled && loadingProvider !== 'google' && styles.disabled]}>
+   {loadingProvider === 'google' ? <ActivityIndicator size="small" color="#FFFFFF" /> : <GoogleSignInIcon />}
   </TouchableOpacity>}
   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Telegram orqali kirish"
-   accessibilityState={{ disabled }} disabled={disabled} onPress={onTelegram} activeOpacity={0.75}
-   style={[styles.button, disabled && styles.disabled]}>
-   {disabled ? <ActivityIndicator size="small" color="#FFFFFF" /> : <FontAwesome name="telegram" size={22} color="#FFFFFF" />}
+   accessibilityState={{ disabled, busy: loadingProvider === 'telegram' }} disabled={disabled} onPress={onTelegram} activeOpacity={0.75}
+   style={[styles.button, disabled && loadingProvider !== 'telegram' && styles.disabled]}>
+   {loadingProvider === 'telegram' ? <ActivityIndicator size="small" color="#FFFFFF" /> : <FontAwesome name="telegram" size={22} color="#FFFFFF" />}
   </TouchableOpacity>
  </View>;
 }

@@ -20,6 +20,7 @@ import Colors from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import SmartImage from '../components/SmartImage';
 import { apiService, supabase } from '../services/apiService';
+import { personalAuthClient } from '../services/personalAuthService';
 import { useTranslation } from 'react-i18next';
 import LanguageSelectModal from '../components/LanguageSelectModal';
 import { SUPPORTED_LANGUAGES } from '../store/useLanguageStore';
@@ -53,6 +54,7 @@ export default function AccountScreen({ navigation }: any) {
     const [showOrgSelectModal, setShowOrgSelectModal] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showPersonalProfileModal, setShowPersonalProfileModal] = useState(false);
+    const [personalEmail, setPersonalEmail] = useState<string | null>(null);
     const [showEditTeamModal, setShowEditTeamModal] = useState(false);
     const [teamEditNotice, setTeamEditNotice] = useState<'closed' | 'failed' | null>(null);
     const [checkingTeamEdit, setCheckingTeamEdit] = useState(false);
@@ -69,6 +71,20 @@ export default function AccountScreen({ navigation }: any) {
     const accountEditKey = `${user?.role || ''}:${user?.id || user?._id || ''}:${currentTeamId || ''}`;
     const latestAccountEditKey = useRef(accountEditKey);
     latestAccountEditKey.current = accountEditKey;
+
+    useEffect(() => {
+        let active = true;
+        setPersonalEmail(null);
+        if (!isGuest && user?.role === 'user' && user?.appUserId && ['apple', 'google'].includes(user.authProvider)) {
+            const ownerId = user.appUserId;
+            void personalAuthClient.auth.getUser().then(({ data, error }) => {
+                if (active && !error && data.user?.id === ownerId && useAuthStore.getState().user?.appUserId === ownerId) {
+                    setPersonalEmail(data.user.email || null);
+                }
+            }).catch(() => undefined);
+        }
+        return () => { active = false; };
+    }, [isGuest, user?.appUserId, user?.role, user?.authProvider]);
 
     useEffect(() => {
         setShowEditTeamModal(false);
@@ -470,6 +486,7 @@ export default function AccountScreen({ navigation }: any) {
                                     </View>
 
                                     {user?.role === 'user' && user?.bio ? <Text numberOfLines={2} style={{ color: homeColors.textSecondary, marginTop: 6 }}>{user.bio}</Text> : null}
+                                    {personalEmail ? <Text numberOfLines={1} style={[styles.phoneText, { color: homeColors.textSecondary }]}>{personalEmail}</Text> : null}
                                     {user?.phone && (user?.role !== 'user' || user?.showPhone === true) ? (
                                         <Text style={[styles.phoneText, { color: homeColors.textSecondary }]}>
                                             {user.phone}

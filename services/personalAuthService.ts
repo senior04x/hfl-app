@@ -8,6 +8,7 @@ import { useAuthStore, registerPersonalLogout } from '../store/useAuthStore';
 import { saveTransferLoginSessions } from './transferLoginStorage';
 import { useOrganizationStore } from '../store/useOrganizationStore';
 import { requestAppleIdentity, NativeAppleLoginError } from './nativeAppleAuth';
+import { createNativePkce } from './nativeOAuthPkce';
 import { PERSONAL_AUTH_IS_TEST, PERSONAL_AUTH_URL, PERSONAL_AUTH_KEY, PERSONAL_AUTH_STORAGE_KEY } from '../constants/PersonalAuthEnvironment';
 
 export const PERSONAL_RETURN_URL = 'hflsoccerapp://auth/telegram';
@@ -48,8 +49,13 @@ export class PersonalLoginError extends Error {
  constructor(public code: string) { super(code); }
 }
 export function personalLoginMessage(code: string, language: string): string {
- if (code.startsWith('GOOGLE_')) return language.startsWith('ru') ? 'Не удалось войти через Google. Повторите попытку.'
-  : language.startsWith('en') ? 'Unable to sign in with Google. Please try again.' : 'Google orqali kirib bo‘lmadi. Qayta urinib ko‘ring.';
+ if (code.startsWith('GOOGLE_')) {
+  const diagnostic: Record<string, string> = { GOOGLE_PROVIDER_CALLBACK_FAILED: 'GP01', GOOGLE_SESSION_EXCHANGE_FAILED: 'GP02',
+   GOOGLE_PROFILE_UNAVAILABLE: 'GP03', GOOGLE_INVALID_CALLBACK: 'GP04', GOOGLE_PROVIDER_DENIED: 'GP05' };
+  const text = language.startsWith('ru') ? 'Не удалось войти через Google. Повторите попытку.'
+   : language.startsWith('en') ? 'Unable to sign in with Google. Please try again.' : 'Google orqali kirib bo‘lmadi. Qayta urinib ko‘ring.';
+  return `${text} (${diagnostic[code] || 'GP00'})`;
+ }
  if (code.startsWith('APPLE_')) {
   return language.startsWith('ru') ? 'Не удалось войти через Apple. Повторите попытку.' : language.startsWith('en')
    ? 'Unable to sign in with Apple. Please try again.' : 'Apple orqali kirib bo‘lmadi. Qayta urinib ko‘ring.';
@@ -121,6 +127,20 @@ export async function loginWithApple(): Promise<any | null> {
   const profile = await refreshPersonalAccounts('apple');
   if (current !== authRevision || profile.user?.authProvider !== 'apple' || profile.user?.role !== 'user'
    || profile.accounts.length !== 1) throw new PersonalLoginError('APPLE_SIGN_IN_FAILED');
+  // Apple supplies the name only at first authorization, outside its ID token.
+  // This owner-only display field never grants membership or replaces an edited name.
+  if (credential.fullName && profile.user.name === 'AMATORA foydalanuvchisi') {
+   try {
+    const saved = await personalAuthClient.from('app_users').update({ display_name: credential.fullName })
+     .eq('id', data.session.user.id).eq('display_name', 'AMATORA foydalanuvchisi').select('id,display_name').maybeSingle();
+    const savedName = saved.data?.display_name;
+    if (!saved.error && saved.data?.id === data.session.user.id && typeof savedName === 'string') {
+     profile.user = { ...profile.user, name: savedName, title: savedName };
+     profile.accounts = profile.accounts.map((account: any) => account.role === 'user' && account.appUserId === data.session.user.id
+      ? { ...account, name: savedName, title: savedName } : account);
+    }
+   } catch { /* Optional display metadata must not invalidate a verified sign-in. */ }
+  }
   return profile;
  } catch (error) {
   if (createdSession && (PERSONAL_AUTH_IS_TEST || !useAuthStore.getState().user?.appUserId)) await personalAuthClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
@@ -138,17 +158,15 @@ export async function loginWithGoogle(): Promise<any | null> {
  let notifyCallback: (() => void) | undefined;
  let receivedUrl: string | null = null;
  try {
-  const { data, error } = await personalAuthClient.auth.signInWithOAuth({ provider: 'google', options: {
-   redirectTo: GOOGLE_RETURN_URL, skipBrowserRedirect: true, queryParams: { prompt: 'select_account' },
-  } });
-  if (error || !data.url) throw new PersonalLoginError('GOOGLE_SIGN_IN_FAILED');
-  const authorization = new URL(data.url);
-  if (authorization.origin !== PERSONAL_AUTH_URL || authorization.pathname !== '/auth/v1/authorize'
-   || authorization.searchParams.get('provider') !== 'google') throw new PersonalLoginError('GOOGLE_SIGN_IN_FAILED');
+  const pkce = await createNativePkce();
+  const authorization = new URL('/auth/v1/authorize', PERSONAL_AUTH_URL);
+  authorization.search = new URLSearchParams({ provider: 'google', redirect_to: GOOGLE_RETURN_URL,
+   code_challenge: pkce.challenge, code_challenge_method: 's256', prompt: 'select_account' }).toString();
+  await personalSessionStorage.setItem(VERIFIER_KEY, JSON.stringify(pkce.verifier));
   await personalSessionStorage.setItem(GOOGLE_PENDING_KEY, String(Date.now()));
   const callbackArrived = new Promise<void>(resolve => { notifyCallback = resolve; });
   captureBrowserCallback = url => { receivedUrl = url; notifyCallback?.(); };
-  const result = await WebBrowser.openAuthSessionAsync(data.url, GOOGLE_RETURN_URL, { createTask: false });
+  const result = await WebBrowser.openAuthSessionAsync(authorization.toString(), GOOGLE_RETURN_URL, { createTask: false });
   if (result.type !== 'success' && !receivedUrl && Platform.OS === 'android') {
    let timer: ReturnType<typeof setTimeout> | undefined;
    await Promise.race([callbackArrived, new Promise<void>(resolve => { timer = setTimeout(resolve, 1500); })]);
@@ -164,7 +182,8 @@ export async function loginWithGoogle(): Promise<any | null> {
   return profile;
  } catch (error) {
   if (!useAuthStore.getState().user?.appUserId) await personalAuthClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
-  throw new PersonalLoginError('GOOGLE_SIGN_IN_FAILED');
+  const code = error instanceof PersonalLoginError ? error.code : 'GOOGLE_SIGN_IN_FAILED';
+  throw new PersonalLoginError(code.startsWith('GOOGLE_') ? code : `GOOGLE_${code}`);
  } finally {
   captureBrowserCallback = null;
   await personalSessionStorage.removeItem(GOOGLE_PENDING_KEY).catch(() => undefined);

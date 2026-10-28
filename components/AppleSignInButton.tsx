@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Image, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, TouchableOpacity, View } from 'react-native';
 import { getAppleAuthModule } from '../services/nativeAppleAuth';
 
-export default function AppleSignInButton({ onPress, disabled, iconOnly = false }: { onPress: () => void; disabled: boolean; iconOnly?: boolean }) {
+export default function AppleSignInButton({ onPress, disabled, loading = false, iconOnly = false }: { onPress: () => void; disabled: boolean; loading?: boolean; iconOnly?: boolean }) {
  const [available, setAvailable] = useState(false);
  const apple = getAppleAuthModule();
  useEffect(() => {
@@ -12,9 +12,9 @@ export default function AppleSignInButton({ onPress, disabled, iconOnly = false 
  }, [apple]);
  if (!apple || !available) return null;
  if (iconOnly) return <TouchableOpacity onPress={onPress} disabled={disabled}
-  accessibilityRole="button" accessibilityLabel="Sign in with Apple" accessibilityState={{ disabled }}
-  activeOpacity={0.75} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.5 : 1 }}>
-  <Image source={require('../assets/auth/apple-signin-glyph.png')} style={{ width: 52, height: 52, transform: [{ translateY: 1 }] }} accessible={false} />
+  accessibilityRole="button" accessibilityLabel="Sign in with Apple" accessibilityState={{ disabled, busy: loading }}
+  activeOpacity={0.75} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled && !loading ? 0.5 : 1 }}>
+  {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Image source={require('../assets/auth/apple-signin-glyph.png')} style={{ width: 52, height: 52, transform: [{ translateY: 1 }] }} accessible={false} />}
  </TouchableOpacity>;
  const NativeButton = apple.AppleAuthenticationButton;
  return <View pointerEvents={disabled ? 'none' : 'auto'} accessibilityState={{ disabled }}
