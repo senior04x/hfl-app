@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 
-async function scenario(unmountBeforeCaptureCompletes) {
+async function scenario(unmountBeforeCaptureCompletes, failure) {
     const refs = [], effects = [], frames = [], ready = [], released = [], captures = [];
     let complete;
     const pending = new Promise(resolve => { complete = resolve; });
@@ -17,8 +17,15 @@ async function scenario(unmountBeforeCaptureCompletes) {
         'react-native': { View: 'View', StyleSheet: { create: value => value } },
         'expo-image': { Image: 'Image' },
         'react-native-view-shot': {
-            captureRef: (ref, options) => { captures.push(options); return pending; },
-            releaseCapture: uri => released.push(uri),
+            captureRef: (ref, options) => {
+                captures.push(options);
+                if (failure === 'capture') throw new Error('Exception in HostFunction: <unknown>');
+                return pending;
+            },
+            releaseCapture: uri => {
+                released.push(uri);
+                if (failure === 'release') throw new Error('Exception in HostFunction: <unknown>');
+            },
         },
     };
     const module = {};
@@ -36,12 +43,19 @@ async function scenario(unmountBeforeCaptureCompletes) {
         assert.equal(captures.length, 0); // never capture before the image has actually displayed
         image.props.onDisplay();
         image.props.onDisplay(); // repeated display events must not re-encode the avatar
-        while (frames.length) frames.shift()();
+        assert.doesNotThrow(() => { while (frames.length) frames.shift()(); });
         assert.equal(captures.length, 1);
         assert.equal(captures[0].format, 'png');
         assert.equal(captures[0].result, 'tmpfile');
         assert.equal(captures[0].width, 84);
-        if (unmountBeforeCaptureCompletes) effects.forEach(cleanup => cleanup());
+        if (failure === 'capture') {
+            await Promise.resolve();
+            await Promise.resolve();
+            assert.deepEqual(ready, []);
+            assert.doesNotThrow(() => effects.forEach(cleanup => cleanup()));
+            return;
+        }
+        if (unmountBeforeCaptureCompletes) assert.doesNotThrow(() => effects.forEach(cleanup => cleanup()));
         complete('file:///test-capture.png');
         await pending;
         await Promise.resolve();
@@ -49,7 +63,7 @@ async function scenario(unmountBeforeCaptureCompletes) {
         else {
             assert.deepEqual(ready, ['file:///test-capture.png']);
             assert.deepEqual(released, []);
-            effects.forEach(cleanup => cleanup());
+            assert.doesNotThrow(() => effects.forEach(cleanup => cleanup()));
         }
         assert.deepEqual(released, ['file:///test-capture.png']);
     } finally {
@@ -60,3 +74,5 @@ async function scenario(unmountBeforeCaptureCompletes) {
 
 test('avatar is captured once after display and its temporary image is released on unmount', () => scenario(false));
 test('an avatar finishing after account change is released without updating the next account', () => scenario(true));
+test('synchronous native capture failure keeps the profile symbol without crashing the app', () => scenario(false, 'capture'));
+test('synchronous native cleanup failure cannot crash unmount or account switching', () => scenario(false, 'release'));

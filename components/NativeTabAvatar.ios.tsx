@@ -3,6 +3,11 @@ import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { captureRef, releaseCapture } from 'react-native-view-shot';
 
+function releasePhoto(uri: string) {
+    // Native HostFunction errors can be synchronous, including during unmount.
+    try { releaseCapture(uri); } catch { /* The OS will clear the temporary file. */ }
+}
+
 // UITabBarItem accepts a bitmap, not a React avatar view. Render a small circular
 // bitmap once per photo, preserving its colors and releasing it on account change.
 export default function NativeTabAvatar({ uri, onReady }: { uri: string; onReady: (image: string) => void }) {
@@ -18,7 +23,7 @@ export default function NativeTabAvatar({ uri, onReady }: { uri: string; onReady
         return () => {
             disposed.current = true;
             if (frame.current !== undefined) cancelAnimationFrame(frame.current);
-            if (file.current) releaseCapture(file.current);
+            if (file.current) releasePhoto(file.current);
         };
     }, []);
 
@@ -26,14 +31,15 @@ export default function NativeTabAvatar({ uri, onReady }: { uri: string; onReady
         if (started.current || disposed.current) return;
         started.current = true;
         frame.current = requestAnimationFrame(() => {
-            frame.current = requestAnimationFrame(() => {
+            frame.current = requestAnimationFrame(async () => {
                 if (disposed.current || !view.current) return;
-                void captureRef(view, { format: 'png', result: 'tmpfile', width: 84, height: 84, useRenderInContext: true })
-                    .then(image => {
-                        if (disposed.current) { releaseCapture(image); return; }
-                        file.current = image;
-                        callback.current(image);
-                    }).catch(() => { /* Keep the SF Symbol when the optional photo fails. */ });
+                try {
+                    // Await inside try catches both bridge throws and rejected promises.
+                    const image = await captureRef(view, { format: 'png', result: 'tmpfile', width: 84, height: 84, useRenderInContext: true });
+                    if (disposed.current) { releasePhoto(image); return; }
+                    file.current = image;
+                    callback.current(image);
+                } catch { /* Keep the SF Symbol when the optional photo fails. */ }
             });
         });
     };
