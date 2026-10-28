@@ -701,7 +701,22 @@
     "cannot_edit_pending": "Message is still sending. Please wait a moment.",
     "one_new_message": "1 new message",
     "new_messages_count": "{{count}} new messages",
-    "typing": "{{name}} is typing..."
+    "typing": "{{name}} is typing...",
+    "safety_load_failed": "Chat safety settings could not be loaded. Go back and open the chat again.",
+    "safety_save_failed": "The block could not be saved. Please try again.",
+    "block_user": "Block user",
+    "unblock_user": "Unblock user",
+    "block_confirm": "This user's chat messages will be hidden on this device. Tap a hidden message to unblock them.",
+    "unblock_confirm": "Show this user's messages again?",
+    "blocked_message": "User blocked · tap to unblock",
+    "filtered_message": "Message hidden · tap to report",
+    "hidden_reply": "Message text hidden",
+    "report_message": "Report message",
+    "report_explanation": "Your email app will open to contact support. Only the team and message IDs are added. Describe the problem and send the email yourself.",
+    "open_report_email": "Open email",
+    "report_email_fallback": "Could not open your email app. Email {{email}} with the team, message and problem.",
+    "content_rejected_title": "Message not sent",
+    "content_rejected": "Remove abusive words. Messages must be no longer than 4000 characters."
   },
   "roles": {
     "player": "Player",

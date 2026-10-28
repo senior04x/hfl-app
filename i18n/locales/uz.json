@@ -701,7 +701,22 @@
     "cannot_edit_pending": "Xabar hali yuborilmoqda. Iltimos biroz kuting.",
     "one_new_message": "1 ta yangi xabar",
     "new_messages_count": "{{count}} ta yangi xabar",
-    "typing": "{{name}} yozmoqda..."
+    "typing": "{{name}} yozmoqda...",
+    "safety_load_failed": "Chat xavfsizlik sozlamalari yuklanmadi. Ortga qaytib, qayta oching.",
+    "safety_save_failed": "Bloklash sozlamasi saqlanmadi. Qayta urinib ko‘ring.",
+    "block_user": "Foydalanuvchini bloklash",
+    "unblock_user": "Blokdan chiqarish",
+    "block_confirm": "Bu foydalanuvchining chat xabarlari ushbu qurilmada yashiriladi. Bloklangan xabar ustiga bosib blokdan chiqarish mumkin.",
+    "unblock_confirm": "Bu foydalanuvchining xabarlari yana ko‘rinsinmi?",
+    "blocked_message": "Foydalanuvchi bloklangan · chiqarish uchun bosing",
+    "filtered_message": "Xabar yashirildi · shikoyat qilish uchun bosing",
+    "hidden_reply": "Xabar matni yashirilgan",
+    "report_message": "Xabar haqida shikoyat",
+    "report_explanation": "Yordam xizmatiga yozish uchun email ilovangiz ochiladi. Xatga faqat jamoa va xabar ID’lari qo‘shiladi. Muammoni yozib, xatni o‘zingiz yuborasiz.",
+    "open_report_email": "Emailni ochish",
+    "report_email_fallback": "Email ilovasini ochib bo‘lmadi. {{email}} manziliga jamoa, xabar va muammoni ko‘rsatib yozing.",
+    "content_rejected_title": "Xabar yuborilmadi",
+    "content_rejected": "Haqoratli so‘zlarni olib tashlang. Xabar 4000 belgidan oshmasligi kerak."
   },
   "roles": {
     "player": "O'yinchi",

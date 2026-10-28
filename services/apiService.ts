@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { resolveMatchAssist } from './matchEventAssist';
 import { loadMatchCompetitionMetadata } from './matchCompetitionMetadata';
 import { loadTransferCareer } from './publicTransferHistory';
+import { objectionableChatText } from './chatSafety';
 
 export { supabase };
 
@@ -807,6 +808,7 @@ export const apiService = {
     },
 
     sendChatMessage: async (messageData: any) => {
+        if (objectionableChatText(messageData.text)) throw new Error('CHAT_CONTENT_REJECTED');
         try {
             const teamIdStr = String(messageData.teamId);
             const senderIdStr = String(messageData.senderId || 'unknown');
@@ -913,6 +915,7 @@ export const apiService = {
     },
 
     editChatMessage: async (messageId: string | number, newText: string) => {
+        if (objectionableChatText(newText)) throw new Error('CHAT_CONTENT_REJECTED');
         try {
             const queryId = String(messageId);
 

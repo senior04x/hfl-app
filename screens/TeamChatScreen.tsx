@@ -19,6 +19,7 @@ import {
     Alert,
     Keyboard,
     Easing,
+    Linking,
     TouchableWithoutFeedback,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,6 +39,7 @@ import SmartImage from '../components/SmartImage';
 import ChatSkeleton from '../components/ChatSkeleton';
 import { useThemeStore } from '../store/useThemeStore';
 import { getHomeScreenColors } from '../constants/homeTheme';
+import { chatSafetyOwner, readChatBlocks, writeChatBlocks, objectionableChatText, chatReportUrl } from '../services/chatSafety';
 
 const CHAT_CACHE_PREFIX = '@team_chat_messages_v2_';
 const TEAM_INFO_CACHE_PREFIX = '@team_info_v2_';
@@ -53,6 +55,40 @@ function TeamChatScreen({ route, navigation }: any) {
     const insets = useSafeAreaInsets();
     
     const [messages, setMessages] = useState<any[]>([]);
+    const safetyOwner = chatSafetyOwner(user);
+    const safetyOwnerRef = useRef(safetyOwner); safetyOwnerRef.current = safetyOwner;
+    const [chatBlocks, setChatBlocks] = useState<{owner: string; ids: string[]} | null>(null);
+    const safetyReady = Boolean(safetyOwner && chatBlocks?.owner === safetyOwner);
+    const blockedIds = React.useMemo(() => new Set(safetyReady ? chatBlocks!.ids : []), [chatBlocks, safetyReady]);
+    useEffect(() => {
+        let active = true;
+        if (safetyOwner) readChatBlocks(safetyOwner).then(ids => {
+            if (active) setChatBlocks({owner:safetyOwner,ids});
+        }).catch(() => { if (active) Alert.alert(t('common.error'),t('chat.safety_load_failed'),[{text:t('common.back'),onPress:()=>navigation.goBack()}]); });
+        return () => { active = false; };
+    }, [safetyOwner]);
+
+    const changeBlock = (senderId: unknown, unblock = false) => {
+        const sender = String(senderId || '');
+        if (!safetyOwner || !safetyReady || !/^[A-Za-z0-9_-]{1,128}$/.test(sender) || sender === String(user?._id || user?.id)) return;
+        Alert.alert(t(unblock?'chat.unblock_user':'chat.block_user'), t(unblock?'chat.unblock_confirm':'chat.block_confirm'), [
+            {text:t('common.cancel'),style:'cancel'},
+            {text:t(unblock?'chat.unblock_user':'chat.block_user'),onPress:async()=>{
+                const ids = unblock ? chatBlocks!.ids.filter(id=>id!==sender) : [...new Set([...chatBlocks!.ids,sender])];
+                try { await writeChatBlocks(safetyOwner,ids); if(safetyOwnerRef.current===safetyOwner)setChatBlocks({owner:safetyOwner,ids}); }
+                catch { Alert.alert(t('common.error'),t('chat.safety_save_failed')); }
+            }},
+        ]);
+    };
+    const reportMessage = (message: any) => {
+        Alert.alert(t('chat.report_message'),t('chat.report_explanation'),[
+            {text:t('common.cancel'),style:'cancel'},
+            {text:t('chat.open_report_email'),onPress:async()=>{
+                try { await Linking.openURL(chatReportUrl(teamId,message._id || message.id)); }
+                catch { Alert.alert(t('chat.report_message'),t('chat.report_email_fallback',{email:'gcccc406@gmail.com'})); }
+            }},
+        ]);
+    };
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(false);
     const [teamInfo, setTeamInfo] = useState<any>(null);
@@ -839,6 +875,7 @@ function TeamChatScreen({ route, navigation }: any) {
 
     const retryMessage = (msg: any) => {
         if (isRateLimited) return;
+        if (!safetyReady || objectionableChatText(msg.text)) { Alert.alert(t('chat.content_rejected_title'),t('chat.content_rejected')); return; }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         
         // Remove error state visually immediately
@@ -866,6 +903,7 @@ function TeamChatScreen({ route, navigation }: any) {
 
     const sendMessage = () => {
         if (!inputText.trim() || !user) return;
+        if (!safetyReady || objectionableChatText(inputText)) { Alert.alert(t('chat.content_rejected_title'),t('chat.content_rejected')); return; }
 
         animateSendButton();
 
@@ -1257,7 +1295,9 @@ function TeamChatScreen({ route, navigation }: any) {
 
         // Bu xabar biror boshqa xabarga javob bo'lsa — reply_to (jsonb) ichida
         // { id, text, senderName, senderId } snapshot saqlangan bo'ladi.
-        const replyToInfo = item.replyTo && typeof item.replyTo === 'object' ? item.replyTo : null;
+        const rawReply = item.replyTo && typeof item.replyTo === 'object' ? item.replyTo : null;
+        const replyToInfo = rawReply && (blockedIds.has(String(rawReply.senderId)) || objectionableChatText(rawReply.text))
+            ? {...rawReply,text:t('chat.hidden_reply'),senderName:''} : rawReply;
         const replyToSenderLabel = replyToInfo
             ? (String(replyToInfo.senderId) === String(user?._id || user?.id) ? (t('chat.you') || 'Siz') : (replyToInfo.senderName || ''))
             : '';
@@ -1483,6 +1523,17 @@ function TeamChatScreen({ route, navigation }: any) {
     });
 
     const renderMessage = React.useCallback(({ item }: { item: any }) => {
+        if (!safetyReady) return null;
+        if (blockedIds.has(String(item.senderId))) return <TouchableOpacity
+            accessibilityRole="button" accessibilityLabel={t('chat.unblock_user')}
+            onPress={()=>changeBlock(item.senderId,true)} style={{paddingVertical:12,paddingHorizontal:16}}>
+            <Text style={{color:homeColors.textSecondary,fontSize:13}}>{t('chat.blocked_message')}</Text>
+        </TouchableOpacity>;
+        if (objectionableChatText(item.text)) return <TouchableOpacity
+            accessibilityRole="button" accessibilityLabel={t('chat.report_message')}
+            onPress={()=>reportMessage(item)} style={{paddingVertical:12,paddingHorizontal:16}}>
+            <Text style={{color:homeColors.textSecondary,fontSize:13}}>{t('chat.filtered_message')}</Text>
+        </TouchableOpacity>;
         const isMe = String(item.senderId) === String(user?._id || user?.id);
         const itemKey = String(item._id || item.id || item.localId || item.clientMessageId);
         
@@ -1526,7 +1577,7 @@ function TeamChatScreen({ route, navigation }: any) {
                 isHighlighted={isHighlighted}
             />
         );
-    }, [user, teamInfo, teamPlayers, t, startReply, scrollToMessage, highlightedMessageId]);
+    }, [user, teamInfo, teamPlayers, t, startReply, scrollToMessage, highlightedMessageId, safetyReady, blockedIds, homeColors.textSecondary, changeBlock, reportMessage]);
 
     const backdropOpacity = swipeBackAnim.interpolate({
         inputRange: [0, width * 0.8, width],
@@ -1611,7 +1662,7 @@ function TeamChatScreen({ route, navigation }: any) {
                     style={{ flex: 1 }}
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
                 >
-                    {(loading && messages.length === 0) ? (
+                    {(!safetyReady || (loading && messages.length === 0)) ? (
                         <ChatSkeleton />
                     ) : (
                         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -1665,7 +1716,7 @@ function TeamChatScreen({ route, navigation }: any) {
                                     ListHeaderComponent={
                                         Object.keys(typingUsers).length > 0 ? (
                                             <View style={styles.typingMessagesContainer}>
-                                                {Object.entries(typingUsers).map(([tUserId, tUserData]) => {
+                                                {Object.entries(typingUsers).filter(([id])=>!blockedIds.has(id)).map(([tUserId, tUserData]) => {
                                                     const foundPlayer = teamPlayers.find((p: any) => String(p._id || p.id) === String(tUserId));
                                                     const isTeamAccount = foundPlayer?.role === 'team' || String(tUserId).includes('team') || tUserData.name === teamInfo?.name;
                                                     const avatarUri = isTeamAccount ? teamInfo?.logo : (tUserData.photo || foundPlayer?.photo || foundPlayer?.photo_url || foundPlayer?.avatar);
@@ -1925,6 +1976,21 @@ function TeamChatScreen({ route, navigation }: any) {
                                             <Ionicons name="copy-outline" size={16} color={homeColors.textPrimary} />
                                             <Text style={[styles.menuActionText, { color: homeColors.textPrimary }]}>{t('chat.copy')}</Text>
                                         </TouchableOpacity>
+
+                                        {!isMe && <>
+                                            <View style={[styles.menuDivider, { backgroundColor: homeColors.border }]} />
+                                            <TouchableOpacity style={styles.menuActionItem} accessibilityRole="button"
+                                                onPress={()=>{const message=selectedMessage;closeMenu();reportMessage(message);}}>
+                                                <Ionicons name="flag-outline" size={16} color={homeColors.textPrimary}/>
+                                                <Text style={[styles.menuActionText,{color:homeColors.textPrimary}]}>{t('chat.report_message')}</Text>
+                                            </TouchableOpacity>
+                                            <View style={[styles.menuDivider, { backgroundColor: homeColors.border }]} />
+                                            <TouchableOpacity style={styles.menuActionItem} accessibilityRole="button"
+                                                onPress={()=>{const sender=selectedMessage.senderId;closeMenu();changeBlock(sender);}}>
+                                                <Ionicons name="ban-outline" size={16} color={homeColors.textPrimary}/>
+                                                <Text style={[styles.menuActionText,{color:homeColors.textPrimary}]}>{t('chat.block_user')}</Text>
+                                            </TouchableOpacity>
+                                        </>}
 
                                         {/* Edit Action (Only for User's own messages) */}
                                         {isMe && (
