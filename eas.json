@@ -20,6 +20,15 @@
       "distribution": "store",
       "environment": "preview"
     },
+    "store-screenshots": {
+      "extends": "production",
+      "autoIncrement": false,
+      "withoutCredentials": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "channel": "production",
       "environment": "production",

@@ -1,0 +1,26 @@
+# Public browsing only: no login, account creation, notification or write action.
+appId: com.amatora.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Akkauntsiz tomosha qilish"
+    timeout: 60000
+- takeScreenshot: welcome
+- tapOn: "Akkauntsiz tomosha qilish"
+- extendedWaitUntil:
+    visible: "Havas futbol ligasi"
+    timeout: 60000
+- takeScreenshot: organization-choice
+- tapOn: "Havas futbol ligasi"
+- extendedWaitUntil:
+    visible: "Home|Главная|Asosiy"
+    timeout: 60000
+- waitForAnimationToEnd
+- takeScreenshot: home
+- tapOn: "Tournaments|Турниры|Turnirlar"
+- waitForAnimationToEnd
+- takeScreenshot: tournaments
+- tapOn: "Calendar|Календарь|Taqvim"
+- waitForAnimationToEnd
+- takeScreenshot: calendar

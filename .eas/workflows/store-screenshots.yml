@@ -1,0 +1,30 @@
+name: AMATORA native listing screenshots
+jobs:
+  ios_simulator:
+    name: Build the tested release for iOS Simulator
+    type: build
+    params:
+      platform: ios
+      profile: store-screenshots
+  iphone_screenshots:
+    name: Capture public pages on iPhone
+    needs: [ios_simulator]
+    type: maestro
+    environment: production
+    params:
+      build_id: ${{ needs.ios_simulator.outputs.build_id }}
+      flow_path: .maestro/store-screenshots.yml
+      device_identifier: iPhone 16
+      retries: 0
+      record_screen: false
+  ipad_screenshots:
+    name: Capture public pages on iPad 13 inch
+    needs: [ios_simulator]
+    type: maestro
+    environment: production
+    params:
+      build_id: ${{ needs.ios_simulator.outputs.build_id }}
+      flow_path: .maestro/store-screenshots.yml
+      device_identifier: iPad Pro 13-inch (M4)
+      retries: 0
+      record_screen: false
