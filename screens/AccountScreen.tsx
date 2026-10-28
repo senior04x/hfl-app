@@ -54,7 +54,8 @@ export default function AccountScreen({ navigation }: any) {
     const [showOrgSelectModal, setShowOrgSelectModal] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showPersonalProfileModal, setShowPersonalProfileModal] = useState(false);
-    const [personalEmail, setPersonalEmail] = useState<string | null>(null);
+    const [personalContact, setPersonalContact] = useState<{ ownerId: string; email: string } | null>(null);
+    const personalEmail = personalContact && personalContact.ownerId === user?.appUserId ? personalContact.email : null;
     const [showEditTeamModal, setShowEditTeamModal] = useState(false);
     const [teamEditNotice, setTeamEditNotice] = useState<'closed' | 'failed' | null>(null);
     const [checkingTeamEdit, setCheckingTeamEdit] = useState(false);
@@ -74,12 +75,12 @@ export default function AccountScreen({ navigation }: any) {
 
     useEffect(() => {
         let active = true;
-        setPersonalEmail(null);
+        setPersonalContact(null);
         if (!isGuest && user?.role === 'user' && user?.appUserId && ['apple', 'google'].includes(user.authProvider)) {
             const ownerId = user.appUserId;
             void personalAuthClient.auth.getUser().then(({ data, error }) => {
                 if (active && !error && data.user?.id === ownerId && useAuthStore.getState().user?.appUserId === ownerId) {
-                    setPersonalEmail(data.user.email || null);
+                    setPersonalContact(data.user.email ? { ownerId, email: data.user.email } : null);
                 }
             }).catch(() => undefined);
         }
@@ -780,7 +781,9 @@ export default function AccountScreen({ navigation }: any) {
 
 
 
-                <PersonalProfileModal visible={showPersonalProfileModal} onClose={() => setShowPersonalProfileModal(false)} />
+                <PersonalProfileModal key={user?.appUserId || 'no-personal-account'} visible={showPersonalProfileModal}
+                    authProvider={user?.authProvider} email={personalEmail}
+                    onClose={() => setShowPersonalProfileModal(false)} />
                 {/* Logout Confirmation Modal */}
                 <Modal
                     visible={showLogoutModal}

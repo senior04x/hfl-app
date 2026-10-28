@@ -391,6 +391,8 @@
     "edit_personal": "Edit profile",
     "change_avatar": "Change photo",
     "full_name": "Full name",
+    "login_method": "Sign-in method",
+    "email": "Email address",
     "bio": "About you",
     "show_phone": "Show my phone number on my profile",
     "photo_permission": "Allow access to your photo library.",

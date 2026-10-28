@@ -391,6 +391,8 @@
     "edit_personal": "Profilni tahrirlash",
     "change_avatar": "Rasmni almashtirish",
     "full_name": "Ism-familiya",
+    "login_method": "Kirish usuli",
+    "email": "Elektron pochta",
     "bio": "O‘zingiz haqingizda",
     "show_phone": "Profilimda telefon raqamimni ko‘rsatish",
     "photo_permission": "Rasm tanlash uchun galereyaga ruxsat bering.",
