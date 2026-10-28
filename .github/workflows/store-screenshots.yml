@@ -66,7 +66,6 @@ jobs:
       MAESTRO_CLI_NO_ANALYTICS: 'true'
       MAESTRO_DRIVER_STARTUP_TIMEOUT: '240000'
       SCREENSHOT_DEVICE: ${{ matrix.device }}
-      SIMULATOR_APP_ARCHIVE: ${{ runner.temp }}/simulator-app/amatora-simulator-app.tar.gz
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -80,6 +79,8 @@ jobs:
           name: amatora-ios-simulator
           path: ${{ runner.temp }}/simulator-app
       - name: Capture on a clean simulator worker
+        env:
+          SIMULATOR_APP_ARCHIVE: ${{ runner.temp }}/simulator-app/amatora-simulator-app.tar.gz
         run: bash scripts/store-screenshots-ios.sh capture
       - name: Save genuine device screenshots and results
         if: always()
