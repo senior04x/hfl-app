@@ -70,7 +70,7 @@ function harness(user = null) {
     for (const screen of ['HomeScreen', 'TournamentsScreen', 'CalendarScreen', 'NewsScreen', 'AccountScreen']) {
         imports[`../screens/${screen}`] = { __esModule: true, default: screen };
     }
-    const module = load('navigation/AppNavigator.ios.tsx', imports);
+    const module = load('navigation/NativeAppNavigator.ios.tsx', imports);
     const navigation = { navigate: (...args) => state.navigations.push(args) };
     const outer = module.default({ navigation, route: { params: { tab: 'pRoFiL' } } });
     const native = outer.props.children[0].props.children[0];

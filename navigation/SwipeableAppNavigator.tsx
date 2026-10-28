@@ -26,7 +26,7 @@ import SmartImage from '../components/SmartImage';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../store/useThemeStore';
-import { TabSwipeProvider, useTabSwipe } from '../context/TabSwipeContext';
+import { TabSwipeProvider } from '../context/TabSwipeContext';
 import { NavBarScrollProvider, useNavBarScroll } from '../context/NavBarScrollContext';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -38,22 +38,16 @@ import { refreshPersonalAccounts } from '../services/personalAuthService';
 import { APP_TABS as TABS } from './tabRoutes';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const IS_ANDROID = Platform.OS === 'android';
-const CAPSULE_WIDTH = IS_ANDROID ? SCREEN_WIDTH : SCREEN_WIDTH - 72;
+const CAPSULE_WIDTH = SCREEN_WIDTH - 72;
 const TAB_COUNT = 5;
 const TAB_ITEM_WIDTH = (CAPSULE_WIDTH - 8) / TAB_COUNT;
-const HIGHLIGHT_WIDTH = TAB_ITEM_WIDTH - (IS_ANDROID ? 4 : 2);
-const HIGHLIGHT_OFFSET = IS_ANDROID ? 2 : 1;
+const HIGHLIGHT_WIDTH = TAB_ITEM_WIDTH - 2;
+const HIGHLIGHT_OFFSET = 1;
 
-// Capsule's own corner radius (iOS = fully-rounded stadium since height 60 -> radius 30;
-// Android = top-only-rounded docked bar). The active-tab pill is inset 6px from the
-// capsule's edges (top:6 / bottom:60-6-48=6), so its "ideal" concentric radius is simply
-// the capsule radius minus that same inset — a single mathematically-derived source of
-// truth instead of a hand-picked number.
-const CAPSULE_RADIUS_IOS = 30;
-const CAPSULE_RADIUS_ANDROID = 16;
+// Keep the previous iOS floating capsule geometry on every legacy platform.
+const CAPSULE_RADIUS = 30;
 const PILL_INSET = 6;
-const HIGHLIGHT_RADIUS = Math.max(0, (IS_ANDROID ? CAPSULE_RADIUS_ANDROID : CAPSULE_RADIUS_IOS) - PILL_INSET);
+const HIGHLIGHT_RADIUS = CAPSULE_RADIUS - PILL_INSET;
 const BLUR_INTENSITY = 55;
 
 // Scroll-linked resize: how much the navbar shrinks/sinks at full shrinkProgress (1).
@@ -100,37 +94,17 @@ export function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigat
     const { shrinkProgress } = useNavBarScroll();
     const userAvatarUri = user?.photo || user?.photo_url || user?.avatar || user?.logo || user?.logo_url;
 
-    // Floating tab bar — endi kunduzgi/kechki rejimga mos, rangi yengil/tiniq
-    // (deyarli rangsiz), asosiy vizual og'irlik esa haqiqiy blur'ga (SmartBlurView —
-    // iOS'da UIVisualEffectView/Liquid Glass, Android'da GPU blur) yuklangan.
-    // Floating tab bar — Liquid Glass (kunduzgi rejimda qora, tungi rejimda oq iconlar):
+    // Retain the old iOS colors/geometry with a solid Android surface.
     const TAB_ACTIVE_COLOR = isDark ? '#FFFFFF' : '#0B0B0C';
     const TAB_INACTIVE_COLOR = isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.45)';
 
-    // Liquid Glass fon ranglari:
-    const capsuleBg = isDark ? 'rgba(16, 16, 16, 0.88)' : 'rgba(255, 255, 255, 0.65)';
+    const capsuleBg = Platform.OS === 'android' ? (isDark ? '#141414' : '#FFFFFF')
+        : (isDark ? 'rgba(16, 16, 16, 0.88)' : 'rgba(255, 255, 255, 0.65)');
     const capsuleBorderColor = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.08)';
     const activePillBg = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
     const blurFallbackColor = isDark ? 'rgba(16, 16, 16, 0.95)' : 'rgba(255, 255, 255, 0.85)';
 
-    // Blur/qirralarning konteynerdagi bilan ANIQ bir xil radiusi — ba'zi RN/expo-blur
-    // versiyalarida native blur qatlami ota-view'ning overflow:hidden'iga to'liq
-    // bo'ysunmasligi mumkin ("qirrali" ko'rinish sababi), shuning uchun radiusni
-    // blur'ning o'ziga ham to'g'ridan-to'g'ri beramiz (ikki qavat himoya).
-    const capsuleRadiusStyle = Platform.OS === 'ios'
-        ? { borderRadius: CAPSULE_RADIUS_IOS, overflow: 'hidden' as const }
-        : {
-            borderTopLeftRadius: CAPSULE_RADIUS_ANDROID,
-            borderTopRightRadius: CAPSULE_RADIUS_ANDROID,
-            borderBottomLeftRadius: 0,
-            borderBottomRightRadius: 0,
-            overflow: 'hidden' as const,
-        };
-
-    // Android'da xavfsiz zona (safe-area) endi alohida to'rtburchak "quyruq" emas,
-    // kapsulaning o'zi bilan bir butun — shu bois qirrali ko'rinish yo'qoladi va
-    // blur pastgacha uzluksiz davom etadi.
-    const androidExtraHeight = Platform.OS === 'android' ? insets.bottom : 0;
+    const capsuleRadiusStyle = { borderRadius: CAPSULE_RADIUS, overflow: 'hidden' as const };
 
     // Scroll-linked resize: shrinks/sinks as the active screen scrolls down,
     // returns to its original size when scrolling back up toward the top.
@@ -269,13 +243,8 @@ export function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigat
         extrapolate: 'clamp',
     });
 
-    const combinedNavbarScale = Platform.OS === 'ios'
-        ? Animated.multiply(shrinkScale, navbarBounceScale)
-        : navbarBounceScale;
-
-    const combinedNavbarTranslateY = Platform.OS === 'ios'
-        ? Animated.add(shrinkTranslateY, navbarBounceY)
-        : navbarBounceY;
+    const combinedNavbarScale = Animated.multiply(shrinkScale, navbarBounceScale);
+    const combinedNavbarTranslateY = Animated.add(shrinkTranslateY, navbarBounceY);
 
     const deduplicateAccountsList = (list: any[]) => {
         if (!list || !Array.isArray(list)) return [];
@@ -367,6 +336,7 @@ export function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigat
             style={nativeOnly ? styles.nativeSwitcherHost : [
                 styles.floatingContainer,
                 {
+                    bottom: Math.max(16, insets.bottom + 2),
                     transform: [
                         { scale: combinedNavbarScale },
                         { translateY: combinedNavbarTranslateY },
@@ -380,20 +350,20 @@ export function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigat
                     styles.floatingCapsuleWrapper,
                     capsuleRadiusStyle,
                     {
-                        height: 60 + androidExtraHeight,
+                        height: 60,
                         backgroundColor: capsuleBg,
                         borderColor: capsuleBorderColor,
                     },
                 ]}
             >
-                {/* Haqiqiy Liquid Glass blur — kunduzgi va qorong'i rejimda to'liq shaffof oyna effekti */}
-                <BlurView
+                {/* iOS keeps backdrop blur; Android keeps a fast solid surface. */}
+                {Platform.OS !== 'android' && <BlurView
                     intensity={isDark ? 65 : BLUR_INTENSITY}
                     tint={isDark ? 'dark' : 'light'}
                     fallbackColor={blurFallbackColor}
                     style={capsuleRadiusStyle}
                     containerStyle={capsuleRadiusStyle}
-                />
+                />}
 
                 {/* Real-time Smooth Highlight Pill — suyuqlikdek oqib o'tadi va heighti eziladi */}
                 <Animated.View
@@ -418,7 +388,8 @@ export function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigat
                         return (
                             <TouchableOpacity
                                 key={tab.key}
-                                accessibilityRole="button"
+                                accessibilityRole="tab"
+                                accessibilityLabel={t(tab.nameKey, tab.defaultName)}
                                 accessibilityState={isFocused ? { selected: true } : {}}
                                 onPress={() => handleTabButtonPress(index)}
                                 onLongPress={tab.key === 'Profil' ? handleProfilLongPress : undefined}
@@ -449,15 +420,6 @@ export function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigat
                                         <Ionicons name={tab.icon as any} size={22} color={tabColor} />
                                     )}
                                 </View>
-                                {/* Matn label FAQAT Android'da — iOS'da faqat icon (foydalanuvchi so'rovi bo'yicha) */}
-                                {Platform.OS !== 'ios' && (
-                                    <Text
-                                        style={[styles.tabLabel, { color: tabColor, fontWeight: isFocused ? '700' : '500' }]}
-                                        numberOfLines={1}
-                                    >
-                                        {t(tab.nameKey, tab.defaultName)}
-                                    </Text>
-                                )}
                             </TouchableOpacity>
                         );
                     })}
@@ -577,7 +539,6 @@ export function CustomFloatingTabBar({ activeIndex, scrollX, onTabPress, navigat
 }
 
 function MainSwipeableTabs({ navigation, route }: any) {
-    const { isSwipeDisabled } = useTabSwipe();
     const { resetNavBarShrink } = useNavBarScroll();
     const scrollX = useRef(new Animated.Value(0)).current;
     const scrollViewRef = useRef<ScrollView>(null);
@@ -655,12 +616,12 @@ function MainSwipeableTabs({ navigation, route }: any) {
 
     return (
         <View style={styles.mainContainer}>
-            {/* Horizontal paging on both platforms; inner sliders can temporarily disable it */}
+            {/* Retain lazy pages, but switch them only through navigation buttons. */}
             <Animated.ScrollView
                 ref={scrollViewRef}
                 horizontal
                 pagingEnabled
-                scrollEnabled={!isSwipeDisabled}
+                scrollEnabled={false}
                 nestedScrollEnabled
                 directionalLockEnabled
                 showsHorizontalScrollIndicator={false}
@@ -721,7 +682,7 @@ const styles = StyleSheet.create({
     },
     floatingContainer: {
         position: 'absolute',
-        bottom: Platform.OS === 'ios' ? 36 : 0,
+        bottom: 16,
         left: 0,
         right: 0,
         alignItems: 'center',
@@ -730,16 +691,9 @@ const styles = StyleSheet.create({
     floatingCapsuleWrapper: {
         width: CAPSULE_WIDTH,
         height: 60,
-        borderRadius: Platform.OS === 'ios' ? CAPSULE_RADIUS_IOS : 0,
-        borderTopLeftRadius: Platform.OS === 'ios' ? CAPSULE_RADIUS_IOS : CAPSULE_RADIUS_ANDROID,
-        borderTopRightRadius: Platform.OS === 'ios' ? CAPSULE_RADIUS_IOS : CAPSULE_RADIUS_ANDROID,
-        borderBottomLeftRadius: Platform.OS === 'ios' ? CAPSULE_RADIUS_IOS : 0,
-        borderBottomRightRadius: Platform.OS === 'ios' ? CAPSULE_RADIUS_IOS : 0,
+        borderRadius: CAPSULE_RADIUS,
         overflow: 'hidden',
-        borderTopWidth: 1,
-        borderLeftWidth: Platform.OS === 'ios' ? 1 : 0,
-        borderRightWidth: Platform.OS === 'ios' ? 1 : 0,
-        borderBottomWidth: Platform.OS === 'ios' ? 1 : 0,
+        borderWidth: 1,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.14,
@@ -762,7 +716,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-around',
         paddingHorizontal: 4,
-        paddingBottom: Platform.OS === 'ios' ? 0 : 2,
+        paddingBottom: 0,
     },
     tabItem: {
         flex: 1,
@@ -776,11 +730,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
-    },
-    tabLabel: {
-        fontSize: 10.5,
-        marginTop: 3,
-        letterSpacing: -0.1,
     },
     modalOverlay: {
         flex: 1,
