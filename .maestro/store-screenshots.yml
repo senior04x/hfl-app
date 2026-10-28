@@ -24,3 +24,5 @@ appId: com.amatora.app
 - tapOn: "Calendar|Календарь|Taqvim"
 - waitForAnimationToEnd
 - takeScreenshot: calendar
+- tapOn: "Home|Главная|Asosiy"
+- waitForAnimationToEnd
