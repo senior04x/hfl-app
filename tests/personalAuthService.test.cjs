@@ -29,6 +29,33 @@ function load({ result = { type: 'success', url: 'hflsoccerapp://auth/telegram?c
  new Function('require','exports','fetch','process',ts.transpileModule(fs.readFileSync('services/personalAuthService.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText)(name=>{assert.ok(name in imports,name);return imports[name];},out,fetch,{env:{EXPO_PUBLIC_GOOGLE_LOGIN_ENABLED:googleEnabled?'true':'false'}});
  return { ...out, values, calls, logout:()=>logout(), state };
 }
+
+function deleting({badIdentity=false,storageFailure=false,switched=false}={}){
+ const h=load();const id='11111111-2222-4333-8444-555555555555';let sessions=0;
+ h.personalAuthClient.auth.getSession=async()=>({data:{session:{access_token:'test-access-token',user:{id:switched&&sessions++>0?'another-account':id}}}});
+ h.personalAuthClient.auth.getUser=async()=>({data:{user:{id:badIdentity?'unverified-id':id}}});
+ const objects=new Set(Array.from({length:205},(_,i)=>id+'/'+i+'.jpg'));const removed=[];
+ h.personalAuthClient.storage={from:bucket=>{assert.equal(bucket,'personal-avatars');return {
+  list:async(prefix,options)=>{assert.equal(prefix,id);assert.equal(options.offset,0);return storageFailure?{error:{message:'private-storage-detail'}}:{data:[...objects].slice(0,100).map(path=>({id:'object',name:path.slice(id.length+1)}))};},
+  remove:async paths=>{removed.push(...paths);paths.forEach(p=>objects.delete(p));return {};},
+ };}};
+ return {...h,objects,removed};
+}
+test('personal deletion cleans every owned avatar page before the existing authenticated DELETE',async()=>{
+ const h=deleting();const response=await h.deletePersonalAccount();assert.equal(response.success,true);assert.equal(h.objects.size,0);assert.equal(h.removed.length,205);
+ assert.deepEqual(h.calls.fetchUrls,['https://backend.invalid/api/auth/personal/account']);
+});
+test('unverified subject never touches Storage or sends account deletion',async()=>{
+ const h=deleting({badIdentity:true});h.personalAuthClient.storage={from:()=>assert.fail('must not touch storage')};
+ await assert.rejects(h.deletePersonalAccount(),e=>e.code==='AUTH_REQUIRED');assert.deepEqual(h.calls.fetchUrls,[]);
+});
+test('Storage cleanup failure never deletes Auth or exposes storage diagnostics',async()=>{
+ const h=deleting({storageFailure:true});await assert.rejects(h.deletePersonalAccount(),e=>e.code==='PROFILE_UNAVAILABLE'&&!e.message.includes('private-storage-detail'));
+ assert.deepEqual(h.calls.fetchUrls,[]);assert.equal(h.objects.size,205);
+});
+test('account switch during cleanup cancels the subsequent Auth deletion',async()=>{
+ const h=deleting({switched:true});await assert.rejects(h.deletePersonalAccount(),e=>e.code==='AUTH_REQUIRED');assert.deepEqual(h.calls.fetchUrls,[]);
+});
 test('successful Telegram callback exchanges code and returns a permanent account without persisting API tokens in profile',async()=>{
  const auth=load();const profile=await auth.loginWithTelegram();
  assert.equal(profile.user.appUserId,'user-id');assert.equal(auth.calls.exchange,1);assert.equal(auth.calls.saved,1);

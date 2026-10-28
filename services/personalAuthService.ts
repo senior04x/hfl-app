@@ -76,8 +76,40 @@ export function personalLoginMessage(code: string, language: string): string {
  return ru ? 'Не удалось войти. Проверьте интернет и попробуйте снова.' : 'Kirish amalga oshmadi. Internetni tekshirib, qayta urinib ko‘ring.';
 }
 export async function deletePersonalAccount() {
+ if (PERSONAL_AUTH_IS_TEST) throw new PersonalLoginError('APPLE_TEST_ONLY');
  const { data, error } = await personalAuthClient.auth.getSession();
  if (error || !data.session) throw new PersonalLoginError('AUTH_REQUIRED');
+ const session = data.session;
+ // Verify the subject with Auth before touching Storage. Storage RLS permits
+ // this JWT to list/delete only its own UUID folder, never a caller-supplied path.
+ const verified = await personalAuthClient.auth.getUser(session.access_token);
+ const id = verified.data.user?.id;
+ if (verified.error || !id || id !== session.user.id
+  || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new PersonalLoginError('AUTH_REQUIRED');
+ const bucket = personalAuthClient.storage.from('personal-avatars');
+ let entries = 0;
+ const empty = async (prefix: string, depth: number): Promise<void> => {
+  if (depth > 8) throw new PersonalLoginError('PROFILE_UNAVAILABLE');
+  for (;;) {
+   const listed = await bucket.list(prefix, { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
+   if (listed.error || !Array.isArray(listed.data)) throw new PersonalLoginError('PROFILE_UNAVAILABLE');
+   if (!listed.data.length) return;
+   const files: string[] = [];
+   for (const item of listed.data) {
+    if (++entries > 10000 || typeof item.name !== 'string' || !item.name
+     || item.name === '.' || item.name === '..' || /[\\/\u0000]/.test(item.name)) throw new PersonalLoginError('PROFILE_UNAVAILABLE');
+    const path = `${prefix}/${item.name}`;
+    if (item.id) files.push(path);
+    else await empty(path, depth + 1);
+   }
+   if (files.length && (await bucket.remove(files)).error) throw new PersonalLoginError('PROFILE_UNAVAILABLE');
+  }
+ };
+ await empty(id, 0);
+ // An account switch during the asynchronous cleanup must not delete an old
+ // identity after the UI has moved to another signed-in account.
+ const current = await personalAuthClient.auth.getSession();
+ if (current.error || current.data.session?.user.id !== id) throw new PersonalLoginError('AUTH_REQUIRED');
  return jsonRequest('personal/account', { method: 'DELETE', headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) });
 }
 async function jsonRequest(path: string, options: RequestInit = {}) {
