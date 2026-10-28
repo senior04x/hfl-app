@@ -162,13 +162,14 @@ test('scroll marker never loads or mounts inside Expo Go or without its native c
         { version: '26.0', expoGo: false, nativeThrows: true, expected: false },
         { version: '18.5', expoGo: false, registered: true, expected: false },
         { version: '26.0', expoGo: false, registered: true, expected: true },
+        { version: '26.0', isPad: true, expoGo: false, registered: true, expected: false },
     ]) {
         let nativeQueries = 0, experimentalImports = 0;
         const imports = {
             react: { __esModule: true, default: React },
             expo: { isRunningInExpoGo: () => environment.expoGo },
             'react-native': {
-                Platform: { Version: environment.version }, StyleSheet: { create: value => value },
+                Platform: { Version: environment.version, isPad: environment.isPad }, StyleSheet: { create: value => value },
                 UIManager: { hasViewManagerConfig: name => {
                     nativeQueries++;
                     assert.equal(name, 'RNSScrollViewMarker');
@@ -184,7 +185,7 @@ test('scroll marker never loads or mounts inside Expo Go or without its native c
         const output = ios.default({ children: child });
         assert.equal(environment.expected ? output.type : output, environment.expected ? 'NativeScrollMarker' : child);
         assert.equal(experimentalImports, environment.expected ? 1 : 0);
-        if (environment.expoGo || environment.version === '18.5') assert.equal(nativeQueries, 0);
+        if (environment.isPad || environment.expoGo || environment.version === '18.5') assert.equal(nativeQueries, 0);
     }
     assert.equal(load('components/NativeTabScroll.tsx').default({ children: child }), child);
 });

@@ -1,11 +1,13 @@
 name: Native iPhone and iPad screenshots
 on:
   push:
-    branches: [release/store-final-20261028, fix/ios-screenshot-driver-20261028]
+    branches: [release/store-final-20261028, fix/ios-screenshot-driver-20261028, fix/ipad-navigation-20261029]
     paths:
       - .github/workflows/store-screenshots.yml
       - scripts/store-screenshots-ios.sh
       - .maestro/store-screenshots.yml
+      - navigation/AppNavigator.ios.tsx
+      - components/NativeTabScroll.ios.tsx
   workflow_dispatch:
 permissions:
   contents: read

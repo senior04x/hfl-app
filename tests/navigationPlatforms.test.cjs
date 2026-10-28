@@ -15,14 +15,15 @@ function load(file, imports) {
 }
 
 test('older iOS uses the legacy panel without initializing native tabs; iOS26+ uses native tabs', () => {
-    for (const [os, version, expectedNative] of [
+    for (const [os, version, expectedNative, isPad = false] of [
         ['ios', '16.4', false], ['ios', '18.7', false], ['ios', '26.0', true],
         ['ios', 26, true], ['ios', '27.1', true], ['ios', 'unknown', false], ['android', 36, false],
+        ['ios', 26, false, true], ['ios', '27.1', false, true], ['ios', '18.7', false, true],
     ]) {
         const legacy = () => {}, native = () => {};
         let nativeLoads = 0;
         const imports = {
-            'react-native': { Platform: { OS: os, Version: version } },
+            'react-native': { Platform: { OS: os, Version: version, isPad } },
             './SwipeableAppNavigator': { __esModule: true, default: legacy },
         };
         Object.defineProperty(imports, './NativeAppNavigator.ios', {

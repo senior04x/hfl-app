@@ -5,7 +5,7 @@ import { isRunningInExpoGo } from 'expo';
 function availableScrollMarker(): typeof import('react-native-screens/experimental').ScrollViewMarker | null {
     // Expo Go's fixed native binary cannot safely mount this experimental view.
     // A matching JS package or iOS version alone does not prove native support.
-    if (isRunningInExpoGo() || Number.parseInt(String(Platform.Version), 10) < 26) return null;
+    if (Platform.isPad || isRunningInExpoGo() || Number.parseInt(String(Platform.Version), 10) < 26) return null;
     try {
         if (!UIManager.hasViewManagerConfig('RNSScrollViewMarker')) return null;
         return require('react-native-screens/experimental').ScrollViewMarker;
